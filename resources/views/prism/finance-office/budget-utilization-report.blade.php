@@ -1,99 +1,490 @@
-@extends('prism.layout')
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Budget Utilization Report | PRISM — Finance Office</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-@section('content')
-    <section class="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.045)] lg:flex-row lg:items-start lg:justify-between [&_h1]:mt-1.5 [&_h1]:text-2xl [&_h1]:font-extrabold [&_h1]:tracking-tight [&_h1]:text-slate-950 lg:[&_h1]:text-[1.8rem]">
-        <div>
-            <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">Finance Office</p>
-            <h1>Budget Utilization Report</h1>
-            <p class="mt-2 max-w-3xl text-base leading-7 text-slate-600">Track campus budget utilization, offices at risk, and office-level spending progress by quarter.</p>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f0e9e9;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ═══════════════════════════════════════
+           SIDEBAR
+        ═══════════════════════════════════════ */
+        .sb {
+            width: 272px;
+            min-height: 100vh;
+            background: #681012;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 50;
+        }
+        .sb-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 22px 18px 20px;
+            text-decoration: none;
+        }
+        .sb-logo {
+            width: 44px; height: 44px;
+            border-radius: 10px;
+            background: #fff;
+            padding: 6px;
+            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sb-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .sb-brand-name { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: .5px; }
+        .sb-divider { height: 1px; background: rgba(255,255,255,.1); margin: 0 18px; }
+        .sb-nav {
+            padding: 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+        }
+        .sb-nav a {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: rgba(255,255,255,.65);
+            text-decoration: none;
+            transition: background .15s, color .15s;
+        }
+        .sb-nav a:hover { background: rgba(255,255,255,.1); color: #fff; }
+        .sb-nav a.active { background: #fff; color: #681012; font-weight: 700; }
+        .sb-nav a svg {
+            width: 18px; height: 18px;
+            flex-shrink: 0;
+            stroke: currentColor; fill: none;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .sb-bottom { padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .sb-workspace { padding: 16px 18px 8px; }
+        .sb-workspace-label {
+            font-size: 9px; font-weight: 700; letter-spacing: .18em;
+            text-transform: uppercase; color: rgba(255,255,255,.38); margin-bottom: 3px;
+        }
+        .sb-workspace-role { font-size: 13px; font-weight: 800; color: #fff; }
+        .sb-logout {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            min-height: 42px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.15);
+            background: rgba(255,255,255,.1);
+            font-size: 13px; font-weight: 700; color: #fff;
+            text-decoration: none; transition: background .2s, color .2s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .sb-logout:hover { background: #fff; color: #681012; }
+        .sb-logout svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ═══════════════════════════════════════
+           MAIN
+        ═══════════════════════════════════════ */
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+        .topbar {
+            position: sticky; top: 0; z-index: 40;
+            background: rgba(255,255,255,.96);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px; height: 66px; gap: 16px; flex-shrink: 0;
+        }
+        .topbar-title { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -.4px; }
+
+        /* ═══════════════════════════════════════
+           CONTENT
+        ═══════════════════════════════════════ */
+        .content {
+            padding: 28px 32px 56px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+
+            --m:     #681012;
+            --m-dk:  #4e0c0e;
+            --gold:  #c9a84c;
+            --white: #ffffff;
+            --s50:   #f8fafc;
+            --s100:  #f1f5f9;
+            --s200:  #e2e8f0;
+            --s300:  #cbd5e1;
+            --s400:  #94a3b8;
+            --s500:  #64748b;
+            --s600:  #475569;
+            --s700:  #334155;
+            --s900:  #0f172a;
+            --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+        }
+
+        /* ─── Card ─── */
+        .card {
+            background: var(--white);
+            border: 1px solid var(--s200);
+            border-radius: 18px;
+            padding: 22px 26px;
+            box-shadow: var(--sh-sm);
+        }
+        .card-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
+        .card-title   { font-size: 17px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; }
+        .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
+        .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+
+        /* ─── Stat cards ─── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            background: var(--white);
+            border: 1px solid var(--s200);
+            border-radius: 18px;
+            padding: 20px 20px 20px 24px;
+            box-shadow: var(--sh-sm);
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .stat-card:hover {
+            border-color: rgba(201,168,76,.5);
+            box-shadow: 0 12px 28px rgba(15,23,42,.07);
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 20px;
+            width: 4px; height: 40px;
+            border-radius: 0 4px 4px 0;
+            background: var(--gold);
+        }
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            right: 16px; top: 16px;
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            border: 1px solid rgba(104,16,18,.1);
+            background: rgba(104,16,18,.05);
+        }
+        .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
+        .stat-value { font-size: 1.55rem; font-weight: 800; color: var(--m); margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
+        .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
+
+        /* ─── Filters ─── */
+        .filters-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
+        .field-select {
+            height: 44px; width: 100%; border-radius: 10px;
+            border: 1px solid var(--s300); background: var(--white);
+            padding: 0 14px; font-size: 13.5px; font-weight: 500;
+            color: var(--s900); font-family: 'Poppins', sans-serif; outline: none;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .field-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+
+        /* ─── Table ─── */
+        .table-wrap {
+            border-radius: 12px; border: 1px solid var(--s200);
+            overflow: auto; max-height: 64vh;
+            background: var(--white);
+            box-shadow: inset 0 1px 4px rgba(15,23,42,.04);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
+        thead th {
+            position: sticky; top: 0; z-index: 5;
+            background: var(--s50); border-bottom: 1px solid var(--s200);
+            padding: 11px 16px;
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .08em; color: var(--s500); white-space: nowrap;
+        }
+        tbody td { padding: 14px 16px; border-bottom: 1px solid var(--s100); vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr { transition: background .12s; }
+        tbody tr:hover { background: rgba(104,16,18,.03); }
+
+        /* ─── Cell helpers ─── */
+        .amount-val { font-size: 13px; font-weight: 700; color: var(--s900); }
+
+        /* ─── Progress bar ─── */
+        .progress-wrap { min-width: 140px; }
+        .progress-pct  { font-size: 13px; font-weight: 700; color: var(--s900); margin-bottom: 6px; }
+        .progress-bar  {
+            height: 8px; border-radius: 99px;
+            background: var(--s100);
+            border: 1px solid var(--s200);
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; border-radius: 99px;
+            background: var(--m);
+            transition: width .4s ease;
+        }
+        .progress-fill.low    { background: #e24b4a; }
+        .progress-fill.medium { background: #ef9f27; }
+        .progress-fill.high   { background: #639922; }
+
+        /* ─── Risk badge ─── */
+        .risk-badge {
+            display: inline-flex; align-items: center;
+            height: 26px; padding: 0 10px; border-radius: 20px;
+            font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        .risk-badge.at-risk    { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+        .risk-badge.on-track   { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+        .risk-badge.moderate   { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+
+        /* ─── Count chip ─── */
+        .count-chip {
+            display: inline-flex; align-items: center;
+            height: 28px; padding: 0 12px; border-radius: 20px;
+            font-size: 11px; font-weight: 700;
+            background: var(--s100); color: var(--s700);
+            border: 1px solid var(--s200);
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 1200px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 1024px) {
+            .sb { display: none; }
+            body { display: block; }
+            .content { padding: 16px 16px 40px; }
+            .topbar { padding: 0 16px; }
+        }
+        @media (max-width: 640px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .filters-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+{{-- ═══════════════ SIDEBAR ═══════════════ --}}
+<aside class="sb">
+    <a class="sb-brand" href="{{ route('finance-office.dashboard') }}">
+        <div class="sb-logo">
+            <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU seal"
+                 onerror="this.parentElement.innerHTML='🎓'">
         </div>
-    </section>
+        <span class="sb-brand-name">PRISM</span>
+    </a>
 
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Budget utilization totals">
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Total campus budget</span>
-            <strong>PHP {{ number_format($summary['campusBudget']) }}</strong>
-            <small>Approved allocation for monitored offices</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Total utilized</span>
-            <strong>PHP {{ number_format($summary['totalUtilized']) }}</strong>
-            <small>Posted utilization across procurement activity</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Overall utilization</span>
-            <strong>{{ $summary['utilizationPercent'] }}%</strong>
-            <small>Campus-wide budget utilization percentage</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Offices at risk</span>
-            <strong>{{ $summary['officesAtRisk'] }}</strong>
-            <small>Low utilization or delayed procurement movement</small>
-        </article>
-    </section>
+    <div class="sb-divider"></div>
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] grid gap-4 sm:grid-cols-2 [&_label]:block [&_label>span]:mb-1.5 [&_label>span]:block [&_label>span]:text-sm [&_label>span]:font-bold [&_label>span]:text-slate-700 [&_input]:h-11 [&_input]:w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-slate-300 [&_input]:bg-white [&_input]:px-4 [&_input]:text-base [&_input]:text-slate-800 [&_select]:h-11 [&_select]:w-full [&_select]:rounded-xl [&_select]:border [&_select]:border-slate-300 [&_select]:bg-white [&_select]:px-4 [&_select]:text-base [&_select]:text-slate-800 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-slate-300 [&_textarea]:bg-white [&_textarea]:px-4 [&_textarea]:py-3 [&_textarea]:text-base [&_textarea]:text-slate-800 [&_input:focus]:border-bsu-maroon [&_input:focus]:outline-none [&_input:focus]:ring-2 [&_input:focus]:ring-bsu-gold/40 [&_select:focus]:border-bsu-maroon [&_select:focus]:outline-none [&_select:focus]:ring-2 [&_select:focus]:ring-bsu-gold/40 [&_textarea:focus]:border-bsu-maroon [&_textarea:focus]:outline-none [&_textarea:focus]:ring-2 [&_textarea:focus]:ring-bsu-gold/40" aria-label="Budget utilization filters">
-        <label>
-            <span>Quarter</span>
-            <select id="utilQuarterFilter">
-                <option value="all">All quarters</option>
-                @foreach ($quarters as $quarter)
-                    <option value="{{ $quarter }}">{{ $quarter }}</option>
-                @endforeach
-            </select>
-        </label>
-        <label>
-            <span>Office</span>
-            <select id="utilOfficeFilter">
-                <option value="all">All offices</option>
-                @foreach ($offices as $office)
-                    <option value="{{ $office }}">{{ $office }}</option>
-                @endforeach
-            </select>
-        </label>
-    </section>
+    <nav class="sb-nav">
+        <a href="{{ route('finance-office.dashboard') }}">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Dashboard
+        </a>
+        <a href="{{ route('finance-office.proposal-review') }}">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Proposal Review
+        </a>
+        <a href="{{ route('finance-office.annual-procurement-plan') }}">
+            <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+            Annual Procurement Plan
+        </a>
+        <a href="{{ route('finance-office.budget-utilization-report') }}" class="active">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Budget Utilization Report
+        </a>
+    </nav>
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950">
-            <div>
-                <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">Utilization per office</p>
-                <h2>Office Spending Progress</h2>
+    <div class="sb-bottom">
+        <div class="sb-workspace">
+            <p class="sb-workspace-label">Workspace</p>
+            <p class="sb-workspace-role">Finance Office</p>
+        </div>
+        <a href="{{ route('login') }}" class="sb-logout">
+            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Logout
+        </a>
+    </div>
+</aside>
+
+{{-- ═══════════════ MAIN ═══════════════ --}}
+<div class="main">
+
+    <header class="topbar">
+        <span class="topbar-title">Budget Utilization Report</span>
+    </header>
+
+    <div class="content">
+
+        {{-- Page header --}}
+        <div class="card">
+            <p class="card-eyebrow">Finance Office</p>
+            <h1 class="card-title">Budget Utilization Report</h1>
+            <p class="card-sub">Track campus budget utilization, offices at risk, and office-level spending progress by quarter.</p>
+        </div>
+
+        {{-- Summary stat cards --}}
+        <div class="stats-grid">
+            <div class="stat-card">
+                <p class="stat-label">Total campus budget</p>
+                <strong class="stat-value">PHP {{ number_format($summary['campusBudget']) }}</strong>
+                <p class="stat-desc">Approved allocation for monitored offices</p>
             </div>
-            <span class="inline-flex min-h-7 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200" id="utilVisibleCount">{{ count($utilizationRows) }} shown</span>
+            <div class="stat-card">
+                <p class="stat-label">Total utilized</p>
+                <strong class="stat-value">PHP {{ number_format($summary['totalUtilized']) }}</strong>
+                <p class="stat-desc">Posted utilization across procurement activity</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Overall utilization</p>
+                <strong class="stat-value">{{ $summary['utilizationPercent'] }}%</strong>
+                <p class="stat-desc">Campus-wide budget utilization percentage</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Offices at risk</p>
+                <strong class="stat-value">{{ $summary['officesAtRisk'] }}</strong>
+                <p class="stat-desc">Low utilization or delayed procurement movement</p>
+            </div>
         </div>
-        <div class="max-h-[64vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-inner shadow-slate-100">
-            <table class="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:bg-slate-50 [&_th]:px-4 [&_th]:py-3 [&_th]:text-xs [&_th]:font-extrabold [&_th]:uppercase [&_th]:tracking-[0.08em] [&_th]:text-slate-500 [&_td]:border-b [&_td]:border-slate-100 [&_td]:px-4 [&_td]:py-3.5 [&_td]:align-top [&_tbody_tr]:transition [&_tbody_tr:hover]:bg-bsu-maroon/5">
-                <thead>
-                    <tr>
-                        <th>Office</th>
-                        <th>Quarter</th>
-                        <th>Budget</th>
-                        <th>Utilized</th>
-                        <th>Utilization</th>
-                        <th>Risk</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($utilizationRows as $row)
-                        <tr data-util-row data-office="{{ $row['office'] }}" data-quarter="{{ $row['quarter'] }}">
-                            <td>{{ $row['office'] }}</td>
-                            <td>{{ $row['quarter'] }}</td>
-                            <td>PHP {{ number_format($row['budget']) }}</td>
-                            <td>PHP {{ number_format($row['utilized']) }}</td>
-                            <td>
-                                <div class="min-w-36 space-y-2 [&>span]:text-sm [&>span]:font-bold [&>span]:text-slate-700">
-                                    <span>{{ $row['percent'] }}%</span>
-                                    <div class="h-3 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200 [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-bsu-maroon">
-                                        <span style="width: {{ $row['percent'] }}%"></span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><x-prism.status-badge :status="$row['risk']" /></td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </section>
-@endsection
 
+        {{-- Filters --}}
+        <div class="card">
+            <div class="filters-grid">
+                <div>
+                    <label class="field-label" for="utilQuarterFilter">Quarter</label>
+                    <select class="field-select" id="utilQuarterFilter">
+                        <option value="all">All quarters</option>
+                        @foreach ($quarters as $quarter)
+                            <option value="{{ $quarter }}">{{ $quarter }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label" for="utilOfficeFilter">Office</label>
+                    <select class="field-select" id="utilOfficeFilter">
+                        <option value="all">All offices</option>
+                        @foreach ($offices as $office)
+                            <option value="{{ $office }}">{{ $office }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        {{-- Office Spending Progress table --}}
+        <div class="card">
+            <div class="card-head">
+                <div>
+                    <p class="card-eyebrow">Utilization per office</p>
+                    <h2 class="card-title">Office Spending Progress</h2>
+                </div>
+                <span class="count-chip" id="utilVisibleCount">{{ count($utilizationRows) }} shown</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Office</th>
+                            <th>Quarter</th>
+                            <th>Budget</th>
+                            <th>Utilized</th>
+                            <th>Utilization</th>
+                            <th>Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($utilizationRows as $row)
+                            @php
+                                $pct = $row['percent'];
+                                $fillClass = $pct >= 70 ? 'high' : ($pct >= 40 ? 'medium' : 'low');
+                                $riskSlug = strtolower(str_replace(' ', '-', $row['risk']));
+                            @endphp
+                            <tr data-util-row
+                                data-office="{{ $row['office'] }}"
+                                data-quarter="{{ $row['quarter'] }}">
+                                <td style="font-size:13px;font-weight:600;color:var(--s600);">
+                                    {{ $row['office'] }}
+                                </td>
+                                <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">
+                                    {{ $row['quarter'] }}
+                                </td>
+                                <td>
+                                    <p class="amount-val">PHP {{ number_format($row['budget']) }}</p>
+                                </td>
+                                <td>
+                                    <p class="amount-val">PHP {{ number_format($row['utilized']) }}</p>
+                                </td>
+                                <td>
+                                    <div class="progress-wrap">
+                                        <p class="progress-pct">{{ $pct }}%</p>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill {{ $fillClass }}" style="width: {{ $pct }}%;"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="risk-badge {{ $riskSlug }}">{{ $row['risk'] }}</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    (function () {
+        const quarterEl = document.getElementById('utilQuarterFilter');
+        const officeEl  = document.getElementById('utilOfficeFilter');
+        const countEl   = document.getElementById('utilVisibleCount');
+        const rows      = document.querySelectorAll('[data-util-row]');
+
+        function applyFilters() {
+            const quarter = quarterEl.value;
+            const office  = officeEl.value;
+            let visible   = 0;
+
+            rows.forEach(row => {
+                const match =
+                    (quarter === 'all' || row.dataset.quarter === quarter) &&
+                    (office  === 'all' || row.dataset.office  === office);
+
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+
+            countEl.textContent = visible + ' shown';
+        }
+
+        quarterEl.addEventListener('change', applyFilters);
+        officeEl.addEventListener('change',  applyFilters);
+    })();
+</script>
+
+</body>
+</html>

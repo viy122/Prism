@@ -1,125 +1,628 @@
-@extends('prism.layout')
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard | PRISM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-@php
-    $quarterTotal = $summary['purchasedThisQuarter'] + $summary['unpurchasedThisQuarter'];
-    $purchasedPercent = $quarterTotal > 0 ? round(($summary['purchasedThisQuarter'] / $quarterTotal) * 100) : 0;
-@endphp
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f0e9e9;
+            min-height: 100vh;
+            display: flex;
+        }
 
-@section('content')
-    <section class="mb-5 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.045)] lg:flex-row lg:items-start lg:justify-between [&_h1]:mt-1.5 [&_h1]:text-2xl [&_h1]:font-extrabold [&_h1]:tracking-tight [&_h1]:text-slate-950 lg:[&_h1]:text-[1.8rem]">
-        <div>
-            <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">Office Head / Dean</p>
-            <h1>Dashboard</h1>
-            <p class="mt-2 max-w-3xl text-base leading-7 text-slate-600">Track proposed budgets, approvals, procurement movement, and PR readiness for your office.</p>
-        </div>
-        <div class="flex flex-wrap gap-2.5 lg:min-w-max lg:justify-end">
-            <a class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-bsu-maroon px-4 text-sm font-bold text-white shadow-sm shadow-bsu-maroon/15 transition hover:bg-bsu-maroon-900 focus:outline-none focus:ring-2 focus:ring-bsu-gold/70" href="{{ route('office-head.budget-proposal') }}">
-                <i data-lucide="file-plus-2" aria-hidden="true"></i>
-                New Budget Proposal
+        /* ═══════════════════════════════════════
+           SIDEBAR — identical across all pages
+        ═══════════════════════════════════════ */
+        .sb {
+            width: 272px;
+            min-height: 100vh;
+            background: #681012;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 50;
+        }
+        .sb-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 22px 18px 20px;
+            text-decoration: none;
+        }
+        .sb-logo {
+            width: 44px; height: 44px;
+            border-radius: 10px;
+            background: #fff;
+            padding: 6px;
+            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sb-logo img { width: 100%; height: 100%; object-fit: contain; }
+        .sb-brand-name { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: .5px; }
+        .sb-divider { height: 1px; background: rgba(255,255,255,.1); margin: 0 18px; }
+        .sb-nav {
+            padding: 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+        }
+        .sb-nav a {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: rgba(255,255,255,.65);
+            text-decoration: none;
+            transition: background .15s, color .15s;
+        }
+        .sb-nav a:hover { background: rgba(255,255,255,.1); color: #fff; }
+        .sb-nav a.active { background: #fff; color: #681012; font-weight: 700; }
+        .sb-nav a svg {
+            width: 18px; height: 18px;
+            flex-shrink: 0;
+            stroke: currentColor; fill: none;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .sb-bottom { padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .sb-workspace { padding: 16px 18px 8px; }
+        .sb-workspace-label {
+            font-size: 9px; font-weight: 700; letter-spacing: .18em;
+            text-transform: uppercase; color: rgba(255,255,255,.38); margin-bottom: 3px;
+        }
+        .sb-workspace-role { font-size: 13px; font-weight: 800; color: #fff; }
+        .sb-logout {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            min-height: 42px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.15);
+            background: rgba(255,255,255,.1);
+            font-size: 13px; font-weight: 700; color: #fff;
+            text-decoration: none; transition: background .2s, color .2s;
+            font-family: 'Poppins', sans-serif;
+        }
+        .sb-logout:hover { background: #fff; color: #681012; }
+        .sb-logout svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ═══════════════════════════════════════
+           MAIN AREA
+        ═══════════════════════════════════════ */
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+        .topbar {
+            position: sticky; top: 0; z-index: 40;
+            background: rgba(255,255,255,.96);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 32px; height: 66px; gap: 16px; flex-shrink: 0;
+        }
+        .topbar-title { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -.4px; }
+        .topbar-chip {
+            display: inline-flex; align-items: center;
+            height: 34px; padding: 0 16px; border-radius: 8px;
+            background: rgba(104,16,18,.07); border: 1px solid rgba(104,16,18,.14);
+            font-size: 12px; font-weight: 700; color: #681012; white-space: nowrap;
+        }
+
+        /* ═══════════════════════════════════════
+           DASHBOARD CONTENT
+        ═══════════════════════════════════════ */
+        .dash {
+            padding: 28px 32px 56px;
+            flex: 1;
+
+            --m:      #681012;
+            --m-dark: #4e0c0e;
+            --white:  #ffffff;
+            --s50:    #f8fafc;
+            --s100:   #f1f5f9;
+            --s200:   #e2e8f0;
+            --s400:   #94a3b8;
+            --s500:   #64748b;
+            --s600:   #475569;
+            --s700:   #334155;
+            --s900:   #0f172a;
+            --sh-sm:  0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+            --sh-md:  0 4px 16px rgba(15,23,42,.08), 0 1px 4px rgba(15,23,42,.04);
+            --sh-lg:  0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05);
+        }
+
+        /* Page header card */
+        .pd-header {
+            background: var(--white); border: 1px solid var(--s200);
+            border-radius: 18px; padding: 22px 26px; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 16px; flex-wrap: wrap; box-shadow: var(--sh-sm);
+        }
+        .pd-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
+        .pd-header h1 { font-size: 26px; font-weight: 800; color: var(--s900); letter-spacing: -.5px; margin-bottom: 5px; line-height: 1.15; }
+        .pd-header-sub { font-size: 13px; color: var(--s600); line-height: 1.65; max-width: 500px; }
+        .pd-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .pd-btn-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--m); color: #fff;
+            padding: 10px 18px; border-radius: 10px;
+            font-size: 13px; font-weight: 700;
+            text-decoration: none; border: none; cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 2px 10px rgba(104,16,18,.22);
+            transition: background .2s, transform .15s;
+        }
+        .pd-btn-primary:hover { background: var(--m-dark); transform: translateY(-1px); }
+        .pd-btn-primary svg { width: 15px; height: 15px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .pd-btn-outline {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--white); color: var(--m);
+            border: 1.5px solid rgba(104,16,18,.35);
+            padding: 10px 18px; border-radius: 10px;
+            font-size: 13px; font-weight: 700;
+            text-decoration: none; cursor: pointer;
+            font-family: 'Poppins', sans-serif;
+            transition: border-color .2s, background .2s, transform .15s;
+        }
+        .pd-btn-outline:hover { border-color: var(--m); background: rgba(104,16,18,.04); transform: translateY(-1px); }
+        .pd-btn-outline svg { width: 15px; height: 15px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Stat cards */
+        .pd-stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; margin-bottom: 20px; }
+        .pd-stat {
+            background: var(--white); border: 1px solid var(--s200);
+            border-radius: 15px; padding: 18px 20px 16px;
+            position: relative; overflow: hidden; box-shadow: var(--sh-sm);
+            transition: box-shadow .25s, border-color .25s, transform .2s;
+        }
+        .pd-stat:hover { box-shadow: var(--sh-lg); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+        .pd-stat::before {
+            content: ""; position: absolute; left: 0; top: 16px;
+            width: 4px; height: 38px; background: var(--m); border-radius: 0 4px 4px 0;
+        }
+        .pd-stat-icon {
+            position: absolute; right: 16px; top: 16px;
+            width: 38px; height: 38px; border-radius: 11px;
+            background: rgba(104,16,18,.07);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pd-stat-icon svg { width: 19px; height: 19px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-stat-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 9px; }
+        .pd-stat-value { font-size: 28px; font-weight: 800; color: var(--m); letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
+        .pd-stat-value.sm { font-size: 18px; letter-spacing: -.3px; }
+        .pd-stat-hint { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
+
+        /* Section card */
+        .pd-card { background: var(--white); border: 1px solid var(--s200); border-radius: 15px; padding: 20px 22px; box-shadow: var(--sh-sm); }
+        .pd-card-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--m); margin-bottom: 3px; }
+        .pd-card-title { font-size: 15px; font-weight: 800; color: var(--s900); margin: 0 0 16px; letter-spacing: -.2px; }
+        .pd-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+        .pd-card-head .pd-card-title { margin-bottom: 0; }
+
+        /* Badges */
+        .pd-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 99px; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
+        .pd-badge-approved  { background: #dcfce7; color: #166534; }
+        .pd-badge-pending   { background: #fef3c7; color: #92400e; }
+        .pd-badge-returned  { background: #fee2e2; color: #991b1b; }
+        .pd-badge-submitted { background: #dbeafe; color: #1e40af; }
+        .pd-badge-info      { background: #e0f2fe; color: #0369a1; }
+        .pd-badge-progress  { background: #ede9fe; color: #4c1d95; }
+        .pd-badge-finance   { background: #f0fdf4; color: #166534; }
+
+        /* Main 2-col */
+        .pd-main-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; margin-bottom: 15px; }
+
+        /* Progress */
+        .pd-prog-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
+        .pd-prog-box { background: var(--s50); border: 1px solid var(--s200); border-radius: 11px; padding: 13px 15px; }
+        .pd-prog-box strong { display: block; font-size: 26px; font-weight: 800; color: var(--m); letter-spacing: -.5px; line-height: 1; }
+        .pd-prog-box span   { display: block; font-size: 12px; font-weight: 600; color: var(--s400); margin-top: 3px; }
+        .pd-prog-bar-wrap   { height: 9px; background: var(--s100); border-radius: 99px; overflow: hidden; margin-bottom: 11px; }
+        .pd-prog-bar        { height: 100%; background: var(--m); border-radius: 99px; }
+        .pd-prog-note       { background: rgba(104,16,18,.05); border-radius: 9px; padding: 9px 13px; font-size: 12px; color: var(--s600); line-height: 1.6; margin-bottom: 14px; }
+
+        /* Updates */
+        .pd-updates { display: flex; flex-direction: column; gap: 7px; }
+        .pd-update {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            gap: 12px; background: var(--s50); border: 1px solid var(--s200);
+            border-radius: 11px; padding: 12px 14px;
+            transition: border-color .2s, background .2s, box-shadow .2s;
+        }
+        .pd-update:hover { border-color: rgba(104,16,18,.18); background: var(--white); box-shadow: var(--sh-sm); }
+        .pd-update-title  { font-size: 13px; font-weight: 700; color: var(--s900); margin-bottom: 2px; }
+        .pd-update-detail { font-size: 12px; color: var(--s600); line-height: 1.55; }
+        .pd-update-meta   { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+        .pd-update-time   { font-size: 11px; color: var(--s400); white-space: nowrap; }
+
+        /* Bottom 3-col */
+        .pd-bottom-grid { display: grid; grid-template-columns: 1.1fr 1fr 0.85fr; gap: 15px; }
+
+        /* PR links */
+        .pd-pr-links { display: flex; flex-direction: column; gap: 9px; }
+        .pd-pr-link {
+            display: block; background: var(--s50); border: 1px solid var(--s200);
+            border-radius: 11px; padding: 13px 15px; text-decoration: none;
+            transition: border-color .2s, background .2s, box-shadow .2s, transform .15s;
+        }
+        .pd-pr-link:hover { border-color: rgba(104,16,18,.22); background: var(--white); box-shadow: var(--sh-md); transform: translateY(-1px); }
+        .pd-pr-link-title { font-size: 13px; font-weight: 700; color: var(--s900); margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
+        .pd-pr-link-title svg { width: 14px; height: 14px; stroke: var(--m); fill: none; flex-shrink: 0; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-pr-link-sub { font-size: 12px; color: var(--s600); line-height: 1.55; }
+
+        /* Legend */
+        .pd-legend { display: flex; flex-wrap: wrap; gap: 13px; margin-bottom: 10px; font-size: 12px; color: var(--s600); }
+        .pd-legend-item { display: flex; align-items: center; gap: 6px; }
+        .pd-legend-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+        /* Chart */
+        .pd-chart-wrap { position: relative; width: 100%; }
+
+        /* Mobile */
+        @media (max-width: 1024px) {
+            .sb { display: none; }
+            body { display: block; }
+            .main { display: block; }
+            .dash { padding: 16px 16px 40px; }
+            .pd-stat-grid { grid-template-columns: repeat(2,1fr); }
+            .pd-main-grid { grid-template-columns: 1fr; }
+            .pd-bottom-grid { grid-template-columns: 1fr 1fr; }
+            .topbar { padding: 0 16px; }
+        }
+        @media (max-width: 600px) {
+            .pd-stat-grid { grid-template-columns: 1fr; }
+            .pd-bottom-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    {{-- ═══════════════ SIDEBAR ═══════════════ --}}
+    <aside class="sb">
+        <a class="sb-brand" href="{{ route('office-head.dashboard') }}">
+            <div class="sb-logo">
+                <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU seal"
+                     onerror="this.parentElement.innerHTML='🎓'">
+            </div>
+            <span class="sb-brand-name">PRISM</span>
+        </a>
+
+        <div class="sb-divider"></div>
+
+        <nav class="sb-nav">
+            <a href="{{ route('office-head.dashboard') }}" class="active">
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                Dashboard
             </a>
-            <a class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-bsu-maroon/35 bg-white px-4 text-sm font-bold text-bsu-maroon shadow-sm transition hover:border-bsu-maroon hover:bg-bsu-maroon/5 focus:outline-none focus:ring-2 focus:ring-bsu-gold/70" href="{{ route('office-head.purchase-requests') }}">
-                <i data-lucide="upload" aria-hidden="true"></i>
-                Upload PR
+            <a href="{{ route('office-head.market-scoping') ?? '#' }}">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                Market Scoping
+            </a>
+            <a href="{{ route('office-head.budget-proposal') }}">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Budget Proposal
+            </a>
+            <a href="{{ route('office-head.my-proposals') }}">
+                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                My Proposals
+            </a>
+            <a href="{{ route('office-head.purchase-requests') }}">
+                <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+                Purchase Requests
+            </a>
+        </nav>
+
+        <div class="sb-bottom">
+            <div class="sb-workspace">
+                <p class="sb-workspace-label">Workspace</p>
+                <p class="sb-workspace-role">Office Head / Dean</p>
+            </div>
+            <a href="{{ route('login') }}" class="sb-logout">
+                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Logout
             </a>
         </div>
-    </section>
+    </aside>
 
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Dashboard totals">
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Total proposed items</span>
-            <strong>{{ number_format($summary['totalProposedItems']) }}</strong>
-            <small>Across active fiscal year proposals</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Total proposed budget</span>
-            <strong>PHP {{ number_format($summary['totalProposedBudget']) }}</strong>
-            <small>Submitted and draft items combined</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Items approved</span>
-            <strong>{{ number_format($summary['approvedItems']) }}</strong>
-            <small>Eligible for PR preparation</small>
-        </article>
-        <article class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:border-bsu-gold/50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.07)] before:absolute before:left-0 before:top-5 before:h-10 before:w-1 before:rounded-r-full before:bg-bsu-gold after:absolute after:right-4 after:top-4 after:h-9 after:w-9 after:rounded-xl after:border after:border-bsu-maroon/10 after:bg-bsu-maroon/5 [&>span]:relative [&>span]:text-xs [&>span]:font-extrabold [&>span]:uppercase [&>span]:tracking-[0.07em] [&>span]:text-slate-500 [&>strong]:relative [&>strong]:mt-3 [&>strong]:block [&>strong]:text-[1.55rem] 2xl:[&>strong]:text-[1.8rem] [&>strong]:font-extrabold [&>strong]:tracking-tight [&>strong]:text-bsu-maroon [&>small]:relative [&>small]:mt-2 [&>small]:block [&>small]:text-sm [&>small]:leading-6 [&>small]:text-slate-500">
-            <span>Pending approval</span>
-            <strong>{{ number_format($summary['pendingItems']) }}</strong>
-            <small>Under Finance or Chancellor review</small>
-        </article>
-    </section>
+    {{-- ═══════════════ MAIN ═══════════════ --}}
+    <div class="main">
 
-    <section class="mt-5 grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(320px,0.75fr)]">
-        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950">
-                <div>
-                    <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">This quarter</p>
-                    <h2>Own Office Procurement Progress</h2>
-                </div>
-                <span class="inline-flex min-h-7 items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-200">{{ $purchasedPercent }}% purchased</span>
-            </div>
-            <div class="grid grid-cols-2 gap-4 [&>div]:rounded-2xl [&>div]:border [&>div]:border-slate-200/80 [&>div]:bg-slate-50 [&>div]:p-4 [&_strong]:block [&_strong]:text-[1.65rem] 2xl:[&_strong]:text-3xl [&_strong]:font-extrabold [&_strong]:tracking-tight [&_strong]:text-bsu-maroon [&_span]:text-sm [&_span]:font-bold [&_span]:text-slate-500">
-                <div>
-                    <strong>{{ $summary['purchasedThisQuarter'] }}</strong>
-                    <span>Purchased</span>
-                </div>
-                <div>
-                    <strong>{{ $summary['unpurchasedThisQuarter'] }}</strong>
-                    <span>Unpurchased</span>
-                </div>
-            </div>
-            <div class="h-3 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200 [&>span]:block [&>span]:h-full [&>span]:rounded-full [&>span]:bg-bsu-maroon" aria-label="Purchased versus unpurchased">
-                <span style="width: {{ $purchasedPercent }}%"></span>
-            </div>
-            <p class="mt-4 rounded-2xl bg-bsu-maroon/5 px-4 py-3 text-sm leading-6 text-slate-600">
-                {{ $summary['unpurchasedThisQuarter'] }} item{{ $summary['unpurchasedThisQuarter'] === 1 ? '' : 's' }} still need procurement movement this quarter.
-            </p>
-        </article>
+        <header class="topbar">
+            <span class="topbar-title">Dashboard</span>
+            <span class="topbar-chip">Office Head / Dean</span>
+        </header>
 
-        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950">
+        <div class="dash">
+
+            @php
+                $quarterTotal = $summary['purchasedThisQuarter'] + $summary['unpurchasedThisQuarter'];
+                $purchasedPercent = $quarterTotal > 0 ? round(($summary['purchasedThisQuarter'] / $quarterTotal) * 100) : 0;
+            @endphp
+
+            {{-- Page header card --}}
+            <div class="pd-header">
                 <div>
-                    <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">Activity</p>
-                    <h2>Recent Status Updates</h2>
+                    <p class="pd-eyebrow">Office Head / Dean</p>
+                    <h1>Dashboard</h1>
+                    <p class="pd-header-sub">Track proposed budgets, approvals, procurement movement, and PR readiness for your office.</p>
+                </div>
+                <div class="pd-header-actions">
+                    <a href="{{ route('office-head.budget-proposal') }}" class="pd-btn-primary">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                        New Budget Proposal
+                    </a>
+                    <a href="{{ route('office-head.purchase-requests') }}" class="pd-btn-outline">
+                        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+                        Upload PR
+                    </a>
                 </div>
             </div>
-            <div class="grid gap-2">
-                @foreach ($recentUpdates as $update)
-                    <div class="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition hover:border-bsu-gold/40 hover:bg-white hover:shadow-sm sm:flex-row sm:items-start sm:justify-between [&_strong]:block [&_strong]:text-sm [&_strong]:font-bold [&_strong]:text-slate-950 [&_span]:mt-1 [&_span]:block [&_span]:text-sm [&_span]:leading-6 [&_span]:text-slate-600">
+
+            {{-- Stat cards --}}
+            <div class="pd-stat-grid">
+                <article class="pd-stat">
+                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+                    <div class="pd-stat-label">Total Proposed Items</div>
+                    <div class="pd-stat-value">{{ number_format($summary['totalProposedItems']) }}</div>
+                    <div class="pd-stat-hint">Across active fiscal year proposals</div>
+                </article>
+                <article class="pd-stat">
+                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+                    <div class="pd-stat-label">Total Proposed Budget</div>
+                    <div class="pd-stat-value sm">PHP {{ number_format($summary['totalProposedBudget']) }}</div>
+                    <div class="pd-stat-hint">Submitted and draft items combined</div>
+                </article>
+                <article class="pd-stat">
+                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                    <div class="pd-stat-label">Items Approved</div>
+                    <div class="pd-stat-value">{{ number_format($summary['approvedItems']) }}</div>
+                    <div class="pd-stat-hint">Eligible for PR preparation</div>
+                </article>
+                <article class="pd-stat">
+                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                    <div class="pd-stat-label">Pending Approval</div>
+                    <div class="pd-stat-value">{{ number_format($summary['pendingItems']) }}</div>
+                    <div class="pd-stat-hint">Under Finance or Chancellor review</div>
+                </article>
+            </div>
+
+            {{-- Main 2-col --}}
+            <div class="pd-main-grid">
+
+                {{-- Procurement progress --}}
+                <article class="pd-card">
+                    <div class="pd-card-head">
                         <div>
-                            <strong>{{ $update['title'] }}</strong>
-                            <span>{{ $update['details'] }}</span>
+                            <p class="pd-card-eyebrow">This Quarter</p>
+                            <h2 class="pd-card-title">Procurement Progress</h2>
                         </div>
-                        <div class="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
-                            <x-prism.status-badge :status="$update['status']" />
-                            <small>{{ $update['time'] }}</small>
+                        <span class="pd-badge pd-badge-info">{{ $purchasedPercent }}% purchased</span>
+                    </div>
+                    <div class="pd-prog-nums">
+                        <div class="pd-prog-box">
+                            <strong>{{ $summary['purchasedThisQuarter'] }}</strong>
+                            <span>Purchased</span>
+                        </div>
+                        <div class="pd-prog-box">
+                            <strong>{{ $summary['unpurchasedThisQuarter'] }}</strong>
+                            <span>Unpurchased</span>
                         </div>
                     </div>
-                @endforeach
-            </div>
-        </article>
+                    <div class="pd-prog-bar-wrap" role="progressbar" aria-valuenow="{{ $purchasedPercent }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="pd-prog-bar" style="width:{{ $purchasedPercent }}%"></div>
+                    </div>
+                    <p class="pd-prog-note">{{ $summary['unpurchasedThisQuarter'] }} item{{ $summary['unpurchasedThisQuarter'] === 1 ? '' : 's' }} still need procurement movement this quarter.</p>
+                    <div class="pd-legend">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Purchased</span>
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#e2e8f0"></span>Unpurchased</span>
+                    </div>
+                    <div class="pd-chart-wrap" style="height:160px;">
+                        <canvas id="donutChart" role="img"
+                            aria-label="Donut: {{ $summary['purchasedThisQuarter'] }} purchased vs {{ $summary['unpurchasedThisQuarter'] }} unpurchased"
+                            data-purchased="{{ $summary['purchasedThisQuarter'] }}"
+                            data-unpurchased="{{ $summary['unpurchasedThisQuarter'] }}">
+                        </canvas>
+                    </div>
+                </article>
 
-        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(15,23,42,0.05)] xl:col-span-2 2xl:col-span-1">
-            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950">
-                <div>
-                    <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-bsu-maroon">Next actions</p>
-                    <h2>PR Readiness</h2>
-                </div>
-                <x-prism.status-badge status="Pending">{{ $summary['pendingItems'] }} pending</x-prism.status-badge>
-            </div>
-            <div class="grid gap-3">
-                <a class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-bsu-gold/50 hover:bg-white hover:shadow-sm" href="{{ route('office-head.budget-proposal') }}">
-                    <span class="block text-sm font-extrabold text-slate-950">Prepare budget proposal</span>
-                    <small class="mt-1 block text-sm leading-6 text-slate-600">Encode items and run market scoping before submission.</small>
-                </a>
-                <a class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-bsu-gold/50 hover:bg-white hover:shadow-sm" href="{{ route('office-head.my-proposals') }}">
-                    <span class="block text-sm font-extrabold text-slate-950">Review proposal status</span>
-                    <small class="mt-1 block text-sm leading-6 text-slate-600">Check Finance and Chancellor remarks for returned items.</small>
-                </a>
-                <a class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-bsu-gold/50 hover:bg-white hover:shadow-sm" href="{{ route('office-head.purchase-requests') }}">
-                    <span class="block text-sm font-extrabold text-slate-950">Upload signed PR</span>
-                    <small class="mt-1 block text-sm leading-6 text-slate-600">Attach PR PDFs for approved items ready for processing.</small>
-                </a>
-            </div>
-        </article>
-    </section>
-@endsection
+                {{-- Recent updates --}}
+                <article class="pd-card">
+                    <p class="pd-card-eyebrow">Activity</p>
+                    <h2 class="pd-card-title">Recent Status Updates</h2>
+                    <div class="pd-updates">
+                        @forelse ($recentUpdates as $update)
+                            @php
+                                $sc = match(strtolower($update['status'])) {
+                                    'approved'                                   => 'pd-badge-approved',
+                                    'returned'                                   => 'pd-badge-returned',
+                                    'pending'                                    => 'pd-badge-pending',
+                                    'submitted'                                  => 'pd-badge-submitted',
+                                    'in progress', 'progress'                    => 'pd-badge-progress',
+                                    'finance review completed', 'finance review' => 'pd-badge-finance',
+                                    default                                      => 'pd-badge-info',
+                                };
+                            @endphp
+                            <div class="pd-update">
+                                <div>
+                                    <div class="pd-update-title">{{ $update['title'] }}</div>
+                                    <div class="pd-update-detail">{{ $update['details'] }}</div>
+                                </div>
+                                <div class="pd-update-meta">
+                                    <span class="pd-badge {{ $sc }}">{{ $update['status'] }}</span>
+                                    <span class="pd-update-time">{{ $update['time'] }}</span>
+                                </div>
+                            </div>
+                        @empty
+                            <p style="font-size:13px;color:#94a3b8;text-align:center;padding:20px 0;">No recent updates.</p>
+                        @endforelse
+                    </div>
+                </article>
 
+            </div>
+
+            {{-- Bottom 3-col --}}
+            <div class="pd-bottom-grid">
+
+                {{-- Monthly bar chart --}}
+                <article class="pd-card">
+                    <p class="pd-card-eyebrow">Budget Overview</p>
+                    <h2 class="pd-card-title">Monthly Budget Utilization</h2>
+                    <div class="pd-legend">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Budget used (PHP)</span>
+                    </div>
+                    <div class="pd-chart-wrap" style="height:196px;">
+                        <canvas id="barChart" role="img" aria-label="Monthly budget utilization bar chart">Monthly budget data.</canvas>
+                    </div>
+                </article>
+
+                {{-- Status breakdown --}}
+                <article class="pd-card">
+                    <p class="pd-card-eyebrow">Proposal Breakdown</p>
+                    <h2 class="pd-card-title">Items by Status</h2>
+                    <div class="pd-legend">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#166534"></span>Approved</span>
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#92400e"></span>Pending</span>
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#991b1b"></span>Returned</span>
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#334155"></span>Draft</span>
+                    </div>
+                    <div class="pd-chart-wrap" style="height:196px;">
+                        <canvas id="statusChart" role="img" aria-label="Items by status horizontal bar chart"
+                            data-approved="{{ $summary['approvedItems'] }}"
+                            data-pending="{{ $summary['pendingItems'] }}"
+                            data-returned="{{ $summary['returnedItems'] ?? 0 }}"
+                            data-draft="{{ $summary['draftItems'] ?? 0 }}">
+                        </canvas>
+                    </div>
+                </article>
+
+                {{-- PR readiness --}}
+                <article class="pd-card">
+                    <div class="pd-card-head">
+                        <div>
+                            <p class="pd-card-eyebrow">Next Actions</p>
+                            <h2 class="pd-card-title">PR Readiness</h2>
+                        </div>
+                        <span class="pd-badge pd-badge-pending">{{ $summary['pendingItems'] }} pending</span>
+                    </div>
+                    <div class="pd-pr-links">
+                        <a href="{{ route('office-head.budget-proposal') }}" class="pd-pr-link">
+                            <div class="pd-pr-link-title">
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Prepare budget proposal
+                            </div>
+                            <div class="pd-pr-link-sub">Encode items and run market scoping before submission.</div>
+                        </a>
+                        <a href="{{ route('office-head.my-proposals') }}" class="pd-pr-link">
+                            <div class="pd-pr-link-title">
+                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Review proposal status
+                            </div>
+                            <div class="pd-pr-link-sub">Check Finance and Chancellor remarks for returned items.</div>
+                        </a>
+                        <a href="{{ route('office-head.purchase-requests') }}" class="pd-pr-link">
+                            <div class="pd-pr-link-title">
+                                <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+                                Upload signed PR
+                            </div>
+                            <div class="pd-pr-link-sub">Attach PR PDFs for approved items ready for processing.</div>
+                        </a>
+                    </div>
+                </article>
+
+            </div>
+        </div>{{-- /dash --}}
+    </div>{{-- /main --}}
+
+    <script>
+    (function () {
+        const pp = "'Poppins', sans-serif";
+        Chart.defaults.font.family = pp;
+
+        /* DONUT */
+        const dEl = document.getElementById('donutChart');
+        if (dEl) {
+            new Chart(dEl, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Purchased','Unpurchased'],
+                    datasets: [{
+                        data: [parseInt(dEl.dataset.purchased||0), parseInt(dEl.dataset.unpurchased||0)],
+                        backgroundColor: ['#681012','#e2e8f0'],
+                        borderWidth: 0, borderRadius: 4, hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: c => '  '+c.label+': '+c.parsed+' item'+(c.parsed!==1?'s':'') }}
+                    }
+                }
+            });
+        }
+
+        /* BAR — Monthly */
+        const bEl = document.getElementById('barChart');
+        if (bEl) {
+            new Chart(bEl, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    datasets: [{
+                        label: 'Budget Used (PHP)',
+                        data: {!! json_encode($summary['monthlyBudgetUsage'] ?? array_fill(0,12,0)) !!},
+                        backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
+                        y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
+                    }
+                }
+            });
+        }
+
+        /* HORIZONTAL BAR — Status */
+        const sEl = document.getElementById('statusChart');
+        if (sEl) {
+            new Chart(sEl, {
+                type: 'bar',
+                data: {
+                    labels: ['Approved','Pending','Returned','Draft'],
+                    datasets: [{
+                        data: [parseInt(sEl.dataset.approved||0),parseInt(sEl.dataset.pending||0),parseInt(sEl.dataset.returned||0),parseInt(sEl.dataset.draft||0)],
+                        backgroundColor: ['#166534','#92400e','#991b1b','#334155'],
+                        borderRadius: 6, borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
+                        y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 12, weight: '600', family: pp } } }
+                    }
+                }
+            });
+        }
+    })();
+    </script>
+
+</body>
+</html>
