@@ -155,6 +155,18 @@
     .ms-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 300; background: #166534; color: #fff; font-size: 13px; font-weight: 700; border-radius: 99px; padding: 10px 24px; box-shadow: 0 4px 20px rgba(0,0,0,.18); white-space: nowrap; }
 
     @media (max-width: 1100px) { .ms-grid { grid-template-columns: 1fr; } .right-col { position: static; } }
+
+    /* ── Budget input ── */
+    .budget-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+    .budget-prefix { position: absolute; left: 11px; font-size: 13px; font-weight: 700; color: var(--txt3); pointer-events: none; z-index: 1; }
+    .budget-input { height: 42px; width: 170px; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 12px 0 24px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+    .budget-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
+    .budget-input::placeholder { color: var(--txt3); font-size: 12px; }
+
+    /* ── Spec-match & advantageous badges ── */
+    .ref-tag.t-match { background: #ECFDF5; color: #059669; }
+    .ref-tag.t-adv   { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+    .advantageous-reason { font-size: 11px; font-weight: 500; color: #92400E; margin-top: 5px; line-height: 1.5; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 5px; padding: 5px 8px; }
 </style>
 @endpush
 
@@ -177,6 +189,11 @@
                 <i class="ti ti-search si-icon"></i>
                 <input id="marketQueryInput" class="search-input" type="search"
                        placeholder="Search a new item (e.g. Laptop Intel i7 16GB RAM)…">
+            </div>
+            <div class="budget-wrap">
+                <span class="budget-prefix">₱</span>
+                <input id="marketBudgetInput" class="budget-input" type="number" min="0" step="0.01"
+                       placeholder="Budget (optional)">
             </div>
             <button id="runMarketBtn" class="btn-run" type="button">
                 <i class="ti ti-brand-google"></i>Run Market Scoping
@@ -550,6 +567,11 @@
         const query = (queryInput?.value || '').trim();
         if (!query) { queryInput?.focus(); return; }
 
+        /* Extract individual keywords as specs for semantic filtering */
+        const STOP  = new Set(['for','the','and','with','of','per','mga','ang','na','ng','is','an','a']);
+        const specs = query.split(/[\s,]+/).map(w => w.toLowerCase().trim()).filter(w => w.length >= 3 && !STOP.has(w));
+        const budget = parseFloat(document.getElementById('marketBudgetInput')?.value || 0) || 0;
+
         /* Hide search prompt once user starts a real search */
         const sp = document.getElementById('searchPrompt');
         if (sp) sp.style.display = 'none';
@@ -564,7 +586,7 @@
             const res  = await fetch(runUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body:    JSON.stringify({ item_id: 'manual', query }),
+                body:    JSON.stringify({ item_id: 'manual', query, specs, budget }),
             });
             const data = await res.json();
 
@@ -613,12 +635,27 @@
                 ? '<img src="' + esc(imgUrl) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i class=\\\"ti ti-shopping-bag\\\"></i>\'">'
                 : '<i class="ti ti-shopping-bag"></i>';
 
+            const matchScore = item.match_score ? Math.round(item.match_score * 100) : null;
+            const isAdv      = item.is_advantageous === true;
+            const advReason  = item.reason || '';
+
+            const matchBadge = matchScore !== null
+                ? '<span class="ref-tag t-match"><i class="ti ti-check" style="font-size:10px"></i>' + matchScore + '% match</span>'
+                : '';
+            const advBadge = isAdv
+                ? '<span class="ref-tag t-adv"><i class="ti ti-star" style="font-size:10px"></i>Advantageous</span>'
+                : '';
+            const advBlock = isAdv && advReason
+                ? '<p class="advantageous-reason"><i class="ti ti-bulb" style="font-size:11px;margin-right:4px"></i>' + esc(advReason) + '</p>'
+                : '';
+
             card.innerHTML =
                 '<div class="ref-logo">' + logoHtml + '</div>' +
                 '<div class="ref-body">' +
                     '<p class="ref-name">' + esc(name) + '</p>' +
                     '<p class="ref-supplier">' + esc(source) + '</p>' +
-                    '<div class="ref-tags"><span class="ref-tag t-blue">Google Shopping</span></div>' +
+                    '<div class="ref-tags"><span class="ref-tag t-blue">Google Shopping</span>' + matchBadge + advBadge + '</div>' +
+                    advBlock +
                     '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
                 '</div>' +
                 '<div class="ref-right">' +
