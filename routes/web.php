@@ -17,7 +17,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware('auth')->group(function () {
 
-    Route::prefix('office-head')->name('office-head.')->controller(PrismOfficeHeadController::class)->group(function () {
+    Route::prefix('office-head')->name('office-head.')->middleware('role:Office Head / Dean')->controller(PrismOfficeHeadController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
@@ -33,7 +33,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-requests/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-requests.upload');
     });
 
-    Route::prefix('finance-office')->name('finance-office.')->controller(PrismFinanceOfficeController::class)->group(function () {
+    Route::prefix('finance-office')->name('finance-office.')->middleware('role:Finance Office')->controller(PrismFinanceOfficeController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/proposal-review', 'proposalReview')->name('proposal-review');
         Route::get('/proposal-review/{proposal}', 'proposalReview')->name('proposal-review.show');
@@ -43,7 +43,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/budget-utilization-report', 'budgetUtilizationReport')->name('budget-utilization-report');
     });
 
-    Route::prefix('procurement-office')->name('procurement-office.')->controller(PrismProcurementOfficeController::class)->group(function () {
+    Route::prefix('procurement-office')->name('procurement-office.')->middleware('role:Procurement Office')->controller(PrismProcurementOfficeController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
@@ -51,7 +51,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
     });
 
-    Route::prefix('chancellor')->name('chancellor.')->controller(PrismChancellorController::class)->group(function () {
+    Route::prefix('chancellor')->name('chancellor.')->middleware('role:Chancellor')->controller(PrismChancellorController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-approval', 'budgetApproval')->name('budget-approval');
         Route::post('/budget-approval/{proposal}/approve', 'approve')->name('budget-approval.approve');
@@ -59,7 +59,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
     });
 
-    Route::prefix('vice-chancellor')->name('vice-chancellor.')->controller(PrismViceChancellorController::class)->group(function () {
+    Route::prefix('vice-chancellor')->name('vice-chancellor.')->middleware('role:Vice Chancellor')->controller(PrismViceChancellorController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/division-procurement-status', 'divisionProcurementStatus')->name('division-procurement-status');
         Route::get('/division-performance-report', 'divisionPerformanceReport')->name('division-performance-report');

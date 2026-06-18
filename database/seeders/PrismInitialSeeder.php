@@ -86,10 +86,12 @@ class PrismInitialSeeder extends Seeder
 
         $offices = collect([
             'CICS' => ['name' => 'College of Informatics and Computing Sciences', 'office_type' => 'college'],
-            'FIN' => ['name' => 'Finance Office', 'office_type' => 'administrative'],
-            'PROC' => ['name' => 'Procurement Office', 'office_type' => 'administrative'],
-            'OC' => ['name' => 'Office of the Chancellor', 'office_type' => 'executive'],
-            'OVC' => ['name' => 'Office of the Vice Chancellor', 'office_type' => 'executive'],
+            'COE'  => ['name' => 'College of Engineering',                          'office_type' => 'college'],
+            'CBA'  => ['name' => 'College of Business Administration',               'office_type' => 'college'],
+            'FIN'  => ['name' => 'Finance Office',                                   'office_type' => 'administrative'],
+            'PROC' => ['name' => 'Procurement Office',                               'office_type' => 'administrative'],
+            'OC'   => ['name' => 'Office of the Chancellor',                         'office_type' => 'executive'],
+            'OVC'  => ['name' => 'Office of the Vice Chancellor',                    'office_type' => 'executive'],
         ])->mapWithKeys(fn (array $office, string $code) => [
             $code => Office::updateOrCreate(
                 ['code' => $code],
@@ -150,6 +152,22 @@ class PrismInitialSeeder extends Seeder
                 'position_title' => 'Vice Chancellor',
                 'office' => 'OVC',
                 'role' => 'vice-chancellor',
+            ],
+            [
+                'name' => 'COE Office Head Demo',
+                'username' => 'coe_head',
+                'email' => 'coe.head@prism.test',
+                'position_title' => 'Dean, College of Engineering',
+                'office' => 'COE',
+                'role' => 'office-head',
+            ],
+            [
+                'name' => 'CBA Office Head Demo',
+                'username' => 'cba_head',
+                'email' => 'cba.head@prism.test',
+                'position_title' => 'Dean, College of Business Administration',
+                'office' => 'CBA',
+                'role' => 'office-head',
             ],
         ])->each(function (array $demoUser) use ($offices, $roles) {
             $office = $offices[$demoUser['office']];
