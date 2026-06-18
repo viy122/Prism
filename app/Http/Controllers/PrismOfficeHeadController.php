@@ -193,24 +193,29 @@ class PrismOfficeHeadController extends Controller
     {
         $purchaseItems = PurchaseRequest::with('items')
             ->where('office_id', $this->officeId())
-            ->latest()
+            ->orderByRaw("FIELD(status, 'in_progress', 'pending', 'approved', 'completed', 'delayed')")
+            ->orderBy('number')
             ->get()
             ->map(fn ($pr) => [
-                'dbId'              => $pr->id,
-                'id'                => $pr->number ?? "pr-{$pr->id}",
-                'itemName'          => $pr->title,
-                'approvedAmount'    => (float) ($pr->total_amount ?? 0),
-                'targetQuarter'     => $pr->extracted_fields_json['target_quarter'] ?? null,
-                'procurementStatus' => ucwords(str_replace('_', ' ', $pr->status)),
-                'prStatus'          => ucwords($pr->status),
-                'remarks'           => $pr->remarks ?? '',
-                'uploadUrl'         => route('office-head.purchase-requests.upload', $pr->id),
-                'ocr'               => [
-                    'prNumber' => $pr->number ?? '',
-                    'date'     => $pr->uploaded_at?->format('M d, Y') ?? $pr->created_at->format('M d, Y'),
-                    'items'    => $pr->description ?? '',
-                    'amount'   => (float) $pr->total_amount,
-                ],
+                'dbId'        => $pr->id,
+                'number'      => $pr->number ?? "pr-{$pr->id}",
+                'title'       => $pr->title,
+                'quarter'     => $this->extractQuarter($pr->number ?? ''),
+                'fiscalYear'  => $pr->fiscal_year,
+                'totalAmount' => (float) ($pr->total_amount ?? 0),
+                'status'      => $pr->status,
+                'statusLabel' => ucwords(str_replace('_', ' ', $pr->status)),
+                'remarks'     => $pr->remarks ?? '',
+                'uploadUrl'   => route('office-head.purchase-requests.upload', $pr->id),
+                'uploadedAt'  => $pr->uploaded_at?->format('M d, Y'),
+                'itemCount'   => $pr->items->count(),
+                'items'       => $pr->items->map(fn ($item) => [
+                    'name'      => $item->name,
+                    'quantity'  => (int) $item->quantity,
+                    'unit'      => $item->unit,
+                    'unitCost'  => (float) $item->estimated_unit_cost,
+                    'totalCost' => (float) $item->estimated_total_cost,
+                ])->all(),
             ])
             ->all();
 
@@ -218,6 +223,11 @@ class PrismOfficeHeadController extends Controller
             'pageTitle'     => 'Purchase Requests',
             'purchaseItems' => $purchaseItems,
         ]));
+    }
+
+    private function extractQuarter(string $number): string
+    {
+        return preg_match('/-(Q[1-4])(?:-|$)/', $number, $m) ? $m[1] : '';
     }
 
     public function uploadPurchaseRequest(Request $request, PurchaseRequest $pr): JsonResponse
@@ -367,10 +377,13 @@ class PrismOfficeHeadController extends Controller
         $request->validate([
             'item_id' => 'required|string|max:100',
             'query'   => 'required|string|max:300',
+            'specs'   => 'nullable|array|max:10',
+            'specs.*' => 'string|max:100',
+            'budget'  => 'nullable|numeric|min:0',
         ]);
 
         $service = new MarketScopingService();
-        $results = $service->search($request->input('query'), 15);
+        $results = $service->search($request->input('query'), 30);
 
         if (empty($results)) {
             return response()->json([
@@ -380,11 +393,22 @@ class PrismOfficeHeadController extends Controller
             ]);
         }
 
+        $specs = array_values(array_filter($request->input('specs', [])));
+        if (!empty($specs)) {
+            $results = $service->matchSpecs($results, $specs);
+        }
+
+        $budget = (float) $request->input('budget', 0);
+        if ($budget > 0) {
+            $results = $service->flagAdvantageous($results, $budget);
+        }
+
         return response()->json([
-            'success' => true,
-            'results' => $results,
-            'query'   => $request->input('query'),
-            'count'   => count($results),
+            'success'        => true,
+            'results'        => $results,
+            'query'          => $request->input('query'),
+            'count'          => count($results),
+            'specs_filtered' => !empty($specs),
         ]);
     }
 

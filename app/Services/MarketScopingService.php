@@ -9,6 +9,7 @@ class MarketScopingService
 {
     private const CACHE_TTL    = 86400; // 24 hours
     private const SERPAPI_URL  = 'https://serpapi.com/search.json';
+    private const MATCHER_URL  = 'http://localhost:5001';
 
     public function search(string $query, int $limit = 5): array
     {
@@ -28,6 +29,56 @@ class MarketScopingService
         }
 
         return $results;
+    }
+
+    public function matchSpecs(array $results, array $specs): array
+    {
+        if (empty($specs) || empty($results)) {
+            return $results;
+        }
+
+        try {
+            // Add 'title', 'supplier', 'url', 'description' aliases the Python microservice expects
+            // while keeping all original SerpAPI fields so the frontend stays unchanged.
+            $payload = array_map(fn ($r) => array_merge($r, [
+                'title'       => $r['name']       ?? '',
+                'supplier'    => $r['source']     ?? '',
+                'url'         => $r['source_url'] ?? '',
+                'description' => $r['snippet']    ?? '',
+            ]), $results);
+
+            $response = Http::timeout(10)->post(self::MATCHER_URL . '/match', [
+                'specs'   => $specs,
+                'results' => $payload,
+            ]);
+
+            return $response->successful() ? $response->json() : $results;
+        } catch (\Throwable) {
+            return $results;
+        }
+    }
+
+    public function flagAdvantageous(array $results, float $budget): array
+    {
+        if ($budget <= 0 || empty($results)) {
+            return $results;
+        }
+
+        try {
+            $payload = array_map(fn ($r) => array_merge($r, [
+                'title'       => $r['name']    ?? $r['title']       ?? '',
+                'description' => $r['snippet'] ?? $r['description'] ?? '',
+            ]), $results);
+
+            $response = Http::timeout(10)->post(self::MATCHER_URL . '/advantageous', [
+                'budget'  => $budget,
+                'results' => $payload,
+            ]);
+
+            return $response->successful() ? $response->json() : $results;
+        } catch (\Throwable) {
+            return $results;
+        }
     }
 
     private function searchGoogleShopping(string $query, int $limit): array

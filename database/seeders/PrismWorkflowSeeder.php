@@ -8,6 +8,7 @@ use App\Models\BudgetProposalReview;
 use App\Models\MarketScopingReference;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestItem;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -341,101 +342,119 @@ class PrismWorkflowSeeder extends Seeder
         );
 
         // ═══════════════════════════════════════════════════════════════════════
-        // Purchase Requests — CICS, COE, CBA
+        // Purchase Requests — Per quarter, not per item
         // ═══════════════════════════════════════════════════════════════════════
-        $purchaseRequests = [
-            // CICS PRs
+        $quarterlyPRs = [
+            // CICS Q1: Projectors + Networking modules
             [
-                'number'      => 'PR-CICS-2026-001',
-                'title'       => 'Faculty laptop refresh package',
-                'office'      => $cics->id,
-                'user'        => $officeHead->id,
-                'total'       => 850000,
-                'status'      => 'approved',
-                'uploaded_at' => now()->subDays(20),
-                'remarks'     => 'Approved and posted. Delivery expected Q2.',
+                'number' => 'PR-CICS-2026-Q1', 'title' => 'Q1 FY 2026 CICS Purchase Request',
+                'office' => $cics->id, 'user' => $officeHead->id, 'fiscal_year' => 2026,
+                'status' => 'in_progress', 'uploaded_at' => now()->subDays(14),
+                'remarks' => 'Q1 items canvassing ongoing. Suppliers shortlisted.',
+                'items' => [
+                    ['name' => 'Classroom laser projectors',    'qty' => 8,  'unit' => 'unit', 'cost' => 55000],
+                    ['name' => 'Networking laboratory modules', 'qty' => 15, 'unit' => 'set',  'cost' => 18000],
+                ],
             ],
+            // CICS Q2: Faculty laptops
             [
-                'number'      => 'PR-CICS-2026-002',
-                'title'       => 'Networking laboratory modules',
-                'office'      => $cics->id,
-                'user'        => $officeHead->id,
-                'total'       => 270000,
-                'status'      => 'in_progress',
-                'uploaded_at' => now()->subDays(10),
-                'remarks'     => 'Canvassing ongoing.',
+                'number' => 'PR-CICS-2026-Q2', 'title' => 'Q2 FY 2026 CICS Purchase Request',
+                'office' => $cics->id, 'user' => $officeHead->id, 'fiscal_year' => 2026,
+                'status' => 'approved', 'uploaded_at' => now()->subDays(20),
+                'remarks' => 'Approved and posted. Delivery expected Q2.',
+                'items' => [
+                    ['name' => 'Faculty laptop refresh package', 'qty' => 10, 'unit' => 'unit', 'cost' => 85000],
+                ],
             ],
+            // CICS Q3: Smart boards
             [
-                'number'      => 'PR-CICS-2026-003',
-                'title'       => 'Classroom laser projectors',
-                'office'      => $cics->id,
-                'user'        => $officeHead->id,
-                'total'       => 440000,
-                'status'      => 'pending',
-                'uploaded_at' => now()->subDays(3),
-                'remarks'     => 'Awaiting procurement processing.',
+                'number' => 'PR-CICS-2026-Q3', 'title' => 'Q3 FY 2026 CICS Purchase Request',
+                'office' => $cics->id, 'user' => $officeHead->id, 'fiscal_year' => 2026,
+                'status' => 'pending', 'uploaded_at' => now()->subDays(3),
+                'remarks' => 'Awaiting procurement processing.',
+                'items' => [
+                    ['name' => 'Smart board for lecture room', 'qty' => 2, 'unit' => 'unit', 'cost' => 120000],
+                ],
             ],
-            // COE PRs
+            // COE Q1: Software licenses + 3D printers + Safety PPE
             [
-                'number'      => 'PR-COE-2026-001',
-                'title'       => 'Engineering software licenses (AutoCAD, MATLAB)',
-                'office'      => $coe->id,
-                'user'        => $coeHead->id,
-                'total'       => 875000,
-                'status'      => 'in_progress',
-                'uploaded_at' => now()->subDays(14),
-                'remarks'     => 'Purchase order issued. Awaiting vendor confirmation.',
+                'number' => 'PR-COE-2026-Q1', 'title' => 'Q1 FY 2026 COE Purchase Request',
+                'office' => $coe->id, 'user' => $coeHead->id, 'fiscal_year' => 2026,
+                'status' => 'in_progress', 'uploaded_at' => now()->subDays(14),
+                'remarks' => 'Purchase order issued. Awaiting vendor confirmation.',
+                'items' => [
+                    ['name' => 'Engineering software licenses (AutoCAD, MATLAB)', 'qty' => 25, 'unit' => 'license', 'cost' => 35000],
+                    ['name' => '3D printer for prototyping laboratory',           'qty' => 3,  'unit' => 'unit',    'cost' => 95000],
+                    ['name' => 'Safety equipment and PPE kit',                    'qty' => 50, 'unit' => 'set',     'cost' => 8000],
+                ],
             ],
+            // COE Q2: Lab benches + Faculty laptops
             [
-                'number'      => 'PR-COE-2026-002',
-                'title'       => '3D printers for prototyping laboratory',
-                'office'      => $coe->id,
-                'user'        => $coeHead->id,
-                'total'       => 285000,
-                'status'      => 'pending',
-                'uploaded_at' => now()->subDays(5),
-                'remarks'     => 'Submitted for procurement processing.',
+                'number' => 'PR-COE-2026-Q2', 'title' => 'Q2 FY 2026 COE Purchase Request',
+                'office' => $coe->id, 'user' => $coeHead->id, 'fiscal_year' => 2026,
+                'status' => 'pending', 'uploaded_at' => now()->subDays(5),
+                'remarks' => 'Submitted for procurement processing.',
+                'items' => [
+                    ['name' => 'Laboratory benches and workstations', 'qty' => 12, 'unit' => 'set',  'cost' => 45000],
+                    ['name' => 'Faculty laptop refresh package',      'qty' => 8,  'unit' => 'unit', 'cost' => 85000],
+                ],
             ],
+            // COE Q1 FY2025 (completed, previous year)
             [
-                'number'      => 'PR-COE-2025-001',
-                'title'       => 'Laboratory equipment set (previous year)',
-                'office'      => $coe->id,
-                'user'        => $coeHead->id,
-                'total'       => 540000,
-                'status'      => 'completed',
-                'uploaded_at' => now()->subMonths(5),
-                'remarks'     => 'Delivered and accepted. COA endorsed.',
+                'number' => 'PR-COE-2025-Q1', 'title' => 'Q1 FY 2025 COE Purchase Request',
+                'office' => $coe->id, 'user' => $coeHead->id, 'fiscal_year' => 2025,
+                'status' => 'completed', 'uploaded_at' => now()->subMonths(5),
+                'remarks' => 'Delivered and accepted. COA endorsed.',
+                'items' => [
+                    ['name' => 'Laboratory equipment complete set', 'qty' => 1, 'unit' => 'lot', 'cost' => 540000],
+                ],
             ],
-            // CBA PRs
+            // CBA Q1: Software + Materials + Video conferencing
             [
-                'number'      => 'PR-CBA-2026-001',
-                'title'       => 'Business simulation software licenses',
-                'office'      => $cba->id,
-                'user'        => $cbaHead->id,
-                'total'       => 480000,
-                'status'      => 'pending',
-                'uploaded_at' => now()->subDays(2),
-                'remarks'     => 'Waiting for procurement processing.',
+                'number' => 'PR-CBA-2026-Q1', 'title' => 'Q1 FY 2026 CBA Purchase Request',
+                'office' => $cba->id, 'user' => $cbaHead->id, 'fiscal_year' => 2026,
+                'status' => 'pending', 'uploaded_at' => now()->subDays(2),
+                'remarks' => 'Waiting for procurement processing.',
+                'items' => [
+                    ['name' => 'Business simulation software',      'qty' => 40, 'unit' => 'license', 'cost' => 12000],
+                    ['name' => 'Case study materials and textbooks','qty' => 1,  'unit' => 'lot',     'cost' => 150000],
+                    ['name' => 'Video conferencing equipment',      'qty' => 2,  'unit' => 'set',     'cost' => 85000],
+                ],
             ],
         ];
 
-        foreach ($purchaseRequests as $pr) {
-            PurchaseRequest::updateOrCreate(
-                ['number' => $pr['number']],
+        foreach ($quarterlyPRs as $prData) {
+            $total = array_sum(array_map(fn ($i) => $i['qty'] * $i['cost'], $prData['items']));
+
+            $pr = PurchaseRequest::updateOrCreate(
+                ['number' => $prData['number']],
                 [
-                    'office_id'            => $pr['office'],
-                    'created_by_user_id'   => $pr['user'],
-                    'submitted_by_user_id' => $pr['user'],
-                    'number'               => $pr['number'],
-                    'title'                => $pr['title'],
-                    'fiscal_year'          => 2026,
-                    'total_amount'         => $pr['total'],
-                    'status'               => $pr['status'],
-                    'remarks'              => $pr['remarks'],
-                    'uploaded_at'          => $pr['uploaded_at'],
-                    'submitted_at'         => $pr['uploaded_at'],
+                    'office_id'            => $prData['office'],
+                    'created_by_user_id'   => $prData['user'],
+                    'submitted_by_user_id' => $prData['user'],
+                    'title'                => $prData['title'],
+                    'fiscal_year'          => $prData['fiscal_year'],
+                    'total_amount'         => $total,
+                    'status'               => $prData['status'],
+                    'remarks'              => $prData['remarks'],
+                    'uploaded_at'          => $prData['uploaded_at'],
+                    'submitted_at'         => $prData['uploaded_at'],
                 ]
             );
+
+            foreach ($prData['items'] as $item) {
+                PurchaseRequestItem::updateOrCreate(
+                    ['purchase_request_id' => $pr->id, 'name' => $item['name']],
+                    [
+                        'name'                 => $item['name'],
+                        'description'          => $item['name'],
+                        'quantity'             => $item['qty'],
+                        'unit'                 => $item['unit'],
+                        'estimated_unit_cost'  => $item['cost'],
+                        'estimated_total_cost' => $item['qty'] * $item['cost'],
+                    ]
+                );
+            }
         }
     }
 }
