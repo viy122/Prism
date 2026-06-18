@@ -81,6 +81,23 @@ class BudgetProposal extends Model
         return $this->hasMany(BudgetProposalReview::class);
     }
 
+    public function personnelItems(): HasMany
+    {
+        return $this->hasMany(PersonnelBudgetItem::class);
+    }
+
+    public function sched9Items(): HasMany
+    {
+        return $this->hasMany(BudgetProposalItem::class)
+            ->where('schedule_type', BudgetProposalItem::SCHED9_SUPPLIES);
+    }
+
+    public function sched16Items(): HasMany
+    {
+        return $this->hasMany(BudgetProposalItem::class)
+            ->where('schedule_type', BudgetProposalItem::SCHED16_CAPITAL);
+    }
+
     public function documents(): MorphMany
     {
         return $this->morphMany(DocumentUpload::class, 'attachable');

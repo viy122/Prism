@@ -1,169 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>My Proposals | PRISM</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@extends('prism.layouts.office-head')
+@section('title', 'My Proposals')
 
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: #f0e9e9;
-            min-height: 100vh;
-            display: flex;
-        }
+@php
+    $proposalCollection   = collect($proposals);
+    $proposalCount        = $proposalCollection->count();
+    $activeReviewCount    = $proposalCollection->whereIn('status', ['Submitted', 'Under Review', 'Endorsed'])->count();
+    $returnedCount        = $proposalCollection->where('status', 'Returned')->count();
+    $approvedAmount       = $proposalCollection->where('status', 'Approved')->sum('totalAmount');
+@endphp
 
-        /* ═══════════════════════════════════════
-           SIDEBAR
-        ═══════════════════════════════════════ */
-        .sb {
-            width: 272px;
-            min-height: 100vh;
-            background: #681012;
-            display: flex;
-            flex-direction: column;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-            flex-shrink: 0;
-            z-index: 50;
-        }
-        .sb-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 22px 18px 20px;
-            text-decoration: none;
-        }
-        .sb-logo {
-            width: 44px; height: 44px;
-            border-radius: 10px;
-            background: #fff;
-            padding: 6px;
-            flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .sb-logo img { width: 100%; height: 100%; object-fit: contain; }
-        .sb-brand-name {
-            font-size: 18px;
-            font-weight: 900;
-            color: #fff;
-            letter-spacing: .5px;
-        }
-        .sb-divider {
-            height: 1px;
-            background: rgba(255,255,255,.1);
-            margin: 0 18px;
-        }
-        .sb-nav {
-            padding: 14px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            flex: 1;
-        }
-        .sb-nav a {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            font-size: 13.5px;
-            font-weight: 600;
-            color: rgba(255,255,255,.65);
-            text-decoration: none;
-            transition: background .15s, color .15s;
-        }
-        .sb-nav a:hover { background: rgba(255,255,255,.1); color: #fff; }
-        .sb-nav a.active { background: #fff; color: #681012; font-weight: 700; }
-        .sb-nav a svg {
-            width: 18px; height: 18px;
-            flex-shrink: 0;
-            stroke: currentColor; fill: none;
-            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-        }
-        .sb-bottom {
-            padding: 12px 12px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .sb-workspace { padding: 16px 18px 8px; }
-        .sb-workspace-label {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: .18em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,.38);
-            margin-bottom: 3px;
-        }
-        .sb-workspace-role { font-size: 13px; font-weight: 800; color: #fff; }
-        .sb-logout {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            min-height: 42px;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.15);
-            background: rgba(255,255,255,.1);
-            font-size: 13px;
-            font-weight: 700;
-            color: #fff;
-            text-decoration: none;
-            transition: background .2s, color .2s;
-            font-family: 'Poppins', sans-serif;
-        }
-        .sb-logout:hover { background: #fff; color: #681012; }
-        .sb-logout svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-        /* ═══════════════════════════════════════
-           MAIN
-        ═══════════════════════════════════════ */
-        .main {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 40;
-            background: rgba(255,255,255,.96);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 32px;
-            height: 66px;
-            gap: 16px;
-            flex-shrink: 0;
-        }
-        .topbar-title { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -.4px; }
-        .topbar-chip {
-            display: inline-flex;
-            align-items: center;
-            height: 34px;
-            padding: 0 16px;
-            border-radius: 8px;
-            background: rgba(104,16,18,.07);
-            border: 1px solid rgba(104,16,18,.14);
-            font-size: 12px;
-            font-weight: 700;
-            color: #681012;
-            white-space: nowrap;
-        }
-
-        /* ═══════════════════════════════════════
-           CSS VARS
-        ═══════════════════════════════════════ */
+@push('page-css')
+<style>
         :root {
             --m:     #681012;
             --m-dk:  #4e0c0e;
@@ -181,9 +28,6 @@
             --sh-md: 0 4px 20px rgba(15,23,42,.09), 0 1px 4px rgba(15,23,42,.04);
         }
 
-        /* ═══════════════════════════════════════
-           CONTENT
-        ═══════════════════════════════════════ */
         .content {
             padding: 32px 32px 64px;
             flex: 1;
@@ -463,10 +307,7 @@
             .stats-bar { grid-template-columns: repeat(2,1fr); }
         }
         @media (max-width: 1024px) {
-            .sb { display: none; }
-            body { display: block; }
             .content { padding: 20px 20px 48px; gap: 20px; }
-            .topbar { padding: 0 20px; }
             .two-col { grid-template-columns: 1fr; }
             .col-sticky { position: static; }
             .filters-row { grid-template-columns: 1fr 1fr; }
@@ -477,75 +318,15 @@
             .filters-row { grid-template-columns: 1fr; }
             .filters-row .btn-primary { grid-column: span 1; }
         }
-    </style>
-</head>
-<body>
 
-@php
-    $proposalCollection   = collect($proposals);
-    $proposalCount        = $proposalCollection->count();
-    $activeReviewCount    = $proposalCollection->whereIn('status', ['Submitted', 'Under Review', 'Endorsed'])->count();
-    $returnedCount        = $proposalCollection->where('status', 'Returned')->count();
-    $approvedAmount       = $proposalCollection->where('status', 'Approved')->sum('totalAmount');
-@endphp
+        /* ── Success toast ── */
+        .mp-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 10px; background: #166534; color: #fff; font-size: 13px; font-weight: 700; border-radius: 99px; padding: 12px 24px; box-shadow: 0 4px 20px rgba(0,0,0,.2); white-space: nowrap; opacity: 0; transition: opacity .3s; pointer-events: none; }
+        .mp-toast.show { opacity: 1; pointer-events: auto; }
+        .mp-toast i { font-size: 17px; }
+</style>
+@endpush
 
-{{-- ═══════════════ SIDEBAR ═══════════════ --}}
-<aside class="sb">
-    <a class="sb-brand" href="{{ route('office-head.dashboard') }}">
-        <div class="sb-logo">
-            <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU seal"
-                 onerror="this.parentElement.innerHTML='🎓'">
-        </div>
-        <div>
-            <span class="sb-brand-name">PRISM</span>
-        </div>
-    </a>
-
-    <div class="sb-divider"></div>
-
-    <nav class="sb-nav">
-        <a href="{{ route('office-head.dashboard') }}">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            Dashboard
-        </a>
-        <a href="{{ route('office-head.market-scoping') ?? '#' }}">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-            Market Scoping
-        </a>
-        <a href="{{ route('office-head.budget-proposal') }}">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Budget Proposal
-        </a>
-        <a href="{{ route('office-head.my-proposals') }}" class="active">
-            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-            My Proposals
-        </a>
-        <a href="{{ route('office-head.purchase-requests') }}">
-            <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-            Purchase Requests
-        </a>
-    </nav>
-
-    <div class="sb-bottom">
-        <div class="sb-workspace">
-            <p class="sb-workspace-label">Workspace</p>
-            <p class="sb-workspace-role">Office Head / Dean</p>
-        </div>
-        <a href="{{ route('login') }}" class="sb-logout">
-            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Logout
-        </a>
-    </div>
-</aside>
-
-{{-- ═══════════════ MAIN ═══════════════ --}}
-<div class="main">
-
-    <header class="topbar">
-        <span class="topbar-title">My Proposals</span>
-        <span class="topbar-chip">Proposal Tracker</span>
-    </header>
-
+@section('content')
     <div class="content">
 
         {{-- Stats + Filters card --}}
@@ -689,9 +470,25 @@
         </div>{{-- /two-col --}}
 
     </div>{{-- /content --}}
-</div>{{-- /main --}}
 
+    <div id="mpToast" class="mp-toast" role="status" aria-live="polite">
+        <i class="ti ti-circle-check"></i>
+        <span id="mpToastMsg"></span>
+    </div>
+@endsection
+
+@push('scripts')
 <script type="application/json" id="proposalData">@json($proposals)</script>
-
-</body>
-</html>
+<script>
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('submitted') === '1') {
+        const toast = document.getElementById('mpToast');
+        document.getElementById('mpToastMsg').textContent = 'Your proposal has been submitted successfully.';
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 4000);
+        history.replaceState({}, '', window.location.pathname);
+    }
+})();
+</script>
+@endpush

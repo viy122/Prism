@@ -2,154 +2,169 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BudgetProposalItem;
+use App\Models\Office;
+use App\Models\PurchaseRequest;
 use Illuminate\View\View;
 
 class PrismViceChancellorController extends Controller
 {
     public function dashboard(): View
     {
+        $currentQ = $this->currentQuarter();
+
+        $offices = Office::has('budgetProposals')
+            ->with([
+                'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
+                'purchaseRequests',
+            ])
+            ->get();
+
+        $totalAppItems = BudgetProposalItem::whereHas(
+            'budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])
+        )->count();
+        $procuredCount = PurchaseRequest::where('status', 'completed')->count();
+
+        $approvedBudget     = (float) $offices->flatMap->budgetProposals->sum('total_estimated_cost');
+        $utilized           = (float) $offices->flatMap->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+        $divisionUtilization = $approvedBudget > 0 ? round(($utilized / $approvedBudget) * 100) : 0;
+
+        $officeUtilization = $offices->map(function ($office) use ($currentQ) {
+            $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
+            $utilized = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
+            $delayed  = $office->purchaseRequests->where('status', 'delayed')->count();
+            $overdue  = BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $office->id)->whereIn('status', ['endorsed', 'approved']))
+                ->whereNotNull('target_quarter')
+                ->where('target_quarter', '<', $currentQ)
+                ->count();
+            $risk = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
+
+            return ['office' => $office->name, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
+        })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
+
+        $pendingPrSummary = $offices->map(function ($office) {
+            $pending    = $office->purchaseRequests->where('status', 'pending')->count();
+            $inProgress = $office->purchaseRequests->where('status', 'in_progress')->count();
+            $oldest     = $office->purchaseRequests->where('status', 'pending')->sortBy('created_at')->first();
+
+            return [
+                'office'         => $office->name,
+                'pendingPrs'     => $pending,
+                'inProgress'     => $inProgress,
+                'oldestPending'  => $oldest?->created_at?->format('M d, Y') ?? '—',
+            ];
+        })->filter(fn ($r) => $r['pendingPrs'] + $r['inProgress'] > 0)->values()->all();
+
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
-            'pageTitle' => 'Vice Chancellor Division Dashboard',
-            'divisionName' => 'Academic Affairs Division',
-            'offices' => ['College of Engineering', 'College of Science', 'University Library', 'Graduate School'],
-            'summary' => [
-                'totalAppItems' => 86,
-                'procuredCount' => 53,
-                'divisionUtilization' => 71,
+            'pageTitle'        => 'Vice Chancellor Division Dashboard',
+            'divisionName'     => 'Campus Division',
+            'offices'          => $offices->pluck('name')->all(),
+            'summary'          => [
+                'totalAppItems'      => $totalAppItems,
+                'procuredCount'      => $procuredCount,
+                'divisionUtilization'=> $divisionUtilization,
             ],
-            'officeUtilization' => [
-                ['office' => 'College of Engineering', 'utilization' => 69, 'risk' => 'At Risk', 'delayed' => 2, 'overdue' => 1],
-                ['office' => 'College of Science', 'utilization' => 80, 'risk' => 'On Track', 'delayed' => 1, 'overdue' => 1],
-                ['office' => 'University Library', 'utilization' => 47, 'risk' => 'Critical', 'delayed' => 1, 'overdue' => 2],
-                ['office' => 'Graduate School', 'utilization' => 76, 'risk' => 'On Track', 'delayed' => 0, 'overdue' => 0],
-            ],
-            'pendingPrSummary' => [
-                ['office' => 'College of Engineering', 'pendingPrs' => 4, 'inProgress' => 5, 'oldestPending' => 'May 21, 2026'],
-                ['office' => 'College of Science', 'pendingPrs' => 3, 'inProgress' => 4, 'oldestPending' => 'May 20, 2026'],
-                ['office' => 'University Library', 'pendingPrs' => 2, 'inProgress' => 1, 'oldestPending' => 'May 18, 2026'],
-                ['office' => 'Graduate School', 'pendingPrs' => 1, 'inProgress' => 2, 'oldestPending' => 'May 24, 2026'],
-            ],
+            'officeUtilization'  => $officeUtilization,
+            'pendingPrSummary'   => $pendingPrSummary,
         ]));
     }
 
     public function divisionProcurementStatus(): View
     {
-        $items = $this->divisionItems();
+        $items = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->latest()
+            ->get()
+            ->map(fn ($item) => [
+                'id'                  => $item->id,
+                'office'              => $item->budgetProposal?->office?->name ?? '—',
+                'item'                => $item->name,
+                'targetQuarter'       => $item->target_quarter ?? '—',
+                'currentStatus'       => 'Pending',
+                'remarks'             => $item->remarks ?? '—',
+                'procurementRemarks'  => '—',
+                'timeline'            => [],
+            ])
+            ->all();
 
         return view('prism.vice-chancellor.division-procurement-status', $this->withCommon('division-procurement-status', [
-            'pageTitle' => 'Vice Chancellor Division Procurement Status',
-            'divisionItems' => $items,
-            'offices' => collect($items)->pluck('office')->unique()->values()->all(),
-            'quarters' => collect($items)->pluck('targetQuarter')->unique()->values()->all(),
-            'statuses' => collect($items)->pluck('currentStatus')->unique()->values()->all(),
+            'pageTitle'    => 'Vice Chancellor Division Procurement Status',
+            'divisionItems'=> $items,
+            'offices'      => collect($items)->pluck('office')->unique()->values()->all(),
+            'quarters'     => collect($items)->pluck('targetQuarter')->filter(fn ($q) => $q !== '—')->unique()->sort()->values()->all(),
+            'statuses'     => collect($items)->pluck('currentStatus')->unique()->values()->all(),
         ]));
     }
 
     public function divisionPerformanceReport(): View
     {
+        $offices = Office::has('budgetProposals')
+            ->with([
+                'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
+                'purchaseRequests',
+            ])
+            ->get();
+
+        $rows = $offices->map(function ($office) {
+            $totalAppItems = $office->budgetProposals->flatMap->items->count();
+            $procured      = $office->purchaseRequests->where('status', 'completed')->count();
+            $pending       = max(0, $totalAppItems - $procured);
+            $budget        = (float) $office->budgetProposals->sum('total_estimated_cost');
+            $utilized      = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $utilization   = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
+
+            return ['office' => $office->name, 'totalAppItems' => $totalAppItems, 'procured' => $procured, 'pending' => $pending, 'utilization' => $utilization, 'budget' => $budget];
+        })->filter(fn ($r) => $r['budget'] > 0)->sortByDesc('utilization')->values();
+
+        $performanceRows = $rows->map(fn ($r, $i) => array_merge($r, [
+            'performance' => $i === 0 ? 'best' : ($i === $rows->count() - 1 ? 'lowest' : 'steady'),
+        ]))->all();
+
+        $bestOffice   = $rows->first()['office'] ?? '—';
+        $lowestOffice = $rows->last()['office'] ?? '—';
+
         return view('prism.vice-chancellor.division-performance-report', $this->withCommon('division-performance-report', [
-            'pageTitle' => 'Vice Chancellor Division Performance Report',
-            'performanceRows' => [
-                ['office' => 'College of Science', 'totalAppItems' => 31, 'procured' => 24, 'pending' => 7, 'utilization' => 80, 'performance' => 'best'],
-                ['office' => 'Graduate School', 'totalAppItems' => 12, 'procured' => 8, 'pending' => 4, 'utilization' => 76, 'performance' => 'steady'],
-                ['office' => 'College of Engineering', 'totalAppItems' => 34, 'procured' => 22, 'pending' => 12, 'utilization' => 69, 'performance' => 'steady'],
-                ['office' => 'University Library', 'totalAppItems' => 9, 'procured' => 4, 'pending' => 5, 'utilization' => 47, 'performance' => 'lowest'],
-            ],
-            'bestOffice' => 'College of Science',
-            'lowestOffice' => 'University Library',
+            'pageTitle'       => 'Vice Chancellor Division Performance Report',
+            'performanceRows' => $performanceRows,
+            'bestOffice'      => $bestOffice,
+            'lowestOffice'    => $lowestOffice,
         ]));
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function currentQuarter(): string
+    {
+        return match (true) {
+            now()->month <= 3  => 'Q1',
+            now()->month <= 6  => 'Q2',
+            now()->month <= 9  => 'Q3',
+            default            => 'Q4',
+        };
     }
 
     private function withCommon(string $activeViceChancellorPage, array $data): array
     {
         return array_merge([
-            'activeRole' => 'vice-chancellor',
+            'activeRole'       => 'vice-chancellor',
             'activeModulePage' => $activeViceChancellorPage,
-            'brandHref' => route('vice-chancellor.dashboard'),
-            'roleNavigation' => [
-                ['slug' => 'office-head', 'label' => 'Office Head / Dean', 'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office', 'label' => 'Finance Office', 'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office', 'label' => 'Procurement Office', 'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor', 'label' => 'Chancellor', 'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor', 'label' => 'Vice Chancellor', 'href' => route('vice-chancellor.dashboard')],
+            'brandHref'        => route('vice-chancellor.dashboard'),
+            'roleLabel'        => 'Vice Chancellor',
+            'roleInitials'     => 'VC',
+            'roleNavigation'   => [
+                ['slug' => 'office-head',        'label' => 'Office Head / Dean', 'href' => route('office-head.dashboard')],
+                ['slug' => 'finance-office',     'label' => 'Finance Office',      'href' => route('finance-office.dashboard')],
+                ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
+                ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
+                ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
             ],
-            'moduleNavLabel' => 'Vice Chancellor pages',
+            'moduleNavLabel'   => 'Vice Chancellor pages',
             'moduleNavigation' => [
-                ['slug' => 'dashboard', 'label' => 'Division Dashboard', 'href' => route('vice-chancellor.dashboard'), 'icon' => 'layout-dashboard'],
-                ['slug' => 'division-procurement-status', 'label' => 'Division Procurement Status', 'href' => route('vice-chancellor.division-procurement-status'), 'icon' => 'list-checks'],
-                ['slug' => 'division-performance-report', 'label' => 'Division Performance Report', 'href' => route('vice-chancellor.division-performance-report'), 'icon' => 'chart-no-axes-combined'],
+                ['slug' => 'dashboard',                    'label' => 'Division Dashboard',          'href' => route('vice-chancellor.dashboard'),                    'icon' => 'layout-dashboard'],
+                ['slug' => 'division-procurement-status',  'label' => 'Division Procurement Status', 'href' => route('vice-chancellor.division-procurement-status'),  'icon' => 'list-check'],
+                ['slug' => 'division-performance-report',  'label' => 'Division Performance Report', 'href' => route('vice-chancellor.division-performance-report'),  'icon' => 'trending-up'],
             ],
         ], $data);
-    }
-
-    private function divisionItems(): array
-    {
-        return [
-            [
-                'id' => 'vc-eng-021',
-                'office' => 'College of Engineering',
-                'item' => 'Electronics laboratory instruments',
-                'targetQuarter' => 'Q1',
-                'currentStatus' => 'Delayed',
-                'remarks' => 'Updated delivery lead times requested from suppliers.',
-                'procurementRemarks' => 'Procurement Office requested revised lead time matrix before canvassing.',
-                'timeline' => [
-                    ['timestamp' => 'May 20, 2026 9:15 AM', 'status' => 'Pending', 'remarks' => 'PR queued for technical review.'],
-                    ['timestamp' => 'May 25, 2026 3:40 PM', 'status' => 'In Progress', 'remarks' => 'Canvassing officer assigned.'],
-                    ['timestamp' => 'May 27, 2026 4:05 PM', 'status' => 'Delayed', 'remarks' => 'Supplier lead times need validation.'],
-                ],
-            ],
-            [
-                'id' => 'vc-sci-017',
-                'office' => 'College of Science',
-                'item' => 'Chemical storage safety cabinets',
-                'targetQuarter' => 'Q2',
-                'currentStatus' => 'In Progress',
-                'remarks' => 'Technical specifications under validation.',
-                'procurementRemarks' => 'Safety committee comments expected this week.',
-                'timeline' => [
-                    ['timestamp' => 'May 22, 2026 10:10 AM', 'status' => 'Pending', 'remarks' => 'PR received from Finance-endorsed APP.'],
-                    ['timestamp' => 'May 27, 2026 10:18 AM', 'status' => 'In Progress', 'remarks' => 'Specification validation assigned.'],
-                ],
-            ],
-            [
-                'id' => 'vc-lib-006',
-                'office' => 'University Library',
-                'item' => 'Digital database renewal',
-                'targetQuarter' => 'Q3',
-                'currentStatus' => 'Pending',
-                'remarks' => 'Awaiting direct contracting documents.',
-                'procurementRemarks' => 'Direct contracting justification is incomplete.',
-                'timeline' => [
-                    ['timestamp' => 'May 24, 2026 3:50 PM', 'status' => 'Pending', 'remarks' => 'PR uploaded with subscription matrix.'],
-                ],
-            ],
-            [
-                'id' => 'vc-eng-019',
-                'office' => 'College of Engineering',
-                'item' => 'Classroom laser projectors',
-                'targetQuarter' => 'Q2',
-                'currentStatus' => 'Completed',
-                'remarks' => 'Purchase completed and delivery accepted.',
-                'procurementRemarks' => 'Completed purchase and posted delivery acceptance.',
-                'timeline' => [
-                    ['timestamp' => 'May 18, 2026 11:30 AM', 'status' => 'Pending', 'remarks' => 'PR received for processing.'],
-                    ['timestamp' => 'May 20, 2026 4:40 PM', 'status' => 'Completed', 'remarks' => 'Purchase order issued and posted.'],
-                ],
-            ],
-            [
-                'id' => 'vc-grad-004',
-                'office' => 'Graduate School',
-                'item' => 'Research commons workstations',
-                'targetQuarter' => 'Q2',
-                'currentStatus' => 'In Progress',
-                'remarks' => 'Supplier quotations under comparison.',
-                'procurementRemarks' => 'Canvassing completed; preparing recommendation.',
-                'timeline' => [
-                    ['timestamp' => 'May 23, 2026 8:45 AM', 'status' => 'Pending', 'remarks' => 'PR received with approved specifications.'],
-                    ['timestamp' => 'May 26, 2026 2:30 PM', 'status' => 'In Progress', 'remarks' => 'Supplier quotations under comparison.'],
-                ],
-            ],
-        ];
     }
 }

@@ -1,1019 +1,722 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Market Scoping | PRISM</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: #f0e9e9;
-            min-height: 100vh;
-            display: flex;
-        }
-
-        /* ═══════════════════════════════════════
-           SIDEBAR
-        ═══════════════════════════════════════ */
-        .sb {
-            width: 272px;
-            min-height: 100vh;
-            background: #681012;
-            display: flex;
-            flex-direction: column;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-            flex-shrink: 0;
-            z-index: 50;
-        }
-
-        .sb-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 22px 18px 20px;
-            text-decoration: none;
-        }
-
-        .sb-logo {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            background: #fff;
-            padding: 6px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .sb-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .sb-brand-name {
-            display: block;
-            font-size: 18px;
-            font-weight: 900;
-            color: #fff;
-            letter-spacing: .5px;
-        }
-
-        .sb-divider {
-            height: 1px;
-            background: rgba(255, 255, 255, .1);
-            margin: 0 18px;
-        }
-
-        .sb-nav {
-            padding: 14px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            flex: 1;
-        }
-
-        .sb-nav a {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            font-size: 13.5px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, .65);
-            text-decoration: none;
-            transition: background .15s, color .15s;
-        }
-
-        .sb-nav a:hover {
-            background: rgba(255, 255, 255, .1);
-            color: #fff;
-        }
-
-        .sb-nav a.active {
-            background: #fff;
-            color: #681012;
-            font-weight: 700;
-        }
-
-        .sb-nav a svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        .sb-bottom {
-            padding: 12px 12px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .sb-workspace {
-            padding: 16px 18px 8px;
-        }
-
-        .sb-workspace-label {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: .18em;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, .38);
-            margin-bottom: 3px;
-        }
-
-        .sb-workspace-role {
-            font-size: 13px;
-            font-weight: 800;
-            color: #fff;
-        }
-
-        .sb-logout {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            min-height: 42px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, .15);
-            background: rgba(255, 255, 255, .1);
-            font-size: 13px;
-            font-weight: 700;
-            color: #fff;
-            text-decoration: none;
-            transition: background .2s, color .2s;
-            font-family: 'Poppins', sans-serif;
-        }
-
-        .sb-logout:hover {
-            background: #fff;
-            color: #681012;
-        }
-
-        .sb-logout svg {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        /* ═══════════════════════════════════════
-           MAIN
-        ═══════════════════════════════════════ */
-        .main {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 40;
-            background: rgba(255, 255, 255, .96);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 32px;
-            height: 66px;
-            gap: 16px;
-            flex-shrink: 0;
-        }
-
-        .topbar-title {
-            font-size: 20px;
-            font-weight: 800;
-            color: #0f172a;
-            letter-spacing: -.4px;
-        }
-
-        .topbar-chip {
-            display: inline-flex;
-            align-items: center;
-            height: 34px;
-            padding: 0 16px;
-            border-radius: 8px;
-            background: rgba(104, 16, 18, .07);
-            border: 1px solid rgba(104, 16, 18, .14);
-            font-size: 12px;
-            font-weight: 700;
-            color: #681012;
-            white-space: nowrap;
-        }
-
-        /* ═══════════════════════════════════════
-           CSS VARS
-        ═══════════════════════════════════════ */
-        :root {
-            --m: #681012;
-            --m-dk: #4e0c0e;
-            --white: #ffffff;
-            --s50: #f8fafc;
-            --s100: #f1f5f9;
-            --s200: #e2e8f0;
-            --s400: #94a3b8;
-            --s500: #64748b;
-            --s600: #475569;
-            --s700: #334155;
-            --s900: #0f172a;
-            --sh: 0 2px 8px rgba(15, 23, 42, .06), 0 1px 3px rgba(15, 23, 42, .04);
-            --sh-md: 0 4px 20px rgba(15, 23, 42, .09), 0 1px 4px rgba(15, 23, 42, .04);
-        }
-
-        /* ═══════════════════════════════════════
-           PAGE CONTENT
-        ═══════════════════════════════════════ */
-        .content {
-            padding: 36px 32px 64px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 28px;
-        }
-
-        /* Page header */
-        .page-header {
-            background: var(--white);
-            border: 1px solid var(--s200);
-            border-radius: 18px;
-            padding: 30px 32px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            flex-wrap: wrap;
-            box-shadow: var(--sh);
-        }
-
-        .eyebrow {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: .18em;
-            text-transform: uppercase;
-            color: var(--m);
-            margin-bottom: 5px;
-        }
-
-        .page-header h1 {
-            font-size: 26px;
-            font-weight: 800;
-            color: var(--s900);
-            letter-spacing: -.5px;
-            line-height: 1.2;
-            margin-bottom: 6px;
-        }
-
-        .page-header p {
-            font-size: 13.5px;
-            color: var(--s600);
-            line-height: 1.65;
-        }
-
-        /* 3-col grid */
-        .scoping-grid {
-            display: grid;
-            grid-template-columns: 300px minmax(0, 1fr) 360px;
-            gap: 24px;
-            align-items: start;
-        }
-
-        /* Sticky columns */
-        .col-sticky {
-            position: sticky;
-            top: 86px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-
-        /* Card */
-        .card {
-            background: var(--white);
-            border: 1px solid var(--s200);
-            border-radius: 18px;
-            padding: 28px;
-            box-shadow: var(--sh);
-        }
-
-        .card-eyebrow {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: .18em;
-            text-transform: uppercase;
-            color: var(--m);
-            margin-bottom: 4px;
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 800;
-            color: var(--s900);
-            letter-spacing: -.2px;
-            margin-bottom: 22px;
-        }
-
-        .card-head {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .card-head .card-title {
-            margin-bottom: 0;
-        }
-
-        /* Filter form */
-        .filter-form {
-            display: flex;
-            flex-direction: column;
-            gap: 22px;
-        }
-
-        .field-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .field-label {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            color: var(--s500);
-            margin-bottom: 7px;
-        }
-
-        .field-input,
-        .field-select {
-            width: 100%;
-            height: 42px;
-            border-radius: 10px;
-            border: 1px solid var(--s200);
-            background: var(--white);
-            padding: 0 14px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--s900);
-            font-family: 'Poppins', sans-serif;
-            transition: border-color .15s, box-shadow .15s;
-            outline: none;
-        }
-
-        .field-input:focus,
-        .field-select:focus {
-            border-color: var(--m);
-            box-shadow: 0 0 0 3px rgba(104, 16, 18, .08);
-        }
-
-        .search-wrap {
-            position: relative;
-        }
-
-        .search-wrap svg {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 15px;
-            height: 15px;
-            stroke: var(--s400);
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            pointer-events: none;
-        }
-
-        .search-wrap input {
-            padding-left: 36px;
-        }
-
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        /* Item preview */
-        .item-preview {
-            background: var(--s50);
-            border: 1px solid var(--s200);
-            border-radius: 12px;
-            padding: 18px;
-            margin: 4px 0;
-        }
-
-        .item-preview-code {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-            color: var(--m);
-            margin-bottom: 4px;
-        }
-
-        .item-preview-name {
-            font-size: 13px;
-            font-weight: 800;
-            color: var(--s900);
-            margin-bottom: 12px;
-            line-height: 1.45;
-        }
-
-        .item-preview dl {
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-        }
-
-        .item-preview .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            font-size: 12.5px;
-        }
-
-        .item-preview dt {
-            color: var(--s500);
-        }
-
-        .item-preview dd {
-            font-weight: 700;
-            color: var(--s900);
-        }
-
-        .item-preview-specs {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--s200);
-            font-size: 12px;
-            color: var(--s600);
-            line-height: 1.65;
-        }
-
-        /* Buttons */
-        .btn-reset {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            height: 42px;
-            width: 100%;
-            border-radius: 10px;
-            border: 1px solid rgba(104, 16, 18, .28);
-            background: var(--white);
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--m);
-            cursor: pointer;
-            font-family: 'Poppins', sans-serif;
-            transition: border-color .15s, background .15s;
-        }
-
-        .btn-reset:hover {
-            border-color: var(--m);
-            background: rgba(104, 16, 18, .04);
-        }
-
-        .btn-reset svg {
-            width: 14px;
-            height: 14px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        .btn-attach {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            height: 44px;
-            width: 100%;
-            margin-top: 18px;
-            border-radius: 10px;
-            background: var(--m);
-            color: #fff;
-            font-size: 13px;
-            font-weight: 700;
-            border: none;
-            cursor: pointer;
-            font-family: 'Poppins', sans-serif;
-            box-shadow: 0 3px 12px rgba(104, 16, 18, .22);
-            transition: background .2s;
-        }
-
-        .btn-attach:hover {
-            background: var(--m-dk);
-        }
-
-        .btn-attach:disabled {
-            background: var(--s200);
-            color: var(--s400);
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        .btn-attach svg {
-            width: 15px;
-            height: 15px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-        }
-
-        /* Count pills */
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            height: 28px;
-            padding: 0 12px;
-            border-radius: 99px;
-            font-size: 11px;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .pill-gray {
-            background: var(--s100);
-            color: var(--s700);
-            border: 1px solid var(--s200);
-        }
-
-        .pill-maroon {
-            background: rgba(104, 16, 18, .08);
-            color: var(--m);
-            border: 1px solid rgba(104, 16, 18, .15);
-        }
-
-        /* Results area */
-        .results-topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-        }
-
-        #marketSmartMessages {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        #marketResultsGrid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        #marketShortlist {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        #marketSummary {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        /* Drawer */
-        #marketReferenceDrawer {
-            position: fixed;
-            inset: 0;
-            z-index: 90;
-            display: none;
-        }
-
-        #marketReferenceDrawer .overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(15, 23, 42, .4);
-        }
-
-        #marketReferenceDrawer aside {
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: 100%;
-            max-width: 640px;
-            height: 100%;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            box-shadow: -8px 0 48px rgba(15, 23, 42, .14);
-        }
-
-        .drawer-head {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 22px 24px;
-            border-bottom: 1px solid var(--s200);
-            flex-shrink: 0;
-        }
-
-        .drawer-close {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            border: 1px solid var(--s200);
-            background: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--s600);
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: border-color .15s, color .15s;
-            font-family: 'Poppins', sans-serif;
-        }
-
-        .drawer-close:hover {
-            border-color: var(--m);
-            color: var(--m);
-        }
-
-        #marketDetailsContent {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-        }
-
-        /* Responsive */
-        @media (max-width: 1280px) {
-            .scoping-grid {
-                grid-template-columns: 280px minmax(0, 1fr) 320px;
-                gap: 20px;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            #marketResultsGrid {
-                grid-template-columns: 1fr;
-            }
-
-            .sb {
-                display: none;
-            }
-
-            body {
-                display: block;
-            }
-
-            .content {
-                padding: 20px 20px 48px;
-                gap: 20px;
-            }
-
-            .scoping-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .col-sticky {
-                position: static;
-            }
-
-            .topbar {
-                padding: 0 20px;
-            }
-        }
-    </style>
-</head>
-
-<body>
-
-    {{-- ═══════════════ SIDEBAR ═══════════════ --}}
-    <aside class="sb">
-        <a class="sb-brand" href="{{ route('office-head.dashboard') }}">
-            <div class="sb-logo">
-                <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU seal"
-                    onerror="this.parentElement.innerHTML='🎓'">
-            </div>
-            <div>
-                <span class="sb-brand-name">PRISM</span>
-            </div>
-        </a>
-
-        <div class="sb-divider"></div>
-
-        <nav class="sb-nav">
-            <a href="{{ route('office-head.dashboard') }}">
-                <svg viewBox="0 0 24 24">
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-                Dashboard
-            </a>
-            <a href="{{ route('office-head.market-scoping') ?? '#' }}" class="active">
-                <svg viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    <line x1="11" y1="8" x2="11" y2="14" />
-                    <line x1="8" y1="11" x2="14" y2="11" />
-                </svg>
-                Market Scoping
-            </a>
-            <a href="{{ route('office-head.budget-proposal') }}">
-                <svg viewBox="0 0 24 24">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
-                Budget Proposal
-            </a>
-            <a href="{{ route('office-head.my-proposals') }}">
-                <svg viewBox="0 0 24 24">
-                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-                </svg>
-                My Proposals
-            </a>
-            <a href="{{ route('office-head.purchase-requests') }}">
-                <svg viewBox="0 0 24 24">
-                    <polyline points="16 16 12 12 8 16" />
-                    <line x1="12" y1="12" x2="12" y2="21" />
-                    <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
-                </svg>
-                Purchase Requests
-            </a>
-        </nav>
-
-        <div class="sb-bottom">
-            <div class="sb-workspace">
-                <p class="sb-workspace-label">Workspace</p>
-                <p class="sb-workspace-role">Office Head / Dean</p>
-            </div>
-            <a href="{{ route('login') }}" class="sb-logout">
-                <svg viewBox="0 0 24 24">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Logout
-            </a>
-        </div>
-    </aside>
-
-    {{-- ═══════════════ MAIN ═══════════════ --}}
-    <div class="main">
-
-        <header class="topbar">
-            <span class="topbar-title">Market Scoping</span>
-            <span class="topbar-chip">Minimum 3 valid references</span>
-        </header>
-
-        <div class="content">
-
-            @php
-            $sources = collect($supplierReferences)->pluck('sourceType')->unique()->sort()->values();
-            $brands = collect($supplierReferences)->pluck('brand')->unique()->sort()->values();
-            $categories = collect($supplierReferences)->pluck('category')->unique()->sort()->values();
-            $availabilityOptions = collect($supplierReferences)->pluck('availability')->unique()->sort()->values();
-            $initialItem = collect($proposalItems)->first();
-            @endphp
-
-            {{-- Page header --}}
-            <div class="page-header">
+@extends('prism.layouts.office-head')
+@section('title', 'Market Scoping')
+
+@push('page-css')
+<style>
+    /* ══ TOP CARD ══ */
+    .top-card { background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); overflow: hidden; }
+    .top-card-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px 16px; }
+    .top-card-title-left { display: flex; align-items: center; gap: 12px; }
+    .top-card-title-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .top-card-title-icon i { font-size: 20px; color: var(--crimson); }
+    .top-card-title h1 { font-size: 18px; font-weight: 800; color: var(--txt); letter-spacing: -.3px; }
+    .top-card-title p  { font-size: 12px; color: var(--txt3); font-weight: 500; margin-top: 2px; }
+    .search-bar { display: flex; align-items: center; gap: 10px; padding: 0 22px 18px; }
+    .search-wrap { position: relative; flex: 1; }
+    .search-wrap i.si-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--txt3); pointer-events: none; }
+    .search-input { height: 42px; width: 100%; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 14px 0 38px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+    .search-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
+    .search-input::placeholder { color: var(--txt3); }
+    .btn-run { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 42px; padding: 0 22px; border-radius: var(--r-sm); background: var(--crimson); color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 3px 12px rgba(139,26,28,.28); transition: all .18s; white-space: nowrap; flex-shrink: 0; }
+    .btn-run:hover { background: var(--crimson-dark); transform: translateY(-1px); }
+    .btn-run:disabled { background: var(--s400); box-shadow: none; cursor: not-allowed; transform: none; }
+    .btn-run i { font-size: 15px; }
+
+    /* ══ MAIN GRID ══ */
+    .ms-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 14px; align-items: start; min-width: 0; }
+
+    /* ── Results panel ── */
+    .results-panel { background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); overflow: hidden; min-width: 0; max-width: 100%; }
+    .results-panel-head { padding: 14px 18px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border2); }
+    .results-head-left { display: flex; align-items: center; gap: 10px; }
+    .results-title { font-size: 15px; font-weight: 800; color: var(--txt); letter-spacing: -.3px; }
+    .pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 10px; border-radius: 99px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .pill-gray  { background: var(--bg2); color: var(--txt2); border: 1px solid var(--border2); }
+    .pill-green { background: var(--green-bg); color: var(--green); }
+    .pill-amber { background: var(--amber-bg); color: var(--amber); }
+
+    .smart-alert { margin: 12px 18px; display: flex; align-items: flex-start; gap: 8px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r-sm); padding: 9px 13px; font-size: 12px; font-weight: 600; color: #92400E; }
+    .smart-alert i { font-size: 15px; color: #F59E0B; flex-shrink: 0; margin-top: 1px; }
+
+    .results-list { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 320px); overflow-y: auto; }
+
+    /* ── Reference card ── */
+    .ref-card { display: flex; align-items: flex-start; gap: 12px; background: var(--white); border: 1.5px solid var(--border2); border-radius: var(--r-sm); padding: 14px; transition: all .18s; }
+    .ref-card:hover { border-color: var(--crimson-border); box-shadow: var(--sh); }
+    .ref-card.ref-attached { background: #FFF8F8; border-color: var(--crimson-border); }
+
+    .ref-logo { width: 64px; height: 48px; border-radius: 8px; background: #F8F8F8; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+    .ref-logo i { font-size: 22px; color: var(--txt3); }
+    .ref-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .ref-body { flex: 1; min-width: 0; overflow: hidden; }
+    .ref-name { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 2px; line-height: 1.35; word-break: break-word; overflow-wrap: break-word; }
+    .ref-supplier { font-size: 11.5px; color: var(--txt3); font-weight: 500; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ref-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+    .ref-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px; font-size: 10.5px; font-weight: 600; }
+    .ref-tag.t-green  { background: var(--green-bg);  color: var(--green); }
+    .ref-tag.t-blue   { background: var(--blue-bg);   color: var(--blue); }
+    .ref-tag.t-amber  { background: var(--amber-bg);  color: var(--amber); }
+    .ref-tag.t-purple { background: var(--purple-bg); color: var(--purple); }
+    .ref-tag.t-gray   { background: var(--bg2); color: var(--txt2); }
+    .ref-date { font-size: 11px; color: var(--txt3); font-weight: 500; }
+
+    .ref-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px; }
+    .ref-price { font-size: 20px; font-weight: 800; color: var(--crimson); letter-spacing: -.5px; line-height: 1; }
+    .ref-actions { display: flex; gap: 6px; margin-top: 4px; }
+
+    .btn-view-src { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); font-size: 12px; font-weight: 700; color: var(--txt2); cursor: pointer; font-family: 'Poppins', sans-serif; transition: all .15s; white-space: nowrap; text-decoration: none; }
+    .btn-view-src:hover { border-color: var(--crimson); color: var(--crimson); }
+
+    .btn-del-ref { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border2); background: var(--white); color: var(--txt3); cursor: pointer; transition: all .15s; flex-shrink: 0; }
+    .btn-del-ref:hover { border-color: var(--red); background: var(--red-bg); color: var(--red); }
+    .btn-del-ref i { font-size: 13px; pointer-events: none; }
+
+    .btn-attach-card { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 13px; border-radius: 8px; background: var(--crimson); color: #fff; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 2px 8px rgba(139,26,28,.28); transition: all .18s; white-space: nowrap; }
+    .btn-attach-card:hover { background: var(--crimson-dark); transform: translateY(-1px); }
+    .btn-attach-card.is-attached { background: var(--green); box-shadow: 0 2px 8px rgba(22,101,52,.2); }
+    .btn-attach-card.is-attached:hover { background: #14532d; transform: none; }
+    .btn-attach-card i { font-size: 12px; }
+
+    /* Empty state */
+    .state-box { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 52px 20px; text-align: center; }
+    .state-icon { width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+    .state-icon.si-init { background: var(--crimson-mid); border: 1px solid var(--crimson-border); }
+    .state-icon.si-load { background: #DBEAFE; border: 1px solid #BFDBFE; }
+    .state-icon.si-error { background: var(--red-bg); border: 1px solid #FECACA; }
+    .state-icon i { font-size: 26px; }
+    .state-icon.si-init i { color: var(--crimson); }
+    .state-icon.si-load i { color: var(--blue); animation: spin .9s linear infinite; }
+    .state-icon.si-error i { color: var(--red); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-title { font-size: 14px; font-weight: 800; color: var(--txt); }
+    .state-sub   { font-size: 12px; font-weight: 500; color: var(--txt3); max-width: 320px; line-height: 1.6; }
+
+    /* ══ RIGHT PANEL ══ */
+    .right-col { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 20px; }
+    .rp-card { background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); overflow: hidden; }
+    .rp-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px 11px; border-bottom: 1px solid var(--border2); }
+    .rp-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--crimson); }
+    .rp-title { font-size: 13px; font-weight: 800; color: var(--txt); margin-top: 2px; }
+
+    /* Attached table */
+    .attached-wrap { overflow-x: auto; }
+    .attached-table { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--txt); }
+    .attached-table th { padding: 9px 12px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--txt3); border-bottom: 1px solid var(--border2); text-align: left; white-space: nowrap; background: var(--bg); }
+    .attached-table td { padding: 10px 12px; border-bottom: 1px solid var(--border2); vertical-align: middle; }
+    .attached-table tbody tr:last-child td { border-bottom: none; }
+    .attached-table tbody tr { transition: background .12s; }
+    .td-supplier { font-weight: 700; color: var(--txt); }
+    .td-price { font-weight: 800; color: var(--crimson); white-space: nowrap; }
+    .td-source { color: var(--txt3); font-weight: 500; }
+
+    .table-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; text-align: center; }
+    .table-empty i { font-size: 32px; color: #D1D5DB; }
+    .table-empty p { font-size: 12px; color: var(--txt3); font-weight: 600; line-height: 1.6; }
+
+    /* Save row */
+    .rp-save-row { padding: 12px 16px 16px; border-top: 1px solid var(--border2); display: flex; flex-direction: column; gap: 8px; }
+    .rp-save-hint { font-size: 11px; font-weight: 600; color: var(--txt3); text-align: center; }
+    .rp-save-hint.hint-ok  { color: var(--green); }
+    .rp-save-hint.hint-err { color: var(--red); }
+
+    .btn-save-ref { display: flex; align-items: center; justify-content: center; gap: 7px; height: 42px; width: 100%; border-radius: var(--r-sm); background: var(--crimson); color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 3px 12px rgba(139,26,28,.28); transition: all .18s; }
+    .btn-save-ref:disabled { background: var(--s400); box-shadow: none; cursor: not-allowed; }
+    .btn-save-ref:not(:disabled):hover { background: var(--crimson-dark); transform: translateY(-1px); }
+    .btn-save-ref.saved { background: var(--green); box-shadow: 0 3px 12px rgba(22,101,52,.2); }
+    .btn-save-ref.saved:not(:disabled):hover { background: #14532d; transform: none; }
+    .btn-save-ref i { font-size: 15px; }
+
+    /* ── Modal ── */
+    .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-card { background: var(--white); border-radius: var(--r-lg); box-shadow: var(--sh2); width: 100%; max-width: 480px; overflow: hidden; }
+    .modal-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 22px 18px; border-bottom: 1px solid var(--border2); background: var(--crimson-mid); }
+    .modal-head-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--white); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .modal-head-icon i { font-size: 20px; color: var(--crimson); }
+    .modal-title { font-size: 15px; font-weight: 800; color: var(--txt); letter-spacing: -.3px; }
+    .modal-sub { font-size: 12px; color: var(--txt3); margin-top: 3px; line-height: 1.5; }
+    .modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+    .modal-error { background: var(--red-bg); border: 1px solid #FECACA; border-radius: var(--r-sm); padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--red); }
+    .modal-field { display: flex; flex-direction: column; gap: 5px; }
+    .modal-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-label { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--txt3); }
+    .modal-req { color: var(--crimson); }
+    .modal-input { height: 40px; border-radius: var(--r-sm); border: 1px solid var(--border2); background: var(--bg); padding: 0 12px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; width: 100%; transition: border-color .15s, box-shadow .15s; }
+    .modal-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
+    .modal-footer { padding: 14px 22px 18px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border2); }
+    .btn-modal-skip { height: 40px; padding: 0 20px; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: transparent; font-size: 13px; font-weight: 700; color: var(--txt2); cursor: pointer; font-family: 'Poppins', sans-serif; transition: all .15s; }
+    .btn-modal-skip:hover { border-color: var(--crimson); color: var(--crimson); }
+    .btn-modal-add { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 22px; border-radius: var(--r-sm); background: var(--crimson); color: #fff; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 3px 12px rgba(139,26,28,.28); transition: all .18s; }
+    .btn-modal-add:hover { background: var(--crimson-dark); }
+    .btn-modal-add:disabled { background: var(--s400); box-shadow: none; cursor: not-allowed; }
+    .btn-modal-add i { font-size: 15px; }
+
+    /* ── Toast ── */
+    .ms-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 300; background: #166534; color: #fff; font-size: 13px; font-weight: 700; border-radius: 99px; padding: 10px 24px; box-shadow: 0 4px 20px rgba(0,0,0,.18); white-space: nowrap; }
+
+    @media (max-width: 1100px) { .ms-grid { grid-template-columns: 1fr; } .right-col { position: static; } }
+</style>
+@endpush
+
+@section('content')
+<div class="page-shell">
+
+    {{-- TOP CARD --}}
+    <div class="top-card">
+        <div class="top-card-title">
+            <div class="top-card-title-left">
+                <div class="top-card-title-icon"><i class="ti ti-search"></i></div>
                 <div>
-                    <p class="eyebrow">Office Head / Dean</p>
                     <h1>Market Scoping</h1>
-                    <p>Compare supplier price references and attach valid sources to the proposal.</p>
+                    <p>Search market prices and attach references to your proposal items.</p>
                 </div>
             </div>
-
-            {{-- 3-col layout --}}
-            <div class="scoping-grid">
-
-                {{-- ── LEFT: Filters ── --}}
-                <div class="col-sticky">
-                    <div class="card">
-                        <p class="card-eyebrow">Search & Filter</p>
-                        <h2 class="card-title">Reference Search</h2>
-
-                        <div class="filter-form">
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketSearchInput">Search References</label>
-                                <div class="search-wrap">
-                                    <svg viewBox="0 0 24 24">
-                                        <circle cx="11" cy="11" r="8" />
-                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                    </svg>
-                                    <input id="marketSearchInput" class="field-input" type="search" placeholder="Item, brand, supplier…">
-                                </div>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketItemSelect">Proposal Item</label>
-                                <select id="marketItemSelect" class="field-select">
-                                    @foreach ($proposalItems as $item)
-                                    <option value="{{ $item['id'] }}">{{ $item['itemName'] }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="item-preview">
-                                <p class="item-preview-code" id="marketItemCode">{{ $initialItem['proposalCode'] ?? '' }}</p>
-                                <p class="item-preview-name" id="marketItemTitle">{{ $initialItem['itemName'] ?? '' }}</p>
-                                <dl>
-                                    <div class="row">
-                                        <dt>Unit cost</dt>
-                                        <dd id="marketItemBudget">PHP {{ number_format($initialItem['estimatedUnitCost'] ?? 0) }}</dd>
-                                    </div>
-                                    <div class="row">
-                                        <dt>Quantity</dt>
-                                        <dd id="marketItemQuantity">{{ $initialItem['quantity'] ?? 0 }} {{ $initialItem['unit'] ?? '' }}</dd>
-                                    </div>
-                                </dl>
-                                <p class="item-preview-specs" id="marketItemSpecs">{{ $initialItem['specification'] ?? '' }}</p>
-                            </div>
-
-                            <div class="grid-2">
-                                <div class="field-group">
-                                    <label class="field-label" for="marketMinPrice">Min price</label>
-                                    <input id="marketMinPrice" class="field-input" type="number" min="0" placeholder="0">
-                                </div>
-                                <div class="field-group">
-                                    <label class="field-label" for="marketMaxPrice">Max price</label>
-                                    <input id="marketMaxPrice" class="field-input" type="number" min="0" placeholder="Any">
-                                </div>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketSourceFilter">Source type</label>
-                                <select id="marketSourceFilter" class="field-select">
-                                    <option value="all">All source types</option>
-                                    @foreach ($sources as $source)
-                                    <option value="{{ $source }}">{{ $source }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketBrandFilter">Brand</label>
-                                <select id="marketBrandFilter" class="field-select">
-                                    <option value="all">All brands</option>
-                                    @foreach ($brands as $brand)
-                                    <option value="{{ $brand }}">{{ $brand }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketCategoryFilter">Category</label>
-                                <select id="marketCategoryFilter" class="field-select">
-                                    <option value="all">All categories</option>
-                                    @foreach ($categories as $category)
-                                    <option value="{{ $category }}">{{ $category }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketAvailabilityFilter">Availability</label>
-                                <select id="marketAvailabilityFilter" class="field-select">
-                                    <option value="all">All statuses</option>
-                                    @foreach ($availabilityOptions as $availability)
-                                    <option value="{{ $availability }}">{{ $availability }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <div class="field-group">
-                                <label class="field-label" for="marketKeywordFilter">Spec keywords</label>
-                                <input id="marketKeywordFilter" class="field-input" type="text" placeholder="e.g. warranty, HDMI…">
-                            </div>
-
-                            <button id="marketResetFilters" class="btn-reset" type="button">
-                                <svg viewBox="0 0 24 24">
-                                    <polyline points="1 4 1 10 7 10" />
-                                    <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-                                </svg>
-                                Reset Filters
-                            </button>
-
-                        </div>
-                    </div>
-                </div>
-
-                {{-- ── CENTER: Results ── --}}
-                <div class="card" style="min-width:0; align-self:start;">
-                    <div class="results-topbar">
-                        <div>
-                            <p class="card-eyebrow">Supplier price references</p>
-                            <h2 class="card-title" style="margin-bottom:0;">Supplier References</h2>
-                        </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <span id="marketResultCount" class="pill pill-gray">0 references</span>
-                            <span id="marketSelectedCount" class="pill pill-maroon">0 selected</span>
-                        </div>
-                    </div>
-
-                    <div id="marketSmartMessages"></div>
-                    <div id="marketResultsGrid"></div>
-                </div>
-
-                {{-- ── RIGHT: Shortlist + Summary ── --}}
-                <div class="col-sticky">
-
-                    <div class="card">
-                        <div class="card-head">
-                            <div>
-                                <p class="card-eyebrow">Selected references</p>
-                                <h2 class="card-title" style="margin-bottom:0;">Reference Shortlist</h2>
-                            </div>
-                            <span id="marketValidCount" class="pill pill-gray">0 valid</span>
-                        </div>
-                        <div id="marketShortlist"></div>
-                        <button id="marketAttachButton" class="btn-attach" type="button" disabled>
-                            <svg viewBox="0 0 24 24">
-                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                            </svg>
-                            Attach to Proposal
-                        </button>
-                    </div>
-
-                    <div class="card">
-                        <p class="card-eyebrow">Comparison summary</p>
-                        <h2 class="card-title">Budget Validation</h2>
-                        <div id="marketSummary"></div>
-                    </div>
-
-                </div>
-
-            </div>{{-- /scoping-grid --}}
-        </div>{{-- /content --}}
-    </div>{{-- /main --}}
-
-    {{-- Reference details drawer --}}
-    <div id="marketReferenceDrawer" aria-hidden="true">
-        <div class="overlay" data-market-details-close></div>
-        <aside>
-            <div class="drawer-head">
-                <div style="min-width:0;">
-                    <p class="card-eyebrow">Supplier reference details</p>
-                    <h2 id="marketDetailsTitle" style="font-size:19px; font-weight:800; color:var(--s900); margin-top:4px; line-height:1.35;">Reference details</h2>
-                </div>
-                <button class="drawer-close" type="button" data-market-details-close aria-label="Close">✕</button>
+        </div>
+        <div class="search-bar">
+            <div class="search-wrap">
+                <i class="ti ti-search si-icon"></i>
+                <input id="marketQueryInput" class="search-input" type="search"
+                       placeholder="Search a new item (e.g. Laptop Intel i7 16GB RAM)…">
             </div>
-            <div id="marketDetailsContent"></div>
-        </aside>
+            <button id="runMarketBtn" class="btn-run" type="button">
+                <i class="ti ti-brand-google"></i>Run Market Scoping
+            </button>
+        </div>
     </div>
 
-    <script type="application/json" id="marketScopingItems">
-        @json($proposalItems)
-    </script>
-    <script type="application/json" id="marketSupplierReferences">
-        @json($supplierReferences)
-    </script>
+    {{-- MAIN GRID --}}
+    <div class="ms-grid">
 
-</body>
+        {{-- LEFT: Reference cards --}}
+        <div class="results-panel">
+            <div class="results-panel-head">
+                <div class="results-head-left">
+                    <span class="results-title">Market References</span>
+                    <span id="refCount" class="pill pill-gray">0 results</span>
+                </div>
+            </div>
 
-</html>
+            <div class="results-list" id="resultsContainer">
+                <div id="searchPrompt" class="state-box">
+                    <div class="state-icon si-init"><i class="ti ti-search"></i></div>
+                    <p class="state-title">Search for market prices</p>
+                    <p class="state-sub">Type an item name above and click <strong>Run Market Scoping</strong> to fetch live price references.</p>
+                </div>
+                <div id="dynamicResults"></div>
+
+            </div>
+        </div>
+
+        {{-- RIGHT: Attached references + detail --}}
+        <div class="right-col">
+            <div class="rp-card">
+                <div class="rp-head">
+                    <div>
+                        <p class="rp-eyebrow">Proposal Reference List</p>
+                        <p class="rp-title">Attached References</p>
+                    </div>
+                    <span id="attachedCount" class="pill pill-gray">0 / 3</span>
+                </div>
+
+                <div class="attached-wrap">
+                    <table class="attached-table">
+                        <thead>
+                            <tr>
+                                <th>Supplier</th>
+                                <th>Price / unit</th>
+                                <th>Source</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attachedTableBody">
+                            <tr id="tableEmptyRow">
+                                <td colspan="3">
+                                    <div class="table-empty">
+                                        <i class="ti ti-clipboard-list"></i>
+                                        <p>No references attached yet.<br>Click <strong>Attach</strong> on a card.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="rp-save-row">
+                    <p class="rp-save-hint" id="saveHint">Attach exactly 3 references to continue.</p>
+                    <button class="btn-save-ref" id="saveRefBtn" type="button" disabled>
+                        <i class="ti ti-link"></i>Attach to Proposal
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{{-- ── Add Item Modal ── --}}
+<div id="addItemModal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div class="modal-head-icon"><i class="ti ti-file-plus"></i></div>
+            <div>
+                <h2 class="modal-title">Add Item to Proposal</h2>
+                <p class="modal-sub">This item isn't in your proposal yet. Fill in the details to add it with the 3 attached references.</p>
+            </div>
+        </div>
+        <div class="modal-body">
+            <p id="modalError" class="modal-error" style="display:none"></p>
+            <div class="modal-field">
+                <label class="modal-label">Item Name</label>
+                <input id="modalItemName" class="modal-input" type="text" placeholder="Item name">
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label class="modal-label">Unit</label>
+                    <input id="modalUnit" class="modal-input" type="text" value="unit">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label">Quantity <span class="modal-req">*</span></label>
+                    <input id="modalQty" class="modal-input" type="number" min="1" placeholder="0">
+                </div>
+            </div>
+            <div class="modal-grid2">
+                <div class="modal-field">
+                    <label class="modal-label">Estimated Unit Cost</label>
+                    <input id="modalCost" class="modal-input" type="number" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label">Target Quarter <span class="modal-req">*</span></label>
+                    <select id="modalQuarter" class="modal-input">
+                        <option value="Q1">Q1</option>
+                        <option value="Q2">Q2</option>
+                        <option value="Q3">Q3</option>
+                        <option value="Q4">Q4</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-field">
+                <label class="modal-label">Category <span class="modal-req">*</span></label>
+                <select id="modalCategory" class="modal-input">
+                    <option value="Sched 9 - Supplies">Sched 9 — Supplies and Materials</option>
+                    <option value="Sched 16 - Capital Outlay">Sched 16 — Capital Outlay</option>
+                    <option value="ICT Equipment">ICT Equipment</option>
+                    <option value="Office Equipment">Office Equipment</option>
+                    <option value="Laboratory Equipment">Laboratory Equipment</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="modalSkipBtn" class="btn-modal-skip" type="button">Skip</button>
+            <button id="modalAddBtn" class="btn-modal-add" type="button">
+                <i class="ti ti-circle-plus"></i>Add to Proposal
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- ── Toast ── --}}
+<div id="msToast" class="ms-toast" style="display:none"></div>
+@endsection
+
+@push('scripts')
+<script type="application/json" id="msProposalItems">@json($proposalItems)</script>
+<script type="application/json" id="msSelectedRefs">@json($selectedRefs)</script>
+
+<script>
+(function () {
+
+    const attached = {};   /* refId → ref data */
+    const MAX_REFS = 3;
+
+    /* ── Attach / detach ── */
+    window.attachRef = function (refId) {
+        const card = document.getElementById('card-' + refId);
+        if (!card) return;
+
+        if (attached[refId]) {
+            /* detach */
+            delete attached[refId];
+            card.classList.remove('ref-attached');
+            const btn = card.querySelector('.btn-attach-card[data-ref-id="' + refId + '"]');
+            if (btn) { btn.innerHTML = '<i class="ti ti-paperclip"></i>Attach'; btn.classList.remove('is-attached'); }
+            removeTableRow(refId);
+        } else {
+            /* block if already at max */
+            if (Object.keys(attached).length >= MAX_REFS) {
+                const hint = document.getElementById('saveHint');
+                hint.textContent = 'Maximum of 3 references reached. Remove one first.';
+                hint.className = 'rp-save-hint hint-err';
+                setTimeout(() => updateCount(), 2000);
+                return;
+            }
+            /* attach */
+            const d = card.dataset;
+            attached[refId] = {
+                id:       refId,
+                name:     d.name,
+                price:    parseFloat(d.priceRaw),
+                priceStr: d.price,
+                supplier: d.supplier,
+                source:   d.source,
+                date:     d.date,
+                url:      d.url,
+                specs:    d.specs,
+                itemId:   d.itemId,
+            };
+            card.classList.add('ref-attached');
+            const btn = card.querySelector('.btn-attach-card[data-ref-id="' + refId + '"]');
+            if (btn) { btn.innerHTML = '<i class="ti ti-check"></i>Attached'; btn.classList.add('is-attached'); }
+            addTableRow(refId, attached[refId]);
+        }
+
+        updateCount();
+    };
+
+    /* ── Table helpers ── */
+    function addTableRow(refId, ref) {
+        const emptyRow = document.getElementById('tableEmptyRow');
+        if (emptyRow) emptyRow.style.display = 'none';
+
+        const tbody = document.getElementById('attachedTableBody');
+        const tr = document.createElement('tr');
+        tr.id = 'tr-' + refId;
+        tr.innerHTML =
+            '<td class="td-supplier">' + esc(ref.supplier) + '</td>' +
+            '<td class="td-price">₱' + esc(ref.priceStr) + '</td>' +
+            '<td class="td-source">' + esc(ref.source) + '</td>';
+        tbody.appendChild(tr);
+    }
+
+    function removeTableRow(refId) {
+        const tr = document.getElementById('tr-' + refId);
+        if (tr) tr.remove();
+        if (Object.keys(attached).length === 0) {
+            document.getElementById('tableEmptyRow').style.display = '';
+        }
+    }
+
+    function updateCount() {
+        const n    = Object.keys(attached).length;
+        const hint = document.getElementById('saveHint');
+        const btn  = document.getElementById('saveRefBtn');
+
+        document.getElementById('attachedCount').textContent = n + ' / 3';
+
+        if (n === 0) {
+            hint.textContent = 'Attach exactly 3 references to continue.';
+            hint.className   = 'rp-save-hint';
+            btn.disabled = true;
+        } else if (n < MAX_REFS) {
+            hint.textContent = (MAX_REFS - n) + ' more reference' + (MAX_REFS - n > 1 ? 's' : '') + ' needed.';
+            hint.className   = 'rp-save-hint';
+            btn.disabled = true;
+        } else {
+            hint.textContent = '3 references ready — click to attach to proposal.';
+            hint.className   = 'rp-save-hint hint-ok';
+            btn.disabled = false;
+        }
+    }
+
+    let pendingRefsData = null;
+
+    /* ── Attach to Proposal button ── */
+    document.getElementById('saveRefBtn').addEventListener('click', function () {
+        if (Object.keys(attached).length < MAX_REFS) return;
+
+        const query = (queryInput?.value || '').trim();
+
+        /* No search done — refs already saved, just go to proposal */
+        if (!query) {
+            window.location.href = '{{ route("office-head.budget-proposal") }}';
+            return;
+        }
+
+        this.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite"></i>Checking…';
+        this.disabled  = true;
+
+        fetch('{{ route("office-head.market-scoping.attach") }}', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+            body:    JSON.stringify({ query, refs: Object.values(attached) }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.innerHTML = '<i class="ti ti-link"></i>Attach to Proposal';
+            this.disabled  = false;
+
+            if (!data.success) {
+                document.getElementById('saveHint').textContent = data.message || 'Something went wrong.';
+                document.getElementById('saveHint').className   = 'rp-save-hint hint-err';
+                return;
+            }
+
+            if (data.item_exists) {
+                showMsToast('References attached to "' + data.item_name + '".');
+                document.getElementById('saveHint').textContent = 'Redirecting to Budget Proposal…';
+                document.getElementById('saveHint').className   = 'rp-save-hint hint-ok';
+                setTimeout(() => { window.location.href = '{{ route("office-head.budget-proposal") }}'; }, 1400);
+            } else {
+                openAddItemModal(data);
+            }
+        })
+        .catch(() => {
+            this.innerHTML = '<i class="ti ti-alert-circle"></i>Error';
+            this.disabled  = false;
+            document.getElementById('saveHint').textContent = 'Network error. Try again.';
+            document.getElementById('saveHint').className   = 'rp-save-hint hint-err';
+        });
+    });
+
+    function openAddItemModal(data) {
+        pendingRefsData = data.refs_data;
+        document.getElementById('modalItemName').value = data.query || '';
+        document.getElementById('modalCost').value     = data.lowest_price ? parseFloat(data.lowest_price).toFixed(2) : '';
+        document.getElementById('modalUnit').value     = 'unit';
+        document.getElementById('modalQty').value      = '';
+        document.getElementById('modalQuarter').value  = 'Q1';
+        document.getElementById('modalCategory').value = 'Sched 9 - Supplies';
+        document.getElementById('modalError').style.display = 'none';
+        document.getElementById('addItemModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('modalQty').focus(), 80);
+    }
+
+    document.getElementById('modalSkipBtn').addEventListener('click', function () {
+        document.getElementById('addItemModal').style.display = 'none';
+        pendingRefsData = null;
+    });
+
+    document.getElementById('addItemModal').addEventListener('click', function (e) {
+        if (e.target === this) { this.style.display = 'none'; pendingRefsData = null; }
+    });
+
+    document.getElementById('modalAddBtn').addEventListener('click', async function () {
+        const name    = document.getElementById('modalItemName').value.trim();
+        const unit    = document.getElementById('modalUnit').value.trim() || 'unit';
+        const qty     = parseFloat(document.getElementById('modalQty').value);
+        const cost    = parseFloat(document.getElementById('modalCost').value);
+        const quarter = document.getElementById('modalQuarter').value;
+        const cat     = document.getElementById('modalCategory').value;
+        const errEl   = document.getElementById('modalError');
+
+        if (!name || !qty || isNaN(qty) || !cost || isNaN(cost) || !quarter || !cat) {
+            errEl.textContent = 'Please fill in all required fields.';
+            errEl.style.display = '';
+            return;
+        }
+        errEl.style.display = 'none';
+
+        this.disabled = true;
+        this.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite"></i>Adding…';
+
+        try {
+            const res  = await fetch('{{ route("office-head.market-scoping.add-item-with-refs") }}', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: cat, refs: pendingRefsData }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                document.getElementById('addItemModal').style.display = 'none';
+                showMsToast('Item added to proposal!');
+                setTimeout(() => { window.location.href = json.redirect; }, 1000);
+            } else {
+                errEl.textContent = json.message || 'Failed to save.';
+                errEl.style.display = '';
+                this.disabled = false;
+                this.innerHTML = '<i class="ti ti-circle-plus"></i>Add to Proposal';
+            }
+        } catch {
+            errEl.textContent = 'Network error. Try again.';
+            errEl.style.display = '';
+            this.disabled = false;
+            this.innerHTML = '<i class="ti ti-circle-plus"></i>Add to Proposal';
+        }
+    });
+
+    function showMsToast(msg) {
+        const t = document.getElementById('msToast');
+        t.textContent = msg;
+        t.style.display = 'flex';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    /* ── Live search ── */
+    const runBtn     = document.getElementById('runMarketBtn');
+    const queryInput = document.getElementById('marketQueryInput');
+    const csrf       = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const runUrl     = '{{ route("office-head.market-scoping.run") }}';
+
+    async function runSearch() {
+        const query = (queryInput?.value || '').trim();
+        if (!query) { queryInput?.focus(); return; }
+
+        /* Hide search prompt once user starts a real search */
+        const sp = document.getElementById('searchPrompt');
+        if (sp) sp.style.display = 'none';
+
+        runBtn.disabled = true;
+        runBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite"></i>Fetching…';
+
+        const dynDiv = document.getElementById('dynamicResults');
+        dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-load"><i class="ti ti-loader-2"></i></div><p class="state-title">Fetching market prices…</p><p class="state-sub">Searching for <strong>' + esc(query) + '</strong>.</p></div>';
+
+        try {
+            const res  = await fetch(runUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body:    JSON.stringify({ item_id: 'manual', query }),
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">No results found</p><p class="state-sub">' + esc(data.message || 'Try different keywords.') + '</p></div>';
+                return;
+            }
+
+            renderDynamic(data.results, dynDiv);
+            document.getElementById('refCount').textContent = data.results.length + ' result' + (data.results.length !== 1 ? 's' : '') + ' found';
+
+        } catch (e) {
+            dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">Network error</p><p class="state-sub">Check your connection and try again.</p></div>';
+        } finally {
+            runBtn.disabled = false;
+            runBtn.innerHTML = '<i class="ti ti-brand-google"></i>Run Market Scoping';
+        }
+    }
+
+    function renderDynamic(results, container) {
+        container.innerHTML = '';
+        results.forEach((item, idx) => {
+            const id       = 'live-' + idx;
+            const name     = item.name || 'Unknown product';
+            const price    = item.price || 0;
+            const priceFmt = item.price_formatted || ('₱' + price.toLocaleString());
+            const source   = item.source || 'Google Shopping';
+            const date     = item.date_retrieved || '—';
+            const url      = item.source_url || '#';
+
+            const card = document.createElement('div');
+            card.className = 'ref-card';
+            card.id = 'card-' + id;
+            card.dataset.refId    = id;
+            card.dataset.name     = name;
+            card.dataset.price    = priceFmt.replace('₱','').replace(/,/g,'');
+            card.dataset.priceRaw = price;
+            card.dataset.supplier = source;
+            card.dataset.source   = 'Google Shopping';
+            card.dataset.date     = date;
+            card.dataset.url      = url;
+            card.dataset.specs    = item.snippet || '';
+            card.dataset.itemId   = '';
+            const imgUrl = item.image_url || item.source_icon || '';
+            const logoHtml = imgUrl
+                ? '<img src="' + esc(imgUrl) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i class=\\\"ti ti-shopping-bag\\\"></i>\'">'
+                : '<i class="ti ti-shopping-bag"></i>';
+
+            card.innerHTML =
+                '<div class="ref-logo">' + logoHtml + '</div>' +
+                '<div class="ref-body">' +
+                    '<p class="ref-name">' + esc(name) + '</p>' +
+                    '<p class="ref-supplier">' + esc(source) + '</p>' +
+                    '<div class="ref-tags"><span class="ref-tag t-blue">Google Shopping</span></div>' +
+                    '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
+                '</div>' +
+                '<div class="ref-right">' +
+                    '<p class="ref-price">' + esc(priceFmt) + '</p>' +
+                    '<div class="ref-actions">' +
+                        '<a class="btn-view-src" href="' + esc(url) + '" target="_blank" rel="noopener"><i class="ti ti-external-link" style="font-size:12px"></i>Source</a>' +
+                        '<button class="btn-attach-card" type="button" data-ref-id="' + id + '" onclick="window.attachLive(\'' + id + '\')"><i class="ti ti-paperclip"></i>Attach</button>' +
+                    '</div>' +
+                '</div>';
+            container.appendChild(card);
+        });
+    }
+
+    window.attachLive = function(id) {
+        const card = document.getElementById('card-' + id);
+        if (!card) return;
+        const d = card.dataset;
+
+        if (attached[id]) {
+            delete attached[id];
+            card.classList.remove('ref-attached');
+            card.querySelector('.btn-attach-card').innerHTML = '<i class="ti ti-paperclip"></i>Attach';
+            card.querySelector('.btn-attach-card').classList.remove('is-attached');
+            removeTableRow(id);
+        } else {
+            if (Object.keys(attached).length >= MAX_REFS) {
+                const hint = document.getElementById('saveHint');
+                hint.textContent = 'Maximum of 3 references reached. Remove one first.';
+                hint.className = 'rp-save-hint hint-err';
+                setTimeout(() => updateCount(), 2000);
+                return;
+            }
+            attached[id] = { id, name: d.name, price: parseFloat(d.priceRaw), priceStr: parseFloat(d.priceRaw).toLocaleString('en-PH', {minimumFractionDigits:2}), supplier: d.supplier, source: d.source, date: d.date, url: d.url, specs: d.specs, itemId: d.itemId };
+            card.classList.add('ref-attached');
+            card.querySelector('.btn-attach-card').innerHTML = '<i class="ti ti-check"></i>Attached';
+            card.querySelector('.btn-attach-card').classList.add('is-attached');
+            addTableRow(id, attached[id]);
+        }
+        updateCount();
+    };
+
+    /* Delegate clicks on pre-loaded DB ref buttons (attach + delete) */
+    const resultsContainer = document.getElementById('resultsContainer');
+    resultsContainer && resultsContainer.addEventListener('click', function (e) {
+        const attachBtn = e.target.closest('.btn-attach-card[data-ref-id]');
+        if (attachBtn) { window.attachRef(parseInt(attachBtn.dataset.refId, 10)); return; }
+
+        const delBtn = e.target.closest('.btn-del-ref');
+        if (!delBtn) return;
+
+        const card = delBtn.closest('.ref-card');
+        const url  = delBtn.dataset.deleteUrl;
+        if (!url || !card) return;
+
+        delBtn.disabled = true;
+        delBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite"></i>';
+
+        fetch(url, {
+            method:  'DELETE',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                card.style.transition = 'opacity .2s';
+                card.style.opacity = '0';
+                setTimeout(() => card.remove(), 200);
+                /* also update the ref count pill */
+                const pill = document.getElementById('refCount');
+                if (pill) {
+                    const m = pill.textContent.match(/\d+/);
+                    if (m) pill.textContent = (parseInt(m[0]) - 1) + ' references found';
+                }
+            } else {
+                delBtn.disabled = false;
+                delBtn.innerHTML = '<i class="ti ti-x"></i>';
+            }
+        })
+        .catch(() => { delBtn.disabled = false; delBtn.innerHTML = '<i class="ti ti-x"></i>'; });
+    });
+
+    runBtn    && runBtn.addEventListener('click', runSearch);
+    queryInput && queryInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+    /* ── Auto-search when arriving from Budget Proposal "Run scoping →" ── */
+    (function () {
+        const q = new URLSearchParams(window.location.search).get('q');
+        if (q && queryInput) {
+            queryInput.value = q;
+            setTimeout(runSearch, 280);
+        }
+    })();
+
+    function esc(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+})();
+</script>
+@endpush

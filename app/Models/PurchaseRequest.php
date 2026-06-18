@@ -83,6 +83,11 @@ class PurchaseRequest extends Model
         return $this->hasMany(PurchaseRequestItem::class);
     }
 
+    public function statusUpdates(): HasMany
+    {
+        return $this->hasMany(ProcurementStatusUpdate::class);
+    }
+
     public function documents(): MorphMany
     {
         return $this->morphMany(DocumentUpload::class, 'attachable');

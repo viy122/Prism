@@ -1,124 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashboard | PRISM</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@extends('prism.layouts.office-head')
+@section('title', 'Dashboard')
 
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: #f0e9e9;
-            min-height: 100vh;
-            display: flex;
-        }
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
 
-        /* ═══════════════════════════════════════
-           SIDEBAR — identical across all pages
-        ═══════════════════════════════════════ */
-        .sb {
-            width: 272px;
-            min-height: 100vh;
-            background: #681012;
-            display: flex;
-            flex-direction: column;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-            flex-shrink: 0;
-            z-index: 50;
-        }
-        .sb-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 22px 18px 20px;
-            text-decoration: none;
-        }
-        .sb-logo {
-            width: 44px; height: 44px;
-            border-radius: 10px;
-            background: #fff;
-            padding: 6px;
-            flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .sb-logo img { width: 100%; height: 100%; object-fit: contain; }
-        .sb-brand-name { font-size: 18px; font-weight: 900; color: #fff; letter-spacing: .5px; }
-        .sb-divider { height: 1px; background: rgba(255,255,255,.1); margin: 0 18px; }
-        .sb-nav {
-            padding: 14px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            flex: 1;
-        }
-        .sb-nav a {
-            display: flex;
-            align-items: center;
-            gap: 11px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            font-size: 13.5px;
-            font-weight: 600;
-            color: rgba(255,255,255,.65);
-            text-decoration: none;
-            transition: background .15s, color .15s;
-        }
-        .sb-nav a:hover { background: rgba(255,255,255,.1); color: #fff; }
-        .sb-nav a.active { background: #fff; color: #681012; font-weight: 700; }
-        .sb-nav a svg {
-            width: 18px; height: 18px;
-            flex-shrink: 0;
-            stroke: currentColor; fill: none;
-            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-        }
-        .sb-bottom { padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px; }
-        .sb-workspace { padding: 16px 18px 8px; }
-        .sb-workspace-label {
-            font-size: 9px; font-weight: 700; letter-spacing: .18em;
-            text-transform: uppercase; color: rgba(255,255,255,.38); margin-bottom: 3px;
-        }
-        .sb-workspace-role { font-size: 13px; font-weight: 800; color: #fff; }
-        .sb-logout {
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            min-height: 42px; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,.15);
-            background: rgba(255,255,255,.1);
-            font-size: 13px; font-weight: 700; color: #fff;
-            text-decoration: none; transition: background .2s, color .2s;
-            font-family: 'Poppins', sans-serif;
-        }
-        .sb-logout:hover { background: #fff; color: #681012; }
-        .sb-logout svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-        /* ═══════════════════════════════════════
-           MAIN AREA
-        ═══════════════════════════════════════ */
-        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-
-        .topbar {
-            position: sticky; top: 0; z-index: 40;
-            background: rgba(255,255,255,.96);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #e2e8f0;
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 32px; height: 66px; gap: 16px; flex-shrink: 0;
-        }
-        .topbar-title { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -.4px; }
-        .topbar-chip {
-            display: inline-flex; align-items: center;
-            height: 34px; padding: 0 16px; border-radius: 8px;
-            background: rgba(104,16,18,.07); border: 1px solid rgba(104,16,18,.14);
-            font-size: 12px; font-weight: 700; color: #681012; white-space: nowrap;
-        }
-
+@push('page-css')
+<style>
         /* ═══════════════════════════════════════
            DASHBOARD CONTENT
         ═══════════════════════════════════════ */
@@ -273,78 +161,19 @@
 
         /* Mobile */
         @media (max-width: 1024px) {
-            .sb { display: none; }
-            body { display: block; }
-            .main { display: block; }
             .dash { padding: 16px 16px 40px; }
             .pd-stat-grid { grid-template-columns: repeat(2,1fr); }
             .pd-main-grid { grid-template-columns: 1fr; }
             .pd-bottom-grid { grid-template-columns: 1fr 1fr; }
-            .topbar { padding: 0 16px; }
         }
         @media (max-width: 600px) {
             .pd-stat-grid { grid-template-columns: 1fr; }
             .pd-bottom-grid { grid-template-columns: 1fr; }
         }
-    </style>
-</head>
-<body>
+</style>
+@endpush
 
-    {{-- ═══════════════ SIDEBAR ═══════════════ --}}
-    <aside class="sb">
-        <a class="sb-brand" href="{{ route('office-head.dashboard') }}">
-            <div class="sb-logo">
-                <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU seal"
-                     onerror="this.parentElement.innerHTML='🎓'">
-            </div>
-            <span class="sb-brand-name">PRISM</span>
-        </a>
-
-        <div class="sb-divider"></div>
-
-        <nav class="sb-nav">
-            <a href="{{ route('office-head.dashboard') }}" class="active">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                Dashboard
-            </a>
-            <a href="{{ route('office-head.market-scoping') ?? '#' }}">
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                Market Scoping
-            </a>
-            <a href="{{ route('office-head.budget-proposal') }}">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                Budget Proposal
-            </a>
-            <a href="{{ route('office-head.my-proposals') }}">
-                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                My Proposals
-            </a>
-            <a href="{{ route('office-head.purchase-requests') }}">
-                <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                Purchase Requests
-            </a>
-        </nav>
-
-        <div class="sb-bottom">
-            <div class="sb-workspace">
-                <p class="sb-workspace-label">Workspace</p>
-                <p class="sb-workspace-role">Office Head / Dean</p>
-            </div>
-            <a href="{{ route('login') }}" class="sb-logout">
-                <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                Logout
-            </a>
-        </div>
-    </aside>
-
-    {{-- ═══════════════ MAIN ═══════════════ --}}
-    <div class="main">
-
-        <header class="topbar">
-            <span class="topbar-title">Dashboard</span>
-            <span class="topbar-chip">Office Head / Dean</span>
-        </header>
-
+@section('content')
         <div class="dash">
 
             @php
@@ -544,85 +373,84 @@
 
             </div>
         </div>{{-- /dash --}}
-    </div>{{-- /main --}}
+@endsection
 
-    <script>
-    (function () {
-        const pp = "'Poppins', sans-serif";
-        Chart.defaults.font.family = pp;
+@push('scripts')
+<script>
+(function () {
+    const pp = "'Poppins', sans-serif";
+    Chart.defaults.font.family = pp;
 
-        /* DONUT */
-        const dEl = document.getElementById('donutChart');
-        if (dEl) {
-            new Chart(dEl, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Purchased','Unpurchased'],
-                    datasets: [{
-                        data: [parseInt(dEl.dataset.purchased||0), parseInt(dEl.dataset.unpurchased||0)],
-                        backgroundColor: ['#681012','#e2e8f0'],
-                        borderWidth: 0, borderRadius: 4, hoverOffset: 6
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false, cutout: '70%',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: c => '  '+c.label+': '+c.parsed+' item'+(c.parsed!==1?'s':'') }}
-                    }
+    /* DONUT */
+    const dEl = document.getElementById('donutChart');
+    if (dEl) {
+        new Chart(dEl, {
+            type: 'doughnut',
+            data: {
+                labels: ['Purchased','Unpurchased'],
+                datasets: [{
+                    data: [parseInt(dEl.dataset.purchased||0), parseInt(dEl.dataset.unpurchased||0)],
+                    backgroundColor: ['#681012','#e2e8f0'],
+                    borderWidth: 0, borderRadius: 4, hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: c => '  '+c.label+': '+c.parsed+' item'+(c.parsed!==1?'s':'') }}
                 }
-            });
-        }
+            }
+        });
+    }
 
-        /* BAR — Monthly */
-        const bEl = document.getElementById('barChart');
-        if (bEl) {
-            new Chart(bEl, {
-                type: 'bar',
-                data: {
-                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-                    datasets: [{
-                        label: 'Budget Used (PHP)',
-                        data: {!! json_encode($summary['monthlyBudgetUsage'] ?? array_fill(0,12,0)) !!},
-                        backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
-                        y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
-                    }
+    /* BAR — Monthly */
+    const bEl = document.getElementById('barChart');
+    if (bEl) {
+        new Chart(bEl, {
+            type: 'bar',
+            data: {
+                labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                datasets: [{
+                    label: 'Budget Used (PHP)',
+                    data: {!! json_encode($summary['monthlyBudgetUsage'] ?? array_fill(0,12,0)) !!},
+                    backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
+                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
                 }
-            });
-        }
+            }
+        });
+    }
 
-        /* HORIZONTAL BAR — Status */
-        const sEl = document.getElementById('statusChart');
-        if (sEl) {
-            new Chart(sEl, {
-                type: 'bar',
-                data: {
-                    labels: ['Approved','Pending','Returned','Draft'],
-                    datasets: [{
-                        data: [parseInt(sEl.dataset.approved||0),parseInt(sEl.dataset.pending||0),parseInt(sEl.dataset.returned||0),parseInt(sEl.dataset.draft||0)],
-                        backgroundColor: ['#166534','#92400e','#991b1b','#334155'],
-                        borderRadius: 6, borderSkipped: false
-                    }]
-                },
-                options: {
-                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
-                        y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 12, weight: '600', family: pp } } }
-                    }
+    /* HORIZONTAL BAR — Status */
+    const sEl = document.getElementById('statusChart');
+    if (sEl) {
+        new Chart(sEl, {
+            type: 'bar',
+            data: {
+                labels: ['Approved','Pending','Returned','Draft'],
+                datasets: [{
+                    data: [parseInt(sEl.dataset.approved||0),parseInt(sEl.dataset.pending||0),parseInt(sEl.dataset.returned||0),parseInt(sEl.dataset.draft||0)],
+                    backgroundColor: ['#166534','#92400e','#991b1b','#334155'],
+                    borderRadius: 6, borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
+                    y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 12, weight: '600', family: pp } } }
                 }
-            });
-        }
-    })();
-    </script>
-
-</body>
-</html>
+            }
+        });
+    }
+})();
+</script>
+@endpush
