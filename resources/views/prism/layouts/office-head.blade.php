@@ -163,7 +163,7 @@
             position: absolute; inset: 0;
             background: linear-gradient(90deg, rgba(139,26,28,.45) 0%, rgba(139,26,28,.15) 60%, rgba(10,30,80,.55) 100%);
         }
-        .univ-header-right { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); text-align: right; }
+        .univ-header-right { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 14px; }
         .univ-date { font-size: 13px; font-weight: 800; color: #fff; letter-spacing: .5px; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
         .univ-time { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -1px; text-shadow: 0 2px 8px rgba(0,0,0,.4); line-height: 1.1; margin-top: 8px; }
 
@@ -244,8 +244,11 @@
              onerror="this.parentElement.style.background='linear-gradient(135deg,#8B1A1C,#1E3A8A)';this.style.display='none'">
         <div class="univ-header-overlay"></div>
         <div class="univ-header-right">
-            <div class="univ-date" id="hdr-date"></div>
-            <div class="univ-time" id="hdr-time"></div>
+            @include('prism.partials.notification-bell')
+            <div>
+                <div class="univ-date" id="hdr-date"></div>
+                <div class="univ-time" id="hdr-time"></div>
+            </div>
         </div>
     </div>
 
