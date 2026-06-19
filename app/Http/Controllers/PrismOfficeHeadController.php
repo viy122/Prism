@@ -382,8 +382,9 @@ class PrismOfficeHeadController extends Controller
             'budget'  => 'nullable|numeric|min:0',
         ]);
 
+        $query   = $request->input('query');
         $service = new MarketScopingService();
-        $results = $service->search($request->input('query'), 30);
+        $results = $service->search($query, 30);
 
         if (empty($results)) {
             return response()->json([
@@ -393,10 +394,8 @@ class PrismOfficeHeadController extends Controller
             ]);
         }
 
-        $specs = array_values(array_filter($request->input('specs', [])));
-        if (!empty($specs)) {
-            $results = $service->matchSpecs($results, $specs);
-        }
+        $specs   = array_values(array_filter($request->input('specs', [])));
+        $results = $service->matchSpecs($results, $specs, $query);
 
         $budget = (float) $request->input('budget', 0);
         if ($budget > 0) {
@@ -406,7 +405,7 @@ class PrismOfficeHeadController extends Controller
         return response()->json([
             'success'        => true,
             'results'        => $results,
-            'query'          => $request->input('query'),
+            'query'          => $query,
             'count'          => count($results),
             'specs_filtered' => !empty($specs),
         ]);

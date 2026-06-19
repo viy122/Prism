@@ -1,3 +1,10 @@
+# Required
 flask>=3.0.0
-anthropic>=0.40.0
 python-dotenv>=1.0.0
+
+# Semantic matching (strongly recommended — enables sentence-transformers AI)
+sentence-transformers>=2.7.0
+torch>=2.0.0
+
+# TF-IDF fallback (used when sentence-transformers is unavailable)
+scikit-learn>=1.4.0
