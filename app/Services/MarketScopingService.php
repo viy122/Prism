@@ -31,15 +31,13 @@ class MarketScopingService
         return $results;
     }
 
-    public function matchSpecs(array $results, array $specs): array
+    public function matchSpecs(array $results, array $specs, string $query = ''): array
     {
-        if (empty($specs) || empty($results)) {
+        if (empty($results)) {
             return $results;
         }
 
         try {
-            // Add 'title', 'supplier', 'url', 'description' aliases the Python microservice expects
-            // while keeping all original SerpAPI fields so the frontend stays unchanged.
             $payload = array_map(fn ($r) => array_merge($r, [
                 'title'       => $r['name']       ?? '',
                 'supplier'    => $r['source']     ?? '',
@@ -48,11 +46,18 @@ class MarketScopingService
             ]), $results);
 
             $response = Http::timeout(10)->post(self::MATCHER_URL . '/match', [
+                'item'    => $query,
                 'specs'   => $specs,
                 'results' => $payload,
             ]);
 
-            return $response->successful() ? $response->json() : $results;
+            if (!$response->successful()) {
+                return $results;
+            }
+
+            // v2 response: { mode, matched, count }
+            $json = $response->json();
+            return is_array($json['matched'] ?? null) ? $json['matched'] : $results;
         } catch (\Throwable) {
             return $results;
         }
