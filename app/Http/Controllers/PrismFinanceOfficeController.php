@@ -8,6 +8,8 @@ use App\Models\BudgetProposalReview;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
 use App\Services\NotificationService;
+use App\Services\ProcurementModeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -96,15 +98,25 @@ class PrismFinanceOfficeController extends Controller
         $items = BudgetProposalItem::with('budgetProposal.office')
             ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
             ->get()
-            ->map(fn ($item) => [
-                'office'          => $item->budgetProposal?->office?->name ?? '—',
-                'item'            => $item->name,
-                'quantity'        => (int) $item->quantity,
-                'abcAmount'       => (float) $item->estimated_total_cost,
-                'targetQuarter'   => $item->target_quarter ?? 'Q1',
-                'procurementMode' => $this->procurementMode((float) $item->estimated_total_cost),
-                'recommendation'  => $this->procurementRecommendation((float) $item->estimated_total_cost),
-            ])
+            ->map(function ($item) {
+                $abc             = (float) $item->estimated_total_cost;
+                $recommendedMode = ProcurementModeService::recommend($abc);
+
+                return [
+                    'itemId'          => $item->id,
+                    'office'          => $item->budgetProposal?->office?->name ?? '—',
+                    'item'            => $item->name,
+                    'quantity'        => (int) $item->quantity,
+                    'abcAmount'       => $abc,
+                    'targetQuarter'   => $item->target_quarter ?? 'Q1',
+                    'recommendedMode' => $recommendedMode,
+                    'rationale'       => ProcurementModeService::rationale($abc),
+                    'procurementMode' => $item->procurement_mode ?? $recommendedMode,
+                    'isOverridden'    => (bool) $item->is_overridden,
+                    'overrideReason'  => $item->override_reason ?? '',
+                    'saveUrl'         => route('finance-office.annual-procurement-plan.save-mode', $item->id),
+                ];
+            })
             ->all();
 
         return view('prism.finance-office.annual-procurement-plan', $this->withCommon('annual-procurement-plan', [
@@ -112,8 +124,35 @@ class PrismFinanceOfficeController extends Controller
             'appItems'         => $items,
             'offices'          => collect($items)->pluck('office')->unique()->values()->all(),
             'quarters'         => ['Q1', 'Q2', 'Q3', 'Q4'],
-            'procurementModes' => ['Public Bidding', 'Competitive Bidding', 'Small Value Procurement', 'Shopping', 'Direct Contracting'],
+            'procurementModes' => ProcurementModeService::MODES,
         ]));
+    }
+
+    public function saveProcurementMode(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'procurement_mode' => 'required|string|in:' . implode(',', ProcurementModeService::MODES),
+            'override_reason'  => 'nullable|string|max:1000',
+        ]);
+
+        $recommended  = ProcurementModeService::recommend((float) $item->estimated_total_cost);
+        $isOverridden = $validated['procurement_mode'] !== $recommended;
+
+        if ($isOverridden && empty(trim($validated['override_reason'] ?? ''))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A reason is required when overriding the system recommendation.',
+            ], 422);
+        }
+
+        $item->update([
+            'recommended_mode' => $recommended,
+            'procurement_mode' => $validated['procurement_mode'],
+            'is_overridden'    => $isOverridden,
+            'override_reason'  => $isOverridden ? trim($validated['override_reason']) : null,
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     public function budgetUtilizationReport(): View
@@ -276,20 +315,12 @@ class PrismFinanceOfficeController extends Controller
 
     private function procurementMode(float $amount): string
     {
-        if ($amount >= 2_000_000) return 'Public Bidding';
-        if ($amount >= 1_000_000) return 'Competitive Bidding';
-        if ($amount >= 50_000)    return 'Small Value Procurement';
-        if ($amount >= 10_000)    return 'Shopping';
-        return 'Direct Contracting';
+        return ProcurementModeService::recommend($amount);
     }
 
     private function procurementRecommendation(float $amount): string
     {
-        if ($amount >= 2_000_000) return 'ABC meets Public Bidding threshold; formal competitive bidding required under RA 9184.';
-        if ($amount >= 1_000_000) return 'ABC meets Competitive Bidding threshold; conduct formal canvassing with at least 3 quotations.';
-        if ($amount >= 50_000)    return 'ABC is within SVP threshold; simplified procurement applies.';
-        if ($amount >= 10_000)    return 'Readily available items; shopping procedure allowed.';
-        return 'Sole source or low-value item; attach justification for direct contracting.';
+        return ProcurementModeService::rationale($amount);
     }
 
     private function withCommon(string $activeFinancePage, array $data): array

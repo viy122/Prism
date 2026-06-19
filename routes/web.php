@@ -41,6 +41,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/proposal-review/{proposal}/endorse', 'endorse')->name('proposal-review.endorse');
         Route::post('/proposal-review/{proposal}/return', 'returnProposal')->name('proposal-review.return');
         Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
+        Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
         Route::get('/budget-utilization-report', 'budgetUtilizationReport')->name('budget-utilization-report');
     });
 

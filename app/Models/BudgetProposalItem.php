@@ -51,6 +51,10 @@ class BudgetProposalItem extends Model
         'estimated_total_cost',
         'approved_budget',
         'target_quarter',
+        'recommended_mode',
+        'procurement_mode',
+        'override_reason',
+        'is_overridden',
         'status',
         'remarks',
         'specifications_json',
@@ -66,6 +70,7 @@ class BudgetProposalItem extends Model
             'serviceable_units'     => 'integer',
             'unserviceable_units'   => 'integer',
             'specifications_json'   => 'array',
+            'is_overridden'         => 'boolean',
         ];
     }
 
