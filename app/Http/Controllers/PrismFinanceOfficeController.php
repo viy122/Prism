@@ -7,6 +7,7 @@ use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -202,6 +203,8 @@ class PrismFinanceOfficeController extends Controller
             'reviewed_at'         => now(),
         ]);
 
+        NotificationService::proposalEndorsed($proposal);
+
         return redirect()->route('finance-office.proposal-review.show', $proposal->id)
             ->with('success', 'Proposal endorsed and forwarded to the Chancellor.');
     }
@@ -228,6 +231,8 @@ class PrismFinanceOfficeController extends Controller
             'remarks'             => $remarks,
             'reviewed_at'         => now(),
         ]);
+
+        NotificationService::proposalReturnedByFinance($proposal, $remarks);
 
         return redirect()->route('finance-office.proposal-review')
             ->with('success', 'Proposal returned to the office with remarks.');

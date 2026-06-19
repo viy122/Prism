@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
@@ -63,6 +64,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/division-procurement-status', 'divisionProcurementStatus')->name('division-procurement-status');
         Route::get('/division-performance-report', 'divisionPerformanceReport')->name('division-performance-report');
+    });
+
+    // ── Notifications (all authenticated users) ───────────────────────────────
+    Route::controller(NotificationController::class)->prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/',           'index')->name('index');
+        Route::get('/count',      'unreadCount')->name('count');
+        Route::post('/{id}/read', 'markRead')->name('read');
+        Route::post('/read-all',  'markAllRead')->name('read-all');
     });
 
 });

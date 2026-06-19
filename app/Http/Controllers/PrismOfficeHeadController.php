@@ -9,6 +9,7 @@ use App\Models\MarketScopingReference;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
 use App\Services\MarketScopingService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -253,6 +254,8 @@ class PrismOfficeHeadController extends Controller
             'status'      => $newStatus,
         ]);
 
+        NotificationService::prUploaded($pr);
+
         return response()->json([
             'success'  => true,
             'filePath' => $path,
@@ -363,6 +366,8 @@ class PrismOfficeHeadController extends Controller
             'remarks'             => 'Proposal submitted for review.',
             'reviewed_at'         => now(),
         ]);
+
+        NotificationService::proposalSubmitted($proposal);
 
         return response()->json([
             'success'  => true,

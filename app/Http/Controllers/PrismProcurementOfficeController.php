@@ -6,6 +6,7 @@ use App\Models\BudgetProposalItem;
 use App\Models\Office;
 use App\Models\ProcurementStatusUpdate;
 use App\Models\PurchaseRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -109,6 +110,8 @@ class PrismProcurementOfficeController extends Controller
             'status'              => $request->input('status'),
             'remarks'             => $request->input('remarks', ''),
         ]);
+
+        NotificationService::prStatusUpdated($pr);
 
         return response()->json(['success' => true]);
     }

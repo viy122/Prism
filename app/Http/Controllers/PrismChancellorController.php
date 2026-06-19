@@ -7,6 +7,7 @@ use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -158,6 +159,8 @@ class PrismChancellorController extends Controller
             'reviewed_at'         => now(),
         ]);
 
+        NotificationService::proposalApproved($proposal);
+
         return response()->json(['success' => true, 'message' => 'Proposal approved.']);
     }
 
@@ -181,6 +184,8 @@ class PrismChancellorController extends Controller
             'remarks'             => $remarks,
             'reviewed_at'         => now(),
         ]);
+
+        NotificationService::proposalReturnedByChancellor($proposal, $remarks);
 
         return response()->json(['success' => true, 'message' => 'Proposal returned to Finance Office.']);
     }
