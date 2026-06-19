@@ -1,1434 +1,1118 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PRISM – Batangas State University</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    *,
-    *::before,
-    *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
       font-family: 'Poppins', sans-serif;
     }
-
     :root {
-      --red: #8b0000;
-      --red-mid: #9b0000;
-      --red-light: #b30b0b;
-      --white: #ffffff;
-      --bg: #f5efef;
-      --text-dark: #111111;
-      --text-muted: #555555;
+      --red:      #8B0000;
+      --red-dark: #6a0000;
+      --white:    #ffffff;
+      --bg:       #f9f2f2;
+      --text:     #1a1a1a;
+      --muted:    #666666;
+      --border:   #ede0e0;
+      --rose:     #fdf0f0;
     }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      background: var(--bg);
-      overflow-x: hidden;
-    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--white); color: var(--text); overflow-x: hidden; }
 
     /* ── NAVBAR ── */
     header {
-      height: 85px;
-      width: 100%;
-      background: var(--white);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 50px;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 999;
-      box-shadow: 0 2px 15px rgba(0, 0, 0, .07);
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 1000;
+      height: 72px;
+      background: transparent;
+      border-bottom: 1px solid transparent;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 48px;
+      transition: background .3s, box-shadow .3s, border-color .3s;
+    }
+    header.scrolled {
+      background: rgba(255,255,255,0.98);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 2px 20px rgba(139,0,0,.09);
+      border-bottom: 1px solid var(--border);
     }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo-icon { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .nav-logo-icon img { width: 54px; height: 54px; object-fit: contain; }
+    .nav-logo-name { font-size: 18px; font-weight: 800; color: var(--red); letter-spacing: .5px; transition: color .3s; }
+    header.scrolled .nav-logo-name { color: var(--red); }
 
-    .logo img {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .logo-fallback {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      background: var(--red);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-size: 26px;
-      color: white;
-    }
-
-    .logo-text h3 {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text-dark);
-      line-height: 1.2;
-    }
-
-    .logo-text p {
-      font-size: 11.5px;
-      color: var(--red-light);
-      font-weight: 600;
-    }
-
-    nav {
-      display: flex;
-      gap: 32px;
-    }
-
+    .nav-right { display: flex; align-items: center; gap: 36px; }
+    nav { display: flex; align-items: center; gap: 32px; }
     nav a {
-      text-decoration: none;
-      color: var(--text-dark);
-      font-size: 13.5px;
-      font-weight: 500;
-      transition: color .2s;
+      text-decoration: none; font-size: 13.5px; font-weight: 500;
+      color: #1a1a1a; transition: color .3s;
     }
+    nav a:hover { color: var(--red); }
+    header.scrolled nav a { color: #1a1a1a; }
+    header.scrolled nav a:hover { color: var(--red); }
 
-    nav a:hover {
-      color: var(--red);
-    }
-
-    .sign-btn {
-      background: var(--red);
-      color: var(--white);
-      padding: 10px 20px;
-      border-radius: 7px;
-      text-decoration: none;
-      font-size: 13.5px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .nav-btn {
+      display: flex; align-items: center; gap: 7px;
+      background: var(--red); color: white;
+      padding: 10px 22px; border-radius: 7px;
+      text-decoration: none; font-size: 13px; font-weight: 600;
       transition: background .2s, transform .15s;
+      white-space: nowrap;
     }
-
-    .sign-btn:hover {
-      background: #6e0000;
-      transform: translateY(-1px);
-    }
+    .nav-btn:hover { background: var(--red-dark); transform: translateY(-1px); }
 
     /* ── HERO ── */
     .hero {
-      margin-top: 85px;
-      height: 620px;
       position: relative;
+      width: 100%;
+      height: 100vh;
+      min-height: 620px;
       overflow: hidden;
     }
+    .hero-bg {
+      position: absolute; inset: 0; z-index: 0;
+    }
+    .hero-bg img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center;
+      display: block;
+    }
+    .hero-bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(105deg,
+        rgba(255,255,255,0.18) 0%,
+        rgba(255,255,255,0.04) 55%,
+        rgba(0,0,0,0.08) 100%);
+    }
 
-    .slide {
+    .hero-glass {
       position: absolute;
-      inset: 0;
+      left: 60px; top: 50%;
+      transform: translateY(-50%);
+      z-index: 5;
+      width: 440px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.28) 100%);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border-radius: 28px;
+      padding: 50px 50px 46px;
+      border-top: 1.5px solid rgba(255,255,255,0.9);
+      border-left: 1.5px solid rgba(255,255,255,0.75);
+      border-right: 1.5px solid rgba(255,255,255,0.3);
+      border-bottom: 1.5px solid rgba(255,255,255,0.2);
+      box-shadow:
+        0 4px 6px rgba(0,0,0,0.04),
+        0 12px 40px rgba(0,0,0,0.14),
+        0 32px 80px rgba(0,0,0,0.1),
+        inset 0 1px 0 rgba(255,255,255,0.95),
+        inset 0 -1px 0 rgba(255,255,255,0.2);
+      animation: cardIn .9s cubic-bezier(.22,1,.36,1) both;
+      overflow: hidden;
+    }
+    .hero-glass::before {
+      content: '';
+      position: absolute; top: 0; left: 0;
+      width: 60%; height: 50%;
+      background: radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .hero-glass::after {
+      content: '';
+      position: absolute; bottom: -20px; right: -20px;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, rgba(139,0,0,0.08) 0%, rgba(139,0,0,0) 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .hero-glass > * { position: relative; z-index: 1; }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(calc(-50% + 40px)) scale(0.97); }
+      to   { opacity: 1; transform: translateY(-50%) scale(1); }
+    }
+
+    .hero-glass h1 {
+      font-size: 38px; font-weight: 900; line-height: 1.1;
+      color: #111; margin-bottom: 0;
+      text-transform: uppercase; letter-spacing: -.5px;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+    }
+    .hero-glass h1 .accent {
+      color: var(--red);
+      text-shadow: 0 2px 12px rgba(139,0,0,0.2);
+    }
+    .hero-divider {
+      width: 48px; height: 3px;
+      background: linear-gradient(90deg, var(--red), rgba(139,0,0,0.3));
+      border-radius: 2px; margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(139,0,0,0.3);
+    }
+    .hero-glass p {
+      font-size: 13.5px; line-height: 1.9;
+      color: rgba(30,30,30,0.82); margin-bottom: 30px; font-weight: 400;
+    }
+    .hero-btns { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hero-btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, var(--red) 0%, #a50000 100%);
+      color: white; padding: 13px 26px; border-radius: 10px;
+      text-decoration: none; font-size: 13px; font-weight: 700;
+      box-shadow: 0 4px 14px rgba(139,0,0,0.4), 0 1px 3px rgba(139,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+      transition: transform .2s, box-shadow .2s, background .2s; letter-spacing: .2px;
+    }
+    .hero-btn-primary:hover {
+      background: linear-gradient(135deg, #9e0000 0%, #7a0000 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(139,0,0,0.45), 0 2px 6px rgba(139,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+    }
+    .hero-btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.45);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1.5px solid rgba(139,0,0,0.25); color: var(--red);
+      padding: 12px 22px; border-radius: 10px;
+      text-decoration: none; font-size: 13px; font-weight: 600;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.06);
+      transition: background .2s, transform .2s, box-shadow .2s;
+    }
+    .hero-btn-ghost:hover {
+      background: rgba(255,255,255,0.72);
+      transform: translateY(-2px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 16px rgba(0,0,0,0.1);
+    }
+
+    /* ── ABOUT SECTION ── */
+    .about {
+      position: relative;
+      background: white;
+      padding: 0;
+    }
+    .about-bar-top {
+      width: 100%; height: 80px;
+      background: var(--red-dark);
+    }
+    .about-bar-bottom {
+      width: 100%; height: 80px;
+      background: var(--red-dark);
+    }
+    .about-bg {
+      position: relative;
+      width: calc(100% - 200px);
+      min-height: 630px;
+      margin: -28px auto;
+      border-radius: 50px;
+      overflow: hidden;
+      z-index: 2;
+      background-image: url('{{ asset("images/about.png") }}');
       background-size: cover;
       background-position: center;
-      opacity: 0;
-      transition: opacity .9s ease;
+      background-color: #fdf2ec;
     }
-
-    .slide.active {
-      opacity: 1;
-    }
-
-    .slide-1 {
-      background-image: url('images/bgbsu.jpg'), linear-gradient(135deg, #c0392b, #922b21);
-    }
-
-    .slide-2 {
-      background-image: url('images/bgbsu2.jpg'), linear-gradient(135deg, #1a237e, #283593);
-    }
-
-    .slide-3 {
-      background-image: url('images/bgbsu3.jpg'), linear-gradient(135deg, #004d40, #00695c);
-    }
-
-    .slide-4 {
-      background-image: url('images/bgbsu4.jpg'), linear-gradient(135deg, #4a148c, #6a1b9a);
-    }
-
-    .slide-5 {
-      background-image: url('images/bgbsu5.jpg'), linear-gradient(135deg, #e65100, #bf360c);
-    }
-
-    .hero-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      pointer-events: none;
-    }
-
-    .hero-overlay::before {
-      content: "";
-      position: absolute;
-      left: -100px;
-      top: 0;
-      width: 700px;
-      height: 100%;
-      background: linear-gradient(105deg, #7d0000 60%, #b30b0b 100%);
-      border-radius: 0 40% 38% 0/0 50% 50% 0;
-      opacity: .92;
-    }
-
-    .hero-content {
-      position: absolute;
-      left: 65px;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 4;
-      width: 430px;
-      color: var(--white);
-    }
-
-    .hero-content h1 {
-      font-size: 36px;
-      font-weight: 800;
-      line-height: 1.3;
-      margin-bottom: 18px;
-      letter-spacing: -.3px;
-    }
-
-    .hero-content h1 span {
-      white-space: nowrap;
-      display: block;
-    }
-
-    .hero-content p {
-      font-size: 14px;
-      line-height: 1.85;
-      margin-bottom: 28px;
-      opacity: .92;
-    }
-
-    .hero-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      background: var(--white);
-      color: var(--red);
-      padding: 13px 24px;
-      border-radius: 50px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 13.5px;
-      transition: transform .2s, box-shadow .2s;
-    }
-
-    .hero-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, .18);
-    }
-
-    .hero-btn-icon {
-      background: var(--red);
-      color: var(--white);
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-    }
-
-    .carousel-dots {
-      position: absolute;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 5;
-      display: flex;
-      gap: 10px;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--white);
-      opacity: .4;
-      cursor: pointer;
-      border: none;
-      padding: 0;
-      transition: opacity .3s, transform .3s;
-    }
-
-    .dot.active {
-      opacity: 1;
-      transform: scale(1.3);
-    }
-
-    /* ── HERO FEATURES STRIP ── */
-    .features {
-      width: 86%;
-      margin: -55px auto 0;
-      background: var(--white);
-      padding: 28px;
-      border-radius: 16px;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 22px;
+    .about-inner {
       position: relative;
-      z-index: 5;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, .09);
-    }
-
-    .feature-box {
-      text-align: center;
-      padding: 28px 20px;
-      border-radius: 13px;
-      background: #fafafa;
-      border: 1px solid #ececec;
-      transition: transform .25s, box-shadow .25s;
-    }
-
-    .feature-box:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 25px rgba(139, 0, 0, .1);
-    }
-
-    .feature-icon {
-      width: 52px;
-      height: 52px;
-      margin: 0 auto 16px;
-      display: block;
-      color: var(--red);
-    }
-
-    .feature-box h3 {
-      font-size: 14.5px;
-      font-weight: 700;
-      color: var(--red);
-      margin-bottom: 9px;
-    }
-
-    .feature-box p {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    /* ── ABOUT ── */
-    .about {
-      margin-top: 70px;
-      background: var(--red-mid);
-      padding: 90px 70px;
-    }
-
-    .about-title {
-      text-align: center;
-      color: var(--white);
-      font-size: 52px;
-      font-weight: 800;
-      margin-bottom: 60px;
-      letter-spacing: 2px;
-    }
-
-    .about-content {
+      z-index: 1;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 50px;
+      align-items: flex-start;
     }
-
-    .about-text {
-      flex: 1;
-      color: var(--white);
+    .about-left {
+      flex: 0 0 55%;
+      padding: 38px 34px 30px 44px;
+      display: flex; flex-direction: column;
+      justify-content: center;
     }
-
-    .about-text h2 {
-      font-size: 34px;
-      font-weight: 700;
-      margin-bottom: 20px;
+    .about-left h2 {
+      font-size: 40px; font-weight: 800; line-height: 1.18;
+      color: #111; margin-bottom: 0;
     }
-
-    .about-text p {
-      font-size: 15px;
-      line-height: 2;
-      opacity: .9;
+    .about-left h2 .accent { color: var(--red); }
+    .about-divider {
+      width: 28px; height: 3px;
+      background: var(--red); border-radius: 2px;
+      margin: 13px 0 15px;
     }
-
-    .about-image {
-      width: 500px;
-      height: 330px;
-      background: rgba(255, 255, 255, .15);
-      border-radius: 12px;
-      border: 2px solid rgba(255, 255, 255, .25);
-      flex-shrink: 0;
+    .about-left > p {
+      font-size: 12px; line-height: 1.8; color: #444;
+      max-width: 320px;
     }
-
-    /* ── SECTION LABEL ── */
-    .section-label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 14px;
+    .about-right {
+      flex: 0 0 45%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-content: center;
+      padding: 26px 26px 26px 0;
+      transform: translateY(100px);
     }
-
-    .section-label::before {
-      content: "";
-      display: block;
-      width: 32px;
-      height: 3px;
-      background: var(--red);
-      border-radius: 2px;
+    .about-feat {
+      background: white;
+      border-radius: 16px;
+      padding: 26px 20px 22px;
+      box-shadow: 0 2px 10px rgba(139,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+      transition: transform .3s, box-shadow .3s;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
     }
-
-    .section-label span {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: var(--red);
-      text-transform: uppercase;
+    .about-feat:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 22px rgba(139,0,0,0.13);
     }
+    .about-feat-icon {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: #fdf0f0;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 12px;
+    }
+    .about-feat-icon svg { width: 26px; height: 26px; color: var(--red); }
+    .about-feat-divider {
+      width: 24px; height: 2px;
+      background: var(--red); border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    .about-feat h4 { font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 8px; line-height: 1.3; }
+    .about-feat p  { font-size: 12.5px; color: #666; line-height: 1.6; }
 
     /* ── MODULES ── */
     .modules {
-      padding: 90px 7%;
-      background: var(--white);
-    }
-
-    .modules-header {
-      margin-bottom: 50px;
-    }
-
-    .modules-header h2 {
-      font-size: 38px;
-      font-weight: 800;
-      color: var(--text-dark);
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .modules-header p {
-      font-size: 14px;
-      color: var(--text-muted);
-      max-width: 480px;
-      line-height: 1.8;
-    }
-
-    .modules-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-    }
-
-    .module-card {
-      border: 1.5px solid #e8e0e0;
-      border-radius: 14px;
-      padding: 30px 26px;
-      background: #fff;
-      opacity: 0;
-      transform: translateY(30px);
-      transition: box-shadow .3s, border-color .3s;
-    }
-
-    .module-card.visible {
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity .5s ease, transform .5s ease, box-shadow .3s, border-color .3s;
-    }
-
-    .module-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 14px 35px rgba(139, 0, 0, .1);
-      border-color: var(--red);
-    }
-
-    .module-icon-wrap {
-      width: 48px;
-      height: 48px;
-      background: #fdf0f0;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 18px;
-    }
-
-    .module-icon-wrap svg {
-      width: 26px;
-      height: 26px;
-      color: var(--red);
-    }
-
-    .module-card h4 {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-dark);
-      margin-bottom: 10px;
-    }
-
-    .module-card p {
-      font-size: 12.5px;
-      color: var(--text-muted);
-      line-height: 1.75;
-    }
-
-    /* ── USER ROLES / FLIP CARDS ── */
-    .user-roles {
-      padding: 90px 7%;
-      background: var(--bg);
-    }
-
-    .user-roles-header {
-      margin-bottom: 55px;
-    }
-
-    .user-roles-header h2 {
-      font-size: 38px;
-      font-weight: 800;
-      color: var(--text-dark);
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .user-roles-header p {
-      font-size: 14px;
-      color: var(--text-muted);
-      max-width: 500px;
-      line-height: 1.8;
-    }
-
-    .roles-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 20px;
-    }
-
-    .flip-card {
-      height: 220px;
-      perspective: 1000px;
-      cursor: pointer;
-      opacity: 0;
-      transform: translateY(25px);
-    }
-
-    .flip-card.visible {
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity .5s ease, transform .5s ease;
-    }
-
-    .flip-card-inner {
       position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      transition: transform .6s cubic-bezier(.4, 0, .2, 1);
-    }
+    
+    padding: 70px 56px;
 
-    .flip-card.flipped .flip-card-inner {
-      transform: rotateY(180deg);
-    }
-
-    .flip-front,
-    .flip-back {
-      position: absolute;
-      inset: 0;
-      border-radius: 14px;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 18px;
-      text-align: center;
-    }
-
-    .flip-front {
-      background: var(--white);
-      border: 1.5px solid #e8e0e0;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, .06);
-    }
-
-    .flip-front-icon {
-      width: 56px;
-      height: 56px;
-      background: #fdf0f0;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 14px;
-    }
-
-    .flip-front-icon svg {
-      width: 28px;
-      height: 28px;
-      color: var(--red);
-    }
-
-    .flip-front h4 {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--text-dark);
-      line-height: 1.3;
-      margin-bottom: 6px;
-    }
-
-    .flip-hint {
-      font-size: 10px;
-      color: #bbb;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 4px;
-    }
-
-    .flip-back {
-      background: var(--red);
-      transform: rotateY(180deg);
-    }
-
-    .flip-back h4 {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--white);
-      margin-bottom: 10px;
-    }
-
-    .flip-back p {
-      font-size: 11.5px;
-      color: rgba(255, 255, 255, .88);
-      line-height: 1.7;
-    }
-
-    /* ── WORKFLOW ── */
-    .workflow {
-      padding: 90px 7%;
-      background: var(--white);
-    }
-
-    .workflow-header {
-      margin-bottom: 60px;
-    }
-
-    .workflow-header h2 {
-      font-size: 38px;
-      font-weight: 800;
-      color: var(--text-dark);
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .workflow-header p {
-      font-size: 14px;
-      color: var(--text-muted);
-      max-width: 500px;
-      line-height: 1.8;
-    }
-
-    .workflow-steps {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      position: relative;
-      gap: 0;
-    }
-
-    .workflow-steps::before {
-      content: "";
-      position: absolute;
-      top: 28px;
-      left: 28px;
-      right: 28px;
-      height: 3px;
-      background: #e8e0e0;
-      z-index: 0;
-    }
-
-    .workflow-line-fill {
-      position: absolute;
-      top: 28px;
-      left: 28px;
-      height: 3px;
-      width: 0;
-      background: var(--red);
-      z-index: 1;
-      transition: width 1.4s ease;
-      border-radius: 2px;
-    }
-
-    .workflow-line-fill.animated {
-      width: calc(100% - 56px);
-    }
-
-    .step {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      position: relative;
-      z-index: 2;
-      opacity: 0;
-      transform: translateY(20px);
-    }
-
-    .step.visible {
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity .5s ease, transform .5s ease;
-    }
-
-    .step-num {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: var(--white);
-      border: 3px solid #e8e0e0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text-muted);
-      margin-bottom: 14px;
-      transition: background .4s, border-color .4s, color .4s, transform .3s;
-    }
-
-    .step.active-step .step-num,
-    .step:hover .step-num {
-      background: var(--red);
-      border-color: var(--red);
-      color: white;
-      transform: scale(1.1);
-    }
-
-    .step-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-dark);
-      line-height: 1.4;
-    }
-
-    .step-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    /* ── CTA ── */
-    .cta {
-      background: linear-gradient(110deg, #4a0000 0%, #7a0000 40%, #9b1010 100%);
-      padding: 80px 7%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 40px;
-      position: relative;
+      background-image: url('{{ asset("images/features.png") }}');
+      background-size: cover;
+      background-position: center;
+      background-color: #faf8f8;
       overflow: hidden;
     }
 
-    /* PRISM watermark — very large, sits behind content on the right */
-    .cta::after {
-      content: "PRISM";
+    /* Dot grid — left side */
+    .modules-dots-left {
       position: absolute;
-      right: -40px;
+      left: 20px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 260px;
-      font-weight: 900;
-      letter-spacing: -8px;
-      color: rgba(180, 20, 20, .35);
-      pointer-events: none;
-      user-select: none;
-      line-height: 1;
-      font-family: 'Poppins', sans-serif;
-    }
-
-    .cta-text {
-      position: relative;
-      z-index: 1;
-    }
-
-    .cta-text h2 {
-      font-size: 34px;
-      font-weight: 800;
-      color: var(--white);
-      margin-bottom: 14px;
-      line-height: 1.2;
-    }
-
-    .cta-text p {
-      font-size: 14px;
-      color: rgba(255, 255, 255, .75);
-      max-width: 460px;
-      line-height: 1.85;
-    }
-
-    .cta-btn {
-      position: relative;
-      z-index: 1;
-      display: inline-flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(6, 10px);
       gap: 10px;
-      background: var(--white);
-      color: var(--red);
-      padding: 15px 32px;
-      border-radius: 8px;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 700;
-      white-space: nowrap;
-      flex-shrink: 0;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, .2);
-      transition: transform .2s, box-shadow .2s;
+      z-index: 0;
+      opacity: 0.55;
+    }
+    .modules-dots-left span {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: #c9a8a8;
+      display: block;
     }
 
-    .cta-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, .3);
+    
+    .modules-head { text-align: center; margin-bottom: 5px; position: relative; z-index: 1; }
+    .modules-head h2 { font-size: 36px; font-weight: 800; color: var(--text); line-height: 1.2; margin-bottom: 10px; }
+    .modules-head h2 .accent { color: var(--red); }
+    .modules-head p { font-size: 15px; color: var(--muted); max-width: 600px; margin: 0 auto; line-height: 1.8; }
+
+    .sec-label {
+      text-align: center; margin-bottom: 2px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      position: relative; z-index: 1;
     }
+    .sec-label::before, .sec-label::after {
+      content: ''; flex: 1; max-width: 60px; height: 1.5px; background: #ddd;
+    }
+    .sec-label span {
+      font-size: 13px; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--red);
+    }
+
+    .modules-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 28px; position: relative; z-index: 1;
+    }
+    .mod-card {
+    padding: 20px;
+    background: white;
+    border-radius: 18px;
+    border: 1px solid rgba(139,0,0,0.08);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+
+    min-height: 235px; /* adjust mo 220-250px */
+}
+    .mod-card.visible {
+      opacity: 1; transform: translateY(0);
+      transition: opacity .5s ease, transform .5s ease, background .25s, box-shadow .3s, border-color .3s;
+    }
+    .mod-card:hover { 
+      background: var(--rose);
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(139,0,0,0.08);
+      border-color: rgba(139,0,0,0.15);
+    }
+
+    .mod-num {
+      font-size: 12px; font-weight: 700; color: #ccc; letter-spacing: 1.5px;
+      margin-bottom: 8px; display: flex; justify-content: flex-end;
+    }
+    /* Red underline below the number */
+    .mod-num-wrap {
+      display: flex; flex-direction: column; align-items: flex-end;
+      margin-bottom: 6px;
+    }
+    .mod-num-wrap .mod-num { margin-bottom: 2px; }
+    .mod-num-underline {
+      width: 22px; height: 2px;
+      background: var(--red); border-radius: 2px;
+      opacity: 0.5;
+    }
+
+    .mod-icon { width: 48px; height: 48px; border-radius: 10px; background: var(--rose); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+    .mod-icon svg { width: 20px; height: 20px; color: var(--red); }
+    .mod-card h4 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .mod-card p  { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* ── USER ROLES ── */
+    /* ===========================
+   USER ROLES SECTION
+=========================== */
+
+.roles-section{
+    position: relative;
+    padding: 90px 60px;
+    background-image: url('images/roles.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+}
+
+.roles-overlay{
+    max-width: 1400px;
+    margin: auto;
+}
+
+.roles-header{
+    text-align: center;
+    margin-bottom: 55px;
+}
+
+.roles-tag{
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.roles-tag::before,
+.roles-tag::after{
+    content: "";
+    width: 55px;
+    height: 1.5px;
+    background: #ddd;
+    position: absolute;
+    top: 50%;
+}
+
+.roles-tag::before{
+    right: 115%;
+}
+
+.roles-tag::after{
+    left: 115%;
+}
+
+.roles-header h2{
+    font-size: 36px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #071634;
+    margin-bottom: 10px;
+}
+
+.roles-header h2 span{
+    color: #a31515;
+}
+
+.roles-header p{
+    font-size: 15px;
+    line-height: 1.8;
+    color: #667085;
+    max-width: 600px;
+    margin: auto;
+}
+
+/* ===========================
+   GRID
+=========================== */
+
+.roles-grid{
+    display: grid;
+    grid-template-columns: repeat(5,1fr);
+    gap: 22px;
+}
+
+/* ===========================
+   FLIP CARD
+=========================== */
+
+.role-card{
+    background: transparent;
+    perspective: 1200px;
+    height: 280px;
+    cursor: pointer;
+}
+
+.role-card-inner{
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform .6s cubic-bezier(.4,.2,.2,1);
+    transform-style: preserve-3d;
+}
+
+/* Hover flips it (desktop); .flipped class flips it on click (touch / accessibility) */
+.role-card:hover .role-card-inner,
+.role-card.flipped .role-card-inner{
+    transform: rotateY(180deg);
+}
+
+.role-card-front,
+.role-card-back{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 22px;
+}
+
+.role-card-front{
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.04);
+    box-shadow: 0 4px 12px rgba(0,0,0,.03);
+}
+
+.role-card-front img{
+    width: 130px;
+    height: 130px;
+    object-fit: contain;
+    margin-bottom: 18px;
+}
+
+.role-card-front h3{
+    font-size: 17px;
+    font-weight: 700;
+    color: #08142c;
+    line-height: 1.35;
+}
+
+.role-card-back{
+    background: linear-gradient(150deg, var(--red) 0%, var(--red-dark) 100%);
+    transform: rotateY(180deg);
+    box-shadow: 0 8px 22px rgba(139,0,0,.25);
+}
+
+.role-card-back h3{
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 14px;
+}
+
+.role-line{
+    width: 30px;
+    height: 3px;
+    background: #d7a545;
+    margin: 0 auto 14px;
+    border-radius: 50px;
+}
+
+.role-card-back .role-line{
+    background: rgba(255,255,255,.6);
+}
+
+.role-card-back p{
+    font-size: 13px;
+    line-height: 1.75;
+    color: rgba(255,255,255,.92);
+}
+
+.flip-hint{
+    position: absolute;
+    bottom: 12px; right: 16px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: #c9a8a8;
+    display: flex; align-items: center; gap: 4px;
+}
+.flip-hint svg{ width: 11px; height: 11px; }
+
+/* ===========================
+   RESPONSIVE
+=========================== */
+
+@media(max-width:1200px){
+
+    .roles-grid{
+        grid-template-columns: repeat(3,1fr);
+    }
+
+}
+
+@media(max-width:768px){
+
+    .roles-header h2{
+        font-size: 30px;
+    }
+
+    .roles-grid{
+        grid-template-columns: repeat(2,1fr);
+    }
+
+}
+
+@media(max-width:576px){
+
+    .roles-grid{
+        grid-template-columns: 1fr;
+    }
+
+    .roles-header h2{
+        font-size: 26px;
+    }
+
+}
+
+    /* ── WORKFLOW ── */
+    /* ── WORKFLOW ── */
+.workflow{
+    padding: 90px 60px;
+    background: white;
+}
+
+.workflow-head{
+    text-align: center;
+    margin-bottom: 55px;
+}
+
+.workflow-head h2{
+    font-size: 36px;       /* same as User Roles */
+    line-height: 1.2;
+    font-weight: 800;
+    color: #071634;
+    margin-bottom: 10px;
+}
+
+.workflow-head h2 .accent{
+    color: var(--red);
+}
+
+.workflow-head p{
+    font-size: 15px;       /* same as User Roles */
+    line-height: 1.8;
+    color: #667085;
+    max-width: 600px;
+    margin: auto;
+}
+    .workflow-steps { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+    .workflow-steps::before { content: ''; position: absolute; top: 27px; left: 40px; right: 40px; height: 2px; background: var(--border); z-index: 0; }
+    .wf-fill { position: absolute; top: 27px; left: 40px; height: 2px; width: 0; z-index: 1; background: var(--red); transition: width 1.5s ease; }
+    .wf-fill.go { width: calc(100% - 80px); }
+    .wf-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; opacity: 0; transform: translateY(16px); }
+    .wf-step.vis { opacity: 1; transform: translateY(0); transition: opacity .45s ease, transform .45s ease; }
+    .wf-num { width: 54px; height: 54px; border-radius: 50%; background: white; border: 2.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; color: var(--muted); margin-bottom: 14px; transition: all .3s; }
+    .wf-step:hover .wf-num { background: var(--red); border-color: var(--red); color: white; transform: scale(1.1); }
+    .wf-label { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.4; }
+
+    /* ── CTA ── */
+    .cta {
+      background: linear-gradient(110deg, #3d0000 0%, #7a0000 45%, #9e1111 100%);
+      padding: 80px 56px;
+      display: flex; align-items: center; justify-content: space-between; gap: 40px;
+      position: relative; overflow: hidden;
+    }
+    .cta::after {
+      content: 'PRISM';
+      position: absolute; right: -30px; top: 50%; transform: translateY(-50%);
+      font-size: 240px; font-weight: 900; letter-spacing: -6px;
+      color: rgba(180,20,20,.28); pointer-events: none; user-select: none; line-height: 1;
+    }
+    .cta-text { position: relative; z-index: 1; }
+    .cta-text h2 { font-size: 32px; font-weight: 800; color: white; margin-bottom: 12px; line-height: 1.2; }
+    .cta-text p  { font-size: 13.5px; color: rgba(255,255,255,.72); max-width: 460px; line-height: 1.85; }
+    .cta-action { position: relative; z-index: 1; flex-shrink: 0; }
+    .cta-btn { display: inline-flex; align-items: center; gap: 10px; background: white; color: var(--red); padding: 15px 30px; border-radius: 8px; text-decoration: none; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 20px rgba(0,0,0,.2); transition: transform .2s, box-shadow .2s; }
+    .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
 
     /* ── FOOTER ── */
-    footer {
-      background: #0d0101;
-      padding: 60px 7% 28px;
-      color: rgba(255, 255, 255, .55);
-    }
-
-    .footer-top {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 80px;
-      padding-bottom: 40px;
-      border-bottom: 1px solid rgba(255, 255, 255, .08);
-      margin-bottom: 24px;
-    }
-
-    .footer-brand .brand-name {
-      font-size: 22px;
-      font-weight: 900;
-      color: var(--white);
-      letter-spacing: 2px;
-    }
-
-    .footer-brand p {
-      font-size: 12.5px;
-      line-height: 2;
-      max-width: 280px;
-      margin-top: 10px;
-    }
-
-    .footer-col h5 {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: #c9a84c;
-      margin-bottom: 20px;
-    }
-
-    .footer-col a {
-      display: block;
-      text-decoration: none;
-      color: rgba(255, 255, 255, .55);
-      font-size: 13.5px;
-      margin-bottom: 12px;
-      transition: color .2s;
-    }
-
-    .footer-col a:hover {
-      color: var(--white);
-    }
-
-    .footer-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .footer-bottom p {
-      font-size: 12px;
-      color: rgba(255, 255, 255, .35);
-    }
-
-    .footer-tagline {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: #c9a84c;
-    }
+    footer { background: #0d0101; padding: 60px 56px 28px; }
+    .footer-top { display: grid; grid-template-columns: 1fr auto auto; gap: 80px; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 24px; }
+    .footer-brand .name { font-size: 22px; font-weight: 900; color: white; letter-spacing: 2px; }
+    .footer-brand p { font-size: 12px; line-height: 2; color: rgba(255,255,255,.45); max-width: 260px; margin-top: 10px; }
+    .footer-col h5 { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #c9a84c; margin-bottom: 18px; }
+    .footer-col a { display: block; text-decoration: none; color: rgba(255,255,255,.45); font-size: 13px; margin-bottom: 10px; transition: color .2s; }
+    .footer-col a:hover { color: white; }
+    .footer-bottom { display: flex; justify-content: space-between; align-items: center; }
+    .footer-bottom p { font-size: 11.5px; color: rgba(255,255,255,.28); }
+    .footer-tagline { font-size: 10.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #c9a84c; }
 
     /* ── RESPONSIVE ── */
-    @media(max-width:991px) {
-      nav {
-        display: none;
-      }
-
-      .hero-content {
-        width: 85%;
-        left: 30px;
-      }
-
-      .hero-content h1 {
-        font-size: 28px;
-      }
-
-      .features {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .about-content {
-        flex-direction: column;
-      }
-
-      .about-image {
-        width: 100%;
-      }
-
-      .modules-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .roles-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-
-      .workflow-steps {
-        flex-wrap: wrap;
-        gap: 20px;
-      }
-
-      .workflow-steps::before,
-      .workflow-line-fill {
-        display: none;
-      }
-
-      .cta {
-        flex-direction: column;
-        text-align: center;
-      }
-
-      .footer-top {
-        grid-template-columns: 1fr;
-        gap: 30px;
-      }
+    @media (max-width: 991px) {
+      nav { display: none; }
+      .hero-glass { left: 30px; right: 30px; width: auto; padding: 36px 32px; }
+      .hero-glass h1 { font-size: 30px; }
+      .about-bar-top, .about-bar-bottom { height: 44px; }
+      .about-bg { width: calc(100% - 32px); margin: -22px auto; border-radius: 20px; }
+      .about-inner { flex-direction: column; }
+      .about-left { flex: none; width: 100%; padding: 30px 26px 16px; justify-content: flex-start; }
+      .about-left h2 { font-size: 24px; }
+      .about-left > p { max-width: none; }
+      .about-right { flex: none; width: 100%; padding: 4px 26px 30px; grid-template-columns: 1fr 1fr; }
+      .modules { padding: 60px 30px; }
+      .modules-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+      .modules-dots-left { display: none; }
+      .roles-section { padding: 60px 30px; }
+      .workflow { padding: 60px 30px; }
+      .workflow-steps { flex-wrap: wrap; gap: 20px; }
+      .workflow-steps::before, .wf-fill { display: none; }
+      .wf-step { flex: 0 0 calc(33.3% - 14px); }
+      .cta { flex-direction: column; padding: 60px 30px; text-align: center; }
+      .footer-top { grid-template-columns: 1fr; gap: 30px; }
+      footer { padding: 50px 30px 24px; }
     }
-
-    @media(max-width:600px) {
-      header {
-        padding: 0 20px;
-      }
-
-      .features {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-content h1 {
-        font-size: 22px;
-      }
-
-      .about {
-        padding: 60px 30px;
-      }
-
-      .about-title {
-        font-size: 38px;
-      }
-
-      .modules-grid,
-      .roles-grid {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 600px) {
+      header { padding: 0 20px; }
+      .hero-glass { left: 16px; right: 16px; padding: 28px 24px; }
+      .hero-glass h1 { font-size: 26px; }
+      .about-left h2 { font-size: 21px; }
+      .about-right { grid-template-columns: 1fr 1fr; gap: 9px; }
+      .about-feat { padding: 13px 10px 11px; }
+      .modules-grid { grid-template-columns: 1fr; gap: 14px; }
+      .roles-grid { gap: 14px; }
+      .wf-step { flex: 0 0 calc(50% - 10px); }
     }
   </style>
 </head>
-
 <body>
 
-  <!-- ── HEADER ── -->
-  <header>
-    <div class="logo">
-      <img src="images/bsulogo.png" alt="BSU Logo"
-        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="logo-fallback" style="display:none;">🎓</div>
-      <div class="logo-text">
-        <h3>BATANGAS STATE UNIVERSITY</h3>
-        <p>The National Engineering University</p>
-      </div>
+<!-- HEADER -->
+<header id="hdr">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">
+      <img src="{{ asset('images/prism2.png') }}" alt="PRISM Logo">
     </div>
+    <span class="nav-logo-name">PRISM</span>
+  </a>
+  <div class="nav-right">
     <nav>
       <a href="#">Home</a>
+      <a href="#about">About</a>
       <a href="#features">Features</a>
       <a href="#roles">Users</a>
       <a href="#workflow">Workflow</a>
-      <a href="#about">About</a>
       <a href="#">Contact</a>
     </nav>
-    <a href="{{ route('login') }}" class="sign-btn">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+    <a href="{{ route('login') }}" class="nav-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
       </svg>
       Sign In
     </a>
-  </header>
+  </div>
+</header>
 
-  <!-- ── HERO ── -->
-  <section class="hero">
-    <div class="slide slide-1 active"></div>
-    <div class="slide slide-2"></div>
-    <div class="slide slide-3"></div>
-    <div class="slide slide-4"></div>
-    <div class="slide slide-5"></div>
-    <div class="hero-overlay"></div>
-    <div class="hero-content">
-      <h1>
-        <span>Smart Procurement.</span>
-        <span>Transparent Governance.</span>
-        <span>Better Education.</span>
-      </h1>
-      <p>An integrated, AI-assisted procurement management system for Batangas State University – TNEU ARASOF-Nasugbu Campus.</p>
-      <a href="{{ route('login') }}" class="hero-btn">
-        GET STARTED
-        <span class="hero-btn-icon">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
-          </svg>
-        </span>
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <img src="{{ asset('images/bsuhero.png') }}" alt="Batangas State University ARASOF-Nasugbu">
+  </div>
+  <div class="hero-glass">
+    <h1>TRANSFORMING<br>IDEAS INTO<br><span class="accent">SMART<br>PROCUREMENT</span></h1>
+    <div class="hero-divider"></div>
+    <p>Designed to simplify procurement workflows through innovation, intelligence, and transparency.</p>
+    <div class="hero-btns">
+      <a href="{{ route('login') }}" class="hero-btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+        </svg>
+        Get Started
+      </a>
+      <a href="#about" class="hero-btn-ghost">
+        Learn More
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
       </a>
     </div>
-    <div class="carousel-dots">
-      <button class="dot active" data-index="0"></button>
-      <button class="dot" data-index="1"></button>
-      <button class="dot" data-index="2"></button>
-      <button class="dot" data-index="3"></button>
-      <button class="dot" data-index="4"></button>
-    </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ── HERO FEATURE STRIP ── -->
-  <section class="features">
-    <div class="feature-box">
-      <svg class="feature-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M32 6 L54 16 L54 32 C54 44 44 54 32 58 C20 54 10 44 10 32 L10 16 Z" />
-        <path d="M22 32 L29 39 L42 26" />
-      </svg>
-      <h3>Transparent</h3>
-      <p>Full visibility in every step of the procurement process.</p>
-    </div>
-    <div class="feature-box">
-      <svg class="feature-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 40 C20 28 28 36 32 30 C36 24 44 32 54 24" />
-        <path d="M20 44 C26 34 30 40 32 36 C34 32 38 38 44 30" />
-        <circle cx="16" cy="20" r="6" />
-        <circle cx="48" cy="20" r="6" />
-        <line x1="22" y1="20" x2="42" y2="20" />
-      </svg>
-      <h3>Collaborative</h3>
-      <p>Strong stakeholder participation across all units.</p>
-    </div>
-    <div class="feature-box">
-      <svg class="feature-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="12" y="6" width="34" height="44" rx="3" />
-        <path d="M20 20 L36 20" />
-        <path d="M20 28 L36 28" />
-        <path d="M20 36 L28 36" />
-        <circle cx="42" cy="46" r="10" />
-        <path d="M38 46 L41 49 L46 43" />
-      </svg>
-      <h3>Efficient</h3>
-      <p>Streamlined and optimized procurement workflow.</p>
-    </div>
-    <div class="feature-box">
-      <svg class="feature-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="14" y="28" width="36" height="28" rx="4" />
-        <path d="M22 28 L22 20 C22 12 42 12 42 20 L42 28" />
-        <circle cx="32" cy="42" r="4" />
-        <line x1="32" y1="46" x2="32" y2="50" />
-      </svg>
-      <h3>Secure</h3>
-      <p>Reliable, protected, and auditable records.</p>
-    </div>
-  </section>
-
-  <!-- ── ABOUT ── -->
-  <section class="about" id="about">
-    <h1 class="about-title">ABOUT</h1>
-    <div class="about-content">
-      <div class="about-text">
-        <h2>What is PRISM?</h2>
-        <p>PRISM is an integrated procurement management platform that helps Batangas State University streamline procurement activities while ensuring transparency, efficiency, accountability, and security throughout the entire procurement lifecycle.</p>
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="about-bar-top"></div>
+  <div class="about-bg">
+    <div class="about-inner">
+      <div class="about-left">
+        <h2>Empowering Smarter<br><span class="accent">Procurement.</span></h2>
+        <div class="about-divider"></div>
+        <p>PRISM is an AI-assisted platform that simplifies procurement processes, improves transparency, and supports smarter budget decisions for the university.</p>
       </div>
-      <div class="about-image"></div>
-    </div>
-  </section>
-
-  <!-- ── CORE FEATURES / MODULES ── -->
-  <section class="modules" id="features">
-    <div class="modules-header">
-      <div class="section-label"><span>Core Features</span></div>
-      <h2>Campus Procurement<br>Support Modules</h2>
-      <p>Purpose-built tools that streamline every stage of the procurement lifecycle — from budget planning to final monitoring.</p>
-    </div>
-    <div class="modules-grid">
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <path d="M8 21h8M12 17v4" />
-          </svg>
-        </div>
-        <h4>Budget Deliberation</h4>
-        <p>Organize proposed items, justifications, and office budget requirements in a structured, reviewable format.</p>
-      </div>
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <path d="M21 21l-4.35-4.35" />
-            <path d="M11 8v6M8 11h6" />
-          </svg>
-        </div>
-        <h4>AI-Assisted Market Scoping</h4>
-        <p>Gather supplier price references intelligently for budget validation and comprehensive documentation.</p>
-      </div>
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <path d="M9 15l2 2 4-4" />
-          </svg>
-        </div>
-        <h4>Budget Proposal Approval</h4>
-        <p>Route proposals through Finance and Chancellor review with a transparent, trackable workflow.</p>
-      </div>
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-          </svg>
-        </div>
-        <h4>APP Consolidation</h4>
-        <p>Prepare consolidated Annual Procurement Plan records seamlessly from all approved budget proposals.</p>
-      </div>
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v4M12 18v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M2 12h4M18 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-          </svg>
-        </div>
-        <h4>Procurement Mode Recommendation</h4>
-        <p>Support procurement mode review using item category and estimated cost data for full compliance.</p>
-      </div>
-
-      <div class="module-card">
-        <div class="module-icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
-        </div>
-        <h4>Purchase Request Tracking</h4>
-        <p>Monitor PR submission, status movement, and procurement remarks in real-time dashboards.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ── USER ROLES — FLIP CARDS ── -->
-  <section class="user-roles" id="roles">
-    <div class="user-roles-header">
-      <div class="section-label"><span>User Roles</span></div>
-      <h2>Designed for Campus<br>Procurement Coordination</h2>
-      <p>Each role has tailored access and capabilities to keep the procurement process efficient and transparent. <strong>Click a card</strong> to see what each role does.</p>
-    </div>
-    <div class="roles-grid">
-
-      <div class="flip-card" onclick="this.classList.toggle('flipped')">
-        <div class="flip-card-inner">
-          <div class="flip-front">
-            <div class="flip-front-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-            </div>
-            <h4>Office Head / Dean</h4>
-            <div class="flip-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-              Click to learn more
-            </div>
+      <div class="about-right">
+        <div class="about-feat">
+          <div class="about-feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
           </div>
-          <div class="flip-back">
-            <h4>Office Head / Dean</h4>
-            <p>Provides budget proposals, market references, and purchase requests for their office units.</p>
-          </div>
+          <div class="about-feat-divider"></div>
+          <h4>Smart Automation</h4>
+          <p>Automate workflows and reduce manual tasks.</p>
         </div>
-      </div>
-
-      <div class="flip-card" onclick="this.classList.toggle('flipped')">
-        <div class="flip-card-inner">
-          <div class="flip-front">
-            <div class="flip-front-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <line x1="2" y1="10" x2="22" y2="10" />
-              </svg>
-            </div>
-            <h4>Finance Office</h4>
-            <div class="flip-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-              Click to learn more
-            </div>
+        <div class="about-feat">
+          <div class="about-feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
           </div>
-          <div class="flip-back">
-            <h4>Finance Office</h4>
-            <p>Reviews budget availability and consolidates approved procurement plans across all offices.</p>
-          </div>
+          <div class="about-feat-divider"></div>
+          <h4>Transparency</h4>
+          <p>Ensure visibility and accountability in every step.</p>
         </div>
-      </div>
-
-      <div class="flip-card" onclick="this.classList.toggle('flipped')">
-        <div class="flip-card-inner">
-          <div class="flip-front">
-            <div class="flip-front-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 01-8 0" />
-              </svg>
-            </div>
-            <h4>Procurement Office</h4>
-            <div class="flip-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-              Click to learn more
-            </div>
+        <div class="about-feat">
+          <div class="about-feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="8" r="4"/><path d="M3 21v-1a6 6 0 0 1 6-6h1"/><circle cx="17" cy="16" r="4"/>
+            </svg>
           </div>
-          <div class="flip-back">
-            <h4>Procurement Office</h4>
-            <p>Tracks purchase requests, status updates, and procurement progress end-to-end in real time.</p>
-          </div>
+          <div class="about-feat-divider"></div>
+          <h4>Better Collaboration</h4>
+          <p>Connect offices and improve coordination.</p>
         </div>
-      </div>
-
-      <div class="flip-card" onclick="this.classList.toggle('flipped')">
-        <div class="flip-card-inner">
-          <div class="flip-front">
-            <div class="flip-front-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="8" r="5" />
-                <path d="M3 21v-2a7 7 0 0114 0v2" />
-                <path d="M16 3.13a4 4 0 010 7.75" />
-              </svg>
-            </div>
-            <h4>Chancellor</h4>
-            <div class="flip-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-              Click to learn more
-            </div>
+        <div class="about-feat">
+          <div class="about-feat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
           </div>
-          <div class="flip-back">
-            <h4>Chancellor</h4>
-            <p>Reviews campus-level approvals, reports, and monitoring dashboards for full oversight.</p>
-          </div>
+          <div class="about-feat-divider"></div>
+          <h4>Data-Driven Decisions</h4>
+          <p>Use real-time insights for smarter budget planning.</p>
         </div>
-      </div>
-
-      <div class="flip-card" onclick="this.classList.toggle('flipped')">
-        <div class="flip-card-inner">
-          <div class="flip-front">
-            <div class="flip-front-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="22 12 16 12 13 21 9 3 6 12 2 12" />
-              </svg>
-            </div>
-            <h4>Vice Chancellor</h4>
-            <div class="flip-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-              Click to learn more
-            </div>
-          </div>
-          <div class="flip-back">
-            <h4>Vice Chancellor</h4>
-            <p>Monitors division performance and office procurement status across all departments.</p>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ── WORKFLOW ── -->
-  <section class="workflow" id="workflow">
-    <div class="workflow-header">
-      <div class="section-label"><span>Procurement Workflow</span></div>
-      <h2>From Proposal Preparation<br>to Analytics</h2>
-      <p>A structured, end-to-end process that ensures every procurement activity is documented, approved, and monitored.</p>
-    </div>
-    <div class="workflow-steps">
-      <div class="workflow-line-fill" id="workflowLine"></div>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-label">Budget<br>Proposal</div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-label">Market<br>Scoping</div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-label">Approval<br>Workflow</div>
-      </div>
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-label">APP<br>Consolidation</div>
-      </div>
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-label">Purchase<br>Request</div>
-      </div>
-      <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-label">Procurement<br>Tracking</div>
-      </div>
-      <div class="step">
-        <div class="step-num">7</div>
-        <div class="step-label">Dashboard<br>&amp; Analytics</div>
       </div>
     </div>
-  </section>
+  </div>
+  <div class="about-bar-bottom"></div>
+</section>
 
-  <!-- ── CTA ── -->
-  <section class="cta">
-    <div class="cta-text">
-      <h2>Ready to streamline campus procurement?</h2>
-      <p>Join Batangas State University TNEU ARASOF-Nasugbu Campus in transforming how procurement is planned, tracked, and reported.</p>
+<!-- MODULES -->
+<section class="modules" id="features">
+  <!-- Dot grid decoration left -->
+  <div class="modules-dots-left" id="dotGridLeft"></div>
+
+  <div class="sec-label"><span>Our Solutions</span></div>
+  <div class="modules-head">
+    <h2>Campus Procurement<br><span class="accent">Support Modules</span></h2>
+    <p>Purpose-built tools that streamline every stage of the procurement lifecycle — from budget planning to final monitoring.</p>
+  </div>
+  <div class="modules-grid" id="modGrid">
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">01</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+      <h4>Budget Deliberation</h4>
+      <p>Organize proposed items, justifications, and office budget requirements in a structured, reviewable format.</p>
     </div>
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">02</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg></div>
+      <h4>AI-Assisted Market Scoping</h4>
+      <p>Gather supplier price references intelligently for budget validation and comprehensive documentation.</p>
+    </div>
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">03</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></div>
+      <h4>Budget Proposal Approval</h4>
+      <p>Route proposals through Finance and Chancellor review with a transparent, trackable workflow.</p>
+    </div>
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">04</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 10l2 2 4-4"/></svg></div>
+      <h4>APP Consolidation</h4>
+      <p>Prepare consolidated Annual Procurement Plan records seamlessly from all approved budget proposals.</p>
+    </div>
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">05</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+      <h4>Procurement Mode Recommendation</h4>
+      <p>Support procurement mode review using item category and estimated cost data for full compliance.</p>
+    </div>
+    <div class="mod-card">
+      <div class="mod-num-wrap">
+        <div class="mod-num">06</div>
+        <div class="mod-num-underline"></div>
+      </div>
+      <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <h4>Purchase Request Tracking</h4>
+      <p>Monitor PR submission, status movement, and procurement remarks in real-time dashboards.</p>
+    </div>
+  </div>
+</section>
+
+<!-- USER ROLES -->
+<section class="roles-section" id="roles">
+    <div class="roles-overlay">
+
+        <div class="roles-header">
+            <span class="roles-tag">User Roles</span>
+
+            <h2>
+                Designed for Campus<br>
+                <span>Procurement Coordination</span>
+            </h2>
+
+            <p>
+                Each role has tailored access and capabilities to keep
+                the procurement process efficient and transparent.
+            </p>
+        </div>
+
+        <div class="roles-grid" id="rolesGrid">
+
+            <div class="role-card" tabindex="0">
+                <div class="role-card-inner">
+                    <div class="role-card-front">
+                        <img src="images/user1.png" alt="Office Head / Dean">
+                        <h3>Office Head / Dean</h3>
+                    </div>
+                    <div class="role-card-back">
+                        <h3>Office Head / Dean</h3>
+                        <div class="role-line"></div>
+                        <p>Encodes budget proposals, market references, and purchase requests for their office.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="role-card" tabindex="0">
+                <div class="role-card-inner">
+                    <div class="role-card-front">
+                        <img src="images/user2.png" alt="Finance Office">
+                        <h3>Finance Office</h3>
+                    </div>
+                    <div class="role-card-back">
+                        <h3>Finance Office</h3>
+                        <div class="role-line"></div>
+                        <p>Reviews budget availability and consolidates approved procurement plans.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="role-card" tabindex="0">
+                <div class="role-card-inner">
+                    <div class="role-card-front">
+                        <img src="images/user3.png" alt="Procurement Office">
+                        <h3>Procurement Office</h3>
+                    </div>
+                    <div class="role-card-back">
+                        <h3>Procurement Office</h3>
+                        <div class="role-line"></div>
+                        <p>Tracks purchase requests, status updates, and procurement progress end-to-end.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="role-card" tabindex="0">
+                <div class="role-card-inner">
+                    <div class="role-card-front">
+                        <img src="images/user4.png" alt="Chancellor">
+                        <h3>Chancellor</h3>
+                    </div>
+                    <div class="role-card-back">
+                        <h3>Chancellor</h3>
+                        <div class="role-line"></div>
+                        <p>Reviews campus-level approvals, reports, and monitoring dashboards.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="role-card" tabindex="0">
+                <div class="role-card-inner">
+                    <div class="role-card-front">
+                        <img src="images/user5.png" alt="Vice Chancellor">
+                        <h3>Vice Chancellor</h3>
+                    </div>
+                    <div class="role-card-back">
+                        <h3>Vice Chancellor</h3>
+                        <div class="role-line"></div>
+                        <p>Monitors division performance and office procurement status across departments.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</section>
+
+<!-- WORKFLOW -->
+<section class="workflow" id="workflow">
+
+    <div class="sec-label">
+        <span>Procurement Workflow</span>
+    </div>
+
+    <div class="workflow-head">
+        <h2>
+            From Proposal Preparation<br>
+            <span class="accent">to Analytics</span>
+        </h2>
+
+        <p>
+            A structured, end-to-end process that ensures every procurement
+            activity is documented, approved, and monitored.
+        </p>
+    </div>
+  <div class="workflow-steps" id="wfSteps">
+    <div class="wf-fill" id="wfLine"></div>
+    <div class="wf-step"><div class="wf-num">1</div><div class="wf-label">Budget<br>Proposal</div></div>
+    <div class="wf-step"><div class="wf-num">2</div><div class="wf-label">Market<br>Scoping</div></div>
+    <div class="wf-step"><div class="wf-num">3</div><div class="wf-label">Approval<br>Workflow</div></div>
+    <div class="wf-step"><div class="wf-num">4</div><div class="wf-label">APP<br>Consolidation</div></div>
+    <div class="wf-step"><div class="wf-num">5</div><div class="wf-label">Purchase<br>Request</div></div>
+    <div class="wf-step"><div class="wf-num">6</div><div class="wf-label">Procurement<br>Tracking</div></div>
+    <div class="wf-step"><div class="wf-num">7</div><div class="wf-label">Dashboard<br>&amp; Analytics</div></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-text">
+    <h2>Ready to streamline campus procurement?</h2>
+    <p>Join Batangas State University TNEU ARASOF-Nasugbu Campus in transforming how procurement is planned, tracked, and reported.</p>
+  </div>
+  <div class="cta-action">
     <a href="{{ route('login') }}" class="cta-btn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.6 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
       Login to PRISM
     </a>
-  </section>
+  </div>
+</section>
 
-  <!-- ── FOOTER ── -->
-  <footer>
-    <div class="footer-top">
-      <div class="footer-brand">
-        <div class="brand-name">PRISM</div>
-        <p>Batangas State University<br>TNEU ARASOF-Nasugbu Campus<br>College of Information and Computing Sciences</p>
-      </div>
-      <div class="footer-col">
-        <h5>System</h5>
-        <a href="#">About PRISM</a>
-        <a href="#">Features</a>
-        <a href="#">Workflow</a>
-      </div>
-      <div class="footer-col">
-        <h5>Access</h5>
-        <a href="#">Login</a>
-        <a href="#">User Roles</a>
-      </div>
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <div class="name">PRISM</div>
+      <p>Batangas State University<br>TNEU ARASOF-Nasugbu Campus<br>College of Information and Computing Sciences</p>
     </div>
-    <div class="footer-bottom">
-      <p>© 2025 PRISM Prototype. All rights reserved.</p>
-      <span class="footer-tagline">Leading Innovations, Transforming Lives</span>
+    <div class="footer-col">
+      <h5>System</h5>
+      <a href="#">About PRISM</a>
+      <a href="#">Features</a>
+      <a href="#">Workflow</a>
     </div>
-  </footer>
+    <div class="footer-col">
+      <h5>Access</h5>
+      <a href="#">Login</a>
+      <a href="#">User Roles</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2025 PRISM Prototype. All rights reserved.</p>
+    <span class="footer-tagline">Leading Innovations, Transforming Lives</span>
+  </div>
+</footer>
 
-  <script>
-    /* ── CAROUSEL ── */
-    const slides = document.querySelectorAll('.slide');
-    const dots = document.querySelectorAll('.dot');
-    let current = 0,
-      timer;
+<script>
+  /* Navbar scroll */
+  window.addEventListener('scroll', () => {
+    document.getElementById('hdr').classList.toggle('scrolled', window.scrollY > 10);
+  });
 
-    function goTo(i) {
-      slides[current].classList.remove('active');
-      dots[current].classList.remove('active');
-      current = (i + slides.length) % slides.length;
-      slides[current].classList.add('active');
-      dots[current].classList.add('active');
+  /* Generate dot grid */
+  (function() {
+    const grid = document.getElementById('dotGridLeft');
+    if (!grid) return;
+    for (let i = 0; i < 6 * 10; i++) {
+      const s = document.createElement('span');
+      grid.appendChild(s);
     }
+  })();
 
-    function startAuto() {
-      clearInterval(timer);
-      timer = setInterval(() => goTo(current + 1), 4000);
-    }
-    dots.forEach(d => d.addEventListener('click', () => {
-      goTo(+d.dataset.index);
-      startAuto();
-    }));
-    startAuto();
-
-    /* ── SCROLL ANIMATIONS ── */
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const el = entry.target;
-          // stagger children
-          if (el.classList.contains('modules-grid') || el.classList.contains('roles-grid')) {
-            [...el.children].forEach((child, i) => {
-              setTimeout(() => child.classList.add('visible'), i * 120);
-            });
-          } else if (el.classList.contains('workflow-steps')) {
-            [...el.querySelectorAll('.step')].forEach((step, i) => {
-              setTimeout(() => step.classList.add('visible'), i * 130);
-            });
-            setTimeout(() => {
-              document.getElementById('workflowLine').classList.add('animated');
-            }, 300);
-          } else {
-            el.classList.add('visible');
-          }
-          observer.unobserve(el);
-        }
-      });
-    }, {
-      threshold: 0.15
+  /* Intersection observer animations */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      if (el.id === 'modGrid') {
+        [...el.children].forEach((c, i) => setTimeout(() => c.classList.add('visible'), i * 100));
+      } else if (el.id === 'rolesGrid') {
+        [...el.children].forEach((c, i) => setTimeout(() => c.classList.add('visible'), i * 110));
+      } else if (el.id === 'wfSteps') {
+        [...el.querySelectorAll('.wf-step')].forEach((s, i) => setTimeout(() => s.classList.add('vis'), i * 120));
+        setTimeout(() => document.getElementById('wfLine').classList.add('go'), 300);
+      }
+      io.unobserve(el);
     });
+  }, { threshold: 0.12 });
 
-    document.querySelectorAll('.modules-grid, .roles-grid, .workflow-steps').forEach(el => observer.observe(el));
+  ['modGrid','rolesGrid','wfSteps'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
 
-    /* ── WORKFLOW STEP HOVER HIGHLIGHT ── */
-    document.querySelectorAll('.step').forEach(step => {
-      step.addEventListener('mouseenter', () => {
-        document.querySelectorAll('.step').forEach(s => s.classList.remove('active-step'));
-        step.classList.add('active-step');
-      });
-      step.addEventListener('mouseleave', () => step.classList.remove('active-step'));
+  /* Smooth scroll */
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const t = document.querySelector(a.getAttribute('href'));
+      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
     });
-  </script>
+  });
 
+  /* Role card flip — click/tap toggles (works alongside hover-to-flip on desktop) */
+  document.querySelectorAll('.role-card').forEach(card => {
+    card.addEventListener('click', () => {
+      card.classList.toggle('flipped');
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        card.classList.toggle('flipped');
+      }
+    });
+  });
+</script>
 </body>
-
 </html>
