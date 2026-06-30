@@ -194,8 +194,8 @@
                         New Budget Proposal
                     </a>
                     <a href="{{ route('office-head.purchase-requests') }}" class="pd-btn-outline">
-                        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                        Upload PR
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        View PRs
                     </a>
                 </div>
             </div>
@@ -363,10 +363,10 @@
                         </a>
                         <a href="{{ route('office-head.purchase-requests') }}" class="pd-pr-link">
                             <div class="pd-pr-link-title">
-                                <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                                Upload signed PR
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                View Purchase Requests
                             </div>
-                            <div class="pd-pr-link-sub">Attach PR PDFs for approved items ready for processing.</div>
+                            <div class="pd-pr-link-sub">Track the status of your office's purchase requests.</div>
                         </a>
                     </div>
                 </article>

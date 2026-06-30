@@ -37,10 +37,45 @@
     tbody tr.selected td:first-child { border-left: 3px solid var(--m); }
 
     .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-    .badge-completed   { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
-    .badge-in-progress { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
-    .badge-pending     { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
-    .badge-delayed     { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+    .badge-completed    { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+    .badge-in-progress  { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
+    .badge-pending      { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+    .badge-delayed      { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+    .badge-signed       { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+    .badge-routing      { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+    .badge-draft        { background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
+
+    /* Signatory timeline */
+    .sig-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 4px; }
+    .sig-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+    .sig-step:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--s200); z-index: 0; }
+    .sig-step.done::after { background: #3b6d11; }
+    .sig-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--s300); background: var(--white); z-index: 1; position: relative; transition: all .2s; }
+    .sig-step.done .sig-dot { background: #3b6d11; border-color: #3b6d11; }
+    .sig-step.active .sig-dot { background: var(--m); border-color: var(--m); box-shadow: 0 0 0 3px rgba(139,26,28,.2); }
+    .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; white-space: nowrap; }
+    .sig-step.done .sig-label, .sig-step.active .sig-label { color: var(--s700); }
+
+    .btn-route { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
+    .btn-route-fwd { background: #3b6d11; color: #fff; }
+    .btn-route-fwd:hover:not(:disabled) { background: #2e560d; }
+    .btn-route-ret { background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
+    .btn-route-ret:hover:not(:disabled) { background: var(--s200); }
+    .btn-route:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Canvassing step */
+    .canvassing-block { border: 1.5px solid var(--s200); border-radius: 12px; padding: 14px 16px; background: var(--s50); display: flex; flex-direction: column; gap: 10px; }
+    .canvassing-block.active { border-color: #fac775; background: #fffbf0; }
+    .canvassing-block.done   { border-color: #c0dd97; background: #f3fbea; }
+    .canvassing-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .canvassing-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s500); }
+    .canvassing-block.active .canvassing-title { color: #854f0b; }
+    .canvassing-block.done   .canvassing-title { color: #3b6d11; }
+    .canvassing-btns { display: flex; gap: 6px; }
+    .btn-canvas { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
+    .btn-canvas-start { background: #854f0b; color: #fff; }
+    .btn-canvas-done  { background: #3b6d11; color: #fff; }
+    .btn-canvas:disabled { opacity: .5; cursor: not-allowed; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
@@ -59,6 +94,12 @@
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 42px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
+
+    /* PDF upload */
+    .upload-pr-label { display: inline-flex; align-items: center; gap: 7px; border: 1.5px dashed var(--s300); border-radius: 9px; background: var(--s50); padding: 7px 14px; font-size: 12px; font-weight: 700; color: var(--s600); cursor: pointer; transition: background .15s; white-space: nowrap; width: 100%; justify-content: center; margin-top: 8px; }
+    .upload-pr-label:hover { background: var(--s100); }
+    .upload-pr-label i { font-size: 14px; }
+    .upload-pr-label input { display: none; }
 
     /* Detail fields */
     .detail-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -140,17 +181,16 @@
                             <th>PR No.</th>
                             <th>Description</th>
                             <th>Date Submitted</th>
-                            <th>Status</th>
+                            <th>Signatory Stage</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($purchaseRequests as $pr)
                             @php
-                                $slug = match(strtolower($pr['currentStatus'])) {
-                                    'completed'   => 'badge-completed',
-                                    'in progress' => 'badge-in-progress',
-                                    'pending'     => 'badge-pending',
-                                    default       => 'badge-delayed',
+                                $stageBadge = match($pr['signatoryStage']) {
+                                    'fully_signed' => 'badge-signed',
+                                    'draft'        => 'badge-draft',
+                                    default        => 'badge-routing',
                                 };
                             @endphp
                             <tr data-pr-row data-pr-id="{{ $pr['id'] }}" tabindex="0">
@@ -158,7 +198,7 @@
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
                                 <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $pr['item'] }}</td>
                                 <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['dateSubmitted'] }}</td>
-                                <td><span class="badge {{ $slug }}" data-status-badge="{{ $pr['id'] }}">{{ $pr['currentStatus'] }}</span></td>
+                                <td><span class="badge {{ $stageBadge }}" data-sig-badge="{{ $pr['id'] }}">{{ $pr['signatoryLabel'] }}</span></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -193,6 +233,11 @@
                         <span>No PDF attached</span>
                     </div>
                 </div>
+                <label class="upload-pr-label" id="uploadPrLabel">
+                    <i class="ti ti-upload"></i>
+                    <span id="uploadPrText">Upload Signed PR PDF</span>
+                    <input type="file" id="uploadPrInput" accept="application/pdf,.pdf">
+                </label>
 
                 {{-- Extracted fields --}}
                 <div class="detail-fields">
@@ -200,18 +245,81 @@
                     <div class="detail-field"><label>PR Number</label><span id="fPrNumber">—</span></div>
                     <div class="detail-field full"><label>Description / Item</label><span id="fItem">—</span></div>
                     <div class="detail-field"><label>Date Submitted</label><span id="fDate">—</span></div>
-                    <div class="detail-field"><label>Current Status</label><span id="fStatus">—</span></div>
+                    <div class="detail-field"><label>Signatory Stage</label><span id="fSigLabel">—</span></div>
                     <div class="detail-field full"><label>Remarks on File</label><span id="fRemarks" style="white-space:pre-line;">—</span></div>
+                </div>
+
+                {{-- Signatory timeline --}}
+                <div>
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--s500);margin-bottom:10px;">Signature Routing</div>
+                    <div class="sig-timeline" id="sigTimeline">
+                        @php $sigLabels = ['End\nUser','2nd\nSign.','3rd\nSign.','4th\nSign.','Chancellor','Fully\nSigned']; @endphp
+                        @foreach($sigLabels as $i => $lbl)
+                            <div class="sig-step" data-step="{{ $i }}" id="sigStep{{ $i }}">
+                                <div class="sig-dot"></div>
+                                <span class="sig-label">{{ str_replace('\n', "\n", $lbl) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:12px;">
+                        <button class="btn-route btn-route-fwd" id="btnAdvance" type="button" disabled>
+                            <i class="ti ti-circle-arrow-right"></i>
+                            Route Forward
+                        </button>
+                        <button class="btn-route btn-route-ret" id="btnReturn" type="button" disabled>
+                            <i class="ti ti-circle-arrow-left"></i>
+                            Return
+                        </button>
+                    </div>
+                    <div id="returnRemarks" style="display:none;margin-top:8px;">
+                        <textarea class="remarks-textarea" id="returnRemarksInput" placeholder="Reason for returning (required)…" style="min-height:60px;"></textarea>
+                        <button class="btn-save" id="btnConfirmReturn" type="button" style="margin-top:6px;background:#a32d2d;">
+                            <i class="ti ti-send"></i> Confirm Return
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Canvassing step (shown only after PR is fully signed) --}}
+                <div id="canvassingBlock" class="canvassing-block" style="display:none;">
+                    <div class="canvassing-header">
+                        <span class="canvassing-title">
+                            <i class="ti ti-search" style="margin-right:4px;"></i>
+                            Canvassing
+                        </span>
+                        <span class="badge" id="canvassingBadge" style="font-size:10px;"></span>
+                    </div>
+                    <p id="canvassingDesc" style="font-size:12px;color:var(--s500);line-height:1.5;"></p>
+                    <div class="canvassing-btns" id="canvassingBtns"></div>
                 </div>
 
                 {{-- Update controls --}}
                 <div class="status-control">
-                    <label>Update Status</label>
+                    <label>Update Processing Status</label>
                     <select class="status-select" id="statusSelect">
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="delayed">Delayed</option>
+                        <optgroup label="Receiving">
+                            <option value="new">New</option>
+                            <option value="approved_pr_received">Approved PR Received</option>
+                            <option value="forwarded_to_bac">Approved PR Received – Forwarded to BAC</option>
+                            <option value="forwarded_to_rgo">Approved PR Received – Forwarded to RGO</option>
+                            <option value="forwarded_to_end_user">Approved PR Received – Forwarded to End-User</option>
+                        </optgroup>
+                        <optgroup label="Processing">
+                            <option value="canvassing">Canvassing</option>
+                            <option value="abstract_of_canvass_made">Abstract of Canvass Made</option>
+                            <option value="for_po">For PO</option>
+                            <option value="po_made">PO Made</option>
+                            <option value="po_confirmed">PO Confirmed</option>
+                            <option value="for_alobs">For ALOBS</option>
+                        </optgroup>
+                        <optgroup label="Special">
+                            <option value="for_reimbursement">For Reimbursement</option>
+                            <option value="for_consolidation">For CONSOLIDATION</option>
+                        </optgroup>
+                        <optgroup label="Closed">
+                            <option value="pr_denied">PR Denied</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="cancelled_system_error">Cancelled – System Error</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -249,38 +357,65 @@
 @endsection
 
 <script type="application/json" id="prData">@json($purchaseRequests)</script>
+<script type="application/json" id="stagesData">@json($stages)</script>
+<script type="application/json" id="aocUrlData">@json(route('procurement-office.abstract-of-canvass'))</script>
 
 @push('scripts')
 <script>
 (function () {
-    const allPrs     = JSON.parse(document.getElementById('prData').textContent);
-    const rows       = document.querySelectorAll('[data-pr-row]');
-    const emptyEl    = document.getElementById('detailEmpty');
-    const contentEl  = document.getElementById('detailContent');
-    const titleEl    = document.getElementById('detailPrNumber');
-    const officeChip = document.getElementById('detailPrOffice');
-    const statusSel  = document.getElementById('statusSelect');
-    const remarksIn  = document.getElementById('remarksInput');
-    const btnSave    = document.getElementById('btnSave');
-    const logEl      = document.getElementById('activityLog');
-    const toastEl    = document.getElementById('prToast');
-    const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+    const allPrs       = JSON.parse(document.getElementById('prData').textContent);
+    const rows         = document.querySelectorAll('[data-pr-row]');
+    const emptyEl      = document.getElementById('detailEmpty');
+    const contentEl    = document.getElementById('detailContent');
+    const titleEl      = document.getElementById('detailPrNumber');
+    const officeChip   = document.getElementById('detailPrOffice');
+    const statusSel    = document.getElementById('statusSelect');
+    const remarksIn    = document.getElementById('remarksInput');
+    const btnSave      = document.getElementById('btnSave');
+    const logEl        = document.getElementById('activityLog');
+    const toastEl      = document.getElementById('prToast');
+    const btnAdvance       = document.getElementById('btnAdvance');
+    const btnReturn        = document.getElementById('btnReturn');
+    const returnRemarks    = document.getElementById('returnRemarks');
+    const returnIn         = document.getElementById('returnRemarksInput');
+    const btnConfirmRet    = document.getElementById('btnConfirmReturn');
+    const canvassingBlock  = document.getElementById('canvassingBlock');
+    const canvassingBadge  = document.getElementById('canvassingBadge');
+    const canvassingDesc   = document.getElementById('canvassingDesc');
+    const canvassingBtns   = document.getElementById('canvassingBtns');
+    const uploadPrInput    = document.getElementById('uploadPrInput');
+    const uploadPrText     = document.getElementById('uploadPrText');
+    const csrfToken        = document.querySelector('meta[name="csrf-token"]').content;
+
+    const stages    = JSON.parse(document.getElementById('stagesData').textContent);
+    const aocUrl    = JSON.parse(document.getElementById('aocUrlData').textContent);
+    const sigLabels = ['End User', '2nd Sign.', '3rd Sign.', '4th Sign.', 'Chancellor', 'Fully Signed'];
 
     const logs = {};
-    let activePrId = null;
+    let activePr = null;
     let saving = false;
 
     /* ── Helpers ── */
-    function badgeClass(status) {
-        const s = (status || '').toLowerCase().replace(/_/g, ' ');
-        if (s === 'completed')   return 'badge-completed';
-        if (s === 'in progress') return 'badge-in-progress';
-        if (s === 'pending')     return 'badge-pending';
-        return 'badge-delayed';
-    }
-
     function displayStatus(val) {
-        return { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed', delayed: 'Delayed' }[val] ?? val;
+        const map = {
+            new: 'New',
+            approved_pr_received: 'Approved PR Received',
+            forwarded_to_bac: 'Approved PR Received – Forwarded to BAC',
+            forwarded_to_rgo: 'Approved PR Received – Forwarded to RGO',
+            forwarded_to_end_user: 'Approved PR Received – Forwarded to End-User',
+            canvassing: 'Canvassing',
+            abstract_of_canvass_made: 'Abstract of Canvass Made',
+            for_po: 'For PO',
+            po_made: 'PO Made',
+            po_confirmed: 'PO Confirmed',
+            for_alobs: 'For ALOBS',
+            for_reimbursement: 'For Reimbursement',
+            for_consolidation: 'For CONSOLIDATION',
+            pr_denied: 'PR Denied',
+            cancelled: 'Cancelled',
+            cancelled_system_error: 'Cancelled – System Error',
+        };
+        return map[val] ?? val;
     }
 
     function nowStr() {
@@ -313,57 +448,168 @@
             </div>`).join('');
     }
 
+    function updateTimeline(sigStage) {
+        // stages: ['draft','at_end_user','at_signatory_2',...,'fully_signed']
+        // timeline dots: 0=at_end_user .. 4=at_chancellor, 5=fully_signed
+        const timelineStages = stages.slice(1); // remove 'draft'
+        const activeIdx = timelineStages.indexOf(sigStage);
+        for (let i = 0; i < 6; i++) {
+            const el = document.getElementById('sigStep' + i);
+            if (!el) continue;
+            el.classList.remove('done', 'active');
+            if (i < activeIdx) el.classList.add('done');
+            else if (i === activeIdx) el.classList.add('active');
+        }
+    }
+
+    function updateRoutingButtons(pr) {
+        const isDraft    = pr.signatoryStage === 'draft';
+        const isSigned   = pr.signatoryStage === 'fully_signed';
+        btnAdvance.disabled = isSigned;
+        btnReturn.disabled  = isDraft || isSigned;
+        returnRemarks.style.display = 'none';
+        returnIn.value = '';
+    }
+
+    function updateCanvassingUI(pr) {
+        const stage = pr.canvassingStage;
+        if (!stage) {
+            canvassingBlock.style.display = 'none';
+            return;
+        }
+        canvassingBlock.style.display = '';
+        canvassingBlock.classList.remove('active', 'done');
+
+        if (stage === 'not_started') {
+            canvassingBadge.textContent = 'Not Started';
+            canvassingBadge.className   = 'badge badge-draft';
+            canvassingDesc.textContent  = 'PR is fully signed. Initiate canvassing of suppliers for the listed items before creating the AOC.';
+            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-start" id="btnStartCanvassing" type="button"><i class="ti ti-search"></i> Start Canvassing</button>`;
+        } else if (stage === 'in_progress') {
+            canvassingBlock.classList.add('active');
+            canvassingBadge.textContent = 'In Progress';
+            canvassingBadge.className   = 'badge badge-routing';
+            canvassingDesc.textContent  = 'Canvassing is currently in progress. Mark complete when all supplier quotes have been collected.';
+            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-done" id="btnCompleteCanvassing" type="button"><i class="ti ti-circle-check"></i> Mark Canvassing Complete</button>`;
+        } else if (stage === 'completed') {
+            canvassingBlock.classList.add('done');
+            canvassingBadge.textContent = 'Completed';
+            canvassingBadge.className   = 'badge badge-signed';
+            canvassingDesc.textContent  = 'Canvassing complete. You may now create the Abstract of Canvass (AOC).';
+            canvassingBtns.innerHTML    = `<a href="${aocUrl}" class="btn-canvas btn-canvas-done"><i class="ti ti-file-text"></i> Go to AOC</a>`;
+        }
+        attachCanvassingHandlers(pr);
+    }
+
+    function attachCanvassingHandlers(pr) {
+        const btnStart    = document.getElementById('btnStartCanvassing');
+        const btnComplete = document.getElementById('btnCompleteCanvassing');
+
+        if (btnStart) {
+            btnStart.addEventListener('click', async () => {
+                if (saving) return;
+                saving = true;
+                btnStart.disabled = true;
+                btnStart.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Starting…';
+                try {
+                    const resp = await fetch(pr.canvassingUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body: JSON.stringify({ action: 'start' }),
+                    });
+                    const json = await resp.json();
+                    if (resp.ok && json.success) {
+                        pr.canvassingStage = 'in_progress';
+                        updateCanvassingUI(pr);
+                        showToast('Canvassing started.');
+                    } else {
+                        showToast(json.error || 'Failed to start canvassing.', true);
+                    }
+                } catch { showToast('Network error.', true); }
+                finally { saving = false; }
+            });
+        }
+
+        if (btnComplete) {
+            btnComplete.addEventListener('click', async () => {
+                if (saving) return;
+                saving = true;
+                btnComplete.disabled = true;
+                btnComplete.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Completing…';
+                try {
+                    const resp = await fetch(pr.canvassingUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body: JSON.stringify({ action: 'complete' }),
+                    });
+                    const json = await resp.json();
+                    if (resp.ok && json.success) {
+                        pr.canvassingStage = 'completed';
+                        updateCanvassingUI(pr);
+                        showToast('Canvassing marked as complete. AOC can now be created.');
+                    } else {
+                        showToast(json.error || 'Failed to complete canvassing.', true);
+                    }
+                } catch { showToast('Network error.', true); }
+                finally { saving = false; }
+            });
+        }
+    }
+
+    function updateSigBadge(prId, label, stage) {
+        const badge = document.querySelector(`[data-sig-badge="${prId}"]`);
+        if (!badge) return;
+        badge.textContent = label;
+        badge.className = 'badge ' + (stage === 'fully_signed' ? 'badge-signed' : stage === 'draft' ? 'badge-draft' : 'badge-routing');
+    }
+
     /* ── Open PR ── */
     function openPr(pr) {
-        activePrId = pr.id;
+        activePr = pr;
 
-        // Highlight row
         rows.forEach(r => r.classList.remove('selected'));
         document.querySelector(`[data-pr-id="${pr.id}"]`).classList.add('selected');
 
-        // Header
         titleEl.textContent      = pr.prNumber;
         officeChip.textContent   = pr.office;
         officeChip.style.display = '';
 
-        // Fields
         document.getElementById('fOffice').textContent   = pr.office;
         document.getElementById('fPrNumber').textContent = pr.prNumber;
         document.getElementById('fItem').textContent     = pr.item;
         document.getElementById('fDate').textContent     = pr.dateSubmitted;
+        document.getElementById('fSigLabel').textContent = pr.signatoryLabel;
         document.getElementById('fRemarks').textContent  = pr.remarks !== '—' ? pr.remarks : '—';
 
-        const currentDisplay = pr.currentStatus;
-        document.getElementById('fStatus').textContent = currentDisplay;
-
-        // Reverse-map display label → select value
-        const toValue = { 'Pending': 'pending', 'In Progress': 'in_progress', 'Completed': 'completed', 'Delayed': 'delayed' };
-        statusSel.value = toValue[currentDisplay] ?? 'pending';
+        statusSel.value = pr.currentStatus ?? 'new';
         remarksIn.value = '';
 
-        // PDF preview
         const pdfEl = document.getElementById('pdfPreview');
-        if (pr.pdfFile) {
-            pdfEl.innerHTML = `<iframe src="/storage/${pr.pdfFile}" title="PR Document"></iframe>`;
-        } else {
-            pdfEl.innerHTML = `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
-        }
+        pdfEl.innerHTML = pr.pdfFile
+            ? `<iframe src="/storage/${pr.pdfFile}" title="PR Document"></iframe>`
+            : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
+        uploadPrText.textContent = pr.pdfFile ? 'Re-upload PDF' : 'Upload Signed PR PDF';
 
-        // Seed log from server history (first open only)
         if (!logs[pr.id]) {
             logs[pr.id] = (pr.activityLog || []).map(e => ({
-                text: `Status set to <strong>${e.status}</strong>` +
-                      (e.remarks && e.remarks !== '—' ? ` &mdash; ${e.remarks}` : ''),
+                text: `Status: <strong>${e.status}</strong>` + (e.remarks && e.remarks !== '—' ? ` &mdash; ${e.remarks}` : ''),
                 time: e.timestamp,
             }));
+            (pr.signatureLogs || []).forEach(l => {
+                logs[pr.id].push({ text: `<strong>${l.signatory}</strong> ${l.action} the PR` + (l.remarks ? ` &mdash; ${l.remarks}` : ''), time: l.at });
+            });
         }
+
+        updateTimeline(pr.signatoryStage);
+        updateRoutingButtons(pr);
+        updateCanvassingUI(pr);
 
         emptyEl.style.display = 'none';
         contentEl.classList.add('visible');
         renderLog(pr.id);
     }
 
-    /* ── Row click / keyboard ── */
+    /* ── Row click ── */
     rows.forEach(row => {
         row.addEventListener('click', () => {
             const pr = allPrs.find(p => String(p.id) === row.dataset.prId);
@@ -374,10 +620,87 @@
         });
     });
 
-    /* ── Save ── */
+    /* ── Route Forward ── */
+    btnAdvance.addEventListener('click', async () => {
+        if (!activePr || saving) return;
+        saving = true;
+        btnAdvance.disabled = true;
+        btnAdvance.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Routing…';
+
+        try {
+            const resp = await fetch(activePr.advanceUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                activePr.signatoryStage  = json.signatoryStage;
+                activePr.signatoryLabel  = json.signatoryLabel;
+                activePr.nextStage       = json.signatoryStage !== 'fully_signed' ? true : null;
+                if (json.canvassingStage) activePr.canvassingStage = json.canvassingStage;
+                document.getElementById('fSigLabel').textContent = json.signatoryLabel;
+                updateTimeline(json.signatoryStage);
+                updateRoutingButtons(activePr);
+                updateCanvassingUI(activePr);
+                updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
+                logs[activePr.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr() });
+                renderLog(activePr.id);
+                showToast('PR routed forward.');
+            } else {
+                showToast(json.error || 'Failed to route PR.', true);
+            }
+        } catch { showToast('Network error.', true); }
+        finally {
+            saving = false;
+            btnAdvance.disabled = activePr?.signatoryStage === 'fully_signed';
+            btnAdvance.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Route Forward';
+        }
+    });
+
+    /* ── Return (toggle panel) ── */
+    btnReturn.addEventListener('click', () => {
+        returnRemarks.style.display = returnRemarks.style.display === 'none' ? '' : 'none';
+    });
+
+    /* ── Confirm Return ── */
+    btnConfirmRet.addEventListener('click', async () => {
+        if (!activePr || saving) return;
+        const reason = returnIn.value.trim();
+        if (!reason) { showToast('Please provide a reason for returning.', true); return; }
+        saving = true;
+        btnConfirmRet.disabled = true;
+
+        try {
+            const resp = await fetch(activePr.returnUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ remarks: reason }),
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                activePr.signatoryStage = 'draft';
+                activePr.signatoryLabel = 'PR Created';
+                document.getElementById('fSigLabel').textContent = 'PR Created';
+                updateTimeline('draft');
+                updateRoutingButtons(activePr);
+                updateSigBadge(activePr.id, 'PR Created', 'draft');
+                returnRemarks.style.display = 'none';
+                returnIn.value = '';
+                logs[activePr.id].push({ text: `<strong>Returned to draft</strong> &mdash; ${reason}`, time: nowStr() });
+                renderLog(activePr.id);
+                showToast('PR returned to draft.');
+            } else {
+                showToast(json.error || 'Failed to return PR.', true);
+            }
+        } catch { showToast('Network error.', true); }
+        finally { saving = false; btnConfirmRet.disabled = false; }
+    });
+
+    /* ── Save processing status ── */
     btnSave.addEventListener('click', async () => {
-        if (!activePrId || saving) return;
-        const pr         = allPrs.find(p => p.id == activePrId);
+        if (!activePr || saving) return;
+        const pr         = activePr;
         const statusVal  = statusSel.value;
         const statusDisp = displayStatus(statusVal);
         const remarks    = remarksIn.value.trim();
@@ -390,49 +713,61 @@
         try {
             const resp = await fetch(pr.updateUrl, {
                 method:  'POST',
-                headers: {
-                    'Content-Type':  'application/json',
-                    'X-CSRF-TOKEN':  csrfToken,
-                    'Accept':        'application/json',
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                 body: JSON.stringify({ status: statusVal, remarks }),
             });
-
             if (resp.ok) {
-                // Update in-memory PR record
                 pr.currentStatus = statusDisp;
                 if (remarks) pr.remarks = remarks;
-
-                // Update table badge
-                const badge = document.querySelector(`[data-status-badge="${activePrId}"]`);
-                if (badge) { badge.textContent = statusDisp; badge.className = 'badge ' + badgeClass(statusDisp); }
-
-                // Update status field in panel
-                document.getElementById('fStatus').textContent = statusDisp;
                 if (remarks) document.getElementById('fRemarks').textContent = remarks;
-
-                // Append to log
-                let logText = `Status updated to <strong>${statusDisp}</strong>`;
+                let logText = `Processing status → <strong>${statusDisp}</strong>`;
                 if (remarks) logText += ` &mdash; ${remarks}`;
-                logs[activePrId].push({ text: logText, time: nowStr() });
+                logs[pr.id].push({ text: logText, time: nowStr() });
                 remarksIn.value = '';
-                renderLog(activePrId);
-
+                renderLog(pr.id);
                 showToast('Saved successfully.');
             } else {
                 const json = await resp.json().catch(() => null);
-                showToast(json?.message || 'Save failed. Please try again.', true);
+                showToast(json?.message || 'Save failed.', true);
             }
-        } catch {
-            showToast('Network error. Please try again.', true);
-        } finally {
-            saving          = false;
-            btnSave.disabled = false;
-            btnSave.innerHTML = origHtml;
-        }
+        } catch { showToast('Network error.', true); }
+        finally { saving = false; btnSave.disabled = false; btnSave.innerHTML = origHtml; }
     });
 
-    /* ── Spin keyframe ── */
+    /* ── Upload PR PDF ── */
+    uploadPrInput.addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file || !activePr) return;
+        const origText = uploadPrText.textContent;
+        uploadPrText.textContent = 'Uploading…';
+        this.disabled = true;
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            const resp = await fetch(activePr.uploadUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: fd,
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                activePr.pdfFile = json.filePath;
+                document.getElementById('pdfPreview').innerHTML =
+                    `<iframe src="/storage/${json.filePath}" title="PR Document"></iframe>`;
+                uploadPrText.textContent = 'Re-upload PDF';
+                showToast('PR PDF uploaded successfully.');
+            } else {
+                uploadPrText.textContent = origText;
+                showToast(json.message || 'Upload failed.', true);
+            }
+        } catch {
+            uploadPrText.textContent = origText;
+            showToast('Network error during upload.', true);
+        }
+        this.disabled = false;
+        this.value = '';
+    });
+
     if (!document.getElementById('spinStyle')) {
         const s = document.createElement('style');
         s.id = 'spinStyle';

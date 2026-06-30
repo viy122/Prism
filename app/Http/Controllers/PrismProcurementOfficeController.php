@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AbstractOfCanvass;
+use App\Models\AocSignatureLog;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
 use App\Models\ProcurementStatusUpdate;
+use App\Models\PrSignatureLog;
+use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PrismProcurementOfficeController extends Controller
@@ -67,38 +73,151 @@ class PrismProcurementOfficeController extends Controller
 
     public function purchaseRequestManagement(): View
     {
-        $prs = PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest()])
+        $prs = PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy'])
             ->latest()
             ->get()
             ->map(fn ($pr) => [
-                'id'            => $pr->id,
-                'office'        => $pr->office?->name ?? '—',
-                'prNumber'      => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
-                'item'          => $pr->title,
-                'dateSubmitted' => $pr->submitted_at?->format('M d, Y') ?? $pr->created_at->format('M d, Y'),
-                'currentStatus' => ucfirst(str_replace('_', ' ', $pr->status)),
-                'pdfFile'       => $pr->file_path,
-                'remarks'       => $pr->remarks ?? '—',
-                'ocr'           => $pr->extracted_fields_json ?? [],
-                'activityLog'   => $pr->statusUpdates->map(fn ($u) => [
+                'id'             => $pr->id,
+                'office'         => $pr->office?->name ?? '—',
+                'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+                'item'           => $pr->title,
+                'dateSubmitted'  => $pr->submitted_at?->format('M d, Y') ?? $pr->created_at->format('M d, Y'),
+                'currentStatus'  => $pr->status,
+                'signatoryStage'   => $pr->signatory_stage,
+                'signatoryLabel'   => $pr->signatory_label,
+                'nextStage'        => $pr->nextSignatoryStage(),
+                'canvassingStage'  => $pr->canvassing_stage,
+                'canvassingLabel'  => $pr->canvassing_label,
+                'readyForAoc'      => $pr->isReadyForAoc(),
+                'canvassingUrl'    => route('procurement-office.purchase-request.canvassing', $pr->id),
+                'pdfFile'          => $pr->file_path,
+                'remarks'          => $pr->remarks ?? '—',
+                'ocr'            => $pr->extracted_fields_json ?? [],
+                'activityLog'    => $pr->statusUpdates->map(fn ($u) => [
                     'timestamp' => $u->created_at->format('M d, Y g:i A'),
                     'status'    => ucfirst(str_replace('_', ' ', $u->status)),
                     'remarks'   => $u->remarks ?? '—',
                 ])->all(),
+                'signatureLogs'  => $pr->signatureLogs->map(fn ($l) => [
+                    'signatory' => 'Signatory ' . $l->signatory_number,
+                    'action'    => $l->action,
+                    'by'        => $l->signedBy?->name ?? '—',
+                    'at'        => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                    'remarks'   => $l->remarks ?? '',
+                ])->all(),
+                'advanceUrl'    => route('procurement-office.purchase-request.advance', $pr->id),
+                'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
+                'uploadUrl'     => route('procurement-office.purchase-request.upload', $pr->id),
             ])
             ->all();
 
         return view('prism.procurement-office.purchase-request-management', $this->withCommon('purchase-request-management', [
             'pageTitle'        => 'Purchase Request Management',
             'purchaseRequests' => $prs,
+            'stages'           => PurchaseRequest::signatoryStages(),
         ]));
+    }
+
+    public function advancePrStage(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        $next = $pr->nextSignatoryStage();
+        if (!$next) {
+            return response()->json(['error' => 'PR is already fully signed.'], 422);
+        }
+
+        $signatoryNumber = array_search($next, PurchaseRequest::signatoryStages());
+
+        $updateData = ['signatory_stage' => $next];
+        if ($next === 'fully_signed') {
+            $updateData['canvassing_stage'] = 'not_started';
+        }
+        $pr->update($updateData);
+
+        PrSignatureLog::create([
+            'purchase_request_id' => $pr->id,
+            'signatory_number'    => $signatoryNumber,
+            'signed_by_user_id'   => auth()->id(),
+            'action'              => 'signed',
+            'remarks'             => $request->input('remarks'),
+            'signed_at'           => now(),
+        ]);
+
+        ProcurementStatusUpdate::create([
+            'purchase_request_id' => $pr->id,
+            'updated_by_user_id'  => auth()->id(),
+            'status'              => $next,
+            'remarks'             => $request->input('remarks', ''),
+        ]);
+
+        NotificationService::prStatusUpdated($pr);
+
+        $fresh = $pr->fresh();
+        return response()->json([
+            'success'          => true,
+            'signatoryStage'   => $next,
+            'signatoryLabel'   => $fresh->signatory_label,
+            'canvassingStage'  => $fresh->canvassing_stage,
+            'canvassingLabel'  => $fresh->canvassing_label,
+        ]);
+    }
+
+    public function returnPr(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        $request->validate(['remarks' => 'required|string|max:1000']);
+
+        $prev = $pr->signatory_stage;
+        $pr->update(['signatory_stage' => 'draft']);
+
+        PrSignatureLog::create([
+            'purchase_request_id' => $pr->id,
+            'signatory_number'    => array_search($prev, PurchaseRequest::signatoryStages()) ?: 0,
+            'signed_by_user_id'   => auth()->id(),
+            'action'              => 'returned',
+            'remarks'             => $request->input('remarks'),
+            'signed_at'           => now(),
+        ]);
+
+        ProcurementStatusUpdate::create([
+            'purchase_request_id' => $pr->id,
+            'updated_by_user_id'  => auth()->id(),
+            'status'              => 'returned_to_draft',
+            'remarks'             => $request->input('remarks'),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updateCanvassing(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        if ($pr->signatory_stage !== 'fully_signed') {
+            return response()->json(['error' => 'PR must be fully signed before canvassing.'], 422);
+        }
+
+        $request->validate(['action' => 'required|in:start,complete']);
+
+        $newStage = $request->input('action') === 'start' ? 'in_progress' : 'completed';
+        $pr->update(['canvassing_stage' => $newStage]);
+
+        ProcurementStatusUpdate::create([
+            'purchase_request_id' => $pr->id,
+            'updated_by_user_id'  => auth()->id(),
+            'status'              => 'canvassing_' . $newStage,
+            'remarks'             => $request->input('remarks', ''),
+        ]);
+
+        return response()->json([
+            'success'           => true,
+            'canvassingStage'   => $newStage,
+            'canvassingLabel'   => $pr->fresh()->canvassing_label,
+            'readyForAoc'       => $pr->fresh()->isReadyForAoc(),
+        ]);
     }
 
     public function updatePrStatus(Request $request, PurchaseRequest $pr): JsonResponse
     {
         $request->validate([
-            'status'  => 'required|in:pending,in_progress,completed,delayed',
+            'status'  => 'required|in:new,approved_pr_received,forwarded_to_bac,canvassing,abstract_of_canvass_made,for_po,po_made,po_confirmed,for_alobs,forwarded_to_rgo,forwarded_to_end_user,for_reimbursement,for_consolidation,pr_denied,cancelled,cancelled_system_error',
             'remarks' => 'nullable|string|max:1000',
         ]);
 
@@ -114,6 +233,223 @@ class PrismProcurementOfficeController extends Controller
         NotificationService::prStatusUpdated($pr);
 
         return response()->json(['success' => true]);
+    }
+
+    // ── Phase 2: Abstract of Canvass ─────────────────────────────────────────
+
+    public function abstractOfCanvass(): View
+    {
+        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'signatureLogs.signedBy', 'purchaseOrder'])
+            ->latest()
+            ->get()
+            ->map(fn ($aoc) => [
+                'id'             => $aoc->id,
+                'code'           => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+                'prNumber'       => $aoc->purchaseRequest->number ?? 'PR-' . str_pad($aoc->purchaseRequest->id, 4, '0', STR_PAD_LEFT),
+                'office'         => $aoc->purchaseRequest->office?->name ?? '—',
+                'title'          => $aoc->purchaseRequest->title,
+                'signatoryStage' => $aoc->signatory_stage,
+                'signatoryLabel' => $aoc->signatory_label,
+                'nextStage'      => $aoc->nextSignatoryStage(),
+                'hasPo'          => $aoc->purchaseOrder !== null,
+                'remarks'        => $aoc->remarks ?? '—',
+                'createdAt'      => $aoc->created_at->format('M d, Y'),
+                'advanceUrl'     => route('procurement-office.aoc.advance', $aoc->id),
+                'returnUrl'      => route('procurement-office.aoc.return', $aoc->id),
+                'issuePo'        => route('procurement-office.po.issue', $aoc->id),
+            ])
+            ->all();
+
+        // PRs that completed canvassing but don't have an AOC yet
+        $eligiblePrs = PurchaseRequest::with('office')
+            ->where('signatory_stage', 'fully_signed')
+            ->where('canvassing_stage', 'completed')
+            ->whereDoesntHave('abstractOfCanvass')
+            ->latest()
+            ->get()
+            ->map(fn ($pr) => [
+                'id'       => $pr->id,
+                'prNumber' => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+                'office'   => $pr->office?->name ?? '—',
+                'title'    => $pr->title,
+                'createUrl'=> route('procurement-office.aoc.create', $pr->id),
+            ])
+            ->all();
+
+        return view('prism.procurement-office.abstract-of-canvass', $this->withCommon('abstract-of-canvass', [
+            'pageTitle'   => 'Abstract of Canvass',
+            'aocs'        => $aocs,
+            'eligiblePrs' => $eligiblePrs,
+            'stages'      => AbstractOfCanvass::signatoryStages(),
+        ]));
+    }
+
+    public function createAoc(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        if (!$pr->isReadyForAoc()) {
+            return response()->json(['error' => 'PR must be fully signed and canvassing completed before creating an AOC.'], 422);
+        }
+
+        if ($pr->abstractOfCanvass) {
+            return response()->json(['error' => 'AOC already exists for this PR.'], 422);
+        }
+
+        $aoc = AbstractOfCanvass::create([
+            'purchase_request_id' => $pr->id,
+            'created_by_user_id'  => auth()->id(),
+            'code'                => 'AOC-' . now()->format('Ymd') . '-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+            'signatory_stage'     => 'draft',
+        ]);
+
+        return response()->json(['success' => true, 'aocId' => $aoc->id]);
+    }
+
+    public function advanceAocStage(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    {
+        $next = $aoc->nextSignatoryStage();
+        if (!$next) {
+            return response()->json(['error' => 'AOC is already fully signed.'], 422);
+        }
+
+        $signatoryNumber = array_search($next, AbstractOfCanvass::signatoryStages());
+        $aoc->update(['signatory_stage' => $next]);
+
+        AocSignatureLog::create([
+            'abstract_of_canvass_id' => $aoc->id,
+            'signatory_number'       => $signatoryNumber,
+            'signed_by_user_id'      => auth()->id(),
+            'action'                 => 'signed',
+            'remarks'                => $request->input('remarks'),
+            'signed_at'              => now(),
+        ]);
+
+        return response()->json([
+            'success'        => true,
+            'signatoryStage' => $next,
+            'signatoryLabel' => $aoc->fresh()->signatory_label,
+        ]);
+    }
+
+    public function returnAoc(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    {
+        $request->validate(['remarks' => 'required|string|max:1000']);
+
+        $prev = $aoc->signatory_stage;
+        $aoc->update(['signatory_stage' => 'draft']);
+
+        AocSignatureLog::create([
+            'abstract_of_canvass_id' => $aoc->id,
+            'signatory_number'       => array_search($prev, AbstractOfCanvass::signatoryStages()) ?: 0,
+            'signed_by_user_id'      => auth()->id(),
+            'action'                 => 'returned',
+            'remarks'                => $request->input('remarks'),
+            'signed_at'              => now(),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    // ── Phase 3: Purchase Order ───────────────────────────────────────────────
+
+    public function purchaseOrders(): View
+    {
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy'])
+            ->latest()
+            ->get()
+            ->map(fn ($po) => [
+                'id'           => $po->id,
+                'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+                'aocCode'      => $po->abstractOfCanvass->code ?? '—',
+                'prNumber'     => $po->abstractOfCanvass->purchaseRequest->number ?? '—',
+                'office'       => $po->abstractOfCanvass->purchaseRequest->office?->name ?? '—',
+                'title'        => $po->abstractOfCanvass->purchaseRequest->title ?? '—',
+                'supplier'     => $po->supplier_name,
+                'totalAmount'  => (float) $po->total_amount,
+                'status'       => $po->status,
+                'statusLabel'  => $po->status_label,
+                'nextStatus'   => $po->nextStatus(),
+                'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',
+                'expectedDate' => $po->expected_delivery_date?->format('M d, Y') ?? '—',
+                'paidAt'       => $po->paid_at?->format('M d, Y') ?? null,
+                'updateUrl'    => route('procurement-office.po.update-status', $po->id),
+            ])
+            ->all();
+
+        // AOCs that are fully signed but don't have a PO yet
+        $eligibleAocs = AbstractOfCanvass::with('purchaseRequest.office')
+            ->where('signatory_stage', 'fully_signed')
+            ->whereDoesntHave('purchaseOrder')
+            ->latest()
+            ->get()
+            ->map(fn ($aoc) => [
+                'id'      => $aoc->id,
+                'code'    => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+                'office'  => $aoc->purchaseRequest->office?->name ?? '—',
+                'title'   => $aoc->purchaseRequest->title,
+                'amount'  => (float) $aoc->purchaseRequest->total_amount,
+                'issueUrl'=> route('procurement-office.po.issue', $aoc->id),
+            ])
+            ->all();
+
+        return view('prism.procurement-office.purchase-order', $this->withCommon('purchase-orders', [
+            'pageTitle'    => 'Purchase Orders',
+            'purchaseOrders' => $pos,
+            'eligibleAocs' => $eligibleAocs,
+            'statusChain'  => PurchaseOrder::statusChain(),
+        ]));
+    }
+
+    public function issuePo(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    {
+        if ($aoc->signatory_stage !== 'fully_signed') {
+            return response()->json(['error' => 'AOC must be fully signed before issuing a PO.'], 422);
+        }
+
+        if ($aoc->purchaseOrder) {
+            return response()->json(['error' => 'A Purchase Order already exists for this AOC.'], 422);
+        }
+
+        $request->validate([
+            'supplier_name'          => 'required|string|max:255',
+            'supplier_address'       => 'nullable|string',
+            'total_amount'           => 'required|numeric|min:0',
+            'expected_delivery_date' => 'nullable|date',
+        ]);
+
+        $po = PurchaseOrder::create([
+            'abstract_of_canvass_id' => $aoc->id,
+            'created_by_user_id'     => auth()->id(),
+            'po_number'              => 'PO-' . now()->format('Ymd') . '-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+            'supplier_name'          => $request->input('supplier_name'),
+            'supplier_address'       => $request->input('supplier_address'),
+            'total_amount'           => $request->input('total_amount'),
+            'status'                 => 'issued',
+            'issued_at'              => now(),
+            'expected_delivery_date' => $request->input('expected_delivery_date'),
+        ]);
+
+        NotificationService::prStatusUpdated($aoc->purchaseRequest);
+
+        return response()->json(['success' => true, 'poId' => $po->id]);
+    }
+
+    public function updatePoStatus(Request $request, PurchaseOrder $po): JsonResponse
+    {
+        $next = $po->nextStatus();
+        if (!$next || $po->status === 'paid') {
+            return response()->json(['error' => 'No further status available.'], 422);
+        }
+
+        $po->update([
+            'status'  => $next,
+            'remarks' => $request->input('remarks'),
+        ]);
+
+        return response()->json([
+            'success'     => true,
+            'status'      => $next,
+            'statusLabel' => $po->fresh()->status_label,
+        ]);
     }
 
     public function procurementStatusTracking(): View
@@ -196,7 +532,58 @@ class PrismProcurementOfficeController extends Controller
         ]));
     }
 
+    public function uploadPurchaseRequest(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $year = now()->year;
+        $slug = Str::slug($pr->number ?? 'pr-' . $pr->id);
+        $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
+        $path = $request->file('file')->storeAs("purchase-requests/{$year}", $name, 'public');
+
+        $newStatus = $pr->status === 'pending' ? 'in_progress' : $pr->status;
+
+        $pr->update([
+            'file_path'   => $path,
+            'uploaded_at' => now(),
+            'status'      => $newStatus,
+        ]);
+
+        NotificationService::prUploaded($pr);
+
+        return response()->json([
+            'success'  => true,
+            'filePath' => $path,
+            'status'   => ucwords(str_replace('_', ' ', $newStatus)),
+        ]);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function prStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'new'                    => 'New',
+            'approved_pr_received'   => 'Approved PR Received',
+            'forwarded_to_bac'       => 'Approved PR Received – Forwarded to BAC',
+            'canvassing'             => 'Canvassing',
+            'abstract_of_canvass_made' => 'Abstract of Canvass Made',
+            'for_po'                 => 'For PO',
+            'po_made'                => 'PO Made',
+            'po_confirmed'           => 'PO Confirmed',
+            'for_alobs'              => 'For ALOBS',
+            'forwarded_to_rgo'       => 'Approved PR Received – Forwarded to RGO',
+            'forwarded_to_end_user'  => 'Approved PR Received – Forwarded to End-User',
+            'for_reimbursement'      => 'For Reimbursement',
+            'for_consolidation'      => 'For CONSOLIDATION',
+            'pr_denied'              => 'PR Denied',
+            'cancelled'              => 'Cancelled',
+            'cancelled_system_error' => 'Cancelled – System Error',
+            default                  => ucwords(str_replace('_', ' ', $status)),
+        };
+    }
 
     private function withCommon(string $activeProcurementPage, array $data): array
     {
@@ -216,9 +603,11 @@ class PrismProcurementOfficeController extends Controller
             'moduleNavLabel'   => 'Procurement Office pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                   'label' => 'Dashboard',                  'href' => route('procurement-office.dashboard'),                   'icon' => 'layout-dashboard'],
-                ['slug' => 'purchase-request-management', 'label' => 'Purchase Request Management', 'href' => route('procurement-office.purchase-request-management'), 'icon' => 'receipt'],
-                ['slug' => 'procurement-status-tracking', 'label' => 'Procurement Status Tracking', 'href' => route('procurement-office.procurement-status-tracking'), 'icon' => 'list-check'],
-                ['slug' => 'procurement-reports',         'label' => 'Procurement Reports',         'href' => route('procurement-office.procurement-reports'),         'icon' => 'trending-up'],
+                ['slug' => 'purchase-request-management', 'label' => 'Purchase Requests',           'href' => route('procurement-office.purchase-request-management'), 'icon' => 'receipt'],
+                ['slug' => 'abstract-of-canvass',         'label' => 'Abstract of Canvass',         'href' => route('procurement-office.abstract-of-canvass'),         'icon' => 'file-text'],
+                ['slug' => 'purchase-orders',             'label' => 'Purchase Orders',             'href' => route('procurement-office.purchase-orders'),             'icon' => 'shopping-cart'],
+                ['slug' => 'procurement-status-tracking', 'label' => 'Status Tracking',             'href' => route('procurement-office.procurement-status-tracking'), 'icon' => 'list-check'],
+                ['slug' => 'procurement-reports',         'label' => 'Reports',                     'href' => route('procurement-office.procurement-reports'),         'icon' => 'trending-up'],
             ],
         ], $data);
     }

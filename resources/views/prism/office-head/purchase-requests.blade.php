@@ -124,17 +124,6 @@
         .pr-items-table .total-cell     { font-weight: 700; color: var(--m); text-align: right; }
         .pr-items-table tfoot td        { padding: 11px 16px; font-size: 12px; font-weight: 700; color: var(--s900); background: var(--s100); border-top: 1px solid var(--s200); text-align: right; }
 
-        /* ─── Upload ─── */
-        .upload-label {
-            display: inline-flex; align-items: center; gap: 7px;
-            border: 1.5px dashed rgba(104,16,18,.35); border-radius: 10px;
-            background: rgba(104,16,18,.04); padding: 7px 14px;
-            font-size: 12px; font-weight: 700; color: var(--m); cursor: pointer;
-            transition: background .15s, box-shadow .15s; white-space: nowrap;
-        }
-        .upload-label:hover { background: rgba(104,16,18,.09); box-shadow: var(--sh); }
-        .upload-label svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .upload-label input { display: none; }
 
         /* ─── Status badges ─── */
         .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 99px; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -191,11 +180,6 @@
                 <small>Across all quarters</small>
             </div>
             <div class="stat-box">
-                <dt>Pending Upload</dt>
-                <dd class="amber">{{ $pendingCount }}</dd>
-                <small class="amber">Needs signed PDF</small>
-            </div>
-            <div class="stat-box">
                 <dt>In Progress</dt>
                 <dd class="maroon">{{ $inProgressCount }}</dd>
                 <small>{{ $delayedCount }} delayed</small>
@@ -210,8 +194,8 @@
                 <div class="card-head">
                     <div>
                         <p class="card-eyebrow">Purchase Requests</p>
-                        <h2 class="card-title">Quarterly PR Upload Queue</h2>
-                        <p class="card-sub">Each PR covers all items for that quarter. Upload the signed PR PDF to update its status.</p>
+                        <h2 class="card-title">My Purchase Requests</h2>
+                        <p class="card-sub">Purchase requests submitted by your office. PDF upload is handled by the Procurement Office.</p>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <div class="search-wrap" style="min-width:200px;">
@@ -250,14 +234,7 @@
                                 </p>
                             </div>
                             <div class="pr-card-right">
-                                <span class="badge {{ $badgeCls }}" data-pr-status="{{ $pr['number'] }}">{{ $pr['statusLabel'] }}</span>
-                                <label class="upload-label" onclick="event.stopPropagation()">
-                                    <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-                                    <span data-upload-label="{{ $pr['number'] }}">{{ $pr['uploadedAt'] ? 'Re-upload' : 'Upload PDF' }}</span>
-                                    <input type="file" accept="application/pdf,.pdf"
-                                           data-pr-upload="{{ $pr['number'] }}"
-                                           data-upload-url="{{ $pr['uploadUrl'] }}">
-                                </label>
+                                <span class="badge {{ $badgeCls }}">{{ $pr['statusLabel'] }}</span>
                                 <i class="ti ti-chevron-down pr-chevron"></i>
                             </div>
                         </div>
@@ -334,26 +311,6 @@
                     </div>
                 </div>
 
-                {{-- Upload Checklist --}}
-                <div class="card">
-                    <p class="card-eyebrow">Upload checklist</p>
-                    <h2 class="card-title" style="margin-bottom:16px;">Before Sending</h2>
-                    <ul class="checklist">
-                        <li class="check-item">
-                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                            Signed PR PDF is clear and readable.
-                        </li>
-                        <li class="check-item">
-                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                            All items for the quarter are listed in the PR.
-                        </li>
-                        <li class="check-item">
-                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                            Amount and PR number match the approved record.
-                        </li>
-                    </ul>
-                </div>
-
                 {{-- Recent Remarks --}}
                 <div class="card">
                     <p class="card-eyebrow">Recent remarks</p>
@@ -410,49 +367,6 @@
         badge.className = 'badge ' + (map[statusLabel.toLowerCase()] ?? 'badge-default');
         badge.textContent = statusLabel.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
-
-    /* ── file upload ── */
-    document.querySelectorAll('input[data-pr-upload]').forEach(function (input) {
-        input.addEventListener('change', async function () {
-            const file = input.files[0];
-            if (!file) return;
-
-            const prNumber  = input.dataset.prUpload;
-            const uploadUrl = input.dataset.uploadUrl;
-            const labelEl   = input.closest('label')?.querySelector('[data-upload-label]');
-            const origText  = labelEl?.textContent ?? 'Upload PDF';
-
-            if (labelEl) labelEl.textContent = 'Uploading…';
-            input.disabled = true;
-
-            const fd = new FormData();
-            fd.append('file', file);
-
-            try {
-                const resp = await fetch(uploadUrl, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body: fd,
-                });
-                const data = await resp.json();
-
-                if (resp.ok && data.success) {
-                    if (labelEl) labelEl.textContent = 'Re-upload';
-                    updateBadge(prNumber, data.status);
-                    toast('PDF uploaded successfully.', 'success');
-                } else {
-                    if (labelEl) labelEl.textContent = origText;
-                    toast(data.message ?? 'Upload failed. Please try again.', 'error');
-                }
-            } catch {
-                if (labelEl) labelEl.textContent = origText;
-                toast('Upload failed. Check your connection and try again.', 'error');
-            }
-
-            input.disabled = false;
-            input.value = '';
-        });
-    });
 
     /* ── search ── */
     document.getElementById('prSearch')?.addEventListener('input', function () {

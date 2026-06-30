@@ -71,11 +71,12 @@ class AuthController extends Controller
     {
         return match ($roleName) {
             'Office Head / Dean' => redirect()->route('office-head.dashboard'),
-            'Finance Office' => redirect()->route('finance-office.dashboard'),
+            'Finance Office'     => redirect()->route('finance-office.dashboard'),
             'Procurement Office' => redirect()->route('procurement-office.dashboard'),
-            'Chancellor' => redirect()->route('chancellor.dashboard'),
-            'Vice Chancellor' => redirect()->route('vice-chancellor.dashboard'),
-            default => redirect()->route('prism.home'),
+            'Chancellor'         => redirect()->route('chancellor.dashboard'),
+            'Vice Chancellor'    => redirect()->route('vice-chancellor.dashboard'),
+            'Accounting Office'  => redirect()->route('accounting-office.dashboard'),
+            default              => redirect()->route('prism.home'),
         };
     }
 

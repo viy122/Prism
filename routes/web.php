@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PrismAccountingOfficeController;
 use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
@@ -31,7 +32,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('/market-scoping/ref/{ref}', 'deleteRef')->name('market-scoping.ref.delete');
         Route::get('/my-proposals', 'myProposals')->name('my-proposals');
         Route::get('/purchase-requests', 'purchaseRequests')->name('purchase-requests');
-        Route::post('/purchase-requests/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-requests.upload');
     });
 
     Route::prefix('finance-office')->name('finance-office.')->middleware('role:Finance Office')->controller(PrismFinanceOfficeController::class)->group(function () {
@@ -49,8 +49,24 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
+        Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
+        Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
+        Route::post('/purchase-request/{pr}/canvassing', 'updateCanvassing')->name('purchase-request.canvassing');
+        Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
+        Route::get('/abstract-of-canvass', 'abstractOfCanvass')->name('abstract-of-canvass');
+        Route::post('/purchase-request/{pr}/create-aoc', 'createAoc')->name('aoc.create');
+        Route::post('/aoc/{aoc}/advance', 'advanceAocStage')->name('aoc.advance');
+        Route::post('/aoc/{aoc}/return-aoc', 'returnAoc')->name('aoc.return');
+        Route::get('/purchase-orders', 'purchaseOrders')->name('purchase-orders');
+        Route::post('/aoc/{aoc}/issue-po', 'issuePo')->name('po.issue');
+        Route::post('/purchase-order/{po}/status', 'updatePoStatus')->name('po.update-status');
         Route::get('/procurement-status-tracking', 'procurementStatusTracking')->name('procurement-status-tracking');
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
+    });
+
+    Route::prefix('accounting-office')->name('accounting-office.')->middleware('role:Accounting Office')->controller(PrismAccountingOfficeController::class)->group(function () {
+        Route::get('/', 'dashboard')->name('dashboard');
+        Route::post('/purchase-order/{po}/payment', 'confirmPayment')->name('po.confirm-payment');
     });
 
     Route::prefix('chancellor')->name('chancellor.')->middleware('role:Chancellor')->controller(PrismChancellorController::class)->group(function () {
