@@ -377,232 +377,6 @@
     .mod-card h4 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
     .mod-card p  { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
-    /* ── USER ROLES ── */
-    /* ===========================
-   USER ROLES SECTION
-=========================== */
-
-.roles-section{
-    position: relative;
-    padding: 90px 60px;
-    background-image: url('images/roles.png');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    overflow: hidden;
-}
-
-.roles-overlay{
-    max-width: 1400px;
-    margin: auto;
-}
-
-.roles-header{
-    text-align: center;
-    margin-bottom: 55px;
-}
-
-.roles-tag{
-    display: inline-block;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: var(--red);
-    margin-bottom: 20px;
-    position: relative;
-}
-
-.roles-tag::before,
-.roles-tag::after{
-    content: "";
-    width: 55px;
-    height: 1.5px;
-    background: #ddd;
-    position: absolute;
-    top: 50%;
-}
-
-.roles-tag::before{
-    right: 115%;
-}
-
-.roles-tag::after{
-    left: 115%;
-}
-
-.roles-header h2{
-    font-size: 36px;
-    line-height: 1.2;
-    font-weight: 800;
-    color: #071634;
-    margin-bottom: 10px;
-}
-
-.roles-header h2 span{
-    color: #a31515;
-}
-
-.roles-header p{
-    font-size: 15px;
-    line-height: 1.8;
-    color: #667085;
-    max-width: 600px;
-    margin: auto;
-}
-
-/* ===========================
-   GRID
-=========================== */
-
-.roles-grid{
-    display: grid;
-    grid-template-columns: repeat(5,1fr);
-    gap: 22px;
-}
-
-/* ===========================
-   FLIP CARD
-=========================== */
-
-.role-card{
-    background: transparent;
-    perspective: 1200px;
-    height: 280px;
-    cursor: pointer;
-}
-
-.role-card-inner{
-    position: relative;
-    width: 100%;
-    height: 100%;
-    text-align: center;
-    transition: transform .6s cubic-bezier(.4,.2,.2,1);
-    transform-style: preserve-3d;
-}
-
-/* Hover flips it (desktop); .flipped class flips it on click (touch / accessibility) */
-.role-card:hover .role-card-inner,
-.role-card.flipped .role-card-inner{
-    transform: rotateY(180deg);
-}
-
-.role-card-front,
-.role-card-back{
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-    border-radius: 24px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 30px 22px;
-}
-
-.role-card-front{
-    background: #fff;
-    border: 1px solid rgba(0,0,0,.04);
-    box-shadow: 0 4px 12px rgba(0,0,0,.03);
-}
-
-.role-card-front img{
-    width: 130px;
-    height: 130px;
-    object-fit: contain;
-    margin-bottom: 18px;
-}
-
-.role-card-front h3{
-    font-size: 17px;
-    font-weight: 700;
-    color: #08142c;
-    line-height: 1.35;
-}
-
-.role-card-back{
-    background: linear-gradient(150deg, var(--red) 0%, var(--red-dark) 100%);
-    transform: rotateY(180deg);
-    box-shadow: 0 8px 22px rgba(139,0,0,.25);
-}
-
-.role-card-back h3{
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 14px;
-}
-
-.role-line{
-    width: 30px;
-    height: 3px;
-    background: #d7a545;
-    margin: 0 auto 14px;
-    border-radius: 50px;
-}
-
-.role-card-back .role-line{
-    background: rgba(255,255,255,.6);
-}
-
-.role-card-back p{
-    font-size: 13px;
-    line-height: 1.75;
-    color: rgba(255,255,255,.92);
-}
-
-.flip-hint{
-    position: absolute;
-    bottom: 12px; right: 16px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-    color: #c9a8a8;
-    display: flex; align-items: center; gap: 4px;
-}
-.flip-hint svg{ width: 11px; height: 11px; }
-
-/* ===========================
-   RESPONSIVE
-=========================== */
-
-@media(max-width:1200px){
-
-    .roles-grid{
-        grid-template-columns: repeat(3,1fr);
-    }
-
-}
-
-@media(max-width:768px){
-
-    .roles-header h2{
-        font-size: 30px;
-    }
-
-    .roles-grid{
-        grid-template-columns: repeat(2,1fr);
-    }
-
-}
-
-@media(max-width:576px){
-
-    .roles-grid{
-        grid-template-columns: 1fr;
-    }
-
-    .roles-header h2{
-        font-size: 26px;
-    }
-
-}
-
-    /* ── WORKFLOW ── */
     /* ── WORKFLOW ── */
 .workflow{
     padding: 90px 60px;
@@ -690,7 +464,6 @@
       .modules { padding: 60px 30px; }
       .modules-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
       .modules-dots-left { display: none; }
-      .roles-section { padding: 60px 30px; }
       .workflow { padding: 60px 30px; }
       .workflow-steps { flex-wrap: wrap; gap: 20px; }
       .workflow-steps::before, .wf-fill { display: none; }
@@ -707,7 +480,6 @@
       .about-right { grid-template-columns: 1fr 1fr; gap: 9px; }
       .about-feat { padding: 13px 10px 11px; }
       .modules-grid { grid-template-columns: 1fr; gap: 14px; }
-      .roles-grid { gap: 14px; }
       .wf-step { flex: 0 0 calc(50% - 10px); }
     }
   </style>
@@ -727,7 +499,6 @@
       <a href="#">Home</a>
       <a href="#about">About</a>
       <a href="#features">Features</a>
-      <a href="#roles">Users</a>
       <a href="#workflow">Workflow</a>
       <a href="#">Contact</a>
     </nav>
@@ -891,101 +662,6 @@
   </div>
 </section>
 
-<!-- USER ROLES -->
-<section class="roles-section" id="roles">
-    <div class="roles-overlay">
-
-        <div class="roles-header">
-            <span class="roles-tag">User Roles</span>
-
-            <h2>
-                Designed for Campus<br>
-                <span>Procurement Coordination</span>
-            </h2>
-
-            <p>
-                Each role has tailored access and capabilities to keep
-                the procurement process efficient and transparent.
-            </p>
-        </div>
-
-        <div class="roles-grid" id="rolesGrid">
-
-            <div class="role-card" tabindex="0">
-                <div class="role-card-inner">
-                    <div class="role-card-front">
-                        <img src="images/user1.png" alt="Office Head / Dean">
-                        <h3>Office Head / Dean</h3>
-                    </div>
-                    <div class="role-card-back">
-                        <h3>Office Head / Dean</h3>
-                        <div class="role-line"></div>
-                        <p>Encodes budget proposals, market references, and purchase requests for their office.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="role-card" tabindex="0">
-                <div class="role-card-inner">
-                    <div class="role-card-front">
-                        <img src="images/user2.png" alt="Finance Office">
-                        <h3>Finance Office</h3>
-                    </div>
-                    <div class="role-card-back">
-                        <h3>Finance Office</h3>
-                        <div class="role-line"></div>
-                        <p>Reviews budget availability and consolidates approved procurement plans.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="role-card" tabindex="0">
-                <div class="role-card-inner">
-                    <div class="role-card-front">
-                        <img src="images/user3.png" alt="Procurement Office">
-                        <h3>Procurement Office</h3>
-                    </div>
-                    <div class="role-card-back">
-                        <h3>Procurement Office</h3>
-                        <div class="role-line"></div>
-                        <p>Tracks purchase requests, status updates, and procurement progress end-to-end.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="role-card" tabindex="0">
-                <div class="role-card-inner">
-                    <div class="role-card-front">
-                        <img src="images/user4.png" alt="Chancellor">
-                        <h3>Chancellor</h3>
-                    </div>
-                    <div class="role-card-back">
-                        <h3>Chancellor</h3>
-                        <div class="role-line"></div>
-                        <p>Reviews campus-level approvals, reports, and monitoring dashboards.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="role-card" tabindex="0">
-                <div class="role-card-inner">
-                    <div class="role-card-front">
-                        <img src="images/user5.png" alt="Vice Chancellor">
-                        <h3>Vice Chancellor</h3>
-                    </div>
-                    <div class="role-card-back">
-                        <h3>Vice Chancellor</h3>
-                        <div class="role-line"></div>
-                        <p>Monitors division performance and office procurement status across departments.</p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-    </div>
-</section>
-
 <!-- WORKFLOW -->
 <section class="workflow" id="workflow">
 
@@ -1078,8 +754,6 @@
       const el = e.target;
       if (el.id === 'modGrid') {
         [...el.children].forEach((c, i) => setTimeout(() => c.classList.add('visible'), i * 100));
-      } else if (el.id === 'rolesGrid') {
-        [...el.children].forEach((c, i) => setTimeout(() => c.classList.add('visible'), i * 110));
       } else if (el.id === 'wfSteps') {
         [...el.querySelectorAll('.wf-step')].forEach((s, i) => setTimeout(() => s.classList.add('vis'), i * 120));
         setTimeout(() => document.getElementById('wfLine').classList.add('go'), 300);
@@ -1088,7 +762,7 @@
     });
   }, { threshold: 0.12 });
 
-  ['modGrid','rolesGrid','wfSteps'].forEach(id => {
+  ['modGrid','wfSteps'].forEach(id => {
     const el = document.getElementById(id);
     if (el) io.observe(el);
   });
@@ -1101,18 +775,6 @@
     });
   });
 
-  /* Role card flip — click/tap toggles (works alongside hover-to-flip on desktop) */
-  document.querySelectorAll('.role-card').forEach(card => {
-    card.addEventListener('click', () => {
-      card.classList.toggle('flipped');
-    });
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        card.classList.toggle('flipped');
-      }
-    });
-  });
 </script>
 </body>
 </html>

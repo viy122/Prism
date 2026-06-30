@@ -12,7 +12,6 @@ use App\Services\MarketScopingService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PrismOfficeHeadController extends Controller
@@ -207,7 +206,6 @@ class PrismOfficeHeadController extends Controller
                 'status'      => $pr->status,
                 'statusLabel' => ucwords(str_replace('_', ' ', $pr->status)),
                 'remarks'     => $pr->remarks ?? '',
-                'uploadUrl'   => route('office-head.purchase-requests.upload', $pr->id),
                 'uploadedAt'  => $pr->uploaded_at?->format('M d, Y'),
                 'itemCount'   => $pr->items->count(),
                 'items'       => $pr->items->map(fn ($item) => [
@@ -229,38 +227,6 @@ class PrismOfficeHeadController extends Controller
     private function extractQuarter(string $number): string
     {
         return preg_match('/-(Q[1-4])(?:-|$)/', $number, $m) ? $m[1] : '';
-    }
-
-    public function uploadPurchaseRequest(Request $request, PurchaseRequest $pr): JsonResponse
-    {
-        $request->validate([
-            'file' => 'required|file|mimes:pdf|max:10240',
-        ]);
-
-        if ($pr->office_id !== $this->officeId()) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
-        }
-
-        $year    = now()->year;
-        $slug    = Str::slug($pr->number ?? 'pr-' . $pr->id);
-        $name    = $slug . '-' . now()->format('Ymd-His') . '.pdf';
-        $path    = $request->file('file')->storeAs("purchase-requests/{$year}", $name, 'public');
-
-        $newStatus = $pr->status === 'pending' ? 'in_progress' : $pr->status;
-
-        $pr->update([
-            'file_path'   => $path,
-            'uploaded_at' => now(),
-            'status'      => $newStatus,
-        ]);
-
-        NotificationService::prUploaded($pr);
-
-        return response()->json([
-            'success'  => true,
-            'filePath' => $path,
-            'status'   => ucwords(str_replace('_', ' ', $newStatus)),
-        ]);
     }
 
     // ── Budget Proposal CRUD ─────────────────────────────────────────────────

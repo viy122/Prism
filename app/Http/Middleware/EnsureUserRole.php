@@ -14,6 +14,7 @@ class EnsureUserRole
         'Procurement Office'  => 'procurement-office.dashboard',
         'Chancellor'          => 'chancellor.dashboard',
         'Vice Chancellor'     => 'vice-chancellor.dashboard',
+        'Accounting Office'   => 'accounting-office.dashboard',
     ];
 
     public function handle(Request $request, Closure $next, string $role): Response
