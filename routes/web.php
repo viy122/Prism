@@ -16,6 +16,7 @@ Route::view('/', 'prism.landing')->name('prism.home');
 Route::get('/login', fn() => view('prism.auth.login'))->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/demo-login/{role}', [AuthController::class, 'demoLogin'])->name('demo.login');
 
 Route::middleware('auth')->group(function () {
 
@@ -52,6 +53,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
         Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
         Route::post('/purchase-request/{pr}/canvassing', 'updateCanvassing')->name('purchase-request.canvassing');
+        Route::get('/purchase-request/{pr}/market-prices', 'getMarketPrices')->name('purchase-request.market-prices');
         Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
         Route::get('/abstract-of-canvass', 'abstractOfCanvass')->name('abstract-of-canvass');
         Route::post('/purchase-request/{pr}/create-aoc', 'createAoc')->name('aoc.create');

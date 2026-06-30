@@ -10,6 +10,7 @@ use App\Models\ProcurementStatusUpdate;
 use App\Models\PrSignatureLog;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
+use App\Services\MarketScopingService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -73,7 +74,7 @@ class PrismProcurementOfficeController extends Controller
 
     public function purchaseRequestManagement(): View
     {
-        $prs = PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy'])
+        $prs = PurchaseRequest::with(['office', 'items', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy'])
             ->latest()
             ->get()
             ->map(fn ($pr) => [
@@ -108,7 +109,12 @@ class PrismProcurementOfficeController extends Controller
                 'advanceUrl'    => route('procurement-office.purchase-request.advance', $pr->id),
                 'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
-                'uploadUrl'     => route('procurement-office.purchase-request.upload', $pr->id),
+                'uploadUrl'         => route('procurement-office.purchase-request.upload', $pr->id),
+                'marketPricesUrl'   => route('procurement-office.purchase-request.market-prices', $pr->id),
+                'prItems'           => $pr->items->map(fn ($i) => [
+                    'name'    => $i->name,
+                    'budget'  => (float) $i->estimated_unit_cost,
+                ])->all(),
             ])
             ->all();
 
@@ -530,6 +536,36 @@ class PrismProcurementOfficeController extends Controller
             'completedPurchases' => $completedPurchases,
             'delayedItems'       => $delayedItems,
         ]));
+    }
+
+    public function getMarketPrices(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        $item   = trim($request->input('item', $pr->title));
+        $budget = (float) $request->input('budget', 0);
+
+        $service = new MarketScopingService();
+        $results = $service->search($item);
+
+        if (empty($results)) {
+            return response()->json([
+                'results'         => [],
+                'cached'          => false,
+                'source'          => 'none',
+                'quota_exhausted' => $service->isQuotaExhausted(),
+            ]);
+        }
+
+        $results = $service->matchSpecs($results, [], $item);
+        if ($budget > 0) {
+            $results = $service->flagAdvantageous($results, $budget);
+        }
+
+        return response()->json([
+            'results'         => $results,
+            'cached'          => !empty($results[0]['cached']),
+            'source'          => 'serpapi',
+            'quota_exhausted' => $service->isQuotaExhausted(),
+        ]);
     }
 
     public function uploadPurchaseRequest(Request $request, PurchaseRequest $pr): JsonResponse
