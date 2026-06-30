@@ -11,6 +11,11 @@ class MarketScopingService
     private const SERPAPI_URL  = 'https://serpapi.com/search.json';
     private const MATCHER_URL  = 'http://localhost:5001';
 
+    public function isQuotaExhausted(): bool
+    {
+        return Cache::get('serpapi_quota_exhausted', false);
+    }
+
     public function search(string $query, int $limit = 5): array
     {
         $cacheKey = 'market_scoping_' . md5(strtolower(trim($query)));
@@ -105,6 +110,13 @@ class MarketScopingService
             ]);
 
             if (!$response->successful()) {
+                $errorMsg = strtolower((string) ($response->json('error') ?? ''));
+                if ($response->status() === 429
+                    || str_contains($errorMsg, 'run out')
+                    || str_contains($errorMsg, 'quota')
+                    || str_contains($errorMsg, 'limit')) {
+                    Cache::put('serpapi_quota_exhausted', true, 3600);
+                }
                 return [];
             }
 

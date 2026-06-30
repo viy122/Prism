@@ -76,6 +76,18 @@
     .btn-canvas-start { background: #854f0b; color: #fff; }
     .btn-canvas-done  { background: #3b6d11; color: #fff; }
     .btn-canvas:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-canvas-market { background: #f0f4ff; color: #3b5bdb; border: 1px solid #bac8ff !important; }
+    .btn-canvas-market:hover { background: #dbe4ff; }
+    .market-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+    .market-item-sel { flex: 1; padding: 6px 10px; border: 1px solid var(--s200); border-radius: 6px; font-size: 12px; font-family: 'Poppins', sans-serif; background: #fff; color: var(--s700); }
+    .market-results { display: flex; flex-direction: column; gap: 8px; }
+    .market-card { border: 1px solid var(--s200); border-radius: 8px; padding: 10px 12px; background: #fff; font-size: 12px; }
+    .market-card.advantageous { border-color: #40c057; background: #f4fbe6; }
+    .market-card .mc-name { font-weight: 600; margin-bottom: 3px; color: var(--s900); }
+    .market-card .mc-price { font-size: 15px; color: #2f9e44; font-weight: 700; }
+    .market-card .mc-reason { font-size: 11px; color: #5c940d; margin-top: 3px; }
+    .market-card .mc-source { font-size: 10px; color: var(--s400); margin-top: 4px; }
+    .market-quota-warn { font-size: 11px; color: #e67700; background: #fff3cd; padding: 6px 10px; border-radius: 6px; margin-top: 8px; border: 1px solid #ffd43b; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
@@ -290,6 +302,18 @@
                     </div>
                     <p id="canvassingDesc" style="font-size:12px;color:var(--s500);line-height:1.5;"></p>
                     <div class="canvassing-btns" id="canvassingBtns"></div>
+                    <div id="marketPanel" style="display:none; margin-top:14px;">
+                        <div class="market-controls">
+                            <select id="marketItemSel" class="market-item-sel"></select>
+                            <button id="btnRunMarket" type="button" class="btn-canvas btn-canvas-start" style="min-width:110px;">
+                                <i class="ti ti-search"></i> Search
+                            </button>
+                        </div>
+                        <div id="marketResults" class="market-results"></div>
+                        <div id="marketQuotaWarn" class="market-quota-warn" style="display:none;">
+                            &#9888; SerpAPI search quota reached (250/month). Showing cached results only.
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Update controls --}}
@@ -490,7 +514,7 @@
             canvassingBadge.textContent = 'In Progress';
             canvassingBadge.className   = 'badge badge-routing';
             canvassingDesc.textContent  = 'Canvassing is currently in progress. Mark complete when all supplier quotes have been collected.';
-            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-done" id="btnCompleteCanvassing" type="button"><i class="ti ti-circle-check"></i> Mark Canvassing Complete</button>`;
+            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-done" id="btnCompleteCanvassing" type="button"><i class="ti ti-circle-check"></i> Mark Canvassing Complete</button><button class="btn-canvas btn-canvas-market" id="btnCheckMarket" type="button"><i class="ti ti-coins"></i> Check Market Prices</button>`;
         } else if (stage === 'completed') {
             canvassingBlock.classList.add('done');
             canvassingBadge.textContent = 'Completed';
@@ -554,6 +578,52 @@
                 finally { saving = false; }
             });
         }
+
+        const btnMarket = document.getElementById('btnCheckMarket');
+        if (btnMarket) {
+            btnMarket.addEventListener('click', () => {
+                const panel = document.getElementById('marketPanel');
+                const sel   = document.getElementById('marketItemSel');
+                panel.style.display = panel.style.display === 'none' ? '' : 'none';
+                if (panel.style.display !== 'none' && sel.options.length === 0) {
+                    (pr.prItems || []).forEach((it, i) => sel.add(new Option(it.name, i)));
+                }
+            });
+        }
+
+        const btnRunMarket = document.getElementById('btnRunMarket');
+        if (btnRunMarket) {
+            btnRunMarket.addEventListener('click', async () => {
+                const sel    = document.getElementById('marketItemSel');
+                const resDiv = document.getElementById('marketResults');
+                const warn   = document.getElementById('marketQuotaWarn');
+                const item   = pr.prItems?.[+sel.value];
+                if (!item) return;
+
+                resDiv.innerHTML   = '<p style="font-size:12px;color:var(--s400);">Searching…</p>';
+                warn.style.display = 'none';
+
+                try {
+                    const url  = `${pr.marketPricesUrl}?item=${encodeURIComponent(item.name)}&budget=${item.budget}`;
+                    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
+                    const json = await resp.json();
+
+                    warn.style.display = json.quota_exhausted ? '' : 'none';
+
+                    if (!json.results?.length) {
+                        resDiv.innerHTML = '<p style="font-size:12px;color:var(--s400);">No results found.</p>';
+                        return;
+                    }
+                    resDiv.innerHTML = json.results.map(r => `
+                        <div class="market-card ${r.is_advantageous ? 'advantageous' : ''}">
+                            <div class="mc-name">${r.name ?? r.title ?? ''}</div>
+                            <div class="mc-price">${r.price_formatted ?? ('&#8369;' + r.price)}</div>
+                            ${r.is_advantageous && r.reason ? `<div class="mc-reason">&#10003; ${r.reason}</div>` : ''}
+                            <div class="mc-source">${r.source ?? ''} &middot; ${r.date_retrieved ?? ''}</div>
+                        </div>`).join('');
+                } catch { resDiv.innerHTML = '<p style="font-size:12px;color:#a32d2d;">Search failed. Is the microservice running?</p>'; }
+            });
+        }
     }
 
     function updateSigBadge(prId, label, stage) {
@@ -583,6 +653,13 @@
 
         statusSel.value = pr.currentStatus ?? 'new';
         remarksIn.value = '';
+
+        const mp = document.getElementById('marketPanel');
+        const ms = document.getElementById('marketItemSel');
+        const mr = document.getElementById('marketResults');
+        if (mp) { mp.style.display = 'none'; }
+        if (ms) { ms.innerHTML = ''; }
+        if (mr) { mr.innerHTML = ''; }
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = pr.pdfFile

@@ -81,6 +81,35 @@ class AuthController extends Controller
     }
 
     /**
+     * Instant demo login — only available outside production
+     */
+    public function demoLogin(string $role)
+    {
+        abort_if(app()->isProduction(), 403);
+
+        $usernameMap = [
+            'office-head'        => 'office_head',
+            'finance-office'     => 'finance',
+            'procurement-office' => 'procurement',
+            'chancellor'         => 'chancellor',
+            'vice-chancellor'    => 'vice_chancellor',
+        ];
+
+        $username = $usernameMap[$role] ?? null;
+        abort_if(!$username, 404);
+
+        $user = User::where('username', $username)->where('account_status', 'active')->firstOrFail();
+
+        Auth::login($user);
+        $user->update(['last_login_at' => now()]);
+
+        $userRole = $user->roles()->first();
+        abort_if(!$userRole, 403);
+
+        return $this->redirectByRole($userRole->name);
+    }
+
+    /**
      * Handle logout
      */
     public function logout(Request $request)

@@ -15,6 +15,8 @@ Port: 5001
 """
 
 # ── Standard library ──────────────────────────────────────────────────────────
+import hashlib
+import json as _json
 import os
 import re
 
@@ -29,6 +31,18 @@ except ImportError:
     pass
 
 app = Flask(__name__)
+
+# ── Match cache (process-lifetime, keyed by content hash) ────────────────────
+_match_cache = {}
+_CACHE_LIMIT  = 200
+
+
+def _make_cache_key(item: str, specs: list, results: list) -> str:
+    r_hash = hashlib.md5(_json.dumps(
+        [r.get('name', r.get('title', '')) + str(r.get('price', '')) for r in results]
+    ).encode()).hexdigest()[:8]
+    payload = f"{item.lower()}|{'|'.join(sorted(s.lower() for s in specs))}|{r_hash}"
+    return hashlib.md5(payload.encode()).hexdigest()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -172,7 +186,9 @@ def _semantic_match(specs: list, results: list, threshold: float = 0.40) -> list
     matched = []
     for r, t_emb in zip(results, title_embs):
         per_spec_scores = [float(_ST_UTIL.cos_sim(s_emb, t_emb)) for s_emb in spec_embs]
-        if all(score > threshold for score in per_spec_scores):
+        passing   = sum(1 for s in per_spec_scores if s > threshold)
+        pass_rate = passing / len(per_spec_scores)
+        if pass_rate >= 0.80:
             avg = sum(per_spec_scores) / len(per_spec_scores)
             matched.append({**r, 'match_score': round(avg, 4)})
 
@@ -313,6 +329,10 @@ def match():
     if not results:
         return jsonify({'mode': 'broad', 'matched': [], 'count': 0})
 
+    ck = _make_cache_key(item, specs, results)
+    if ck in _match_cache:
+        return jsonify(_match_cache[ck])
+
     mode = detect_search_mode(item, specs)
 
     # ── MODE 3: Broad ────────────────────────────────────────────────────────
@@ -337,7 +357,10 @@ def match():
         if not matched:
             matched = results
 
-    return jsonify({'mode': mode, 'matched': matched, 'count': len(matched)})
+    result = {'mode': mode, 'matched': matched, 'count': len(matched)}
+    if len(_match_cache) < _CACHE_LIMIT:
+        _match_cache[ck] = result
+    return jsonify(result)
 
 
 @app.route('/advantageous', methods=['POST'])
@@ -363,7 +386,7 @@ def advantageous():
     if budget <= 0:
         return jsonify(results)
 
-    upper  = budget * 1.20
+    upper  = budget * 1.30
     output = []
 
     for r in results:
@@ -385,11 +408,11 @@ def advantageous():
             if top_kw:
                 reasons.append(f"includes value-added items: {', '.join(top_kw)}")
 
-            # Semantic value signals (only if sentence_transformers is loaded)
-            elif _ST_AVAILABLE and _VALUE_CONCEPT_EMBEDDINGS is not None:
+            # Semantic value signals — always runs alongside keyword check
+            if _ST_AVAILABLE and _VALUE_CONCEPT_EMBEDDINGS is not None:
                 emb       = _ST_MODEL.encode(combined, convert_to_tensor=True)
                 sem_score = float(_ST_UTIL.cos_sim(emb, _VALUE_CONCEPT_EMBEDDINGS).max())
-                if sem_score > 0.45:
+                if sem_score > 0.35 and not top_kw:
                     reasons.append('description suggests additional inclusions beyond the base item')
 
             if reasons:
