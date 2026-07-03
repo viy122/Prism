@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "PowerShell(*)",
+      "Edit",
+      "Write",
+      "WebFetch"
+    ],
+    "additionalDirectories": [
+      "C:\\xampp\\htdocs\\prism-price-api"
+    ]
+  }
+}
