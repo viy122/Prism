@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -96,6 +97,11 @@ class BudgetProposal extends Model
     {
         return $this->hasMany(BudgetProposalItem::class)
             ->where('schedule_type', BudgetProposalItem::SCHED16_CAPITAL);
+    }
+
+    public function marketPriceSurvey(): HasOne
+    {
+        return $this->hasOne(MarketPriceSurvey::class);
     }
 
     public function documents(): MorphMany

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
+use App\Models\MarketPriceSurvey;
 use App\Models\MarketScopingReference;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
@@ -149,10 +150,17 @@ class PrismOfficeHeadController extends Controller
             ->map(fn ($ref) => $this->formatMarketReference($ref))
             ->all();
 
+        $survey = BudgetProposal::where('office_id', $officeId)
+            ->with('marketPriceSurvey')
+            ->latest()
+            ->first()
+            ?->marketPriceSurvey;
+
         return view('prism.office-head.market-scoping', $this->withCommon('office-head', 'market-scoping', [
             'pageTitle'     => 'Market Scoping',
             'proposalItems' => $proposalItems,
             'selectedRefs'  => $selectedRefs,
+            'survey'        => $survey,
         ]));
     }
 
@@ -436,17 +444,29 @@ class PrismOfficeHeadController extends Controller
         $officeId = $this->officeId();
         $year     = now()->year + 1;
 
-        $proposal = BudgetProposal::firstOrCreate(
-            ['office_id' => $officeId, 'status' => 'draft', 'fiscal_year' => $year],
-            [
+        $proposal = BudgetProposal::where('office_id', $officeId)
+            ->where('fiscal_year', $year)
+            ->whereIn('status', ['draft', 'returned'])
+            ->latest()
+            ->first();
+
+        if (!$proposal) {
+            $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
+            $code     = $baseCode;
+            $n        = 2;
+            while (BudgetProposal::withTrashed()->where('code', $code)->exists()) {
+                $code = $baseCode . '-' . $n++;
+            }
+            $proposal = BudgetProposal::create([
+                'office_id'            => $officeId,
                 'created_by_user_id'   => $request->user()?->id,
-                'code'                 => 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year,
+                'code'                 => $code,
                 'title'                => 'FY ' . $year . ' Annual Budget Proposal',
                 'fiscal_year'          => $year,
                 'total_estimated_cost' => 0,
                 'status'               => 'draft',
-            ]
-        );
+            ]);
+        }
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
 
@@ -487,6 +507,50 @@ class PrismOfficeHeadController extends Controller
         $ref->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    public function previewMps(): View
+    {
+        $officeId = $this->officeId();
+        $proposal = BudgetProposal::where('office_id', $officeId)
+            ->with([
+                'items.marketReferences' => fn ($q) => $q->where('is_selected', true)->orderBy('price'),
+                'marketPriceSurvey.submittedBy',
+            ])
+            ->latest()
+            ->firstOrFail();
+
+        $items = $proposal->items
+            ->filter(fn ($i) => $i->marketReferences->isNotEmpty())
+            ->values();
+
+        return view('prism.office-head.market-price-survey', $this->withCommon('office-head', 'market-scoping', [
+            'pageTitle' => 'Market Study',
+            'proposal'  => $proposal,
+            'items'     => $items,
+            'survey'    => $proposal->marketPriceSurvey,
+        ]));
+    }
+
+    public function submitMps(Request $request): JsonResponse
+    {
+        $officeId = $this->officeId();
+        $proposal = BudgetProposal::where('office_id', $officeId)
+            ->whereIn('status', ['draft', 'returned'])
+            ->latest()
+            ->firstOrFail();
+
+        if ($proposal->marketPriceSurvey) {
+            return response()->json(['error' => 'Market Study already submitted.'], 409);
+        }
+
+        $survey = $proposal->marketPriceSurvey()->create([
+            'submitted_by_user_id' => auth()->id(),
+            'ref_number'           => 'MPS-' . now()->format('Y') . '-' . str_pad($proposal->id, 5, '0', STR_PAD_LEFT),
+            'submitted_at'         => now(),
+        ]);
+
+        return response()->json(['success' => true, 'ref_number' => $survey->ref_number]);
     }
 
     public function placeholder(string $role): View

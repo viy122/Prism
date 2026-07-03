@@ -31,6 +31,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/market-scoping/attach-to-proposal', 'attachToProposal')->name('market-scoping.attach');
         Route::post('/market-scoping/add-item-with-refs', 'addItemWithRefs')->name('market-scoping.add-item-with-refs');
         Route::delete('/market-scoping/ref/{ref}', 'deleteRef')->name('market-scoping.ref.delete');
+        Route::get('/market-scoping/mps', 'previewMps')->name('market-scoping.mps');
+        Route::post('/market-scoping/mps/submit', 'submitMps')->name('market-scoping.mps.submit');
         Route::get('/my-proposals', 'myProposals')->name('my-proposals');
         Route::get('/purchase-requests', 'purchaseRequests')->name('purchase-requests');
     });

@@ -167,6 +167,12 @@
     .ref-tag.t-match { background: #ECFDF5; color: #059669; }
     .ref-tag.t-adv   { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
     .advantageous-reason { font-size: 11px; font-weight: 500; color: #92400E; margin-top: 5px; line-height: 1.5; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 5px; padding: 5px 8px; }
+
+    /* ── MPS button in header ── */
+    .btn-mps-doc { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1.5px solid var(--border2); background: var(--white); color: var(--txt2); text-decoration: none; font-family: 'Poppins', sans-serif; transition: all .15s; flex-shrink: 0; }
+    .btn-mps-doc:hover { border-color: var(--crimson); color: var(--crimson); }
+    .btn-mps-doc-done { border-color: #86efac; background: #f0fdf4; color: #166534; }
+    .btn-mps-doc-done:hover { border-color: #4ade80; }
 </style>
 @endpush
 
@@ -183,6 +189,10 @@
                     <p>Search market prices and attach references to your proposal items.</p>
                 </div>
             </div>
+            <a href="{{ route('office-head.market-scoping.mps') }}" class="btn-mps-doc{{ $survey ? ' btn-mps-doc-done' : '' }}">
+                <i class="ti {{ $survey ? 'ti-circle-check' : 'ti-file-description' }}"></i>
+                {{ $survey ? 'View Submitted Market Study' : 'View Market Study' }}
+            </a>
         </div>
         <div class="search-bar">
             <div class="search-wrap">
@@ -338,12 +348,34 @@
 @push('scripts')
 <script type="application/json" id="msProposalItems">@json($proposalItems)</script>
 <script type="application/json" id="msSelectedRefs">@json($selectedRefs)</script>
+<script type="application/json" id="msSurveyLocked">@json(isset($survey) && $survey !== null)</script>
 
 <script>
 (function () {
 
-    const attached = {};   /* refId → ref data */
-    const MAX_REFS = 3;
+    const attached   = {};   /* refId → ref data */
+    const MAX_REFS   = 3;
+    const mpsLocked  = JSON.parse(document.getElementById('msSurveyLocked').textContent);
+
+    /* ── Lock UI when MPS has been submitted ── */
+    if (mpsLocked) {
+        document.addEventListener('DOMContentLoaded', () => {
+            const lockBanner = document.createElement('div');
+            lockBanner.style.cssText = 'display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:12px;font-weight:600;color:#166534;';
+            lockBanner.innerHTML = '<i class="ti ti-lock" style="font-size:16px;color:#16a34a;"></i> Market Study has been submitted. References are locked &mdash; no changes allowed.';
+            const grid = document.querySelector('.ms-grid');
+            if (grid) grid.parentNode.insertBefore(lockBanner, grid);
+
+            document.querySelectorAll('[data-delete-ref], .btn-attach-card, #runMarketBtn, #saveRefBtn').forEach(el => {
+                el.setAttribute('disabled', 'disabled');
+                el.style.opacity = '.4';
+                el.style.pointerEvents = 'none';
+                el.style.cursor = 'not-allowed';
+            });
+            const searchInput = document.getElementById('marketQueryInput');
+            if (searchInput) { searchInput.disabled = true; searchInput.style.opacity = '.5'; }
+        });
+    }
 
     /* ── Attach / detach ── */
     window.attachRef = function (refId) {
