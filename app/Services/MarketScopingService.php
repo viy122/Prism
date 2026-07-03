@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SaveMarketPriceSnapshots;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -16,7 +17,7 @@ class MarketScopingService
         return Cache::get('serpapi_quota_exhausted', false);
     }
 
-    public function search(string $query, int $limit = 5): array
+    public function search(string $query, int $limit = 5, ?string $department = null): array
     {
         $cacheKey = 'market_scoping_' . md5(strtolower(trim($query)));
 
@@ -27,13 +28,54 @@ class MarketScopingService
             );
         }
 
-        $results = $this->searchGoogleShopping($query, $limit);
+        // Local price aggregator (PS-DBM + PH stores) — free/official prices.
+        // Fail-soft: returns [] when the service is down, SerpApi still runs.
+        $priceApi        = new PriceApiService();
+        $priceApiResults = $priceApi->search($query, $limit, $department);
+
+        $serpResults = $this->searchGoogleShopping($query, $limit);
+
+        $results = $this->interleave($priceApiResults, $serpResults, $limit);
 
         if (!empty($results)) {
             Cache::put($cacheKey, $results, self::CACHE_TTL);
         }
 
+        // Persist an audit snapshot of the fresh price API rows after the
+        // response is sent — the user never waits on this insert.
+        if (!empty($priceApi->rawResults())) {
+            SaveMarketPriceSnapshots::dispatchAfterResponse(
+                $priceApi->rawResults(),
+                $query,
+                $department
+            );
+        }
+
         return $results;
+    }
+
+    /**
+     * Alternate items from both lists (price API first) so neither source
+     * monopolizes the visible results, capped at $limit.
+     */
+    private function interleave(array $a, array $b, int $limit): array
+    {
+        $merged = [];
+        $max = max(count($a), count($b));
+
+        for ($i = 0; $i < $max && count($merged) < $limit; $i++) {
+            if ($i < count($a)) {
+                $merged[] = $a[$i];
+            }
+            if (count($merged) >= $limit) {
+                break;
+            }
+            if ($i < count($b)) {
+                $merged[] = $b[$i];
+            }
+        }
+
+        return $merged;
     }
 
     public function matchSpecs(array $results, array $specs, string $query = ''): array

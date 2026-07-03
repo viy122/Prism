@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'price_api' => [
+        'url' => env('PRICE_API_URL', 'http://localhost:8000'),
+    ],
+
 ];
