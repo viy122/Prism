@@ -43,7 +43,7 @@
         .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
 
         /* ─── Stats bar ─── */
-        .stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+        .stats-bar { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
         .stat-box  { background: var(--s50); border: 1px solid var(--s200); border-radius: 14px; padding: 18px 20px; }
         .stat-box dt { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--s400); margin-bottom: 6px; }
         .stat-box dd { font-size: 26px; font-weight: 800; color: var(--s900); line-height: 1; }

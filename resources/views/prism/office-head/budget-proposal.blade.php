@@ -77,7 +77,7 @@
             background: var(--crimson-mid); font-weight: 700; color: var(--crimson);
             border-color: var(--crimson-border); cursor: default;
         }
-        .form-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .form-grid-4 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
         .item-row1   { display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
         .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; }
 

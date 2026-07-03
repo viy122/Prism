@@ -106,6 +106,23 @@
             box-shadow: 0 4px 14px rgba(139,26,28,.30);
         }
         .sb-nav a.active i { color: #fff; }
+        .sb-active-pill {
+            margin-left: auto;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.18);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .sb-nav a.active .sb-active-pill { display: inline-flex; }
         .sb-nav a.active::before {
             content: ''; position: absolute; right: -10px; top: 50%;
             transform: translateY(-50%); width: 4px; height: 26px;
@@ -201,29 +218,30 @@
         </div>
     </a>
     <div class="sb-divider"></div>
+    @php
+        $currentModule = collect($moduleNavigation ?? [])->firstWhere('slug', $activeModulePage ?? null);
+    @endphp
+    @php
+        $officeHeadNav = $moduleNavigation ?? [];
+    @endphp
     <nav class="sb-nav">
-        <a href="{{ route('office-head.dashboard') }}" title="Dashboard"{{ ($activeOfficePage ?? '') === 'dashboard' ? ' class="active"' : '' }}>
-            <i class="ti ti-layout-dashboard"></i><span class="sb-label">Dashboard</span>
+        @foreach ($officeHeadNav as $item)
+        <a href="{{ $item['href'] }}" title="{{ $item['label'] }}"
+           @if(($activeModulePage ?? '') === $item['slug']) class="active" aria-current="page" @endif>
+            <i class="ti ti-{{ $item['icon'] }}"></i>
+            <span class="sb-label">{{ $item['label'] }}</span>
+            @if(($activeModulePage ?? '') === $item['slug'])
+                
+            @endif
         </a>
-        <a href="{{ route('office-head.market-scoping') }}" title="Market Scoping"{{ ($activeOfficePage ?? '') === 'market-scoping' ? ' class="active"' : '' }}>
-            <i class="ti ti-search"></i><span class="sb-label">Market Scoping</span>
-        </a>
-        <a href="{{ route('office-head.budget-proposal') }}" title="Budget Proposal"{{ ($activeOfficePage ?? '') === 'budget-proposal' ? ' class="active"' : '' }}>
-            <i class="ti ti-file-text"></i><span class="sb-label">Budget Proposal</span>
-        </a>
-        <a href="{{ route('office-head.my-proposals') }}" title="My Proposals"{{ ($activeOfficePage ?? '') === 'my-proposals' ? ' class="active"' : '' }}>
-            <i class="ti ti-folder-open"></i><span class="sb-label">My Proposals</span>
-        </a>
-        <a href="{{ route('office-head.purchase-requests') }}" title="Purchase Requests"{{ ($activeOfficePage ?? '') === 'purchase-requests' ? ' class="active"' : '' }}>
-            <i class="ti ti-cloud-upload"></i><span class="sb-label">Purchase Requests</span>
-        </a>
+        @endforeach
     </nav>
     <div class="sb-bottom">
         <div class="sb-user">
             <div class="sb-avatar">OH</div>
             <div class="sb-user-info">
                 <div class="sb-user-label">Workspace</div>
-                <div class="sb-user-name">Office Head / Dean</div>
+                <div class="sb-user-name">{{ $roleLabel ?? 'Office Head / Dean' }}</div>
             </div>
         </div>
         <form method="POST" action="{{ route('logout') }}" style="margin:0">
@@ -240,7 +258,7 @@
 
     {{-- University banner with clock --}}
     <div class="univ-header">
-        <img class="hdr-bg" src="{{ asset('images/headers.png') }}" alt="Batangas State University"
+        <img class="hdr-bg" src="{{ asset('images/headers2.png') }}" alt="Batangas State University"
              onerror="this.parentElement.style.background='linear-gradient(135deg,#8B1A1C,#1E3A8A)';this.style.display='none'">
         <div class="univ-header-overlay"></div>
         <div class="univ-header-right">

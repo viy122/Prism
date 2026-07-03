@@ -67,7 +67,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
             margin-bottom: 22px;
             flex-wrap: wrap;
         }
@@ -215,7 +215,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
             margin-bottom: 16px;
             flex-wrap: wrap;
         }
@@ -276,6 +276,18 @@
             font-size: 13px;
             font-weight: 700;
             color: var(--s900);
+        }
+
+        .proposal-status-badge,
+        .timeline-status-badge {
+            min-width: 108px;
+            justify-content: center;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .timeline-status-badge {
+            align-self: flex-start;
         }
 
         /* ─── Timeline empty state ─── */
@@ -417,7 +429,7 @@
                                     <p class="proposal-row-title">{{ $proposal['title'] }}</p>
                                     <p class="proposal-row-meta">FY {{ $proposal['fiscalYear'] }} &middot; Submitted {{ $proposal['dateSubmitted'] }}</p>
                                 </div>
-                                <x-prism.status-badge :status="$proposal['status']" />
+                                <x-prism.status-badge :status="$proposal['status']" class="proposal-status-badge" />
                             </div>
 
                             <dl class="proposal-row-stats">
@@ -447,7 +459,7 @@
                         <h2 class="card-title" id="timelineTitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select a proposal</h2>
                         <p class="card-sub" id="timelineMeta">Timeline details will appear here.</p>
                     </div>
-                    <span class="pill pill-gray" id="timelineStatusBadge">Status</span>
+                    <span class="pill pill-gray timeline-status-badge" id="timelineStatusBadge">Status</span>
                 </div>
 
                 <div class="timeline-meta-grid">
