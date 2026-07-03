@@ -12,7 +12,9 @@ use App\Models\PurchaseRequest;
 use App\Services\MarketScopingService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PrismOfficeHeadController extends Controller
@@ -68,6 +70,8 @@ class PrismOfficeHeadController extends Controller
 
         $isReadOnly     = false;
         $proposalStatus = $proposal?->status ?? 'draft';
+        $canStartNew    = false;
+        $nextFiscalYear = null;
 
         if (!$proposal) {
             $proposal = BudgetProposal::where('office_id', $officeId)
@@ -77,6 +81,11 @@ class PrismOfficeHeadController extends Controller
             if ($proposal) {
                 $isReadOnly     = true;
                 $proposalStatus = $proposal->status;
+                $nextFiscalYear = $proposal->fiscal_year + 1;
+                $canStartNew    = !DB::table('budget_proposals')
+                    ->where('office_id', $officeId)
+                    ->where('fiscal_year', $nextFiscalYear)
+                    ->exists();
             }
         }
 
@@ -117,7 +126,52 @@ class PrismOfficeHeadController extends Controller
             'encodedItems'   => $encodedItems,
             'isReadOnly'     => $isReadOnly,
             'proposalStatus' => $proposalStatus,
+            'canStartNew'    => $canStartNew,
+            'nextFiscalYear' => $nextFiscalYear,
         ]));
+    }
+
+    public function startNewCycle(Request $request): RedirectResponse
+    {
+        $officeId = $this->officeId();
+
+        // Find the highest fiscal year for this office (raw query bypasses all model scopes)
+        $latestYear = DB::table('budget_proposals')
+            ->where('office_id', $officeId)
+            ->max('fiscal_year');
+
+        if (!$latestYear) {
+            return redirect()->route('office-head.budget-proposal')
+                ->with('error', 'No existing proposal found. Create your first budget proposal first.');
+        }
+
+        $nextYear = (int) $latestYear + 1;
+
+        // Guard: should not already exist
+        if (DB::table('budget_proposals')->where('office_id', $officeId)->where('fiscal_year', $nextYear)->exists()) {
+            return redirect()->route('office-head.budget-proposal')
+                ->with('error', "A proposal for FY {$nextYear} already exists.");
+        }
+
+        $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $nextYear;
+        $code = $baseCode;
+        $n = 2;
+        while (DB::table('budget_proposals')->where('code', $code)->exists()) {
+            $code = $baseCode . '-' . $n++;
+        }
+
+        $office = auth()->user()->office;
+        BudgetProposal::create([
+            'office_id'          => $officeId,
+            'created_by_user_id' => auth()->id(),
+            'code'               => $code,
+            'title'              => ($office?->name ?? 'Office') . ' Budget Proposal FY' . $nextYear,
+            'fiscal_year'        => $nextYear,
+            'status'             => 'draft',
+        ]);
+
+        return redirect()->route('office-head.budget-proposal')
+            ->with('success', "FY {$nextYear} Budget Proposal started.");
     }
 
     public function marketScoping(): View
@@ -251,19 +305,30 @@ class PrismOfficeHeadController extends Controller
         ]);
 
         $officeId = $this->officeId();
-        $year     = now()->year + 1;
 
-        $proposal = BudgetProposal::firstOrCreate(
-            ['office_id' => $officeId, 'status' => 'draft', 'fiscal_year' => $year],
-            [
+        $proposal = BudgetProposal::where('office_id', $officeId)
+            ->whereIn('status', ['draft', 'returned'])
+            ->orderByDesc('fiscal_year')
+            ->first();
+
+        if (!$proposal) {
+            $year     = now()->year + 1;
+            $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
+            $code     = $baseCode;
+            $n        = 2;
+            while (DB::table('budget_proposals')->where('code', $code)->exists()) {
+                $code = $baseCode . '-' . $n++;
+            }
+            $proposal = BudgetProposal::create([
+                'office_id'            => $officeId,
                 'created_by_user_id'   => auth()->id(),
-                'code'                 => 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year,
+                'code'                 => $code,
                 'title'                => 'FY ' . $year . ' Annual Budget Proposal',
                 'fiscal_year'          => $year,
                 'total_estimated_cost' => 0,
                 'status'               => 'draft',
-            ]
-        );
+            ]);
+        }
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
 
@@ -442,19 +507,19 @@ class PrismOfficeHeadController extends Controller
         ]);
 
         $officeId = $this->officeId();
-        $year     = now()->year + 1;
 
+        // Use the existing draft/returned proposal for any fiscal year
         $proposal = BudgetProposal::where('office_id', $officeId)
-            ->where('fiscal_year', $year)
             ->whereIn('status', ['draft', 'returned'])
-            ->latest()
+            ->orderByDesc('fiscal_year')
             ->first();
 
         if (!$proposal) {
+            $year     = now()->year + 1;
             $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
             $code     = $baseCode;
             $n        = 2;
-            while (BudgetProposal::withTrashed()->where('code', $code)->exists()) {
+            while (DB::table('budget_proposals')->where('code', $code)->exists()) {
                 $code = $baseCode . '-' . $n++;
             }
             $proposal = BudgetProposal::create([

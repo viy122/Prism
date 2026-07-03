@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends Model
@@ -18,6 +19,7 @@ class PurchaseOrder extends Model
         'supplier_address',
         'total_amount',
         'status',
+        'signatory_stage',
         'issued_at',
         'expected_delivery_date',
         'paid_by_user_id',
@@ -49,6 +51,41 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(User::class, 'paid_by_user_id');
     }
+
+    public function signatureLogs(): HasMany
+    {
+        return $this->hasMany(PoSignatureLog::class);
+    }
+
+    // ── Signatory chain ──────────────────────────────────────────────────────
+
+    public static function signatoryStages(): array
+    {
+        return ['draft', 'at_end_user', 'at_signatory_2', 'at_signatory_3', 'at_signatory_4', 'at_chancellor', 'fully_signed'];
+    }
+
+    public function nextSignatoryStage(): ?string
+    {
+        $stages = self::signatoryStages();
+        $idx    = array_search($this->signatory_stage, $stages);
+        return ($idx !== false && $idx < count($stages) - 1) ? $stages[$idx + 1] : null;
+    }
+
+    public function getSignatoryLabelAttribute(): string
+    {
+        return match ($this->signatory_stage) {
+            'draft'          => 'PO Created',
+            'at_end_user'    => 'PO – At End User (1st Signatory)',
+            'at_signatory_2' => 'PO – At 2nd Signatory',
+            'at_signatory_3' => 'PO – At 3rd Signatory',
+            'at_signatory_4' => 'PO – At 4th Signatory',
+            'at_chancellor'  => 'PO – At Chancellor',
+            'fully_signed'   => 'PO – Fully Signed',
+            default          => ucfirst(str_replace('_', ' ', $this->signatory_stage ?? 'draft')),
+        };
+    }
+
+    // ── Delivery status chain ────────────────────────────────────────────────
 
     public function getStatusLabelAttribute(): string
     {

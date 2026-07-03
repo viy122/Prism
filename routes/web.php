@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\PrismAccountingOfficeController;
 use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
@@ -26,6 +25,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
         Route::delete('/budget-proposal/item/{item}', 'destroyItem')->name('budget-proposal.destroy-item');
         Route::post('/budget-proposal/submit', 'submitProposal')->name('budget-proposal.submit');
+        Route::post('/budget-proposal/start-new-cycle', 'startNewCycle')->name('budget-proposal.start-new-cycle');
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
         Route::post('/market-scoping/run', 'runMarketScoping')->name('market-scoping.run');
         Route::post('/market-scoping/attach-to-proposal', 'attachToProposal')->name('market-scoping.attach');
@@ -64,13 +64,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchase-orders', 'purchaseOrders')->name('purchase-orders');
         Route::post('/aoc/{aoc}/issue-po', 'issuePo')->name('po.issue');
         Route::post('/purchase-order/{po}/status', 'updatePoStatus')->name('po.update-status');
+        Route::post('/purchase-order/{po}/advance', 'advancePoStage')->name('po.advance');
+        Route::post('/purchase-order/{po}/return-po', 'returnPo')->name('po.return');
         Route::get('/procurement-status-tracking', 'procurementStatusTracking')->name('procurement-status-tracking');
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
-    });
-
-    Route::prefix('accounting-office')->name('accounting-office.')->middleware('role:Accounting Office')->controller(PrismAccountingOfficeController::class)->group(function () {
-        Route::get('/', 'dashboard')->name('dashboard');
-        Route::post('/purchase-order/{po}/payment', 'confirmPayment')->name('po.confirm-payment');
     });
 
     Route::prefix('chancellor')->name('chancellor.')->middleware('role:Chancellor')->controller(PrismChancellorController::class)->group(function () {

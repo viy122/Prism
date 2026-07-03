@@ -240,6 +240,23 @@
         .submitted-state i { font-size: 32px; color: #2563EB; }
         .submitted-state-title { font-size: 13px; font-weight: 800; color: var(--txt); }
         .submitted-state-sub   { font-size: 11.5px; color: var(--txt3); line-height: 1.5; }
+
+        /* ── New cycle banner ── */
+        .bp-new-cycle-banner {
+            display: flex; align-items: center; justify-content: space-between; gap: 14px;
+            background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: var(--r-sm);
+            padding: 14px 18px; margin-bottom: 4px; flex-wrap: wrap;
+        }
+        .bp-new-cycle-banner > div { font-size: 13px; color: #134e4a; }
+        .bp-new-cycle-banner strong { color: #0f766e; }
+        .btn-start-new-cycle {
+            display: inline-flex; align-items: center; gap: 7px;
+            height: 36px; padding: 0 16px; border-radius: 8px;
+            background: #0d9488; color: #fff; font-size: 12px; font-weight: 700;
+            border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+            white-space: nowrap; transition: background .15s;
+        }
+        .btn-start-new-cycle:hover { background: #0f766e; }
 </style>
 @endpush
 
@@ -252,6 +269,38 @@
             <div>
                 <p class="submitted-banner-title">Proposal Submitted — Under Review</p>
                 <p class="submitted-banner-sub">This proposal has been submitted and is awaiting Finance Office review. Editing is disabled.</p>
+            </div>
+        </div>
+        @endif
+
+        @if($isReadOnly && ($canStartNew ?? false))
+        <div class="bp-new-cycle-banner">
+            <div>
+                <strong>FY{{ $proposalForm['fiscalYear'] }} proposal is {{ ucfirst($proposalStatus) }}.</strong>
+                Ready to begin FY{{ $nextFiscalYear }} budget planning?
+            </div>
+            <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
+                @csrf
+                <button type="submit" class="btn-start-new-cycle">
+                    <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} Proposal
+                </button>
+            </form>
+        </div>
+        @endif
+
+        @if(session('success'))
+        <div class="submitted-banner" style="background:#f0fdf4;border-color:#86efac;">
+            <i class="ti ti-circle-check-filled" style="color:#16a34a;"></i>
+            <div>
+                <p class="submitted-banner-title" style="color:#166534;">{{ session('success') }}</p>
+            </div>
+        </div>
+        @endif
+        @if(session('error'))
+        <div class="submitted-banner" style="background:#fef2f2;border-color:#fecaca;">
+            <i class="ti ti-alert-circle" style="color:#dc2626;"></i>
+            <div>
+                <p class="submitted-banner-title" style="color:#991b1b;">{{ session('error') }}</p>
             </div>
         </div>
         @endif

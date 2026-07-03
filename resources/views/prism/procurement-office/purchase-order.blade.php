@@ -139,7 +139,7 @@
                     @foreach($purchaseOrders as $po)
                     @php
                         $badgeCls = match(true) {
-                            $po['status'] === 'paid'                                 => 'badge-paid',
+                            $po['status'] === 'paid'                                           => 'badge-paid',
                             in_array($po['status'], ['complete_delivery', 'receipt_uploaded']) => 'badge-complete',
                             in_array($po['status'], ['awaiting_delivery', 'partial_delivery']) => 'badge-delivery',
                             default => 'badge-issued',
@@ -155,7 +155,7 @@
                         <td style="font-size:12px;color:var(--s500);">{{ $po['expectedDate'] }}</td>
                         <td>
                             @if($po['status'] === 'paid')
-                                <span style="font-size:11px;color:#3b6d11;font-weight:700;">✓ Paid {{ $po['paidAt'] }}</span>
+                                <span style="font-size:11px;color:#3b6d11;font-weight:700;">✓ Payment Made</span>
                             @elseif($po['nextStatus'])
                                 <button class="btn btn-green btn-advance-po" data-url="{{ $po['updateUrl'] }}" data-po-id="{{ $po['id'] }}" data-next-status="{{ $po['nextStatus'] }}">
                                     <i class="ti ti-circle-arrow-right"></i>
@@ -171,7 +171,7 @@
                                     {{ $nextLabel }}
                                 </button>
                             @else
-                                <span style="font-size:11px;color:var(--s400);">Awaiting Payment</span>
+                                <span style="font-size:11px;color:var(--s400);">—</span>
                             @endif
                         </td>
                     </tr>

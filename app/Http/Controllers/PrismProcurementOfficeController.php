@@ -6,6 +6,7 @@ use App\Models\AbstractOfCanvass;
 use App\Models\AocSignatureLog;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
+use App\Models\PoSignatureLog;
 use App\Models\ProcurementStatusUpdate;
 use App\Models\PrSignatureLog;
 use App\Models\PurchaseOrder;
@@ -430,6 +431,7 @@ class PrismProcurementOfficeController extends Controller
             'supplier_address'       => $request->input('supplier_address'),
             'total_amount'           => $request->input('total_amount'),
             'status'                 => 'issued',
+            'signatory_stage'        => 'draft',
             'issued_at'              => now(),
             'expected_delivery_date' => $request->input('expected_delivery_date'),
         ]);
@@ -441,6 +443,10 @@ class PrismProcurementOfficeController extends Controller
 
     public function updatePoStatus(Request $request, PurchaseOrder $po): JsonResponse
     {
+        if ($po->signatory_stage !== 'fully_signed') {
+            return response()->json(['error' => 'PO must be fully signed before updating delivery status.'], 422);
+        }
+
         $next = $po->nextStatus();
         if (!$next || $po->status === 'paid') {
             return response()->json(['error' => 'No further status available.'], 422);
@@ -456,6 +462,51 @@ class PrismProcurementOfficeController extends Controller
             'status'      => $next,
             'statusLabel' => $po->fresh()->status_label,
         ]);
+    }
+
+    public function advancePoStage(Request $request, PurchaseOrder $po): JsonResponse
+    {
+        $next = $po->nextSignatoryStage();
+        if (!$next) {
+            return response()->json(['error' => 'PO is already fully signed.'], 422);
+        }
+
+        $signatoryNumber = array_search($next, PurchaseOrder::signatoryStages());
+        $po->update(['signatory_stage' => $next]);
+
+        PoSignatureLog::create([
+            'purchase_order_id' => $po->id,
+            'signatory_number'  => $signatoryNumber,
+            'signed_by_user_id' => auth()->id(),
+            'action'            => 'signed',
+            'remarks'           => $request->input('remarks'),
+            'signed_at'         => now(),
+        ]);
+
+        return response()->json([
+            'success'        => true,
+            'signatoryStage' => $next,
+            'signatoryLabel' => $po->fresh()->signatory_label,
+        ]);
+    }
+
+    public function returnPo(Request $request, PurchaseOrder $po): JsonResponse
+    {
+        $request->validate(['remarks' => 'required|string|max:1000']);
+
+        $prev = $po->signatory_stage;
+        $po->update(['signatory_stage' => 'draft']);
+
+        PoSignatureLog::create([
+            'purchase_order_id' => $po->id,
+            'signatory_number'  => array_search($prev, PurchaseOrder::signatoryStages()) ?: 0,
+            'signed_by_user_id' => auth()->id(),
+            'action'            => 'returned',
+            'remarks'           => $request->input('remarks'),
+            'signed_at'         => now(),
+        ]);
+
+        return response()->json(['success' => true]);
     }
 
     public function procurementStatusTracking(): View

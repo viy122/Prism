@@ -205,11 +205,11 @@
         <a href="{{ route('office-head.dashboard') }}" title="Dashboard"{{ ($activeOfficePage ?? '') === 'dashboard' ? ' class="active"' : '' }}>
             <i class="ti ti-layout-dashboard"></i><span class="sb-label">Dashboard</span>
         </a>
-        <a href="{{ route('office-head.market-scoping') }}" title="Market Scoping"{{ ($activeOfficePage ?? '') === 'market-scoping' ? ' class="active"' : '' }}>
-            <i class="ti ti-search"></i><span class="sb-label">Market Scoping</span>
-        </a>
         <a href="{{ route('office-head.budget-proposal') }}" title="Budget Proposal"{{ ($activeOfficePage ?? '') === 'budget-proposal' ? ' class="active"' : '' }}>
             <i class="ti ti-file-text"></i><span class="sb-label">Budget Proposal</span>
+        </a>
+        <a href="{{ route('office-head.market-scoping') }}" title="Market Scoping"{{ ($activeOfficePage ?? '') === 'market-scoping' ? ' class="active"' : '' }}>
+            <i class="ti ti-search"></i><span class="sb-label">Market Scoping</span>
         </a>
         <a href="{{ route('office-head.my-proposals') }}" title="My Proposals"{{ ($activeOfficePage ?? '') === 'my-proposals' ? ' class="active"' : '' }}>
             <i class="ti ti-folder-open"></i><span class="sb-label">My Proposals</span>
