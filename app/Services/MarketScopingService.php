@@ -12,14 +12,23 @@ class MarketScopingService
     private const SERPAPI_URL  = 'https://serpapi.com/search.json';
     private const MATCHER_URL  = 'http://localhost:5001';
 
+    private bool $matcherAvailable = true;
+
     public function isQuotaExhausted(): bool
     {
         return Cache::get('serpapi_quota_exhausted', false);
     }
 
+    public function matcherAvailable(): bool
+    {
+        return $this->matcherAvailable;
+    }
+
     public function search(string $query, int $limit = 5, ?string $department = null): array
     {
-        $cacheKey = 'market_scoping_' . md5(strtolower(trim($query)));
+        $cacheKey = 'market_scoping_' . md5(
+            strtolower(trim($query)) . '|' . $limit . '|' . strtolower($department ?? '')
+        );
 
         if (Cache::has($cacheKey)) {
             return array_map(
@@ -99,13 +108,19 @@ class MarketScopingService
             ]);
 
             if (!$response->successful()) {
+                $this->matcherAvailable = false;
                 return $results;
             }
 
             // v2 response: { mode, matched, count }
             $json = $response->json();
-            return is_array($json['matched'] ?? null) ? $json['matched'] : $results;
+            if (!is_array($json['matched'] ?? null)) {
+                $this->matcherAvailable = false;
+                return $results;
+            }
+            return $json['matched'];
         } catch (\Throwable) {
+            $this->matcherAvailable = false;
             return $results;
         }
     }
@@ -127,15 +142,20 @@ class MarketScopingService
                 'results' => $payload,
             ]);
 
-            return $response->successful() ? $response->json() : $results;
+            if (!$response->successful()) {
+                $this->matcherAvailable = false;
+                return $results;
+            }
+            return $response->json();
         } catch (\Throwable) {
+            $this->matcherAvailable = false;
             return $results;
         }
     }
 
     private function searchGoogleShopping(string $query, int $limit): array
     {
-        $apiKey = env('SERPAPI_KEY');
+        $apiKey = config('services.serpapi.key');
 
         if (!$apiKey) {
             return [];

@@ -39,4 +39,8 @@ return [
         'url' => env('PRICE_API_URL', 'http://localhost:8000'),
     ],
 
+    'serpapi' => [
+        'key' => env('SERPAPI_KEY'),
+    ],
+
 ];

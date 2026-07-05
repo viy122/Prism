@@ -491,10 +491,11 @@ class PrismOfficeHeadController extends Controller
 
         if (empty($results)) {
             return response()->json([
-                'success'    => false,
-                'message'    => 'No market references found for this item. Try adjusting the search keywords.',
-                'results'    => [],
-                'suggestion' => $this->didYouMean($query),
+                'success'         => false,
+                'message'         => 'No market references found for this item. Try adjusting the search keywords.',
+                'results'         => [],
+                'suggestion'      => $this->didYouMean($query),
+                'quota_exhausted' => $service->isQuotaExhausted(),
             ]);
         }
 
@@ -507,11 +508,13 @@ class PrismOfficeHeadController extends Controller
         }
 
         return response()->json([
-            'success'        => true,
-            'results'        => $results,
-            'query'          => $query,
-            'count'          => count($results),
-            'specs_filtered' => !empty($specs),
+            'success'           => true,
+            'results'           => $results,
+            'query'             => $query,
+            'count'             => count($results),
+            'specs_filtered'    => !empty($specs),
+            'quota_exhausted'   => $service->isQuotaExhausted(),
+            'matcher_available' => $service->matcherAvailable(),
         ]);
     }
 

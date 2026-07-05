@@ -37,6 +37,13 @@
 
     .smart-alert { margin: 12px 18px; display: flex; align-items: flex-start; gap: 8px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r-sm); padding: 9px 13px; font-size: 12px; font-weight: 600; color: #92400E; }
     .smart-alert i { font-size: 15px; color: #F59E0B; flex-shrink: 0; margin-top: 1px; }
+    .smart-alert span { flex: 1; }
+    .smart-alert .alert-close { background: none; border: 0; cursor: pointer; padding: 0; display: flex; flex-shrink: 0; }
+    .smart-alert .alert-close i { font-size: 13px; color: #92400E; margin-top: 2px; }
+
+    .info-note { margin: 12px 18px 0; display: flex; align-items: center; gap: 7px; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--r-sm); padding: 8px 13px; font-size: 12px; font-weight: 500; color: var(--txt3); }
+    .info-note i { font-size: 14px; flex-shrink: 0; }
+    #noticeArea .smart-alert + .info-note, #noticeArea .info-note { margin-bottom: 0; }
 
     .results-list { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 320px); overflow-y: auto; }
 
@@ -60,6 +67,8 @@
     .ref-tag.t-purple { background: var(--purple-bg); color: var(--purple); }
     .ref-tag.t-gray   { background: var(--bg2); color: var(--txt2); }
     .ref-date { font-size: 11px; color: var(--txt3); font-weight: 500; }
+    .ref-rating { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--txt2); font-weight: 600; margin-bottom: 4px; }
+    .ref-rating i { font-size: 12px; color: var(--amber); }
 
     .ref-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px; }
     .ref-price { font-size: 20px; font-weight: 800; color: var(--crimson); letter-spacing: -.5px; line-height: 1; }
@@ -245,6 +254,9 @@
                     <span id="refCount" class="pill pill-gray">0 results</span>
                 </div>
             </div>
+
+            {{-- Service notices (quota / AI matcher availability) --}}
+            <div id="noticeArea"></div>
 
             {{-- Filter / Sort bar --}}
             <div class="filter-bar" id="filterBar" style="display:none;">
@@ -660,6 +672,7 @@
 
         const dynDiv = document.getElementById('dynamicResults');
         dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-load"><i class="ti ti-loader-2"></i></div><p class="state-title">Fetching market prices…</p><p class="state-sub">Searching for <strong>' + esc(query) + '</strong>.</p></div>';
+        renderNotices({});   /* clear notices from the previous search */
 
         try {
             const res  = await fetch(runUrl, {
@@ -668,6 +681,8 @@
                 body:    JSON.stringify({ item_id: 'manual', query, specs, budget }),
             });
             const data = await res.json();
+
+            renderNotices(data);
 
             if (!res.ok || !data.success) {
                 let html = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">No results found</p><p class="state-sub">' + esc(data.message || 'Try different keywords.') + '</p></div>';
@@ -692,6 +707,31 @@
         }
     }
 
+    function renderNotices(data) {
+        const area = document.getElementById('noticeArea');
+        if (!area) return;
+        area.innerHTML = '';
+
+        /* Strict checks: older cached responses without these keys show nothing */
+        if (data.quota_exhausted === true) {
+            const alert = document.createElement('div');
+            alert.className = 'smart-alert';
+            alert.innerHTML =
+                '<i class="ti ti-alert-triangle"></i>' +
+                '<span>Live Google Shopping prices are temporarily unavailable (search quota reached). Results may be limited to the local price database or cached data.</span>' +
+                '<button type="button" class="alert-close" aria-label="Dismiss notice"><i class="ti ti-x"></i></button>';
+            alert.querySelector('.alert-close').addEventListener('click', () => alert.remove());
+            area.appendChild(alert);
+        }
+
+        if (data.matcher_available === false) {
+            const note = document.createElement('div');
+            note.className = 'info-note';
+            note.innerHTML = '<i class="ti ti-info-circle"></i>AI match scoring unavailable — showing unranked results.';
+            area.appendChild(note);
+        }
+    }
+
     function renderDynamic(results, container) {
         container.innerHTML = '';
         results.forEach((item, idx) => {
@@ -711,7 +751,7 @@
             card.dataset.price    = priceFmt.replace('₱','').replace(/,/g,'');
             card.dataset.priceRaw = price;
             card.dataset.supplier = source;
-            card.dataset.source   = 'Google Shopping';
+            card.dataset.source   = source;
             card.dataset.date     = date;
             card.dataset.url      = url;
             card.dataset.specs    = item.snippet || '';
@@ -724,6 +764,17 @@
             const matchScore = item.match_score ? Math.round(item.match_score * 100) : null;
             const isAdv      = item.is_advantageous === true;
             const advReason  = item.reason || '';
+            const rating     = parseFloat(item.rating);
+
+            const sourceTag = '<span class="ref-tag ' + (item.is_official === true ? 't-green' : 't-blue') + '">' + esc(source) + '</span>';
+            const cachedTag = item.cached === true
+                ? '<span class="ref-tag t-gray"><i class="ti ti-clock" style="font-size:10px;margin-right:3px"></i>Cached</span>'
+                : '';
+            const ratingHtml = !isNaN(rating) && rating > 0
+                ? '<div class="ref-rating"><i class="ti ti-star-filled"></i>' + rating.toFixed(1) +
+                  (item.reviews ? '<span style="color:var(--txt3);font-weight:500">(' + Number(item.reviews).toLocaleString() + ' reviews)</span>' : '') +
+                  '</div>'
+                : '';
 
             const matchBadge = matchScore !== null
                 ? '<span class="ref-tag t-match"><i class="ti ti-check" style="font-size:10px"></i>' + matchScore + '% match</span>'
@@ -740,7 +791,8 @@
                 '<div class="ref-body">' +
                     '<p class="ref-name">' + esc(name) + '</p>' +
                     '<p class="ref-supplier">' + esc(source) + '</p>' +
-                    '<div class="ref-tags"><span class="ref-tag t-blue">Google Shopping</span>' + matchBadge + advBadge + '</div>' +
+                    '<div class="ref-tags">' + sourceTag + cachedTag + matchBadge + advBadge + '</div>' +
+                    ratingHtml +
                     advBlock +
                     '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
                 '</div>' +
