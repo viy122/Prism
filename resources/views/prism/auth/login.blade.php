@@ -549,6 +549,31 @@
             display: block;
         }
 
+        .server-error {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fdf1f1;
+            border: 1px solid #f2c4c4;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #a32d2d;
+            margin-bottom: 16px;
+        }
+
+        .server-error svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            stroke: #a32d2d;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         .extras-row {
             display: flex;
             align-items: center;
@@ -878,6 +903,17 @@
                     <h1 class="card-h1">Log <span>in</span></h1>
                     <div class="card-rule"></div>
 
+                    @if ($errors->any())
+                        <div class="server-error" role="alert">
+                            <svg viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            <span>{{ $errors->first() }}</span>
+                        </div>
+                    @endif
+
                     <form id="loginForm" method="POST" action="{{ route('login') }}">
                         @csrf
 
@@ -889,7 +925,7 @@
                                         <circle cx="12" cy="7" r="4" />
                                     </svg>
                                 </div>
-                                <input class="field-input" type="text" id="emailInput" name="email"
+                                <input class="field-input @error('email') error @enderror" type="text" id="emailInput" name="email"
                                     autocomplete="username" placeholder="Username"
                                     value="{{ old('email') }}">
                             </div>
@@ -904,7 +940,7 @@
                                         <path d="M7 11V7a5 5 0 0110 0v4" />
                                     </svg>
                                 </div>
-                                <input class="field-input" type="password" id="passwordInput" name="password"
+                                <input class="field-input @error('password') error @enderror" type="password" id="passwordInput" name="password"
                                     autocomplete="current-password" placeholder="Password">
                                 <button class="pw-toggle" type="button" id="pwToggle" aria-label="Toggle password">
                                     <svg id="eyeIcon" viewBox="0 0 24 24">
