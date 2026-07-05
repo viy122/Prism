@@ -23,11 +23,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
+        Route::put('/budget-proposal/item/{item}', 'updateItem')->name('budget-proposal.update-item');
         Route::delete('/budget-proposal/item/{item}', 'destroyItem')->name('budget-proposal.destroy-item');
         Route::post('/budget-proposal/submit', 'submitProposal')->name('budget-proposal.submit');
         Route::post('/budget-proposal/start-new-cycle', 'startNewCycle')->name('budget-proposal.start-new-cycle');
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
         Route::post('/market-scoping/run', 'runMarketScoping')->name('market-scoping.run');
+        Route::get('/market-scoping/suggestions', 'marketScopingSuggestions')->name('market-scoping.suggestions');
         Route::post('/market-scoping/attach-to-proposal', 'attachToProposal')->name('market-scoping.attach');
         Route::post('/market-scoping/add-item-with-refs', 'addItemWithRefs')->name('market-scoping.add-item-with-refs');
         Route::delete('/market-scoping/ref/{ref}', 'deleteRef')->name('market-scoping.ref.delete');
@@ -41,6 +43,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/proposal-review', 'proposalReview')->name('proposal-review');
         Route::get('/proposal-review/{proposal}', 'proposalReview')->name('proposal-review.show');
+        Route::post('/proposal-review/item/{item}/remark', 'saveItemRemark')->name('proposal-review.item-remark');
         Route::post('/proposal-review/{proposal}/endorse', 'endorse')->name('proposal-review.endorse');
         Route::post('/proposal-review/{proposal}/return', 'returnProposal')->name('proposal-review.return');
         Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
@@ -56,6 +59,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
         Route::post('/purchase-request/{pr}/canvassing', 'updateCanvassing')->name('purchase-request.canvassing');
         Route::get('/purchase-request/{pr}/market-prices', 'getMarketPrices')->name('purchase-request.market-prices');
+        Route::post('/purchase-request/import-pdf', 'importPrFromPdf')->name('purchase-request.import-pdf');
+        Route::post('/purchase-request/import-pdf/confirm', 'importPrConfirm')->name('purchase-request.import-confirm');
         Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
         Route::get('/abstract-of-canvass', 'abstractOfCanvass')->name('abstract-of-canvass');
         Route::post('/purchase-request/{pr}/create-aoc', 'createAoc')->name('aoc.create');

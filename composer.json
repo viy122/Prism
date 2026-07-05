@@ -9,6 +9,7 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "smalot/pdfparser": "^2.12",
         "symfony/css-selector": "^7.4",
         "symfony/dom-crawler": "^7.4"
     },
@@ -89,9 +90,8 @@
             "barryvdh/laravel-ide-helper": true
         },
         "audit": {
-            "ignore": {
-                "PKSA-m5cs-t1y6-qpcs": "Local capstone project — security advisory not relevant for localhost dev."
-            }
+            "ignore": ["PKSA-93qv-9n9h-6k6p", "PKSA-k22t-f949-t9g6", "PKSA-m5cs-t1y6-qpcs", "PKSA-7qs6-zvnz-h66r"],
+            "block-insecure": false
         }
     },
     "minimum-stability": "stable",

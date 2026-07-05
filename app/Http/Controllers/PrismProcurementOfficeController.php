@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AbstractOfCanvass;
+use Smalot\PdfParser\Parser as PdfParser;
 use App\Models\AocSignatureLog;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
@@ -123,6 +124,9 @@ class PrismProcurementOfficeController extends Controller
             'pageTitle'        => 'Purchase Request Management',
             'purchaseRequests' => $prs,
             'stages'           => PurchaseRequest::signatoryStages(),
+            'offices'          => Office::select('id', 'name')->orderBy('name')->get()->toArray(),
+            'importPdfUrl'     => route('procurement-office.purchase-request.import-pdf'),
+            'importConfirmUrl' => route('procurement-office.purchase-request.import-confirm'),
         ]));
     }
 
@@ -645,6 +649,133 @@ class PrismProcurementOfficeController extends Controller
             'filePath' => $path,
             'status'   => ucwords(str_replace('_', ' ', $newStatus)),
         ]);
+    }
+
+    // ── BSU PDF Import ───────────────────────────────────────────────────────
+
+    public function importPrFromPdf(Request $request): JsonResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:pdf|max:20480']);
+
+        $text = '';
+        try {
+            $parser = new PdfParser();
+            $pdf    = $parser->parseContent($request->file('file')->get());
+            $text   = $pdf->getText();
+        } catch (\Exception $e) {
+            $text = '';
+        }
+
+        $extracted = $this->parsePrFields($text);
+
+        $year = now()->year;
+        $name = 'bsu-import-' . now()->format('Ymd-His') . '.pdf';
+        $path = $request->file('file')->storeAs("purchase-requests/{$year}", $name, 'public');
+
+        return response()->json([
+            'success'   => true,
+            'filePath'  => $path,
+            'hasText'   => strlen(trim($text)) > 10,
+            'extracted' => $extracted,
+        ]);
+    }
+
+    public function importPrConfirm(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'office_id'          => 'required|integer|exists:offices,id',
+            'number'             => 'nullable|string|max:100',
+            'title'              => 'required|string|max:500',
+            'purpose'            => 'nullable|string|max:2000',
+            'total_amount'       => 'nullable|numeric|min:0',
+            'file_path'          => 'nullable|string|max:500',
+            'items'              => 'nullable|array',
+            'items.*.name'       => 'required_with:items|string|max:500',
+            'items.*.qty'        => 'nullable|numeric|min:0',
+            'items.*.unit'       => 'nullable|string|max:50',
+            'items.*.unit_cost'  => 'nullable|numeric|min:0',
+        ]);
+
+        $pr = PurchaseRequest::create([
+            'office_id'             => $data['office_id'],
+            'created_by_user_id'    => auth()->id(),
+            'number'                => $data['number'] ?: ('BSU-' . now()->format('YmdHis')),
+            'title'                 => $data['title'],
+            'description'           => $data['purpose'] ?? null,
+            'fiscal_year'           => now()->year,
+            'total_amount'          => $data['total_amount'] ?? 0,
+            'status'                => 'in_progress',
+            'signatory_stage'       => 'draft',
+            'canvassing_stage'      => 'completed',
+            'file_path'             => $data['file_path'] ?? null,
+            'extracted_fields_json' => ['imported_from_bsu' => true],
+            'uploaded_at'           => now(),
+            'remarks'               => 'Imported from BSU procurement system.',
+        ]);
+
+        foreach (($data['items'] ?? []) as $item) {
+            $qty      = (float) ($item['qty'] ?? 1);
+            $unitCost = (float) ($item['unit_cost'] ?? 0);
+            $pr->items()->create([
+                'name'                => $item['name'],
+                'quantity'            => $qty,
+                'unit'                => $item['unit'] ?? 'pc',
+                'estimated_unit_cost' => $unitCost,
+                'estimated_total_cost'=> round($qty * $unitCost, 2),
+            ]);
+        }
+
+        NotificationService::prUploaded($pr);
+
+        return response()->json([
+            'success' => true,
+            'prId'    => $pr->id,
+            'message' => 'PR imported successfully from BSU system.',
+        ]);
+    }
+
+    private function parsePrFields(string $text): array
+    {
+        $clean = fn (string $s) => trim(preg_replace('/\s+/', ' ', $s));
+
+        $prNumber = null;
+        if (preg_match('/PR\s*No\.?\s*[:\|]?\s*([A-Z0-9\-\/]+)/i', $text, $m)) {
+            $prNumber = $clean($m[1]);
+        }
+
+        $office = null;
+        if (preg_match('/Department\s*[\/]?\s*Office\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+            $office = $clean($m[1]);
+        }
+
+        $title = null;
+        if (preg_match('/Name\s+of\s+Project\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+            $title = $clean($m[1]);
+        }
+
+        $purpose = null;
+        if (preg_match('/Purpose\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+            $purpose = $clean($m[1]);
+        }
+
+        $date = null;
+        if (preg_match('/Date\s*[:\|]\s*(\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4}|\w+\s+\d{1,2},?\s*\d{4})/i', $text, $m)) {
+            $date = $clean($m[1]);
+        }
+
+        $total = null;
+        if (preg_match('/TOTAL\s+COST[^0-9₱]*([0-9,]+\.?\d*)/i', $text, $m)) {
+            $total = (float) str_replace(',', '', $m[1]);
+        }
+
+        return [
+            'pr_number' => $prNumber,
+            'office'    => $office,
+            'title'     => $title,
+            'purpose'   => $purpose,
+            'date'      => $date,
+            'total'     => $total,
+        ];
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

@@ -105,6 +105,30 @@
 
     .action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 
+    /* ── Per-item verdict (check / X) ── */
+    .fin-verdict { display: flex; flex-direction: column; gap: 8px; }
+    .verdict-btns { display: flex; gap: 6px; }
+    .btn-verdict { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1.5px solid var(--s200); background: var(--white); color: var(--s500); transition: all .15s; }
+    .btn-verdict i { font-size: 14px; }
+    .btn-ok:hover { border-color: #86efac; color: #166534; background: #f0fdf4; }
+    .btn-ok.active { border-color: #16a34a; background: #16a34a; color: #fff; }
+    .btn-flag:hover { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
+    .btn-flag.active { border-color: #dc2626; background: #dc2626; color: #fff; }
+    .btn-save-remark { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; margin-top: 6px; border-radius: 8px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; background: var(--crimson); color: #fff; transition: background .15s; }
+    .btn-save-remark:hover { background: var(--crimson-dark); }
+    .btn-save-remark:disabled { opacity: .6; cursor: not-allowed; }
+    .verdict-status { font-size: 11px; font-weight: 700; }
+    .verdict-status.ok { color: #166534; }
+    .verdict-status.err { color: #991b1b; }
+
+    /* ── Overall action buttons (endorse / return) ── */
+    .btn-endorse { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: #16a34a; color: #fff; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 2px 10px rgba(22,163,74,.25); transition: background .2s; white-space: nowrap; flex: 1; min-width: 220px; }
+    .btn-endorse:hover { background: #15803d; }
+    .btn-endorse i { font-size: 17px; }
+    .btn-return { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: var(--white); color: #dc2626; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1.5px solid #fecaca; transition: all .2s; white-space: nowrap; }
+    .btn-return:hover { background: #fef2f2; border-color: #dc2626; }
+    .btn-return i { font-size: 17px; }
+
     @media (max-width: 1024px) {
         .page-shell { padding: 16px 16px 40px; }
         .meta-grid { grid-template-columns: 1fr 1fr; }
@@ -238,9 +262,25 @@
                                     @endforeach
                                 </div>
                             </td>
-                            <td style="min-width:200px;">
-                                <label class="field-label">Remarks for item {{ $index + 1 }}</label>
-                                <textarea class="field-textarea" rows="4" placeholder="Add item-level review remarks"></textarea>
+                            <td style="min-width:210px;">
+                                <div class="fin-verdict" data-item-id="{{ $item['id'] }}" data-remark-url="{{ $item['remarkUrl'] }}">
+                                    <div class="verdict-btns">
+                                        <button type="button" class="btn-verdict btn-ok{{ $item['financeOk'] === true ? ' active' : '' }}" title="Budget OK for this item">
+                                            <i class="ti ti-check"></i> OK
+                                        </button>
+                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Issue with this item">
+                                            <i class="ti ti-x"></i> Issue
+                                        </button>
+                                    </div>
+                                    <div class="verdict-remark" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
+                                        <textarea class="field-textarea remark-input" rows="3"
+                                            placeholder="What's the issue with this item? (required)">{{ $item['financeRemark'] }}</textarea>
+                                        <button type="button" class="btn-save-remark">
+                                            <i class="ti ti-device-floppy"></i> Save Remark
+                                        </button>
+                                    </div>
+                                    <p class="verdict-status" style="display:none;"></p>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -274,17 +314,17 @@
                 placeholder="Add endorsement notes or return instructions for the office"></textarea>
             @if($selectedProposal['status'] === 'Submitted')
             <div class="action-row" style="margin-top:14px;">
-                <button class="btn-primary" type="submit"
+                <button class="btn-endorse" type="submit"
                     data-url="{{ route('finance-office.proposal-review.endorse', $selectedProposal['id']) }}"
                     onclick="return submitFinanceForm(this)">
-                    <i class="ti ti-circle-check" style="font-size:14px"></i>
-                    Endorse
+                    <i class="ti ti-circle-check"></i>
+                    Endorse to Chancellor
                 </button>
-                <button class="btn-outline" type="submit"
+                <button class="btn-return" type="submit"
                     data-url="{{ route('finance-office.proposal-review.return', $selectedProposal['id']) }}"
                     onclick="return submitFinanceReturn(this)">
-                    <i class="ti ti-arrow-back-up" style="font-size:14px"></i>
-                    Return with Remarks
+                    <i class="ti ti-arrow-back-up"></i>
+                    Return to Office Head
                 </button>
             </div>
             @else
@@ -325,5 +365,76 @@ function submitFinanceReturn(btn) {
     document.getElementById('financeReviewForm').action = btn.dataset.url;
     return true;
 }
+
+/* ── Per-item check / X verdicts ── */
+(function () {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+    async function saveVerdict(box, ok, remark) {
+        const status = box.querySelector('.verdict-status');
+        try {
+            const res = await fetch(box.dataset.remarkUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ ok, remark: remark || '' }),
+            });
+            const json = await res.json();
+            status.style.display = '';
+            if (res.ok && json.success) {
+                status.textContent = ok ? '✓ Marked as budget OK' : '✓ Issue remark saved';
+                status.className = 'verdict-status ok';
+                setTimeout(() => { status.style.display = 'none'; }, 2200);
+                return true;
+            }
+            status.textContent = json.message || 'Could not save.';
+            status.className = 'verdict-status err';
+            return false;
+        } catch {
+            status.style.display = '';
+            status.textContent = 'Network error.';
+            status.className = 'verdict-status err';
+            return false;
+        }
+    }
+
+    document.querySelectorAll('.fin-verdict').forEach(box => {
+        const btnOk    = box.querySelector('.btn-ok');
+        const btnFlag  = box.querySelector('.btn-flag');
+        const remarkEl = box.querySelector('.verdict-remark');
+        const input    = box.querySelector('.remark-input');
+        const btnSave  = box.querySelector('.btn-save-remark');
+
+        btnOk.addEventListener('click', async () => {
+            const wasActive = btnOk.classList.contains('active');
+            btnOk.classList.add('active');
+            btnFlag.classList.remove('active');
+            remarkEl.style.display = 'none';
+            if (!wasActive) {
+                const saved = await saveVerdict(box, true);
+                if (!saved) btnOk.classList.remove('active');
+            }
+        });
+
+        btnFlag.addEventListener('click', () => {
+            btnFlag.classList.add('active');
+            btnOk.classList.remove('active');
+            remarkEl.style.display = '';
+            input.focus();
+        });
+
+        btnSave.addEventListener('click', async () => {
+            const remark = input.value.trim();
+            if (!remark) {
+                input.style.borderColor = '#dc2626';
+                input.focus();
+                return;
+            }
+            input.style.borderColor = '';
+            btnSave.disabled = true;
+            await saveVerdict(box, false, remark);
+            btnSave.disabled = false;
+        });
+    });
+})();
 </script>
 @endpush

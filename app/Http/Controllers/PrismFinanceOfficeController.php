@@ -128,6 +128,28 @@ class PrismFinanceOfficeController extends Controller
         ]));
     }
 
+    public function saveItemRemark(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'ok'     => 'required|boolean',
+            'remark' => 'nullable|string|max:1000',
+        ]);
+
+        if (!$validated['ok'] && empty(trim($validated['remark'] ?? ''))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A remark is required when flagging an item.',
+            ], 422);
+        }
+
+        $item->update([
+            'finance_ok'     => $validated['ok'],
+            'finance_remark' => $validated['ok'] ? null : trim($validated['remark']),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
     public function saveProcurementMode(Request $request, BudgetProposalItem $item): JsonResponse
     {
         $validated = $request->validate([
@@ -294,6 +316,10 @@ class PrismFinanceOfficeController extends Controller
                 'fundSource'    => 'General Fund',
             ],
             'items' => $p->items->map(fn ($item) => [
+                'id'                => $item->id,
+                'financeOk'         => $item->finance_ok,
+                'financeRemark'     => $item->finance_remark ?? '',
+                'remarkUrl'         => route('finance-office.proposal-review.item-remark', $item->id),
                 'description'       => $item->name,
                 'unit'              => $item->unit,
                 'quantity'          => (int) $item->quantity,
@@ -342,7 +368,7 @@ class PrismFinanceOfficeController extends Controller
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                 'label' => 'Dashboard',                 'href' => route('finance-office.dashboard'),                  'icon' => 'layout-dashboard'],
                 ['slug' => 'proposal-review',           'label' => 'Proposal Review',           'href' => route('finance-office.proposal-review'),            'icon' => 'clipboard-check'],
-                ['slug' => 'annual-procurement-plan',   'label' => 'Annual Procurement Plan',   'href' => route('finance-office.annual-procurement-plan'),    'icon' => 'files'],
+                // Annual Procurement Plan moved to Procurement Office
                 ['slug' => 'budget-utilization-report', 'label' => 'Budget Utilization Report', 'href' => route('finance-office.budget-utilization-report'),  'icon' => 'trending-up'],
             ],
         ], $data);

@@ -1,5 +1,5 @@
 @extends('prism.layouts.office-head')
-@section('title', 'Budget Proposal')
+@section('title', 'PPMP')
 
 @php
     $isReadOnly            = $isReadOnly ?? false;
@@ -267,8 +267,8 @@
         <div class="submitted-banner">
             <i class="ti ti-send"></i>
             <div>
-                <p class="submitted-banner-title">Proposal Submitted — Under Review</p>
-                <p class="submitted-banner-sub">This proposal has been submitted and is awaiting Finance Office review. Editing is disabled.</p>
+                <p class="submitted-banner-title">PPMP Submitted — Under Review</p>
+                <p class="submitted-banner-sub">This PPMP has been submitted and is awaiting Finance Office review. Editing is disabled.</p>
             </div>
         </div>
         @endif
@@ -276,7 +276,7 @@
         @if($isReadOnly && ($canStartNew ?? false))
         <div class="bp-new-cycle-banner">
             <div>
-                <strong>FY{{ $proposalForm['fiscalYear'] }} proposal is {{ ucfirst($proposalStatus) }}.</strong>
+                <strong>FY{{ $proposalForm['fiscalYear'] }} PPMP is {{ ucfirst($proposalStatus) }}.</strong>
                 Ready to begin FY{{ $nextFiscalYear }} budget planning?
             </div>
             <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
@@ -314,21 +314,21 @@
                     <div class="card-head">
                         <div class="card-head-icon"><i class="ti ti-file-invoice"></i></div>
                         <div class="card-head-text">
-                            <p class="card-eyebrow">Proposal info</p>
-                            <p class="card-title">Proposal Details</p>
-                            <p class="card-sub">Basic information for the annual procurement budget proposal.</p>
+                            <p class="card-eyebrow">PPMP Info</p>
+                            <p class="card-title">PPMP Details</p>
+                            <p class="card-sub">Basic information for the annual procurement PPMP.</p>
                         </div>
                         <span class="badge {{ $isReadOnly ? 'badge-blue' : 'badge-gray' }}" style="margin-left:auto;">{{ ucfirst($proposalStatus) }}</span>
                     </div>
                     <div class="card-body">
                         <div class="form-grid-4">
                             <div class="field-group">
-                                <label class="field-label" for="officeName">Office / College</label>
-                                <input id="officeName" class="field-input" value="{{ $proposalForm['officeName'] }}">
+                                <label class="field-label">Office / College</label>
+                                <input class="field-input readonly" readonly value="{{ $proposalForm['officeName'] }}">
                             </div>
                             <div class="field-group">
-                                <label class="field-label" for="fiscalYear">Fiscal Year</label>
-                                <input id="fiscalYear" class="field-input" value="{{ $proposalForm['fiscalYear'] }}">
+                                <label class="field-label">Fiscal Year</label>
+                                <input class="field-input readonly" readonly value="FY {{ $proposalForm['fiscalYear'] }}">
                             </div>
                             <div class="field-group">
                                 <label class="field-label" for="datePrepared">Date Prepared</label>
@@ -412,7 +412,7 @@
                         <div class="card-head-icon"><i class="ti ti-shield-check"></i></div>
                         <div class="card-head-text">
                             <p class="card-eyebrow">Readiness check</p>
-                            <p class="card-title">Submission Readiness</p>
+                            <p class="card-title">PPMP Submission Readiness</p>
                             <p class="card-sub">Market scoping must support all encoded items.</p>
                         </div>
                     </div>
@@ -449,7 +449,7 @@
                         @else
                         <p id="submitMsg" class="submit-msg"></p>
                         <button id="submitProposalButton" type="button" class="btn-submit">
-                            <i class="ti ti-send"></i>Submit Proposal
+                            <i class="ti ti-send"></i>Submit PPMP
                         </button>
                         @endif
                     </div>
@@ -512,6 +512,7 @@
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
 
     let items = JSON.parse(document.getElementById('initialProposalItems').textContent || '[]');
+    let editingId = null;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     function esc(s) {
@@ -554,7 +555,37 @@
                     <span class="scoping-empty-hint"><a href="${esc(scopingUrl)}?q=${encodeURIComponent(item.description)}" style="color:var(--crimson);text-decoration:none;font-weight:700">Run scoping →</a></span>
                    </div>`;
 
-            return `<tr>
+            if (editingId === item.id && !isReadOnly) {
+                return `<tr data-item-row="${esc(item.id)}" style="background:#FFF8F8;">
+                    <td colspan="2">
+                        <input class="field-input" id="edit-desc" value="${esc(item.description)}" placeholder="Item description" style="margin-bottom:6px;">
+                        <input class="field-input" id="edit-just" value="${esc(item.justification)}" placeholder="Purpose / justification">
+                    </td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <input class="field-input" id="edit-qty" type="number" min="0.01" step="any" value="${esc(item.quantity)}" style="width:70px;" title="Quantity">
+                            <input class="field-input" id="edit-unit" value="${esc(item.unit)}" style="width:70px;" title="Unit">
+                        </div>
+                    </td>
+                    <td><input class="field-input" id="edit-cost" type="number" min="0" step="0.01" value="${esc(item.estimatedUnitCost)}" style="width:110px;" title="Unit cost"></td>
+                    <td>
+                        <select class="field-input" id="edit-quarter" style="width:74px;">
+                            ${['Q1','Q2','Q3','Q4'].map(q => `<option value="${q}"${item.targetQuarter === q ? ' selected' : ''}>${q}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td>${scopingCell}</td>
+                    <td><div class="tbl-actions" style="flex-direction:column;gap:5px;">
+                        <button class="tbl-btn" type="button" title="Save changes" style="background:var(--green-bg);color:var(--green);border-color:#bbf7d0;" onclick="prismBP.saveEdit('${esc(item.id)}')">
+                            <i class="ti ti-check"></i>
+                        </button>
+                        <button class="tbl-btn" type="button" title="Cancel" onclick="prismBP.cancelEdit()">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div></td>
+                </tr>`;
+            }
+
+            return `<tr data-item-row="${esc(item.id)}">
                 <td class="td-name">${esc(item.description)}<small>${esc(item.justification)}</small></td>
                 <td>${esc(item.quantity)} ${esc(item.unit)}</td>
                 <td class="td-bold">PHP ${fmt(item.estimatedUnitCost)}</td>
@@ -562,6 +593,9 @@
                 <td>${esc(item.targetQuarter)}</td>
                 <td>${scopingCell}</td>
                 ${isReadOnly ? '' : `<td><div class="tbl-actions">
+                    <button class="tbl-btn" title="Edit item" type="button" onclick="prismBP.editItem('${esc(item.id)}')">
+                        <i class="ti ti-pencil"></i>
+                    </button>
                     <button class="tbl-btn danger" title="Remove item" type="button" onclick="prismBP.deleteItem('${esc(item.id)}')">
                         <i class="ti ti-trash"></i>
                     </button>
@@ -590,6 +624,25 @@
         } else {
             badge.className   = 'readiness-badge draft';
             badge.textContent = 'Draft';
+        }
+
+        // Submit button state follows readiness
+        const submitBtn = document.getElementById('submitProposalButton');
+        const msgEl     = document.getElementById('submitMsg');
+        if (submitBtn) {
+            if (items.length === 0) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP';
+                if (msgEl) { msgEl.textContent = 'Add at least one item to submit.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
+            } else if (missing > 0) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="ti ti-alert-triangle"></i>' + missing + ' item' + (missing > 1 ? 's' : '') + ' need' + (missing > 1 ? '' : 's') + ' market scoping';
+                if (msgEl) { msgEl.textContent = 'Run market scoping on all items before submitting the PPMP.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP to Finance Office';
+                if (msgEl) { msgEl.style.display = 'none'; }
+            }
         }
     }
 
@@ -692,12 +745,12 @@
                 } else {
                     showMsg(data.message || 'Could not submit proposal.', 'err');
                     btn.disabled  = false;
-                    btn.innerHTML = '<i class="ti ti-send"></i>Submit Proposal';
+                    btn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP';
                 }
             } catch {
                 showMsg('Network error. Please try again.', 'err');
                 btn.disabled  = false;
-                btn.innerHTML = '<i class="ti ti-send"></i>Submit Proposal';
+                btn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP';
             }
         });
     }
@@ -707,8 +760,55 @@
         window.location.href = scopingUrl;
     });
 
-    // expose deleteItem globally for inline onclick
-    window.prismBP = { deleteItem };
+    // ── Edit item (inline) ────────────────────────────────────────────────────
+    function editItem(id) {
+        editingId = id;
+        renderTable();
+        document.getElementById('edit-desc')?.focus();
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        renderTable();
+    }
+
+    async function saveEdit(id) {
+        const payload = {
+            description:       document.getElementById('edit-desc').value.trim(),
+            justification:     document.getElementById('edit-just').value.trim(),
+            quantity:          parseFloat(document.getElementById('edit-qty').value),
+            unit:              document.getElementById('edit-unit').value.trim() || 'unit',
+            estimatedUnitCost: parseFloat(document.getElementById('edit-cost').value),
+            targetQuarter:     document.getElementById('edit-quarter').value,
+        };
+        if (!payload.description || isNaN(payload.quantity) || isNaN(payload.estimatedUnitCost)) {
+            alert('Please fill in description, quantity, and unit cost.');
+            return;
+        }
+
+        try {
+            const res  = await fetch(destroyBase + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.success) {
+                const idx = items.findIndex(i => i.id === id);
+                if (idx !== -1) items[idx] = { ...items[idx], ...data.item };
+                editingId = null;
+                renderTable();
+                updateSummary();
+            } else {
+                alert(data.message || 'Could not save changes.');
+            }
+        } catch {
+            alert('Network error. Please try again.');
+        }
+    }
+
+    // expose functions globally for inline onclick
+    window.prismBP = { deleteItem, editItem, cancelEdit, saveEdit };
 
     prismBP.toggleRefs = function (btn) {
         const list = btn.nextElementSibling;

@@ -57,6 +57,8 @@ class BudgetProposalItem extends Model
         'is_overridden',
         'status',
         'remarks',
+        'finance_ok',
+        'finance_remark',
         'specifications_json',
     ];
 
@@ -71,6 +73,7 @@ class BudgetProposalItem extends Model
             'unserviceable_units'   => 'integer',
             'specifications_json'   => 'array',
             'is_overridden'         => 'boolean',
+            'finance_ok'            => 'boolean',
         ];
     }
 

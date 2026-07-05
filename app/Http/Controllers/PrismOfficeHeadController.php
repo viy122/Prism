@@ -365,6 +365,57 @@ class PrismOfficeHeadController extends Controller
         ]);
     }
 
+    public function updateItem(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $proposal = $item->budgetProposal;
+        if (!in_array($proposal->status, ['draft', 'returned'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This PPMP is no longer editable.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'description'       => 'required|string|max:500',
+            'unit'              => 'required|string|max:50',
+            'quantity'          => 'required|numeric|min:0.01',
+            'estimatedUnitCost' => 'required|numeric|min:0',
+            'justification'     => 'nullable|string|max:1000',
+            'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
+        ]);
+
+        $total = $validated['quantity'] * $validated['estimatedUnitCost'];
+
+        $item->update([
+            'name'                 => $validated['description'],
+            'description'          => $validated['description'],
+            'quantity'             => $validated['quantity'],
+            'unit'                 => $validated['unit'],
+            'estimated_unit_cost'  => $validated['estimatedUnitCost'],
+            'estimated_total_cost' => $total,
+            'target_quarter'       => $validated['targetQuarter'],
+            'remarks'              => $validated['justification'] ?? null,
+        ]);
+
+        $proposal->update([
+            'total_estimated_cost' => $proposal->items()->sum('estimated_total_cost'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'item'    => [
+                'id'                => (string) $item->id,
+                'description'       => $item->name,
+                'unit'              => $item->unit,
+                'quantity'          => (float) $item->quantity,
+                'estimatedUnitCost' => (float) $item->estimated_unit_cost,
+                'totalCost'         => (float) $item->estimated_total_cost,
+                'justification'     => $item->remarks ?? '',
+                'targetQuarter'     => $item->target_quarter,
+            ],
+        ]);
+    }
+
     public function destroyItem(BudgetProposalItem $item): JsonResponse
     {
         $proposal = $item->budgetProposal;
@@ -426,15 +477,24 @@ class PrismOfficeHeadController extends Controller
             'budget'  => 'nullable|numeric|min:0',
         ]);
 
-        $query   = $request->input('query');
+        $query = $this->sanitizeSearchQuery($request->input('query'));
+        if ($query === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Search query is empty after removing invalid characters. Please type a valid item name.',
+                'results' => [],
+            ]);
+        }
+
         $service = new MarketScopingService();
         $results = $service->search($query, 30);
 
         if (empty($results)) {
             return response()->json([
-                'success' => false,
-                'message' => 'No market references found for this item. Try adjusting the search keywords.',
-                'results' => [],
+                'success'    => false,
+                'message'    => 'No market references found for this item. Try adjusting the search keywords.',
+                'results'    => [],
+                'suggestion' => $this->didYouMean($query),
             ]);
         }
 
@@ -453,6 +513,76 @@ class PrismOfficeHeadController extends Controller
             'count'          => count($results),
             'specs_filtered' => !empty($specs),
         ]);
+    }
+
+    public function marketScopingSuggestions(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['suggestions' => []]);
+        }
+
+        $like     = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+        $officeId = $this->officeId();
+
+        // Item names already encoded by this office
+        $itemNames = DB::table('budget_proposal_items')
+            ->join('budget_proposals', 'budget_proposals.id', '=', 'budget_proposal_items.budget_proposal_id')
+            ->where('budget_proposals.office_id', $officeId)
+            ->where('budget_proposal_items.name', 'like', $like)
+            ->distinct()
+            ->limit(5)
+            ->pluck('budget_proposal_items.name');
+
+        // Past search queries from cached market snapshots
+        $pastQueries = DB::table('market_price_snapshots')
+            ->where('query_used', 'like', $like)
+            ->distinct()
+            ->limit(5)
+            ->pluck('query_used');
+
+        $suggestions = $itemNames->map(fn ($n) => ['text' => $n, 'type' => 'item'])
+            ->concat($pastQueries->map(fn ($s) => ['text' => $s, 'type' => 'search']))
+            ->unique('text')
+            ->take(8)
+            ->values();
+
+        return response()->json(['suggestions' => $suggestions]);
+    }
+
+    private function sanitizeSearchQuery(string $raw): string
+    {
+        // Keep letters, numbers, spaces, and characters common in product specs
+        $clean = preg_replace('/[^\p{L}\p{N}\s\-\+\.\"\/(),]/u', ' ', $raw);
+        return trim(preg_replace('/\s+/', ' ', $clean));
+    }
+
+    private function didYouMean(string $query): ?string
+    {
+        $known = DB::table('budget_proposal_items')
+            ->join('budget_proposals', 'budget_proposals.id', '=', 'budget_proposal_items.budget_proposal_id')
+            ->where('budget_proposals.office_id', $this->officeId())
+            ->distinct()
+            ->limit(200)
+            ->pluck('budget_proposal_items.name')
+            ->concat(DB::table('market_price_snapshots')->distinct()->limit(200)->pluck('query_used'));
+
+        $qLower = mb_strtolower($query);
+        $best     = null;
+        $bestDist = PHP_INT_MAX;
+
+        foreach ($known as $candidate) {
+            $cLower = mb_strtolower($candidate);
+            if ($cLower === $qLower) continue;
+            $dist = levenshtein($qLower, mb_substr($cLower, 0, 255));
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best     = $candidate;
+            }
+        }
+
+        // Only suggest when reasonably close (≤ 40% of query length)
+        return ($best !== null && $bestDist <= max(2, (int) (mb_strlen($query) * 0.4))) ? $best : null;
     }
 
     public function attachToProposal(Request $request): JsonResponse

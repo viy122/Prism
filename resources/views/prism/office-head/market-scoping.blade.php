@@ -168,6 +168,28 @@
     .ref-tag.t-adv   { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
     .advantageous-reason { font-size: 11px; font-weight: 500; color: #92400E; margin-top: 5px; line-height: 1.5; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 5px; padding: 5px 8px; }
 
+    /* ── Autocomplete dropdown ── */
+    .suggest-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r-sm); box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 50; overflow: hidden; display: none; }
+    .suggest-dropdown.open { display: block; }
+    .suggest-item { display: flex; align-items: center; gap: 9px; padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--txt); cursor: pointer; transition: background .1s; }
+    .suggest-item:hover, .suggest-item.active { background: var(--crimson-mid); }
+    .suggest-item i { font-size: 14px; color: var(--txt3); flex-shrink: 0; }
+    .suggest-item .sg-type { margin-left: auto; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--txt3); }
+
+    /* ── Filter / sort bar ── */
+    .filter-bar { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border2); background: var(--bg); flex-wrap: wrap; }
+    .filter-bar label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--txt3); }
+    .filter-sel { height: 32px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; }
+    .filter-sel:focus { border-color: var(--crimson); }
+    .filter-price { height: 32px; width: 90px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); padding: 0 8px; font-size: 12px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; }
+    .filter-price:focus { border-color: var(--crimson); }
+    .filter-clear { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); font-size: 11px; font-weight: 700; color: var(--txt2); cursor: pointer; font-family: 'Poppins', sans-serif; transition: all .15s; }
+    .filter-clear:hover { border-color: var(--crimson); color: var(--crimson); }
+
+    /* ── Did you mean ── */
+    .dym-box { margin: 12px 18px 0; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 600; color: #1d4ed8; }
+    .dym-box a { color: #1d4ed8; text-decoration: underline; cursor: pointer; }
+
     /* ── MPS button in header ── */
     .btn-mps-doc { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1.5px solid var(--border2); background: var(--white); color: var(--txt2); text-decoration: none; font-family: 'Poppins', sans-serif; transition: all .15s; flex-shrink: 0; }
     .btn-mps-doc:hover { border-color: var(--crimson); color: var(--crimson); }
@@ -197,8 +219,9 @@
         <div class="search-bar">
             <div class="search-wrap">
                 <i class="ti ti-search si-icon"></i>
-                <input id="marketQueryInput" class="search-input" type="search"
+                <input id="marketQueryInput" class="search-input" type="search" autocomplete="off"
                        placeholder="Search a new item (e.g. Laptop Intel i7 16GB RAM)…">
+                <div id="suggestDropdown" class="suggest-dropdown"></div>
             </div>
             <div class="budget-wrap">
                 <span class="budget-prefix">₱</span>
@@ -221,6 +244,24 @@
                     <span class="results-title">Market References</span>
                     <span id="refCount" class="pill pill-gray">0 results</span>
                 </div>
+            </div>
+
+            {{-- Filter / Sort bar --}}
+            <div class="filter-bar" id="filterBar" style="display:none;">
+                <label>Sort</label>
+                <select id="sortSel" class="filter-sel">
+                    <option value="match">Best Match</option>
+                    <option value="price_asc">Price: Low → High</option>
+                    <option value="price_desc">Price: High → Low</option>
+                </select>
+                <label>Price</label>
+                <input id="priceMin" class="filter-price" type="number" min="0" placeholder="Min ₱">
+                <span style="color:var(--txt3);font-size:11px;">–</span>
+                <input id="priceMax" class="filter-price" type="number" min="0" placeholder="Max ₱">
+                <label style="margin-left:4px;">
+                    <input type="checkbox" id="advOnly" style="vertical-align:middle;margin-right:4px;">Advantageous only
+                </label>
+                <button type="button" class="filter-clear" id="filterClear">Clear</button>
             </div>
 
             <div class="results-list" id="resultsContainer">
@@ -270,8 +311,14 @@
                 <div class="rp-save-row">
                     <p class="rp-save-hint" id="saveHint">Attach exactly 3 references to continue.</p>
                     <button class="btn-save-ref" id="saveRefBtn" type="button" disabled>
-                        <i class="ti ti-link"></i>Attach to Proposal
+                        <i class="ti ti-link"></i>Attach to PPMP
                     </button>
+                    <a href="{{ route('office-head.market-scoping.mps') }}"
+                       style="display:flex;align-items:center;justify-content:center;gap:7px;height:38px;width:100%;border-radius:var(--r-sm);background:transparent;color:var(--txt2);border:1.5px solid var(--border2);font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;text-decoration:none;transition:all .15s;"
+                       onmouseover="this.style.borderColor='var(--crimson)';this.style.color='var(--crimson)';"
+                       onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--txt2)';">
+                        <i class="ti ti-file-download"></i>Save Market Study as File
+                    </a>
                 </div>
 
             </div>
@@ -623,12 +670,19 @@
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">No results found</p><p class="state-sub">' + esc(data.message || 'Try different keywords.') + '</p></div>';
+                let html = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">No results found</p><p class="state-sub">' + esc(data.message || 'Try different keywords.') + '</p></div>';
+                if (data.suggestion) {
+                    html = '<div class="dym-box">Did you mean: <a onclick="document.getElementById(\'marketQueryInput\').value=this.textContent;window.msRunSearch();">' + esc(data.suggestion) + '</a>?</div>' + html;
+                }
+                dynDiv.innerHTML = html;
+                document.getElementById('filterBar').style.display = 'none';
+                lastResults = [];
                 return;
             }
 
-            renderDynamic(data.results, dynDiv);
-            document.getElementById('refCount').textContent = data.results.length + ' result' + (data.results.length !== 1 ? 's' : '') + ' found';
+            lastResults = data.results;
+            document.getElementById('filterBar').style.display = '';
+            applyFilters();
 
         } catch (e) {
             dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">Network error</p><p class="state-sub">Check your connection and try again.</p></div>';
@@ -770,7 +824,113 @@
     });
 
     runBtn    && runBtn.addEventListener('click', runSearch);
-    queryInput && queryInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+    window.msRunSearch = runSearch;
+
+    /* ── Filters + sort (client-side on lastResults) ── */
+    let lastResults = [];
+
+    function applyFilters() {
+        const dynDiv = document.getElementById('dynamicResults');
+        const sortBy  = document.getElementById('sortSel').value;
+        const min     = parseFloat(document.getElementById('priceMin').value) || 0;
+        const max     = parseFloat(document.getElementById('priceMax').value) || Infinity;
+        const advOnly = document.getElementById('advOnly').checked;
+
+        let list = lastResults.filter(r => {
+            const p = parseFloat(r.price) || 0;
+            if (p < min || p > max) return false;
+            if (advOnly && r.is_advantageous !== true) return false;
+            return true;
+        });
+
+        if (sortBy === 'price_asc')  list = list.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
+        if (sortBy === 'price_desc') list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
+        /* 'match' keeps server order (already ranked by match score) */
+
+        if (list.length === 0) {
+            dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-init"><i class="ti ti-filter-off"></i></div><p class="state-title">No results match your filters</p><p class="state-sub">Adjust the price range or clear the filters.</p></div>';
+        } else {
+            renderDynamic(list, dynDiv);
+        }
+        document.getElementById('refCount').textContent = list.length + ' of ' + lastResults.length + ' result' + (lastResults.length !== 1 ? 's' : '');
+    }
+
+    ['sortSel', 'priceMin', 'priceMax', 'advOnly'].forEach(id => {
+        const el = document.getElementById(id);
+        el && el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', applyFilters);
+    });
+    document.getElementById('filterClear')?.addEventListener('click', () => {
+        document.getElementById('sortSel').value  = 'match';
+        document.getElementById('priceMin').value = '';
+        document.getElementById('priceMax').value = '';
+        document.getElementById('advOnly').checked = false;
+        applyFilters();
+    });
+
+    /* ── Autocomplete suggestions ── */
+    const suggestUrl = '{{ route("office-head.market-scoping.suggestions") }}';
+    const dropdown   = document.getElementById('suggestDropdown');
+    let suggestTimer = null;
+    let activeIdx    = -1;
+
+    function closeSuggest() { dropdown.classList.remove('open'); dropdown.innerHTML = ''; activeIdx = -1; }
+
+    function renderSuggest(items) {
+        if (!items.length) { closeSuggest(); return; }
+        dropdown.innerHTML = items.map((s, i) =>
+            '<div class="suggest-item" data-idx="' + i + '" data-text="' + esc(s.text) + '">' +
+            '<i class="ti ' + (s.type === 'item' ? 'ti-clipboard-list' : 'ti-history') + '"></i>' +
+            esc(s.text) +
+            '<span class="sg-type">' + (s.type === 'item' ? 'My item' : 'Past search') + '</span>' +
+            '</div>').join('');
+        dropdown.classList.add('open');
+        activeIdx = -1;
+
+        dropdown.querySelectorAll('.suggest-item').forEach(el => {
+            el.addEventListener('mousedown', e => {
+                e.preventDefault();
+                queryInput.value = el.dataset.text;
+                closeSuggest();
+                runSearch();
+            });
+        });
+    }
+
+    queryInput && queryInput.addEventListener('input', function () {
+        clearTimeout(suggestTimer);
+        const q = this.value.trim();
+        if (q.length < 2) { closeSuggest(); return; }
+        suggestTimer = setTimeout(async () => {
+            try {
+                const res  = await fetch(suggestUrl + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+                const json = await res.json();
+                renderSuggest(json.suggestions || []);
+            } catch { closeSuggest(); }
+        }, 250);
+    });
+
+    queryInput && queryInput.addEventListener('keydown', e => {
+        const items = dropdown.querySelectorAll('.suggest-item');
+        if (dropdown.classList.contains('open') && items.length) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); }
+            else if (e.key === 'Escape') { closeSuggest(); return; }
+            else if (e.key === 'Enter' && activeIdx >= 0) {
+                e.preventDefault();
+                queryInput.value = items[activeIdx].dataset.text;
+                closeSuggest();
+                runSearch();
+                return;
+            }
+            items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') return;
+        }
+        if (e.key === 'Enter') { closeSuggest(); runSearch(); }
+    });
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.search-wrap')) closeSuggest();
+    });
 
     /* ── Auto-search when arriving from Budget Proposal "Run scoping →" ── */
     (function () {
