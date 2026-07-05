@@ -1,6 +1,10 @@
 # Required
 flask>=3.0.0
 python-dotenv>=1.0.0
+waitress>=3.0.0
+
+# Dev / testing
+pytest>=8.0.0
 
 # Semantic matching (strongly recommended — enables sentence-transformers AI)
 sentence-transformers>=2.7.0

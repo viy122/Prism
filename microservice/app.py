@@ -190,7 +190,8 @@ def _product_text(r: dict) -> str:
 def _semantic_match(specs: list, results: list, threshold: float = 0.40) -> list:
     """
     Uses sentence_transformers: encodes each spec and each product title separately.
-    A product passes only when ALL per-spec cosine scores exceed the threshold.
+    A product passes when at least 80% of its per-spec cosine scores exceed the
+    threshold (with 1-4 specs this means all of them must pass).
     Returns matched results sorted by average score descending.
     """
     if not _ST_AVAILABLE or not specs or not results:
@@ -375,8 +376,9 @@ def match():
             matched = _broad_rank(results)
 
     result = {'mode': mode, 'matched': matched, 'count': len(matched)}
-    if len(_match_cache) < _CACHE_LIMIT:
-        _match_cache[ck] = result
+    if len(_match_cache) >= _CACHE_LIMIT:
+        _match_cache.pop(next(iter(_match_cache)))   # evict oldest (insertion order)
+    _match_cache[ck] = result
     return jsonify(result)
 
 
@@ -404,8 +406,9 @@ def advantageous():
     if budget <= 0:
         return jsonify(results)
 
-    upper  = budget * (1 + OVER_BUDGET_TOLERANCE)
-    output = []
+    upper      = budget * (1 + OVER_BUDGET_TOLERANCE)
+    output     = []
+    borderline = []   # over-budget-within-tolerance entries, resolved after the loop
 
     for r in results:
         price = _to_float(r.get('price'))
@@ -419,31 +422,39 @@ def advantageous():
             entry['reason']          = 'Within budget'
 
         elif price <= upper:
-            over_amt = price - budget
-            over_pct = (over_amt / budget) * 100
             combined = _product_text(r).lower()
-            reasons  = []
-
-            # Keyword-based value signals
-            top_kw = [kw for kw in VALUE_KEYWORDS if kw in combined][:4]
-            if top_kw:
-                reasons.append(f"includes value-added items: {', '.join(top_kw)}")
-
-            # Semantic value signals — always runs alongside keyword check
-            if _ST_AVAILABLE and _VALUE_CONCEPT_EMBEDDINGS is not None:
-                emb       = _ST_MODEL.encode(combined, convert_to_tensor=True)
-                sem_score = float(_ST_UTIL.cos_sim(emb, _VALUE_CONCEPT_EMBEDDINGS).max())
-                if sem_score > 0.35 and not top_kw:
-                    reasons.append('description suggests additional inclusions beyond the base item')
-
-            if reasons:
-                entry['is_advantageous'] = True
-                entry['reason']          = (
-                    f"Only ₱{over_amt:,.2f} ({over_pct:.1f}%) over budget — "
-                    + '; '.join(reasons)
-                )
+            borderline.append({
+                'idx':      len(output),
+                'text':     combined,
+                'top_kw':   [kw for kw in VALUE_KEYWORDS if kw in combined][:4],
+                'over_amt': price - budget,
+                'over_pct': (price - budget) / budget * 100,
+            })
 
         output.append(entry)
+
+    # Semantic value signals — one batched encode for all borderline entries
+    sem_hit = {}
+    if _ST_AVAILABLE and _VALUE_CONCEPT_EMBEDDINGS is not None and borderline:
+        embs = _ST_MODEL.encode([b['text'] for b in borderline], convert_to_tensor=True)
+        sims = _ST_UTIL.cos_sim(embs, _VALUE_CONCEPT_EMBEDDINGS)
+        for b, row in zip(borderline, sims):
+            sem_hit[b['idx']] = float(row.max()) > 0.35
+
+    for b in borderline:
+        reasons = []
+        if b['top_kw']:
+            reasons.append(f"includes value-added items: {', '.join(b['top_kw'])}")
+        elif sem_hit.get(b['idx']):
+            reasons.append('description suggests additional inclusions beyond the base item')
+
+        if reasons:
+            entry = output[b['idx']]
+            entry['is_advantageous'] = True
+            entry['reason']          = (
+                f"Only ₱{b['over_amt']:,.2f} ({b['over_pct']:.1f}%) over budget — "
+                + '; '.join(reasons)
+            )
 
     return jsonify(output)
 
@@ -461,5 +472,12 @@ if __name__ == '__main__':
     ok = _load_sentence_transformers()
     print(f'  Semantic AI : {"ENABLED (all-MiniLM-L6-v2)" if ok else "DISABLED -- pip install sentence-transformers torch"}')
     print(f'  Modes       : broad | specific | general')
-    print('=' * 55)
-    app.run(host='127.0.0.1', port=5001, debug=False)
+    try:
+        from waitress import serve
+        print('  Server      : waitress')
+        print('=' * 55)
+        serve(app, host='127.0.0.1', port=5001, threads=8)
+    except ImportError:
+        print('  Server      : Flask dev server -- pip install waitress for production')
+        print('=' * 55)
+        app.run(host='127.0.0.1', port=5001, debug=False)
