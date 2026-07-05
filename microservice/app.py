@@ -37,6 +37,19 @@ _match_cache = {}
 _CACHE_LIMIT  = 200
 
 
+def _to_float(value, default: float = 0.0) -> float:
+    """Parse numbers that may arrive as None or formatted strings ('1,234.00', '₱500')."""
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    cleaned = re.sub(r'[^0-9.\-]', '', str(value))
+    try:
+        return float(cleaned) if cleaned else default
+    except ValueError:
+        return default
+
+
 def _make_cache_key(item: str, specs: list, results: list) -> str:
     r_hash = hashlib.md5(_json.dumps(
         [r.get('name', r.get('title', '')) + str(r.get('price', '')) for r in results]
@@ -84,6 +97,10 @@ VALUE_KEYWORDS = [
     'premium', 'pro', 'professional', 'heavy duty', 'high capacity',
     'official', 'genuine', 'authentic', 'certified', 'original',
 ]
+
+# How far over budget a result may go and still qualify as advantageous
+# (0.30 = 30%). Must match the rules described in the /advantageous docstring.
+OVER_BUDGET_TOLERANCE = 0.30
 
 # Natural language concepts precomputed for semantic value detection
 _VALUE_CONCEPTS = [
@@ -347,15 +364,15 @@ def match():
             matched = _keyword_match(specs, results)       # keyword fallback
 
         if not matched:
-            matched = results                              # nothing filtered — return all
+            matched = _broad_rank(results)                 # nothing filtered — return all
 
     # ── MODE 2: General (product name, no specs) ──────────────────────────────
     else:
         matched = _semantic_rank(item, results)            # sentence_transformers
         if not matched:
             matched = _tfidf_rank(item, results)           # TF-IDF fallback
-        if not matched:
-            matched = results
+        if not matched or any('match_score' not in r for r in matched):
+            matched = _broad_rank(results)
 
     result = {'mode': mode, 'matched': matched, 'count': len(matched)}
     if len(_match_cache) < _CACHE_LIMIT:
@@ -368,17 +385,18 @@ def advantageous():
     """
     Mark each result as advantageous based on budget and value signals.
 
-    Rules:
-      price <= budget           → always advantageous ("Within budget")
-      budget < price <= +20%    → advantageous only if value signals detected
-                                   (keyword signals OR semantic signals via sentence_transformers)
-      price > budget * 1.20     → not advantageous
+    Rules (tolerance set by OVER_BUDGET_TOLERANCE):
+      price <= budget                  → always advantageous ("Within budget")
+      budget < price <= +tolerance     → advantageous only if value signals detected
+                                          (keyword signals OR semantic signals via
+                                          sentence_transformers)
+      price > budget * (1 + tolerance) → not advantageous
 
     Input:  { "budget": 500.00, "results": [...] }
     Output: same results, each gains is_advantageous (bool) and reason (str)
     """
     data    = request.get_json(silent=True) or {}
-    budget  = float(data.get('budget', 0))
+    budget  = _to_float(data.get('budget'))
     results = data.get('results', [])
 
     if not results:
@@ -386,14 +404,17 @@ def advantageous():
     if budget <= 0:
         return jsonify(results)
 
-    upper  = budget * 1.30
+    upper  = budget * (1 + OVER_BUDGET_TOLERANCE)
     output = []
 
     for r in results:
-        price = float(r.get('price', 0))
+        price = _to_float(r.get('price'))
         entry = {**r, 'is_advantageous': False, 'reason': ''}
 
-        if price <= budget:
+        if price <= 0:
+            pass                       # no usable price — leave unflagged
+
+        elif price <= budget:
             entry['is_advantageous'] = True
             entry['reason']          = 'Within budget'
 
