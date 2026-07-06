@@ -10,7 +10,7 @@ Endpoints:
   GET  /health       — Service status and capability flags
   POST /match        — Mode-aware filtering and scoring
   POST /advantageous — Budget-aware decision support with semantic value detection
-
+1
 Port: 5001
 """
 

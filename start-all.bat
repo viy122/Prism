@@ -19,9 +19,12 @@ start "Matcher :5001" /min cmd /c "cd /d C:\xampp\htdocs\Prism\microservice && c
 echo.
 echo All services launching in minimized windows.
 echo.
-echo   Laravel app :  http://localhost/Prism/public
+echo   Laravel app :  http://prism.test  (or http://localhost/Prism/prism/public)
 echo   Price API   :  http://localhost:8000/docs
 echo   Matcher     :  http://localhost:5001/health
+echo.
+echo Note: http://prism.test requires a one-time hosts file entry.
+echo See docs/PROJECT_STRUCTURE_GUIDE.md for setup.
 echo.
 echo To stop everything: close the minimized windows,
 echo or stop Apache/MySQL from the XAMPP Control Panel.
