@@ -53,8 +53,10 @@
     .sig-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--s300); background: var(--white); z-index: 1; position: relative; transition: all .2s; }
     .sig-step.done .sig-dot { background: #3b6d11; border-color: #3b6d11; }
     .sig-step.active .sig-dot { background: var(--m); border-color: var(--m); box-shadow: 0 0 0 3px rgba(139,26,28,.2); }
-    .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; white-space: nowrap; }
+    .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; max-width: 84px; }
     .sig-step.done .sig-label, .sig-step.active .sig-label { color: var(--s700); }
+    .sig-step.routing .sig-dot { border-style: dashed; }
+    .sig-step.routing.done .sig-dot { border-style: solid; }
 
     .btn-route { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
     .btn-route-fwd { background: #3b6d11; color: #fff; }
@@ -327,15 +329,7 @@
                 {{-- Signatory timeline --}}
                 <div>
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--s500);margin-bottom:10px;">Signature Routing</div>
-                    <div class="sig-timeline" id="sigTimeline">
-                        @php $sigLabels = ['End\nUser','2nd\nSign.','3rd\nSign.','4th\nSign.','Chancellor','Fully\nSigned']; @endphp
-                        @foreach($sigLabels as $i => $lbl)
-                            <div class="sig-step" data-step="{{ $i }}" id="sigStep{{ $i }}">
-                                <div class="sig-dot"></div>
-                                <span class="sig-label">{{ str_replace('\n', "\n", $lbl) }}</span>
-                            </div>
-                        @endforeach
-                    </div>
+                    <div class="sig-timeline" id="sigTimeline"></div>
                     <div style="display:flex;gap:8px;margin-top:12px;">
                         <button class="btn-route btn-route-fwd" id="btnAdvance" type="button" disabled>
                             <i class="ti ti-circle-arrow-right"></i>
@@ -351,6 +345,14 @@
                         <button class="btn-save" id="btnConfirmReturn" type="button" style="margin-top:6px;background:#a32d2d;">
                             <i class="ti ti-send"></i> Confirm Return
                         </button>
+                    </div>
+                    {{-- 3rd/4th signers are Accounting + Vice Chancellor in flexible order --}}
+                    <div id="thirdSignerPanel" style="display:none;margin-top:8px;">
+                        <p style="font-size:11px;font-weight:700;color:var(--s500);margin-bottom:6px;">Who signed as the 3rd signatory?</p>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn-route btn-route-fwd" id="btnThirdAcct" type="button"><i class="ti ti-calculator"></i> Accounting</button>
+                            <button class="btn-route btn-route-fwd" id="btnThirdVc" type="button"><i class="ti ti-user-check"></i> Vice Chancellor</button>
+                        </div>
                     </div>
                 </div>
 
@@ -555,7 +557,7 @@
 @endsection
 
 <script type="application/json" id="prData">@json($purchaseRequests)</script>
-<script type="application/json" id="stagesData">@json($stages)</script>
+<script type="application/json" id="stagesData">@json($stageMeta)</script>
 <script type="application/json" id="aocUrlData">@json(route('procurement-office.abstract-of-canvass'))</script>
 <script type="application/json" id="importPdfUrlData">@json($importPdfUrl)</script>
 <script type="application/json" id="importConfirmUrlData">@json($importConfirmUrl)</script>
@@ -587,9 +589,18 @@
     const uploadPrText     = document.getElementById('uploadPrText');
     const csrfToken        = document.querySelector('meta[name="csrf-token"]').content;
 
-    const stages    = JSON.parse(document.getElementById('stagesData').textContent);
-    const aocUrl    = JSON.parse(document.getElementById('aocUrlData').textContent);
-    const sigLabels = ['End User', '2nd Sign.', '3rd Sign.', '4th Sign.', 'Chancellor', 'Fully Signed'];
+    const pageStageMeta    = JSON.parse(document.getElementById('stagesData').textContent);
+    const aocUrl           = JSON.parse(document.getElementById('aocUrlData').textContent);
+    const thirdSignerPanel = document.getElementById('thirdSignerPanel');
+
+    /* Stage-meta helpers — per-PR meta carries resolved 3rd/4th signer labels */
+    function metaOf(pr)     { return pr.stageMeta || pageStageMeta; }
+    function stageMetaFor(pr, key) { return metaOf(pr).find(m => m.key === key) || null; }
+    function nextStageKey(pr) {
+        const keys = metaOf(pr).map(m => m.key);
+        const i    = keys.indexOf(pr.signatoryStage);
+        return (i >= 0 && i < keys.length - 1) ? keys[i + 1] : null;
+    }
 
     const logs = {};
     let activePr = null;
@@ -648,27 +659,38 @@
             </div>`).join('');
     }
 
-    function updateTimeline(sigStage) {
-        // stages: ['draft','at_end_user','at_signatory_2',...,'fully_signed']
-        // timeline dots: 0=at_end_user .. 4=at_chancellor, 5=fully_signed
-        const timelineStages = stages.slice(1); // remove 'draft'
-        const activeIdx = timelineStages.indexOf(sigStage);
-        for (let i = 0; i < 6; i++) {
-            const el = document.getElementById('sigStep' + i);
-            if (!el) continue;
-            el.classList.remove('done', 'active');
-            if (i < activeIdx) el.classList.add('done');
-            else if (i === activeIdx) el.classList.add('active');
+    function updateTimeline(pr) {
+        // Timeline shows every stage after 'draft'; routing steps get dashed dots
+        const timeline = document.getElementById('sigTimeline');
+        const meta     = metaOf(pr).slice(1);
+        const activeIdx = meta.findIndex(m => m.key === pr.signatoryStage);
+        timeline.innerHTML = meta.map((m, i) => {
+            const state = i < activeIdx ? ' done' : (i === activeIdx ? ' active' : '');
+            const routing = m.type === 'routing' ? ' routing' : '';
+            return `<div class="sig-step${routing}${state}"><div class="sig-dot"></div><span class="sig-label">${m.label}</span></div>`;
+        }).join('');
+    }
+
+    function advanceBtnHtml(pr) {
+        if (pr.signatoryStage === 'draft') {
+            const first = metaOf(pr)[1];
+            return `<i class="ti ti-circle-arrow-right"></i> Route to ${first ? first.label : 'End User'}`;
         }
+        const meta = stageMetaFor(pr, pr.signatoryStage);
+        return meta && meta.type === 'routing'
+            ? '<i class="ti ti-circle-arrow-right"></i> Mark Forwarded'
+            : '<i class="ti ti-circle-arrow-right"></i> Mark Signed';
     }
 
     function updateRoutingButtons(pr) {
         const isDraft    = pr.signatoryStage === 'draft';
         const isSigned   = pr.signatoryStage === 'fully_signed';
         btnAdvance.disabled = isSigned;
+        btnAdvance.innerHTML = advanceBtnHtml(pr);
         btnReturn.disabled  = isDraft || isSigned;
         returnRemarks.style.display = 'none';
         returnIn.value = '';
+        thirdSignerPanel.style.display = 'none';
     }
 
     function updateCanvassingUI(pr) {
@@ -849,11 +871,11 @@
                 time: e.timestamp,
             }));
             (pr.signatureLogs || []).forEach(l => {
-                logs[pr.id].push({ text: `<strong>${l.signatory}</strong> ${l.action} the PR` + (l.remarks ? ` &mdash; ${l.remarks}` : ''), time: l.at });
+                logs[pr.id].push({ text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : ''), time: l.at });
             });
         }
 
-        updateTimeline(pr.signatoryStage);
+        updateTimeline(pr);
         updateRoutingButtons(pr);
         updateCanvassingUI(pr);
 
@@ -874,7 +896,7 @@
     });
 
     /* ── Route Forward ── */
-    btnAdvance.addEventListener('click', async () => {
+    async function doAdvance(body) {
         if (!activePr || saving) return;
         saving = true;
         btnAdvance.disabled = true;
@@ -884,16 +906,18 @@
             const resp = await fetch(activePr.advanceUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({}),
+                body: JSON.stringify(body || {}),
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
                 activePr.signatoryStage  = json.signatoryStage;
                 activePr.signatoryLabel  = json.signatoryLabel;
                 activePr.nextStage       = json.signatoryStage !== 'fully_signed' ? true : null;
+                if (json.stageMeta)   activePr.stageMeta   = json.stageMeta;
+                if (json.thirdSigner) activePr.thirdSigner = json.thirdSigner;
                 if (json.canvassingStage) activePr.canvassingStage = json.canvassingStage;
                 document.getElementById('fSigLabel').textContent = json.signatoryLabel;
-                updateTimeline(json.signatoryStage);
+                updateTimeline(activePr);
                 updateRoutingButtons(activePr);
                 updateCanvassingUI(activePr);
                 updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
@@ -906,10 +930,25 @@
         } catch { showToast('Network error.', true); }
         finally {
             saving = false;
-            btnAdvance.disabled = activePr?.signatoryStage === 'fully_signed';
-            btnAdvance.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Route Forward';
+            if (activePr) {
+                btnAdvance.disabled  = activePr.signatoryStage === 'fully_signed';
+                btnAdvance.innerHTML = advanceBtnHtml(activePr);
+            }
         }
+    }
+
+    btnAdvance.addEventListener('click', () => {
+        if (!activePr || saving) return;
+        // Entering the flexible 3rd slot — ask who actually signed first
+        if (nextStageKey(activePr) === 'at_third_sign') {
+            thirdSignerPanel.style.display = thirdSignerPanel.style.display === 'none' ? '' : 'none';
+            return;
+        }
+        doAdvance({});
     });
+
+    document.getElementById('btnThirdAcct').addEventListener('click', () => doAdvance({ third_signer: 'accounting' }));
+    document.getElementById('btnThirdVc').addEventListener('click', () => doAdvance({ third_signer: 'vice_chancellor' }));
 
     /* ── Return (toggle panel) ── */
     btnReturn.addEventListener('click', () => {
@@ -934,8 +973,10 @@
             if (resp.ok && json.success) {
                 activePr.signatoryStage = 'draft';
                 activePr.signatoryLabel = 'PR Created';
+                activePr.thirdSigner    = null;
+                activePr.stageMeta      = pageStageMeta;
                 document.getElementById('fSigLabel').textContent = 'PR Created';
-                updateTimeline('draft');
+                updateTimeline(activePr);
                 updateRoutingButtons(activePr);
                 updateSigBadge(activePr.id, 'PR Created', 'draft');
                 returnRemarks.style.display = 'none';

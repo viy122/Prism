@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSignatoryChain;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseOrder extends Model
 {
-    use SoftDeletes;
+    use HasSignatoryChain, SoftDeletes;
 
     protected $fillable = [
         'abstract_of_canvass_id',
@@ -58,44 +59,33 @@ class PurchaseOrder extends Model
     }
 
     // ── Signatory chain ──────────────────────────────────────────────────────
+    // Budget (ORS), VC review, and Internal Audit are routing steps — the
+    // document passes through them without a signature.
 
-    public static function signatoryStages(): array
-    {
-        return ['draft', 'at_end_user', 'at_signatory_2', 'at_signatory_3', 'at_signatory_4', 'at_chancellor', 'fully_signed'];
-    }
+    public const SIGNATORY_DOC_PREFIX = 'PO';
 
-    public function nextSignatoryStage(): ?string
-    {
-        $stages = self::signatoryStages();
-        $idx    = array_search($this->signatory_stage, $stages);
-        return ($idx !== false && $idx < count($stages) - 1) ? $stages[$idx + 1] : null;
-    }
-
-    public function getSignatoryLabelAttribute(): string
-    {
-        return match ($this->signatory_stage) {
-            'draft'          => 'PO Created',
-            'at_end_user'    => 'PO – At End User (1st Signatory)',
-            'at_signatory_2' => 'PO – At 2nd Signatory',
-            'at_signatory_3' => 'PO – At 3rd Signatory',
-            'at_signatory_4' => 'PO – At 4th Signatory',
-            'at_chancellor'  => 'PO – At Chancellor',
-            'fully_signed'   => 'PO – Fully Signed',
-            default          => ucfirst(str_replace('_', ' ', $this->signatory_stage ?? 'draft')),
-        };
-    }
+    public const SIGNATORY_STAGES = [
+        ['key' => 'draft',         'label' => 'Created',                  'type' => 'routing'],
+        ['key' => 'at_budget_ors', 'label' => 'Budget Office – ORS',      'type' => 'routing'],
+        ['key' => 'at_accounting', 'label' => 'Accounting',               'type' => 'signature'],
+        ['key' => 'at_vc_review',  'label' => 'Vice Chancellor – Review', 'type' => 'routing'],
+        ['key' => 'at_audit',      'label' => 'Internal Audit – Review',  'type' => 'routing'],
+        ['key' => 'at_chancellor', 'label' => 'Chancellor',               'type' => 'signature'],
+        ['key' => 'at_supplier',   'label' => 'Supplier',                 'type' => 'signature'],
+        ['key' => 'fully_signed',  'label' => 'Fully Signed',             'type' => 'signature'],
+    ];
 
     // ── Delivery status chain ────────────────────────────────────────────────
 
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            'issued'            => 'PO Issued to Supplier',
-            'awaiting_delivery' => 'Awaiting Delivery',
-            'partial_delivery'  => 'Partial Delivery',
-            'complete_delivery' => 'Complete Delivery',
-            'receipt_uploaded'  => 'Delivery Receipt Uploaded',
-            'paid'              => 'Payment Made',
+            'issued'            => 'Issued to Supplier',
+            'awaiting_delivery' => 'Awaiting Delivery (Supply Office)',
+            'partial_delivery'  => 'Partial Delivery (Supply Office)',
+            'complete_delivery' => 'Complete Delivery (Supply Office)',
+            'receipt_uploaded'  => 'At Accounting – For Payment',
+            'paid'              => 'Paid – Cashier Payment Made',
             default             => ucfirst(str_replace('_', ' ', $this->status)),
         };
     }

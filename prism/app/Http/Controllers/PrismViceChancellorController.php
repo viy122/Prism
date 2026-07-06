@@ -158,6 +158,7 @@ class PrismViceChancellorController extends Controller
                 ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
                 ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
                 ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
+                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
             ],
             'moduleNavLabel'   => 'Vice Chancellor pages',
             'moduleNavigation' => [

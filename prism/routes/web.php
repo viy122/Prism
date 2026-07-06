@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PrismAccountingOfficeController;
 use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
@@ -87,6 +88,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/division-procurement-status', 'divisionProcurementStatus')->name('division-procurement-status');
         Route::get('/division-performance-report', 'divisionPerformanceReport')->name('division-performance-report');
+    });
+
+    Route::prefix('accounting-office')->name('accounting-office.')->middleware('role:Accounting Office')->controller(PrismAccountingOfficeController::class)->group(function () {
+        Route::get('/', 'dashboard')->name('dashboard');
+        Route::post('/purchase-order/{po}/confirm-payment', 'confirmPayment')->name('po.confirm-payment');
     });
 
     // ── Notifications (all authenticated users) ───────────────────────────────

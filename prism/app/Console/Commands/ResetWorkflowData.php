@@ -13,6 +13,11 @@ class ResetWorkflowData extends Command
     public function handle(): int
     {
         $tables = [
+            'po_signature_logs',
+            'purchase_orders',
+            'aoc_signature_logs',
+            'abstract_of_canvasses',
+            'pr_signature_logs',
             'procurement_status_updates',
             'purchase_request_items',
             'purchase_requests',

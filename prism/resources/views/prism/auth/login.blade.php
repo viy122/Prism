@@ -1004,11 +1004,18 @@
                                 </svg>
                                 Chancellor
                             </a>
-                            <a class="demo-btn full" href="{{ route('demo.login', 'vice-chancellor') }}">
+                            <a class="demo-btn" href="{{ route('demo.login', 'vice-chancellor') }}">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                                 </svg>
                                 Vice Chancellor
+                            </a>
+                            <a class="demo-btn" href="{{ route('demo.login', 'accounting-office') }}">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                                    <line x1="2" y1="10" x2="22" y2="10" />
+                                </svg>
+                                Accounting
                             </a>
                         </div>
                     </div>

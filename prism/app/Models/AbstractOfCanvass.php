@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSignatoryChain;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AbstractOfCanvass extends Model
 {
-    use SoftDeletes;
+    use HasSignatoryChain, SoftDeletes;
 
     protected $fillable = [
         'purchase_request_id',
@@ -40,29 +41,20 @@ class AbstractOfCanvass extends Model
         return $this->hasOne(PurchaseOrder::class);
     }
 
-    public function getSignatoryLabelAttribute(): string
-    {
-        return match ($this->signatory_stage) {
-            'draft'           => 'AOC Created',
-            'at_end_user'     => 'AOC – At End User (1st Signatory)',
-            'at_signatory_2'  => 'AOC – At 2nd Signatory',
-            'at_signatory_3'  => 'AOC – At 3rd Signatory',
-            'at_signatory_4'  => 'AOC – At 4th Signatory',
-            'at_chancellor'   => 'AOC – At Chancellor',
-            'fully_signed'    => 'AOC – Fully Signed',
-            default           => ucfirst(str_replace('_', ' ', $this->signatory_stage)),
-        };
-    }
+    // ── Signatory chain ──────────────────────────────────────────────────────
+    // Internal Audit reviews the AOC but does not sign (routing step).
 
-    public static function signatoryStages(): array
-    {
-        return ['draft', 'at_end_user', 'at_signatory_2', 'at_signatory_3', 'at_signatory_4', 'at_chancellor', 'fully_signed'];
-    }
+    public const SIGNATORY_DOC_PREFIX = 'AOC';
 
-    public function nextSignatoryStage(): ?string
-    {
-        $stages = self::signatoryStages();
-        $idx    = array_search($this->signatory_stage, $stages);
-        return ($idx !== false && $idx < count($stages) - 1) ? $stages[$idx + 1] : null;
-    }
+    public const SIGNATORY_STAGES = [
+        ['key' => 'draft',             'label' => 'Created',                       'type' => 'routing'],
+        ['key' => 'at_end_user',       'label' => 'End User',                      'type' => 'signature'],
+        ['key' => 'at_bac_member',     'label' => 'BAC Member',                    'type' => 'signature'],
+        ['key' => 'at_bac_vice_chair', 'label' => 'BAC Vice Chairperson',          'type' => 'signature'],
+        ['key' => 'at_bac_chair',      'label' => 'BAC Chairperson',               'type' => 'signature'],
+        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature'],
+        ['key' => 'at_audit',          'label' => 'Internal Audit – Review',       'type' => 'routing'],
+        ['key' => 'at_chancellor',     'label' => 'Chancellor',                    'type' => 'signature'],
+        ['key' => 'fully_signed',      'label' => 'Fully Signed',                  'type' => 'signature'],
+    ];
 }

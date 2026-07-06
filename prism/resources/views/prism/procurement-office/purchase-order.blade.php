@@ -34,6 +34,9 @@
     .badge-delivery  { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
     .badge-complete  { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
     .badge-paid      { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+    .badge-draft     { background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
+    .badge-routing   { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+    .badge-signed    { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
 
     .btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; white-space: nowrap; }
     .btn-primary { background: var(--m); color: #fff; }
@@ -130,7 +133,8 @@
                         <th>Office</th>
                         <th>Supplier</th>
                         <th>Amount</th>
-                        <th>Status</th>
+                        <th>Signatory Stage</th>
+                        <th>Delivery Status</th>
                         <th>Expected Delivery</th>
                         <th>Actions</th>
                     </tr>
@@ -144,6 +148,14 @@
                             in_array($po['status'], ['awaiting_delivery', 'partial_delivery']) => 'badge-delivery',
                             default => 'badge-issued',
                         };
+                        $sigBadge = match($po['signatoryStage']) {
+                            'fully_signed' => 'badge-signed',
+                            'draft'        => 'badge-draft',
+                            default        => 'badge-routing',
+                        };
+                        $sigAdvLabel = $po['signatoryStage'] === 'draft'
+                            ? 'Route'
+                            : ($po['currentStageType'] === 'routing' ? 'Mark Forwarded' : 'Mark Signed');
                     @endphp
                     <tr>
                         <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}</td>
@@ -151,20 +163,32 @@
                         <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['office'] }}</td>
                         <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['supplier'] }}</td>
                         <td style="font-weight:600;white-space:nowrap;">₱{{ number_format($po['totalAmount'], 2) }}</td>
+                        <td><span class="badge {{ $sigBadge }}" data-po-sig-badge="{{ $po['id'] }}">{{ $po['signatoryLabel'] }}</span></td>
                         <td><span class="badge {{ $badgeCls }}" data-po-status-badge="{{ $po['id'] }}">{{ $po['statusLabel'] }}</span></td>
                         <td style="font-size:12px;color:var(--s500);">{{ $po['expectedDate'] }}</td>
                         <td>
-                            @if($po['status'] === 'paid')
+                            @if($po['signatoryStage'] !== 'fully_signed')
+                                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                    <button class="btn btn-green btn-advance-po-sig" data-url="{{ $po['advanceUrl'] }}" data-po-id="{{ $po['id'] }}">
+                                        <i class="ti ti-circle-arrow-right"></i> {{ $sigAdvLabel }}
+                                    </button>
+                                    @if($po['signatoryStage'] !== 'draft')
+                                        <button class="btn btn-ghost btn-return-po-sig" data-url="{{ $po['returnUrl'] }}" data-po-id="{{ $po['id'] }}">
+                                            <i class="ti ti-circle-arrow-left"></i> Return
+                                        </button>
+                                    @endif
+                                </div>
+                            @elseif($po['status'] === 'paid')
                                 <span style="font-size:11px;color:#3b6d11;font-weight:700;">✓ Payment Made</span>
                             @elseif($po['nextStatus'])
                                 <button class="btn btn-green btn-advance-po" data-url="{{ $po['updateUrl'] }}" data-po-id="{{ $po['id'] }}" data-next-status="{{ $po['nextStatus'] }}">
                                     <i class="ti ti-circle-arrow-right"></i>
                                     @php
                                         $nextLabel = match($po['nextStatus']) {
-                                            'awaiting_delivery' => 'Mark Awaiting',
-                                            'partial_delivery'  => 'Mark Partial',
-                                            'complete_delivery' => 'Mark Complete',
-                                            'receipt_uploaded'  => 'Upload Receipt',
+                                            'awaiting_delivery' => 'Forward to Supply Office',
+                                            'partial_delivery'  => 'Mark Partial Delivery',
+                                            'complete_delivery' => 'Mark Complete Delivery',
+                                            'receipt_uploaded'  => 'Forward to Accounting',
                                             default             => 'Advance',
                                         };
                                     @endphp
@@ -216,6 +240,19 @@
     </div>
 </div>
 
+{{-- Return PO signatory-stage modal --}}
+<div id="poReturnModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:9000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:18px;padding:28px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+        <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:4px;">Return PO</h3>
+        <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Please provide a reason for returning this PO to draft.</p>
+        <textarea id="returnPoRemarks" rows="3" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;" placeholder="Reason for return…"></textarea>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-ghost" id="btnCancelPoReturn" style="flex:1;">Cancel</button>
+            <button class="btn" id="btnConfirmPoReturn" style="flex:1;background:#a32d2d;color:#fff;"><i class="ti ti-send"></i> Confirm Return</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -244,13 +281,86 @@
     }
 
     const statusLabels = {
-        issued: 'PO Issued to Supplier',
-        awaiting_delivery: 'Awaiting Delivery',
-        partial_delivery: 'Partial Delivery',
-        complete_delivery: 'Complete Delivery',
-        receipt_uploaded: 'Delivery Receipt Uploaded',
-        paid: 'Payment Made',
+        issued: 'Issued to Supplier',
+        awaiting_delivery: 'Awaiting Delivery (Supply Office)',
+        partial_delivery: 'Partial Delivery (Supply Office)',
+        complete_delivery: 'Complete Delivery (Supply Office)',
+        receipt_uploaded: 'At Accounting – For Payment',
+        paid: 'Paid – Cashier Payment Made',
     };
+
+    /* ── PO signatory chain: advance ── */
+    document.querySelectorAll('.btn-advance-po-sig').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i>';
+            try {
+                const resp = await fetch(btn.dataset.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+                const json = await resp.json();
+                if (resp.ok && json.success) {
+                    const badge = document.querySelector(`[data-po-sig-badge="${btn.dataset.poId}"]`);
+                    if (badge) {
+                        badge.textContent = json.signatoryLabel;
+                        badge.className = 'badge ' + (json.signatoryStage === 'fully_signed' ? 'badge-signed' : 'badge-routing');
+                    }
+                    showToast(json.signatoryLabel);
+                    if (json.signatoryStage === 'fully_signed') {
+                        setTimeout(() => location.reload(), 900);   // reveal delivery controls
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> ' + (json.currentStageType === 'routing' ? 'Mark Forwarded' : 'Mark Signed');
+                    }
+                } else {
+                    showToast(json.error || 'Failed.', true);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Route';
+                }
+            } catch { showToast('Network error.', true); btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Route'; }
+        });
+    });
+
+    /* ── PO signatory chain: return ── */
+    const poRetModal   = document.getElementById('poReturnModal');
+    const poRetIn      = document.getElementById('returnPoRemarks');
+    const btnPoRetOk   = document.getElementById('btnConfirmPoReturn');
+    const btnPoRetNo   = document.getElementById('btnCancelPoReturn');
+    let pendingPoReturnUrl = null;
+
+    document.querySelectorAll('.btn-return-po-sig').forEach(btn => {
+        btn.addEventListener('click', () => {
+            pendingPoReturnUrl = btn.dataset.url;
+            poRetIn.value = '';
+            poRetModal.style.display = 'flex';
+        });
+    });
+    btnPoRetNo.addEventListener('click', () => { poRetModal.style.display = 'none'; });
+    poRetModal.addEventListener('click', e => { if (e.target === poRetModal) poRetModal.style.display = 'none'; });
+
+    btnPoRetOk.addEventListener('click', async () => {
+        const reason = poRetIn.value.trim();
+        if (!reason) { showToast('Reason is required.', true); return; }
+        btnPoRetOk.disabled = true;
+        try {
+            const resp = await fetch(pendingPoReturnUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ remarks: reason }),
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                showToast('PO returned to draft. Reloading…');
+                poRetModal.style.display = 'none';
+                setTimeout(() => location.reload(), 900);
+            } else {
+                showToast(json.error || 'Failed to return PO.', true);
+            }
+        } catch { showToast('Network error.', true); }
+        finally { btnPoRetOk.disabled = false; }
+    });
 
     /* ── Open Issue PO modal ── */
     document.querySelectorAll('.btn-issue-po').forEach(btn => {

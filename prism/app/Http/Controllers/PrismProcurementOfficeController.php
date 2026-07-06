@@ -102,12 +102,14 @@ class PrismProcurementOfficeController extends Controller
                     'remarks'   => $u->remarks ?? '—',
                 ])->all(),
                 'signatureLogs'  => $pr->signatureLogs->map(fn ($l) => [
-                    'signatory' => 'Signatory ' . $l->signatory_number,
+                    'display'   => $pr->describeSignatureLog($l),
                     'action'    => $l->action,
                     'by'        => $l->signedBy?->name ?? '—',
                     'at'        => $l->signed_at?->format('M d, Y g:i A') ?? '—',
                     'remarks'   => $l->remarks ?? '',
                 ])->all(),
+                'stageMeta'     => $pr->resolvedStageMeta(),
+                'thirdSigner'   => $pr->third_signer,
                 'advanceUrl'    => route('procurement-office.purchase-request.advance', $pr->id),
                 'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
@@ -123,7 +125,7 @@ class PrismProcurementOfficeController extends Controller
         return view('prism.procurement-office.purchase-request-management', $this->withCommon('purchase-request-management', [
             'pageTitle'        => 'Purchase Request Management',
             'purchaseRequests' => $prs,
-            'stages'           => PurchaseRequest::signatoryStages(),
+            'stageMeta'        => PurchaseRequest::signatoryStageMeta(),
             'offices'          => Office::select('id', 'name')->orderBy('name')->get()->toArray(),
             'importPdfUrl'     => route('procurement-office.purchase-request.import-pdf'),
             'importConfirmUrl' => route('procurement-office.purchase-request.import-confirm'),
@@ -137,20 +139,33 @@ class PrismProcurementOfficeController extends Controller
             return response()->json(['error' => 'PR is already fully signed.'], 422);
         }
 
-        $signatoryNumber = array_search($next, PurchaseRequest::signatoryStages());
+        // Completing the CURRENT stage: routing steps forward, signature steps sign
+        $current         = $pr->signatory_stage;
+        $action          = $pr->advanceAction();
+        $signatoryNumber = $pr->stageIndex($current);
+        $remarks         = $request->input('remarks');
 
         $updateData = ['signatory_stage' => $next];
         if ($next === 'fully_signed') {
             $updateData['canvassing_stage'] = 'not_started';
         }
+
+        // Entering the flexible 3rd slot: record who actually signed 3rd
+        if ($next === 'at_third_sign') {
+            $request->validate(['third_signer' => 'required|in:accounting,vice_chancellor']);
+            $updateData['third_signer'] = $request->input('third_signer');
+            $chosen  = $updateData['third_signer'] === 'accounting' ? 'Accounting' : 'Vice Chancellor';
+            $remarks = trim(($remarks ?? '') . " [3rd signer: {$chosen}]");
+        }
+
         $pr->update($updateData);
 
         PrSignatureLog::create([
             'purchase_request_id' => $pr->id,
             'signatory_number'    => $signatoryNumber,
             'signed_by_user_id'   => auth()->id(),
-            'action'              => 'signed',
-            'remarks'             => $request->input('remarks'),
+            'action'              => $action,
+            'remarks'             => $remarks,
             'signed_at'           => now(),
         ]);
 
@@ -158,7 +173,7 @@ class PrismProcurementOfficeController extends Controller
             'purchase_request_id' => $pr->id,
             'updated_by_user_id'  => auth()->id(),
             'status'              => $next,
-            'remarks'             => $request->input('remarks', ''),
+            'remarks'             => $remarks ?? '',
         ]);
 
         NotificationService::prStatusUpdated($pr);
@@ -170,6 +185,8 @@ class PrismProcurementOfficeController extends Controller
             'signatoryLabel'   => $fresh->signatory_label,
             'canvassingStage'  => $fresh->canvassing_stage,
             'canvassingLabel'  => $fresh->canvassing_label,
+            'stageMeta'        => $fresh->resolvedStageMeta(),
+            'thirdSigner'      => $fresh->third_signer,
         ]);
     }
 
@@ -178,11 +195,11 @@ class PrismProcurementOfficeController extends Controller
         $request->validate(['remarks' => 'required|string|max:1000']);
 
         $prev = $pr->signatory_stage;
-        $pr->update(['signatory_stage' => 'draft']);
+        $pr->update(['signatory_stage' => 'draft', 'third_signer' => null]);
 
         PrSignatureLog::create([
             'purchase_request_id' => $pr->id,
-            'signatory_number'    => array_search($prev, PurchaseRequest::signatoryStages()) ?: 0,
+            'signatory_number'    => $pr->stageIndex($prev),
             'signed_by_user_id'   => auth()->id(),
             'action'              => 'returned',
             'remarks'             => $request->input('remarks'),
@@ -259,10 +276,12 @@ class PrismProcurementOfficeController extends Controller
                 'prNumber'       => $aoc->purchaseRequest->number ?? 'PR-' . str_pad($aoc->purchaseRequest->id, 4, '0', STR_PAD_LEFT),
                 'office'         => $aoc->purchaseRequest->office?->name ?? '—',
                 'title'          => $aoc->purchaseRequest->title,
-                'signatoryStage' => $aoc->signatory_stage,
-                'signatoryLabel' => $aoc->signatory_label,
-                'nextStage'      => $aoc->nextSignatoryStage(),
-                'hasPo'          => $aoc->purchaseOrder !== null,
+                'signatoryStage'   => $aoc->signatory_stage,
+                'signatoryLabel'   => $aoc->signatory_label,
+                'nextStage'        => $aoc->nextSignatoryStage(),
+                'currentStageType' => $aoc->stageMetaFor($aoc->signatory_stage)['type'] ?? 'signature',
+                'nextStageLabel'   => $aoc->stageMetaFor($aoc->nextSignatoryStage())['label'] ?? null,
+                'hasPo'            => $aoc->purchaseOrder !== null,
                 'remarks'        => $aoc->remarks ?? '—',
                 'createdAt'      => $aoc->created_at->format('M d, Y'),
                 'advanceUrl'     => route('procurement-office.aoc.advance', $aoc->id),
@@ -291,7 +310,7 @@ class PrismProcurementOfficeController extends Controller
             'pageTitle'   => 'Abstract of Canvass',
             'aocs'        => $aocs,
             'eligiblePrs' => $eligiblePrs,
-            'stages'      => AbstractOfCanvass::signatoryStages(),
+            'stageMeta'   => AbstractOfCanvass::signatoryStageMeta(),
         ]));
     }
 
@@ -322,22 +341,26 @@ class PrismProcurementOfficeController extends Controller
             return response()->json(['error' => 'AOC is already fully signed.'], 422);
         }
 
-        $signatoryNumber = array_search($next, AbstractOfCanvass::signatoryStages());
+        $current = $aoc->signatory_stage;
+        $action  = $aoc->advanceAction();
         $aoc->update(['signatory_stage' => $next]);
 
         AocSignatureLog::create([
             'abstract_of_canvass_id' => $aoc->id,
-            'signatory_number'       => $signatoryNumber,
+            'signatory_number'       => $aoc->stageIndex($current),
             'signed_by_user_id'      => auth()->id(),
-            'action'                 => 'signed',
+            'action'                 => $action,
             'remarks'                => $request->input('remarks'),
             'signed_at'              => now(),
         ]);
 
+        $fresh = $aoc->fresh();
         return response()->json([
-            'success'        => true,
-            'signatoryStage' => $next,
-            'signatoryLabel' => $aoc->fresh()->signatory_label,
+            'success'          => true,
+            'signatoryStage'   => $next,
+            'signatoryLabel'   => $fresh->signatory_label,
+            'currentStageType' => $fresh->stageMetaFor($next)['type'] ?? 'signature',
+            'nextStageLabel'   => $fresh->stageMetaFor($fresh->nextSignatoryStage())['label'] ?? null,
         ]);
     }
 
@@ -350,7 +373,7 @@ class PrismProcurementOfficeController extends Controller
 
         AocSignatureLog::create([
             'abstract_of_canvass_id' => $aoc->id,
-            'signatory_number'       => array_search($prev, AbstractOfCanvass::signatoryStages()) ?: 0,
+            'signatory_number'       => $aoc->stageIndex($prev),
             'signed_by_user_id'      => auth()->id(),
             'action'                 => 'returned',
             'remarks'                => $request->input('remarks'),
@@ -383,6 +406,13 @@ class PrismProcurementOfficeController extends Controller
                 'expectedDate' => $po->expected_delivery_date?->format('M d, Y') ?? '—',
                 'paidAt'       => $po->paid_at?->format('M d, Y') ?? null,
                 'updateUrl'    => route('procurement-office.po.update-status', $po->id),
+                'signatoryStage'   => $po->signatory_stage ?? 'draft',
+                'signatoryLabel'   => $po->signatory_label,
+                'nextStage'        => $po->nextSignatoryStage(),
+                'currentStageType' => $po->stageMetaFor($po->signatory_stage)['type'] ?? 'signature',
+                'nextStageLabel'   => $po->stageMetaFor($po->nextSignatoryStage())['label'] ?? null,
+                'advanceUrl'       => route('procurement-office.po.advance', $po->id),
+                'returnUrl'        => route('procurement-office.po.return', $po->id),
             ])
             ->all();
 
@@ -475,22 +505,26 @@ class PrismProcurementOfficeController extends Controller
             return response()->json(['error' => 'PO is already fully signed.'], 422);
         }
 
-        $signatoryNumber = array_search($next, PurchaseOrder::signatoryStages());
+        $current = $po->signatory_stage;
+        $action  = $po->advanceAction();
         $po->update(['signatory_stage' => $next]);
 
         PoSignatureLog::create([
             'purchase_order_id' => $po->id,
-            'signatory_number'  => $signatoryNumber,
+            'signatory_number'  => $po->stageIndex($current),
             'signed_by_user_id' => auth()->id(),
-            'action'            => 'signed',
+            'action'            => $action,
             'remarks'           => $request->input('remarks'),
             'signed_at'         => now(),
         ]);
 
+        $fresh = $po->fresh();
         return response()->json([
-            'success'        => true,
-            'signatoryStage' => $next,
-            'signatoryLabel' => $po->fresh()->signatory_label,
+            'success'          => true,
+            'signatoryStage'   => $next,
+            'signatoryLabel'   => $fresh->signatory_label,
+            'currentStageType' => $fresh->stageMetaFor($next)['type'] ?? 'signature',
+            'nextStageLabel'   => $fresh->stageMetaFor($fresh->nextSignatoryStage())['label'] ?? null,
         ]);
     }
 
@@ -503,7 +537,7 @@ class PrismProcurementOfficeController extends Controller
 
         PoSignatureLog::create([
             'purchase_order_id' => $po->id,
-            'signatory_number'  => array_search($prev, PurchaseOrder::signatoryStages()) ?: 0,
+            'signatory_number'  => $po->stageIndex($prev),
             'signed_by_user_id' => auth()->id(),
             'action'            => 'returned',
             'remarks'           => $request->input('remarks'),
@@ -817,6 +851,7 @@ class PrismProcurementOfficeController extends Controller
                 ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
                 ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
                 ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
+                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
             ],
             'moduleNavLabel'   => 'Procurement Office pages',
             'moduleNavigation' => [

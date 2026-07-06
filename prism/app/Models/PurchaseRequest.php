@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasSignatoryChain;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseRequest extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasSignatoryChain, SoftDeletes;
 
     protected $fillable = [
         'annual_procurement_plan_id',
@@ -28,6 +29,7 @@ class PurchaseRequest extends Model
         'total_amount',
         'status',
         'signatory_stage',
+        'third_signer',
         'canvassing_stage',
         'remarks',
         'file_path',
@@ -106,31 +108,31 @@ class PurchaseRequest extends Model
         return $this->hasOne(AbstractOfCanvass::class);
     }
 
-    // Human-readable label for the current signatory stage
-    public function getSignatoryLabelAttribute(): string
-    {
-        return match ($this->signatory_stage) {
-            'draft'           => 'PR Created',
-            'at_end_user'     => 'PR – At End User (1st Signatory)',
-            'at_signatory_2'  => 'PR – At 2nd Signatory',
-            'at_signatory_3'  => 'PR – At 3rd Signatory',
-            'at_signatory_4'  => 'PR – At 4th Signatory',
-            'at_chancellor'   => 'PR – At Chancellor',
-            'fully_signed'    => 'PR – Fully Signed',
-            default           => ucfirst(str_replace('_', ' ', $this->signatory_stage)),
-        };
-    }
+    // ── Signatory chain ──────────────────────────────────────────────────────
+    // 3rd/4th signers are Accounting and Vice Chancellor in flexible order;
+    // `third_signer` records who actually signed 3rd once chosen.
 
-    public static function signatoryStages(): array
-    {
-        return ['draft', 'at_end_user', 'at_signatory_2', 'at_signatory_3', 'at_signatory_4', 'at_chancellor', 'fully_signed'];
-    }
+    public const SIGNATORY_DOC_PREFIX = 'PR';
 
-    public function nextSignatoryStage(): ?string
+    public const SIGNATORY_STAGES = [
+        ['key' => 'draft',              'label' => 'Created',                      'type' => 'routing'],
+        ['key' => 'at_end_user',        'label' => 'End User',                     'type' => 'signature'],
+        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature'],
+        ['key' => 'at_third_sign',      'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
+        ['key' => 'at_fourth_sign',     'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
+        ['key' => 'at_chancellor',      'label' => 'Chancellor',                   'type' => 'signature'],
+        ['key' => 'fully_signed',       'label' => 'Fully Signed',                 'type' => 'signature'],
+    ];
+
+    protected function resolveStageLabel(array $meta): array
     {
-        $stages = self::signatoryStages();
-        $idx    = array_search($this->signatory_stage, $stages);
-        return ($idx !== false && $idx < count($stages) - 1) ? $stages[$idx + 1] : null;
+        if (!$this->third_signer || !in_array($meta['key'], ['at_third_sign', 'at_fourth_sign'], true)) {
+            return $meta;
+        }
+        $third         = $this->third_signer === 'accounting' ? 'Accounting' : 'Vice Chancellor';
+        $fourth        = $this->third_signer === 'accounting' ? 'Vice Chancellor' : 'Accounting';
+        $meta['label'] = $meta['key'] === 'at_third_sign' ? $third : $fourth;
+        return $meta;
     }
 
     public function getCanvassingLabelAttribute(): string

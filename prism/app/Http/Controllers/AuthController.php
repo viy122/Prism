@@ -93,6 +93,7 @@ class AuthController extends Controller
             'procurement-office' => 'procurement',
             'chancellor'         => 'chancellor',
             'vice-chancellor'    => 'vice_chancellor',
+            'accounting-office'  => 'accounting',
         ];
 
         $username = $usernameMap[$role] ?? null;

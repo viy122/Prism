@@ -144,6 +144,9 @@
                             'draft'        => 'badge-draft',
                             default        => 'badge-routing',
                         };
+                        $advLabel = $aoc['signatoryStage'] === 'draft'
+                            ? 'Route'
+                            : ($aoc['currentStageType'] === 'routing' ? 'Mark Forwarded' : 'Mark Signed');
                     @endphp
                     <tr>
                         <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $aoc['code'] }}</td>
@@ -164,7 +167,7 @@
                             <div style="display:flex;gap:6px;flex-wrap:wrap;">
                                 @if($aoc['signatoryStage'] !== 'fully_signed')
                                     <button class="btn btn-green btn-advance-aoc" data-url="{{ $aoc['advanceUrl'] }}" data-aoc-id="{{ $aoc['id'] }}" {{ $aoc['signatoryStage'] === 'fully_signed' ? 'disabled' : '' }}>
-                                        <i class="ti ti-circle-arrow-right"></i> Route
+                                        <i class="ti ti-circle-arrow-right"></i> {{ $advLabel }}
                                     </button>
                                     <button class="btn btn-ghost btn-return-aoc" data-url="{{ $aoc['returnUrl'] }}" data-aoc-id="{{ $aoc['id'] }}" {{ $aoc['signatoryStage'] === 'draft' ? 'disabled' : '' }}>
                                         <i class="ti ti-circle-arrow-left"></i> Return
@@ -206,7 +209,7 @@
 @endsection
 
 <script type="application/json" id="aocData">@json($aocs)</script>
-<script type="application/json" id="stagesData">@json($stages)</script>
+<script type="application/json" id="stagesData">@json($stageMeta)</script>
 
 @push('scripts')
 <script>
@@ -273,12 +276,12 @@
                 const json = await resp.json();
                 if (resp.ok && json.success) {
                     updateBadge(btn.dataset.aocId, json.signatoryLabel, json.signatoryStage);
-                    showToast('AOC routed forward.');
+                    showToast(json.currentStageType === 'routing' ? 'AOC forwarded.' : 'AOC routed forward.');
                     if (json.signatoryStage === 'fully_signed') {
                         btn.closest('td').innerHTML = '<a href="{{ route('procurement-office.purchase-orders') }}" class="btn btn-primary"><i class="ti ti-shopping-cart"></i> Issue PO</a>';
                     } else {
                         btn.disabled = false;
-                        btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Route';
+                        btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> ' + (json.currentStageType === 'routing' ? 'Mark Forwarded' : 'Mark Signed');
                     }
                 } else {
                     showToast(json.error || 'Failed.', true);

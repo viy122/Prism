@@ -56,6 +56,10 @@ class PrismInitialSeeder extends Seeder
                 'name' => 'Vice Chancellor',
                 'permissions' => ['view_dashboard', 'track_procurement'],
             ],
+            'accounting-office' => [
+                'name' => 'Accounting Office',
+                'permissions' => ['view_dashboard', 'track_procurement'],
+            ],
         ])->mapWithKeys(function (array $role, string $code) use ($permissions) {
             $model = Role::updateOrCreate(
                 ['code' => $code],
@@ -92,6 +96,7 @@ class PrismInitialSeeder extends Seeder
             'PROC' => ['name' => 'Procurement Office',                               'office_type' => 'administrative'],
             'OC'   => ['name' => 'Office of the Chancellor',                         'office_type' => 'executive'],
             'OVC'  => ['name' => 'Office of the Vice Chancellor',                    'office_type' => 'executive'],
+            'ACCT' => ['name' => 'Accounting Office',                                'office_type' => 'administrative'],
         ])->mapWithKeys(fn (array $office, string $code) => [
             $code => Office::updateOrCreate(
                 ['code' => $code],
@@ -152,6 +157,14 @@ class PrismInitialSeeder extends Seeder
                 'position_title' => 'Vice Chancellor',
                 'office' => 'OVC',
                 'role' => 'vice-chancellor',
+            ],
+            [
+                'name' => 'Accounting Office Demo',
+                'username' => 'accounting',
+                'email' => 'accounting.office@prism.test',
+                'position_title' => 'Accountant',
+                'office' => 'ACCT',
+                'role' => 'accounting-office',
             ],
             [
                 'name' => 'COE Office Head Demo',
