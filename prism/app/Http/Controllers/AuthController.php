@@ -76,6 +76,9 @@ class AuthController extends Controller
             'Chancellor'         => redirect()->route('chancellor.dashboard'),
             'Vice Chancellor'    => redirect()->route('vice-chancellor.dashboard'),
             'Accounting Office'  => redirect()->route('accounting-office.dashboard'),
+            'BAC'                => redirect()->route('bac.dashboard'),
+            'Cashier'            => redirect()->route('cashier.dashboard'),
+            'System Administrator' => redirect()->route('admin.dashboard'),
             default              => redirect()->route('prism.home'),
         };
     }
@@ -94,6 +97,9 @@ class AuthController extends Controller
             'chancellor'         => 'chancellor',
             'vice-chancellor'    => 'vice_chancellor',
             'accounting-office'  => 'accounting',
+            'bac'                => 'bac',
+            'cashier'            => 'cashier',
+            'system-admin'       => 'admin',
         ];
 
         $username = $usernameMap[$role] ?? null;

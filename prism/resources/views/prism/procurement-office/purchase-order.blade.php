@@ -144,7 +144,7 @@
                     @php
                         $badgeCls = match(true) {
                             $po['status'] === 'paid'                                           => 'badge-paid',
-                            in_array($po['status'], ['complete_delivery', 'receipt_uploaded']) => 'badge-complete',
+                            in_array($po['status'], ['complete_delivery', 'processing_payment']) => 'badge-complete',
                             in_array($po['status'], ['awaiting_delivery', 'partial_delivery']) => 'badge-delivery',
                             default => 'badge-issued',
                         };
@@ -180,6 +180,11 @@
                                 </div>
                             @elseif($po['status'] === 'paid')
                                 <span style="font-size:11px;color:#3b6d11;font-weight:700;">✓ Payment Made</span>
+                                @if(!empty($po['receiptUrl']))
+                                    <a href="{{ $po['receiptUrl'] }}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:#5b21b6;text-decoration:none;margin-left:6px;"><i class="ti ti-file-text"></i> Receipt</a>
+                                @endif
+                            @elseif(in_array($po['status'], ['complete_delivery', 'processing_payment']))
+                                <span style="font-size:11px;color:#854f0b;font-weight:700;">At Accounting / Cashier</span>
                             @elseif($po['nextStatus'])
                                 <button class="btn btn-green btn-advance-po" data-url="{{ $po['updateUrl'] }}" data-po-id="{{ $po['id'] }}" data-next-status="{{ $po['nextStatus'] }}">
                                     <i class="ti ti-circle-arrow-right"></i>
@@ -188,7 +193,6 @@
                                             'awaiting_delivery' => 'Forward to Supply Office',
                                             'partial_delivery'  => 'Mark Partial Delivery',
                                             'complete_delivery' => 'Mark Complete Delivery',
-                                            'receipt_uploaded'  => 'Forward to Accounting',
                                             default             => 'Advance',
                                         };
                                     @endphp
@@ -275,7 +279,7 @@
 
     function statusBadgeClass(status) {
         if (status === 'paid') return 'badge-paid';
-        if (['complete_delivery','receipt_uploaded'].includes(status)) return 'badge-complete';
+        if (['complete_delivery','processing_payment'].includes(status)) return 'badge-complete';
         if (['awaiting_delivery','partial_delivery'].includes(status)) return 'badge-delivery';
         return 'badge-issued';
     }
@@ -285,8 +289,8 @@
         awaiting_delivery: 'Awaiting Delivery (Supply Office)',
         partial_delivery: 'Partial Delivery (Supply Office)',
         complete_delivery: 'Complete Delivery (Supply Office)',
-        receipt_uploaded: 'At Accounting – For Payment',
-        paid: 'Paid – Cashier Payment Made',
+        processing_payment: 'At Accounting – Processing Payment',
+        paid: 'Paid – Payment Made (Cashier)',
     };
 
     /* ── PO signatory chain: advance ── */
@@ -430,8 +434,8 @@
                         badge.className   = 'badge ' + statusBadgeClass(json.status);
                     }
                     showToast('PO status updated: ' + json.statusLabel);
-                    if (json.status === 'receipt_uploaded') {
-                        btn.closest('td').innerHTML = '<span style="font-size:11px;color:var(--s400);">Awaiting Payment</span>';
+                    if (json.status === 'complete_delivery') {
+                        btn.closest('td').innerHTML = '<span style="font-size:11px;color:#854f0b;font-weight:700;">At Accounting / Cashier</span>';
                     } else {
                         btn.disabled = false;
                         btn.innerHTML = '<i class="ti ti-circle-arrow-right"></i> Advance';

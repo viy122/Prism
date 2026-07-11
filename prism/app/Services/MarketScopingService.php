@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\SaveMarketPriceSnapshots;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -50,15 +49,9 @@ class MarketScopingService
             Cache::put($cacheKey, $results, self::CACHE_TTL);
         }
 
-        // Persist an audit snapshot of the fresh price API rows after the
-        // response is sent — the user never waits on this insert.
-        if (!empty($priceApi->rawResults())) {
-            SaveMarketPriceSnapshots::dispatchAfterResponse(
-                $priceApi->rawResults(),
-                $query,
-                $department
-            );
-        }
+        // Price history is now recorded by the price API itself (one row per
+        // real scrape, including background pre-warms), so nothing is
+        // persisted here anymore — see prism-price-api app/db.py.
 
         return $results;
     }

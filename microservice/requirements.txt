@@ -12,3 +12,8 @@ torch>=2.0.0
 
 # TF-IDF fallback (used when sentence-transformers is unavailable)
 scikit-learn>=1.4.0
+
+# Signature detection & blurring (/detect-signature, /blur-region)
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
+Pillow>=10.0.0

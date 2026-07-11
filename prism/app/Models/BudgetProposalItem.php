@@ -121,6 +121,16 @@ class BudgetProposalItem extends Model
         return $this->hasMany(MarketScopingReference::class);
     }
 
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(DocumentUpload::class, 'attachable');
+    }
+
+    public function sourceFiles(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->documents()->where('document_type', 'market_study_source');
+    }
+
     public function annualProcurementPlanItems(): HasMany
     {
         return $this->hasMany(AnnualProcurementPlanItem::class);

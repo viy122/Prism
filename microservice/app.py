@@ -113,6 +113,141 @@ _VALUE_CONCEPTS = [
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# 1b. SIGNATURE DETECTION  (OpenCV, optional — /detect-signature + /blur-region)
+# ════════════════════════════════════════════════════════════════════════════════
+
+_CV_AVAILABLE = False
+try:
+    import base64 as _base64
+
+    import cv2 as _cv2
+    import numpy as _np
+    _CV_AVAILABLE = True
+except ImportError:
+    pass
+
+# Detection tuning — page-relative bounds for a signature-like ink blob
+SIG_MAX_EDGE          = 1600    # downscale long edge before analysis
+SIG_MIN_AREA_RATIO    = 0.001   # >= 0.1% of the page
+SIG_MAX_AREA_RATIO    = 0.08    # <= 8% of the page
+SIG_MIN_ASPECT        = 1.2     # signatures are wider than tall
+SIG_MAX_ASPECT        = 10.0
+SIG_MIN_FILL          = 0.02    # ink pixels / box area — strokes, not solid blocks
+SIG_MAX_FILL          = 0.45
+SIG_BOX_PAD           = 0.15    # padding applied around each box before blurring
+SIG_LOWER_HALF_BONUS  = 0.25    # signatures usually sit in the lower half of a form
+
+
+def _decode_image(data: bytes):
+    """bytes → BGR ndarray, downscaled to SIG_MAX_EDGE; returns (img, scale)."""
+    img = _cv2.imdecode(_np.frombuffer(data, _np.uint8), _cv2.IMREAD_COLOR)
+    if img is None:
+        return None, 1.0
+    h, w = img.shape[:2]
+    scale = 1.0
+    long_edge = max(h, w)
+    if long_edge > SIG_MAX_EDGE:
+        scale = SIG_MAX_EDGE / long_edge
+        img = _cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=_cv2.INTER_AREA)
+    return img, scale
+
+
+def _find_signature_boxes(img) -> list:
+    """
+    Heuristic ink detection: adaptive threshold → dilate to merge strokes →
+    connected components scored as signature-like. Returns [{x,y,w,h,score}]
+    in the (possibly downscaled) image's coordinates, best first.
+    """
+    h, w = img.shape[:2]
+    page_area = h * w
+
+    gray = _cv2.cvtColor(img, _cv2.COLOR_BGR2GRAY)
+    binary = _cv2.adaptiveThreshold(
+        gray, 255, _cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        _cv2.THRESH_BINARY_INV, 25, 15,
+    )
+
+    # Suppress long straight ruling lines (table borders, underlines) so they
+    # do not glue printed text together with genuine pen strokes.
+    horiz = _cv2.morphologyEx(binary, _cv2.MORPH_OPEN, _cv2.getStructuringElement(_cv2.MORPH_RECT, (int(w * 0.25) | 1, 1)))
+    vert  = _cv2.morphologyEx(binary, _cv2.MORPH_OPEN, _cv2.getStructuringElement(_cv2.MORPH_RECT, (1, int(h * 0.25) | 1)))
+    ink = _cv2.subtract(binary, _cv2.bitwise_or(horiz, vert))
+
+    # Merge nearby strokes into blobs (signatures are loopy and disconnected)
+    merged = _cv2.dilate(ink, _cv2.getStructuringElement(_cv2.MORPH_ELLIPSE, (13, 7)), iterations=2)
+
+    contours, _ = _cv2.findContours(merged, _cv2.RETR_EXTERNAL, _cv2.CHAIN_APPROX_SIMPLE)
+    boxes = []
+    for contour in contours:
+        x, y, bw, bh = _cv2.boundingRect(contour)
+        if bh == 0 or bw == 0:
+            continue
+        area_ratio = (bw * bh) / page_area
+        aspect = bw / bh
+        if not (SIG_MIN_AREA_RATIO <= area_ratio <= SIG_MAX_AREA_RATIO):
+            continue
+        if not (SIG_MIN_ASPECT <= aspect <= SIG_MAX_ASPECT):
+            continue
+
+        roi = ink[y:y + bh, x:x + bw]
+        fill = float(_np.count_nonzero(roi)) / (bw * bh)
+        if not (SIG_MIN_FILL <= fill <= SIG_MAX_FILL):
+            continue
+
+        # Irregularity: signatures have far more perimeter than a printed word block
+        perimeter = _cv2.arcLength(contour, True)
+        hull_area = max(_cv2.contourArea(_cv2.convexHull(contour)), 1.0)
+        irregularity = (perimeter ** 2) / (4 * _np.pi * hull_area)
+        if irregularity < 2.0:
+            continue
+
+        score = min(irregularity / 10.0, 1.0) * 0.6 + (1.0 - abs(fill - 0.12) / 0.45) * 0.4
+        if (y + bh / 2) > h * 0.45:
+            score += SIG_LOWER_HALF_BONUS
+        boxes.append({'x': x, 'y': y, 'w': bw, 'h': bh, 'score': round(float(score), 4)})
+
+    boxes.sort(key=lambda b: b['score'], reverse=True)
+    return boxes[:6]
+
+
+def _blur_boxes(img, boxes: list):
+    """Blur each padded box in-place on a copy of img; returns the copy."""
+    out = img.copy()
+    h, w = out.shape[:2]
+    for box in boxes:
+        pad_w = int(box['w'] * SIG_BOX_PAD)
+        pad_h = int(box['h'] * SIG_BOX_PAD)
+        x1 = max(int(box['x']) - pad_w, 0)
+        y1 = max(int(box['y']) - pad_h, 0)
+        x2 = min(int(box['x'] + box['w']) + pad_w, w)
+        y2 = min(int(box['y'] + box['h']) + pad_h, h)
+        if x2 <= x1 or y2 <= y1:
+            continue
+        roi = out[y1:y2, x1:x2]
+        kernel = max((min(roi.shape[0], roi.shape[1]) // 2) | 1, 31)
+        out[y1:y2, x1:x2] = _cv2.GaussianBlur(roi, (kernel, kernel), 0)
+    return out
+
+
+def _encode_jpeg_b64(img) -> str:
+    ok, buf = _cv2.imencode('.jpg', img, [int(_cv2.IMWRITE_JPEG_QUALITY), 88])
+    return _base64.b64encode(buf.tobytes()).decode('ascii') if ok else ''
+
+
+def _read_request_image():
+    """Pull image bytes from multipart 'image' or JSON 'image_b64'; None if absent."""
+    if 'image' in request.files:
+        return request.files['image'].read()
+    data = request.get_json(silent=True) or {}
+    if data.get('image_b64'):
+        try:
+            return _base64.b64decode(data['image_b64'])
+        except Exception:
+            return None
+    return None
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # 2. MODEL LOADING  (sentence-transformers, loaded once at startup)
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -307,12 +442,96 @@ def _broad_rank(results: list) -> list:
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
-        'status':             'ok',
-        'version':            '2.0',
-        'modes':              ['specific', 'general', 'broad'],
-        'semantic_available': _ST_AVAILABLE,
-        'semantic_fallback':  'tfidf',
+        'status':              'ok',
+        'version':             '2.1',
+        'modes':               ['specific', 'general', 'broad'],
+        'semantic_available':  _ST_AVAILABLE,
+        'semantic_fallback':   'tfidf',
+        'signature_detection': _CV_AVAILABLE,
     })
+
+
+@app.route('/detect-signature', methods=['POST'])
+def detect_signature():
+    """
+    Detect signature-like ink regions in a photo of a signed document and
+    return a copy with those regions blurred.
+
+    Input:  multipart field "image" (jpeg/png) OR JSON {"image_b64": "..."}
+    Output: {
+        "detected":         bool,
+        "confidence":       float (best box score),
+        "boxes":            [{"x","y","w","h","score"}]  (analysis-image coords),
+        "blurred_image_b64": "<jpeg>"  (only when detected),
+        "method":           "opencv"
+    }
+    When nothing signature-like is found, detected=false and no blurred image is
+    returned — the caller decides whether to fall back to manual confirmation.
+    """
+    if not _CV_AVAILABLE:
+        return jsonify({'error': 'signature detection unavailable — pip install opencv-python-headless'}), 503
+
+    raw = _read_request_image()
+    if not raw:
+        return jsonify({'error': 'no image provided (multipart "image" or JSON "image_b64")'}), 400
+
+    img, _scale = _decode_image(raw)
+    if img is None:
+        return jsonify({'error': 'could not decode image'}), 422
+
+    boxes = _find_signature_boxes(img)
+    if not boxes:
+        return jsonify({'detected': False, 'confidence': 0.0, 'boxes': [], 'method': 'opencv'})
+
+    return jsonify({
+        'detected':          True,
+        'confidence':        boxes[0]['score'],
+        'boxes':             boxes,
+        'blurred_image_b64': _encode_jpeg_b64(_blur_boxes(img, boxes)),
+        'method':            'opencv',
+    })
+
+
+@app.route('/blur-region', methods=['POST'])
+def blur_region():
+    """
+    Blur caller-specified regions (manual fallback when auto-detection misses).
+
+    Input:  {"image_b64": "...", "boxes": [{"x","y","w","h"}]}
+            Box coords are fractions of image size when <= 1.0, else pixels.
+    Output: {"blurred_image_b64": "<jpeg>"}
+    """
+    if not _CV_AVAILABLE:
+        return jsonify({'error': 'signature blurring unavailable — pip install opencv-python-headless'}), 503
+
+    raw = _read_request_image()
+    if not raw:
+        return jsonify({'error': 'no image provided'}), 400
+
+    data = request.get_json(silent=True) or {}
+    boxes = data.get('boxes', [])
+    if not boxes:
+        return jsonify({'error': 'no boxes provided'}), 400
+
+    img, _scale = _decode_image(raw)
+    if img is None:
+        return jsonify({'error': 'could not decode image'}), 422
+
+    h, w = img.shape[:2]
+    pixel_boxes = []
+    for box in boxes:
+        try:
+            x, y, bw, bh = float(box['x']), float(box['y']), float(box['w']), float(box['h'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if max(x, y, bw, bh) <= 1.0:   # fractional coords
+            x, y, bw, bh = x * w, y * h, bw * w, bh * h
+        pixel_boxes.append({'x': x, 'y': y, 'w': bw, 'h': bh})
+
+    if not pixel_boxes:
+        return jsonify({'error': 'no valid boxes provided'}), 400
+
+    return jsonify({'blurred_image_b64': _encode_jpeg_b64(_blur_boxes(img, pixel_boxes))})
 
 
 @app.route('/match', methods=['POST'])

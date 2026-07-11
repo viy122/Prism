@@ -311,14 +311,14 @@
             <input type="hidden" name="remarks" id="financeRemarksHidden">
             <label class="field-label" for="financeOverallRemarks">Overall proposal remarks</label>
             <textarea class="field-textarea" id="financeOverallRemarks" rows="5"
-                placeholder="Add endorsement notes or return instructions for the office"></textarea>
+                placeholder="Add approval notes or return instructions for the office"></textarea>
             @if($selectedProposal['status'] === 'Submitted')
             <div class="action-row" style="margin-top:14px;">
                 <button class="btn-endorse" type="submit"
                     data-url="{{ route('finance-office.proposal-review.endorse', $selectedProposal['id']) }}"
                     onclick="return submitFinanceForm(this)">
                     <i class="ti ti-circle-check"></i>
-                    Endorse to Chancellor
+                    Approve &amp; Forward to Chancellor
                 </button>
                 <button class="btn-return" type="submit"
                     data-url="{{ route('finance-office.proposal-review.return', $selectedProposal['id']) }}"

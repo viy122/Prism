@@ -24,6 +24,8 @@ class PrismInitialSeeder extends Seeder
             ['code' => 'track_procurement', 'name' => 'Track procurement'],
             ['code' => 'manage_users', 'name' => 'Manage users and roles'],
             ['code' => 'view_audit_logs', 'name' => 'View audit logs'],
+            ['code' => 'sign_documents', 'name' => 'Sign procurement documents'],
+            ['code' => 'process_payments', 'name' => 'Process and release payments'],
         ])->mapWithKeys(fn (array $permission) => [
             $permission['code'] => Permission::updateOrCreate(
                 ['code' => $permission['code']],
@@ -50,15 +52,23 @@ class PrismInitialSeeder extends Seeder
             ],
             'chancellor' => [
                 'name' => 'Chancellor',
-                'permissions' => ['view_dashboard', 'review_budget_proposals'],
+                'permissions' => ['view_dashboard', 'review_budget_proposals', 'sign_documents'],
             ],
             'vice-chancellor' => [
                 'name' => 'Vice Chancellor',
-                'permissions' => ['view_dashboard', 'track_procurement'],
+                'permissions' => ['view_dashboard', 'track_procurement', 'sign_documents'],
             ],
             'accounting-office' => [
                 'name' => 'Accounting Office',
-                'permissions' => ['view_dashboard', 'track_procurement'],
+                'permissions' => ['view_dashboard', 'track_procurement', 'sign_documents'],
+            ],
+            'bac' => [
+                'name' => 'BAC',
+                'permissions' => ['view_dashboard', 'track_procurement', 'sign_documents'],
+            ],
+            'cashier' => [
+                'name' => 'Cashier',
+                'permissions' => ['view_dashboard', 'process_payments'],
             ],
         ])->mapWithKeys(function (array $role, string $code) use ($permissions) {
             $model = Role::updateOrCreate(
@@ -97,6 +107,8 @@ class PrismInitialSeeder extends Seeder
             'OC'   => ['name' => 'Office of the Chancellor',                         'office_type' => 'executive'],
             'OVC'  => ['name' => 'Office of the Vice Chancellor',                    'office_type' => 'executive'],
             'ACCT' => ['name' => 'Accounting Office',                                'office_type' => 'administrative'],
+            'BAC'  => ['name' => 'Bids and Awards Committee',                        'office_type' => 'administrative'],
+            'CASH' => ['name' => 'Cashier Office',                                   'office_type' => 'administrative'],
         ])->mapWithKeys(fn (array $office, string $code) => [
             $code => Office::updateOrCreate(
                 ['code' => $code],
@@ -165,6 +177,22 @@ class PrismInitialSeeder extends Seeder
                 'position_title' => 'Accountant',
                 'office' => 'ACCT',
                 'role' => 'accounting-office',
+            ],
+            [
+                'name' => 'BAC Demo',
+                'username' => 'bac',
+                'email' => 'bac@prism.test',
+                'position_title' => 'BAC Member',
+                'office' => 'BAC',
+                'role' => 'bac',
+            ],
+            [
+                'name' => 'Cashier Demo',
+                'username' => 'cashier',
+                'email' => 'cashier@prism.test',
+                'position_title' => 'Cashier',
+                'office' => 'CASH',
+                'role' => 'cashier',
             ],
             [
                 'name' => 'COE Office Head Demo',

@@ -56,8 +56,8 @@ class NotificationService
         self::sendToRole(
             'Finance Office',
             'proposal_submitted',
-            'New Budget Proposal for Review',
-            "{$office} submitted their FY {$year} budget proposal. Please review and endorse.",
+            'New PPMP for Review',
+            "{$office} submitted their FY {$year} PPMP. Please review and approve.",
             route('finance-office.proposal-review'),
         );
     }
@@ -75,8 +75,8 @@ class NotificationService
         self::sendToRole(
             'Chancellor',
             'proposal_endorsed',
-            'Budget Proposal Ready for Approval',
-            "{$office}'s FY {$year} budget proposal has been endorsed by Finance Office and is ready for your approval.",
+            'PPMP Ready for Approval',
+            "{$office}'s FY {$year} PPMP has been approved by the Finance Office and is ready for your approval.",
             route('chancellor.budget-approval'),
         );
 
@@ -85,7 +85,7 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_endorsed',
                 'Your Proposal Has Been Endorsed',
-                "Your FY {$year} budget proposal has been endorsed by the Finance Office and forwarded to the Chancellor for approval.",
+                "Your FY {$year} PPMP has been approved by the Finance Office and forwarded to the Chancellor for approval.",
                 route('office-head.my-proposals'),
             );
         }
@@ -105,7 +105,7 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_returned',
                 'Proposal Returned for Revision',
-                "Your FY {$year} budget proposal was returned by the Finance Office.{$remarkNote} Please revise and resubmit.",
+                "Your FY {$year} PPMP was returned by the Finance Office.{$remarkNote} Please revise and resubmit.",
                 route('office-head.budget-proposal'),
             );
         }
@@ -125,8 +125,8 @@ class NotificationService
             self::send(
                 $proposal->submitted_by_user_id,
                 'proposal_approved',
-                'Budget Proposal Approved',
-                "Congratulations! Your FY {$year} budget proposal has been approved by the Chancellor.",
+                'PPMP Approved',
+                "Congratulations! Your FY {$year} PPMP has been approved by the Chancellor.",
                 route('office-head.my-proposals'),
             );
         }
@@ -134,8 +134,8 @@ class NotificationService
         self::sendToRole(
             'Vice Chancellor',
             'proposal_approved',
-            'Budget Proposal Approved',
-            "{$office}'s FY {$year} budget proposal has been approved by the Chancellor.",
+            'PPMP Approved',
+            "{$office}'s FY {$year} PPMP has been approved by the Chancellor.",
             route('vice-chancellor.division-procurement-status'),
         );
     }
@@ -154,7 +154,7 @@ class NotificationService
             'Finance Office',
             'proposal_returned',
             'Proposal Returned by Chancellor',
-            "{$office}'s FY {$year} budget proposal was returned by the Chancellor for revision." . ($remarks ? " Remarks: \"{$remarks}\"" : ''),
+            "{$office}'s FY {$year} PPMP was returned by the Chancellor for revision." . ($remarks ? " Remarks: \"{$remarks}\"" : ''),
             route('finance-office.proposal-review'),
         );
 
@@ -164,10 +164,48 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_returned',
                 'Proposal Returned by Chancellor',
-                "Your FY {$year} budget proposal was returned by the Chancellor.{$remarkNote} Please coordinate with the Finance Office.",
+                "Your FY {$year} PPMP was returned by the Chancellor.{$remarkNote} Please coordinate with the Finance Office.",
                 route('office-head.my-proposals'),
             );
         }
+    }
+
+    // ── Signatory queue events ────────────────────────────────────────────────
+
+    /**
+     * Triggered when: a PR/AOC/PO lands on a stage owned by a signatory role.
+     * Notifies: every user holding that role — a document awaits their signature.
+     */
+    public static function documentAwaitingSignature($doc, string $roleCode): void
+    {
+        $roleNames = [
+            'bac'               => 'BAC',
+            'vice-chancellor'   => 'Vice Chancellor',
+            'chancellor'        => 'Chancellor',
+            'accounting-office' => 'Accounting Office',
+        ];
+        $queueRoutes = [
+            'bac'               => 'bac.for-my-signature',
+            'vice-chancellor'   => 'vice-chancellor.for-my-signature',
+            'chancellor'        => 'chancellor.for-my-signature',
+            'accounting-office' => 'accounting-office.for-my-signature',
+        ];
+
+        if (!isset($roleNames[$roleCode])) {
+            return;
+        }
+
+        $prefix = $doc::SIGNATORY_DOC_PREFIX;
+        $number = $doc->number ?? $doc->code ?? $doc->po_number ?? ($prefix . '-' . str_pad($doc->id, 4, '0', STR_PAD_LEFT));
+        $stage  = $doc->stageMetaFor($doc->signatory_stage)['label'] ?? '';
+
+        self::sendToRole(
+            $roleNames[$roleCode],
+            'awaiting_signature',
+            "{$prefix} Awaiting Your Signature",
+            "{$number} is now at \"{$stage}\" and needs your action.",
+            route($queueRoutes[$roleCode]),
+        );
     }
 
     // ── Purchase Request events ───────────────────────────────────────────────

@@ -1,5 +1,5 @@
 @extends('prism.layouts.office-head')
-@section('title', 'My Proposals')
+@section('title', 'My PPMPs')
 
 @php
     $proposalCollection   = collect($proposals);
@@ -334,11 +334,11 @@
             <div class="card-head">
                 <div>
                     <p class="card-eyebrow">Overview</p>
-                    <h2 class="card-title">Proposal Summary</h2>
+                    <h2 class="card-title">PPMP Summary</h2>
                 </div>
                 <a class="btn-primary" href="{{ route('office-head.budget-proposal') }}">
                     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                    New Budget Proposal
+                    New PPMP
                 </a>
             </div>
 

@@ -6,6 +6,7 @@ use App\Models\AbstractOfCanvass;
 use Smalot\PdfParser\Parser as PdfParser;
 use App\Models\AocSignatureLog;
 use App\Models\BudgetProposalItem;
+use App\Models\DocumentUpload;
 use App\Models\Office;
 use App\Models\PoSignatureLog;
 use App\Models\ProcurementStatusUpdate;
@@ -14,6 +15,9 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Services\MarketScopingService;
 use App\Services\NotificationService;
+use App\Services\ProcurementModeService;
+use App\Services\SignatoryActionService;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -107,6 +111,11 @@ class PrismProcurementOfficeController extends Controller
                     'by'        => $l->signedBy?->name ?? '—',
                     'at'        => $l->signed_at?->format('M d, Y g:i A') ?? '—',
                     'remarks'   => $l->remarks ?? '',
+                    'photoUrl'      => $l->blurred_photo_path ? \Illuminate\Support\Facades\Storage::url($l->blurred_photo_path) : null,
+                    'photoStatus'   => $l->detection_status,
+                    'reprocessUrl'  => in_array($l->detection_status, ['pending', 'failed'], true)
+                        ? route('procurement-office.signature-photo.reprocess', ['pr', $l->id])
+                        : null,
                 ])->all(),
                 'stageMeta'     => $pr->resolvedStageMeta(),
                 'thirdSigner'   => $pr->third_signer,
@@ -132,88 +141,22 @@ class PrismProcurementOfficeController extends Controller
         ]));
     }
 
-    public function advancePrStage(Request $request, PurchaseRequest $pr): JsonResponse
+    public function advancePrStage(Request $request, PurchaseRequest $pr, SignatoryActionService $signatory): JsonResponse
     {
-        $next = $pr->nextSignatoryStage();
-        if (!$next) {
-            return response()->json(['error' => 'PR is already fully signed.'], 422);
-        }
-
-        // Completing the CURRENT stage: routing steps forward, signature steps sign
-        $current         = $pr->signatory_stage;
-        $action          = $pr->advanceAction();
-        $signatoryNumber = $pr->stageIndex($current);
-        $remarks         = $request->input('remarks');
-
-        $updateData = ['signatory_stage' => $next];
-        if ($next === 'fully_signed') {
-            $updateData['canvassing_stage'] = 'not_started';
-        }
-
-        // Entering the flexible 3rd slot: record who actually signed 3rd
-        if ($next === 'at_third_sign') {
+        if ($pr->nextSignatoryStage() === 'at_third_sign') {
             $request->validate(['third_signer' => 'required|in:accounting,vice_chancellor']);
-            $updateData['third_signer'] = $request->input('third_signer');
-            $chosen  = $updateData['third_signer'] === 'accounting' ? 'Accounting' : 'Vice Chancellor';
-            $remarks = trim(($remarks ?? '') . " [3rd signer: {$chosen}]");
         }
 
-        $pr->update($updateData);
+        $result = $signatory->advance($pr, $request->input('remarks'), $request->input('third_signer'));
 
-        PrSignatureLog::create([
-            'purchase_request_id' => $pr->id,
-            'signatory_number'    => $signatoryNumber,
-            'signed_by_user_id'   => auth()->id(),
-            'action'              => $action,
-            'remarks'             => $remarks,
-            'signed_at'           => now(),
-        ]);
-
-        ProcurementStatusUpdate::create([
-            'purchase_request_id' => $pr->id,
-            'updated_by_user_id'  => auth()->id(),
-            'status'              => $next,
-            'remarks'             => $remarks ?? '',
-        ]);
-
-        NotificationService::prStatusUpdated($pr);
-
-        $fresh = $pr->fresh();
-        return response()->json([
-            'success'          => true,
-            'signatoryStage'   => $next,
-            'signatoryLabel'   => $fresh->signatory_label,
-            'canvassingStage'  => $fresh->canvassing_stage,
-            'canvassingLabel'  => $fresh->canvassing_label,
-            'stageMeta'        => $fresh->resolvedStageMeta(),
-            'thirdSigner'      => $fresh->third_signer,
-        ]);
+        return response()->json($result, $result['status'] ?? 200);
     }
 
-    public function returnPr(Request $request, PurchaseRequest $pr): JsonResponse
+    public function returnPr(Request $request, PurchaseRequest $pr, SignatoryActionService $signatory): JsonResponse
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        $prev = $pr->signatory_stage;
-        $pr->update(['signatory_stage' => 'draft', 'third_signer' => null]);
-
-        PrSignatureLog::create([
-            'purchase_request_id' => $pr->id,
-            'signatory_number'    => $pr->stageIndex($prev),
-            'signed_by_user_id'   => auth()->id(),
-            'action'              => 'returned',
-            'remarks'             => $request->input('remarks'),
-            'signed_at'           => now(),
-        ]);
-
-        ProcurementStatusUpdate::create([
-            'purchase_request_id' => $pr->id,
-            'updated_by_user_id'  => auth()->id(),
-            'status'              => 'returned_to_draft',
-            'remarks'             => $request->input('remarks'),
-        ]);
-
-        return response()->json(['success' => true]);
+        return response()->json($signatory->returnToDraft($pr, $request->input('remarks')));
     }
 
     public function updateCanvassing(Request $request, PurchaseRequest $pr): JsonResponse
@@ -225,6 +168,12 @@ class PrismProcurementOfficeController extends Controller
         $request->validate(['action' => 'required|in:start,complete']);
 
         $newStage = $request->input('action') === 'start' ? 'in_progress' : 'completed';
+
+        // Three-quotation rule: canvassing needs at least 3 supplier quotations
+        if ($newStage === 'completed' && $pr->canvassDocuments()->count() < 3) {
+            return response()->json(['error' => 'At least 3 supplier quotations must be uploaded before completing canvassing. Use the Canvassing tab to attach them.'], 422);
+        }
+
         $pr->update(['canvassing_stage' => $newStage]);
 
         ProcurementStatusUpdate::create([
@@ -259,6 +208,167 @@ class PrismProcurementOfficeController extends Controller
         ]);
 
         NotificationService::prStatusUpdated($pr);
+
+        return response()->json(['success' => true]);
+    }
+
+    // ── Annual Procurement Plan (moved from Finance Office) ──────────────────
+
+    public function annualProcurementPlan(): View
+    {
+        $items = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->get()
+            ->map(function ($item) {
+                $abc             = (float) $item->estimated_total_cost;
+                $recommendedMode = ProcurementModeService::recommend($abc);
+
+                return [
+                    'itemId'          => $item->id,
+                    'office'          => $item->budgetProposal?->office?->name ?? '—',
+                    'item'            => $item->name,
+                    'quantity'        => (int) $item->quantity,
+                    'abcAmount'       => $abc,
+                    'targetQuarter'   => $item->target_quarter ?? 'Q1',
+                    'recommendedMode' => $recommendedMode,
+                    'rationale'       => ProcurementModeService::rationale($abc),
+                    'procurementMode' => $item->procurement_mode ?? $recommendedMode,
+                    'isOverridden'    => (bool) $item->is_overridden,
+                    'overrideReason'  => $item->override_reason ?? '',
+                    'saveUrl'         => route('procurement-office.annual-procurement-plan.save-mode', $item->id),
+                ];
+            })
+            ->all();
+
+        return view('prism.procurement-office.annual-procurement-plan', $this->withCommon('annual-procurement-plan', [
+            'pageTitle'        => 'Annual Procurement Plan',
+            'appItems'         => $items,
+            'offices'          => collect($items)->pluck('office')->unique()->values()->all(),
+            'quarters'         => ['Q1', 'Q2', 'Q3', 'Q4'],
+            'procurementModes' => ProcurementModeService::MODES,
+        ]));
+    }
+
+    public function saveProcurementMode(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'procurement_mode' => 'required|string|in:' . implode(',', ProcurementModeService::MODES),
+            'override_reason'  => 'nullable|string|max:1000',
+        ]);
+
+        $recommended  = ProcurementModeService::recommend((float) $item->estimated_total_cost);
+        $isOverridden = $validated['procurement_mode'] !== $recommended;
+
+        if ($isOverridden && empty(trim($validated['override_reason'] ?? ''))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A reason is required when overriding the system recommendation.',
+            ], 422);
+        }
+
+        $item->update([
+            'recommended_mode' => $recommended,
+            'procurement_mode' => $validated['procurement_mode'],
+            'is_overridden'    => $isOverridden,
+            'override_reason'  => $isOverridden ? trim($validated['override_reason']) : null,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    // ── Canvassing tab (quotation uploads + stage tracking) ──────────────────
+
+    public function canvassing(): View
+    {
+        $prs = PurchaseRequest::with(['office', 'documents' => fn ($q) => $q->where('document_type', 'canvass_quotation')])
+            ->where('signatory_stage', 'fully_signed')
+            ->latest()
+            ->get()
+            ->map(fn ($pr) => [
+                'id'              => $pr->id,
+                'prNumber'        => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+                'office'          => $pr->office?->name ?? '—',
+                'title'           => $pr->title,
+                'canvassingStage' => $pr->canvassing_stage,
+                'canvassingLabel' => $pr->canvassing_label,
+                'readyForAoc'     => $pr->isReadyForAoc(),
+                'quotations'      => $pr->documents->map(fn ($doc) => [
+                    'id'        => $doc->id,
+                    'supplier'  => $doc->title,
+                    'filename'  => $doc->original_filename,
+                    'url'       => Storage::url($doc->file_path),
+                    'uploadedAt'=> $doc->uploaded_at?->format('M d, Y') ?? '—',
+                    'deleteUrl' => route('procurement-office.canvass-document.delete', $doc->id),
+                ])->all(),
+                'updateUrl' => route('procurement-office.purchase-request.canvassing', $pr->id),
+                'uploadUrl' => route('procurement-office.purchase-request.canvass-document', $pr->id),
+            ])
+            ->all();
+
+        return view('prism.procurement-office.canvassing', $this->withCommon('canvassing', [
+            'pageTitle' => 'Canvassing',
+            'prs'       => $prs,
+        ]));
+    }
+
+    public function uploadCanvassDocument(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        if ($pr->signatory_stage !== 'fully_signed') {
+            return response()->json(['error' => 'PR must be fully signed before canvassing.'], 422);
+        }
+        if ($pr->canvassing_stage === 'completed') {
+            return response()->json(['error' => 'Canvassing is already completed for this PR.'], 422);
+        }
+
+        $request->validate([
+            'document'      => 'required|file|mimes:pdf,jpeg,jpg,png|max:10240',
+            'supplier_name' => 'required|string|max:255',
+        ]);
+
+        $file = $request->file('document');
+        $path = $file->store('canvass/' . now()->year, 'public');
+
+        $doc = DocumentUpload::create([
+            'uploaded_by_user_id' => auth()->id(),
+            'attachable_type'     => PurchaseRequest::class,
+            'attachable_id'       => $pr->id,
+            'document_type'       => 'canvass_quotation',
+            'title'               => $request->input('supplier_name'),
+            'original_filename'   => $file->getClientOriginalName(),
+            'file_path'           => $path,
+            'mime_type'           => $file->getClientMimeType(),
+            'file_size'           => $file->getSize(),
+            'status'              => 'uploaded',
+            'uploaded_at'         => now(),
+        ]);
+
+        // First quotation implicitly starts canvassing
+        if ($pr->canvassing_stage === 'not_started') {
+            $pr->update(['canvassing_stage' => 'in_progress']);
+        }
+
+        return response()->json([
+            'success'         => true,
+            'documentId'      => $doc->id,
+            'url'             => Storage::url($path),
+            'canvassingStage' => $pr->fresh()->canvassing_stage,
+            'quotationCount'  => $pr->canvassDocuments()->count(),
+        ]);
+    }
+
+    public function deleteCanvassDocument(DocumentUpload $document): JsonResponse
+    {
+        if ($document->document_type !== 'canvass_quotation') {
+            return response()->json(['error' => 'Not a canvass quotation.'], 422);
+        }
+
+        $pr = $document->attachable;
+        if ($pr instanceof PurchaseRequest && $pr->canvassing_stage === 'completed') {
+            return response()->json(['error' => 'Canvassing is already completed — quotations are locked.'], 422);
+        }
+
+        Storage::disk('public')->delete($document->file_path);
+        $document->delete();
 
         return response()->json(['success' => true]);
     }
@@ -334,63 +444,31 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true, 'aocId' => $aoc->id]);
     }
 
-    public function advanceAocStage(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    public function advanceAocStage(Request $request, AbstractOfCanvass $aoc, SignatoryActionService $signatory): JsonResponse
     {
-        $next = $aoc->nextSignatoryStage();
-        if (!$next) {
-            return response()->json(['error' => 'AOC is already fully signed.'], 422);
-        }
+        $result = $signatory->advance($aoc, $request->input('remarks'));
 
-        $current = $aoc->signatory_stage;
-        $action  = $aoc->advanceAction();
-        $aoc->update(['signatory_stage' => $next]);
-
-        AocSignatureLog::create([
-            'abstract_of_canvass_id' => $aoc->id,
-            'signatory_number'       => $aoc->stageIndex($current),
-            'signed_by_user_id'      => auth()->id(),
-            'action'                 => $action,
-            'remarks'                => $request->input('remarks'),
-            'signed_at'              => now(),
-        ]);
-
-        $fresh = $aoc->fresh();
-        return response()->json([
-            'success'          => true,
-            'signatoryStage'   => $next,
-            'signatoryLabel'   => $fresh->signatory_label,
-            'currentStageType' => $fresh->stageMetaFor($next)['type'] ?? 'signature',
-            'nextStageLabel'   => $fresh->stageMetaFor($fresh->nextSignatoryStage())['label'] ?? null,
-        ]);
+        return response()->json($result, $result['status'] ?? 200);
     }
 
-    public function returnAoc(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    public function returnAoc(Request $request, AbstractOfCanvass $aoc, SignatoryActionService $signatory): JsonResponse
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        $prev = $aoc->signatory_stage;
-        $aoc->update(['signatory_stage' => 'draft']);
-
-        AocSignatureLog::create([
-            'abstract_of_canvass_id' => $aoc->id,
-            'signatory_number'       => $aoc->stageIndex($prev),
-            'signed_by_user_id'      => auth()->id(),
-            'action'                 => 'returned',
-            'remarks'                => $request->input('remarks'),
-            'signed_at'              => now(),
-        ]);
-
-        return response()->json(['success' => true]);
+        return response()->json($signatory->returnToDraft($aoc, $request->input('remarks')));
     }
 
     // ── Phase 3: Purchase Order ───────────────────────────────────────────────
 
     public function purchaseOrders(): View
     {
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy'])
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents'])
             ->latest()
             ->get()
             ->map(fn ($po) => [
+                'receiptUrl'   => ($receipt = $po->documents->firstWhere('document_type', 'payment_receipt'))
+                    ? \Illuminate\Support\Facades\Storage::url($receipt->file_path)
+                    : null,
                 'id'           => $po->id,
                 'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
                 'aocCode'      => $po->abstractOfCanvass->code ?? '—',
@@ -486,6 +564,11 @@ class PrismProcurementOfficeController extends Controller
             return response()->json(['error' => 'No further status available.'], 422);
         }
 
+        // Payment steps belong to Accounting (start processing) and the Cashier (receipt → paid)
+        if ($next === 'processing_payment') {
+            return response()->json(['error' => 'Delivery is complete — the Accounting Office takes over payment processing from here.'], 422);
+        }
+
         $po->update([
             'status'  => $next,
             'remarks' => $request->input('remarks'),
@@ -498,53 +581,33 @@ class PrismProcurementOfficeController extends Controller
         ]);
     }
 
-    public function advancePoStage(Request $request, PurchaseOrder $po): JsonResponse
+    public function advancePoStage(Request $request, PurchaseOrder $po, SignatoryActionService $signatory): JsonResponse
     {
-        $next = $po->nextSignatoryStage();
-        if (!$next) {
-            return response()->json(['error' => 'PO is already fully signed.'], 422);
-        }
+        $result = $signatory->advance($po, $request->input('remarks'));
 
-        $current = $po->signatory_stage;
-        $action  = $po->advanceAction();
-        $po->update(['signatory_stage' => $next]);
-
-        PoSignatureLog::create([
-            'purchase_order_id' => $po->id,
-            'signatory_number'  => $po->stageIndex($current),
-            'signed_by_user_id' => auth()->id(),
-            'action'            => $action,
-            'remarks'           => $request->input('remarks'),
-            'signed_at'         => now(),
-        ]);
-
-        $fresh = $po->fresh();
-        return response()->json([
-            'success'          => true,
-            'signatoryStage'   => $next,
-            'signatoryLabel'   => $fresh->signatory_label,
-            'currentStageType' => $fresh->stageMetaFor($next)['type'] ?? 'signature',
-            'nextStageLabel'   => $fresh->stageMetaFor($fresh->nextSignatoryStage())['label'] ?? null,
-        ]);
+        return response()->json($result, $result['status'] ?? 200);
     }
 
-    public function returnPo(Request $request, PurchaseOrder $po): JsonResponse
+    public function returnPo(Request $request, PurchaseOrder $po, SignatoryActionService $signatory): JsonResponse
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        $prev = $po->signatory_stage;
-        $po->update(['signatory_stage' => 'draft']);
+        return response()->json($signatory->returnToDraft($po, $request->input('remarks')));
+    }
 
-        PoSignatureLog::create([
-            'purchase_order_id' => $po->id,
-            'signatory_number'  => $po->stageIndex($prev),
-            'signed_by_user_id' => auth()->id(),
-            'action'            => 'returned',
-            'remarks'           => $request->input('remarks'),
-            'signed_at'         => now(),
-        ]);
+    /** Re-run signature detection for a log whose photo is pending/failed. */
+    public function reprocessSignaturePhoto(Request $request, string $docType, int $logId, SignatoryActionService $signatory): JsonResponse
+    {
+        [$log, $doc] = match ($docType) {
+            'pr'    => [($l = PrSignatureLog::findOrFail($logId)), $l->purchaseRequest],
+            'aoc'   => [($l = AocSignatureLog::findOrFail($logId)), $l->abstractOfCanvass],
+            'po'    => [($l = PoSignatureLog::findOrFail($logId)), $l->purchaseOrder],
+            default => abort(404),
+        };
 
-        return response()->json(['success' => true]);
+        $result = $signatory->reprocessPhoto($doc, $log);
+
+        return response()->json($result, $result['status'] ?? 200);
     }
 
     public function procurementStatusTracking(): View
@@ -845,18 +908,13 @@ class PrismProcurementOfficeController extends Controller
             'brandHref'        => route('procurement-office.dashboard'),
             'roleLabel'        => 'Procurement Office',
             'roleInitials'     => 'PO',
-            'roleNavigation'   => [
-                ['slug' => 'office-head',        'label' => 'Office Head / Dean', 'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office',     'label' => 'Finance Office',      'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
-                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
-            ],
+            'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Procurement Office pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                   'label' => 'Dashboard',                  'href' => route('procurement-office.dashboard'),                   'icon' => 'layout-dashboard'],
+                ['slug' => 'annual-procurement-plan',     'label' => 'Annual Procurement Plan',     'href' => route('procurement-office.annual-procurement-plan'),     'icon' => 'calendar-stats'],
                 ['slug' => 'purchase-request-management', 'label' => 'Purchase Requests',           'href' => route('procurement-office.purchase-request-management'), 'icon' => 'receipt'],
+                ['slug' => 'canvassing',                  'label' => 'Canvassing',                  'href' => route('procurement-office.canvassing'),                  'icon' => 'clipboard-list'],
                 ['slug' => 'abstract-of-canvass',         'label' => 'Abstract of Canvass',         'href' => route('procurement-office.abstract-of-canvass'),         'icon' => 'file-text'],
                 ['slug' => 'purchase-orders',             'label' => 'Purchase Orders',             'href' => route('procurement-office.purchase-orders'),             'icon' => 'shopping-cart'],
                 ['slug' => 'procurement-status-tracking', 'label' => 'Status Tracking',             'href' => route('procurement-office.procurement-status-tracking'), 'icon' => 'list-check'],

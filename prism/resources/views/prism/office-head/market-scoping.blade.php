@@ -171,6 +171,8 @@
     .budget-input { height: 42px; width: 170px; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 12px 0 24px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
     .budget-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
     .budget-input::placeholder { color: var(--txt3); font-size: 12px; }
+    .dept-select { height: 42px; width: 160px; flex-shrink: 0; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 10px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; cursor: pointer; }
+    .dept-select:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
 
     /* ── Spec-match & advantageous badges ── */
     .ref-tag.t-match { background: #ECFDF5; color: #059669; }
@@ -232,6 +234,17 @@
                        placeholder="Search a new item (e.g. Laptop Intel i7 16GB RAM)…">
                 <div id="suggestDropdown" class="suggest-dropdown"></div>
             </div>
+            <select id="marketDeptSelect" class="dept-select" title="Limit the search to stores serving this category">
+                <option value="">All categories</option>
+                <option value="office">Office supplies</option>
+                <option value="it">IT / Computers</option>
+                <option value="medical">Medical</option>
+                <option value="appliances">Appliances</option>
+                <option value="furniture">Furniture</option>
+                <option value="hardware">Hardware</option>
+                <option value="janitorial">Janitorial</option>
+                <option value="sports">Sports / PE</option>
+            </select>
             <div class="budget-wrap">
                 <span class="budget-prefix">₱</span>
                 <input id="marketBudgetInput" class="budget-input" type="number" min="0" step="0.01"
@@ -263,8 +276,14 @@
                 <label>Sort</label>
                 <select id="sortSel" class="filter-sel">
                     <option value="match">Best Match</option>
+                    <option value="score_desc">Match Score: High → Low</option>
                     <option value="price_asc">Price: Low → High</option>
                     <option value="price_desc">Price: High → Low</option>
+                    <option value="store_az">Store: A → Z</option>
+                </select>
+                <label>Store</label>
+                <select id="storeSel" class="filter-sel">
+                    <option value="">All stores</option>
                 </select>
                 <label>Price</label>
                 <input id="priceMin" class="filter-price" type="number" min="0" placeholder="Min ₱">
@@ -272,6 +291,9 @@
                 <input id="priceMax" class="filter-price" type="number" min="0" placeholder="Max ₱">
                 <label style="margin-left:4px;">
                     <input type="checkbox" id="advOnly" style="vertical-align:middle;margin-right:4px;">Advantageous only
+                </label>
+                <label style="margin-left:4px;">
+                    <input type="checkbox" id="hasPriceOnly" style="vertical-align:middle;margin-right:4px;">With price only
                 </label>
                 <button type="button" class="filter-clear" id="filterClear">Clear</button>
             </div>
@@ -549,7 +571,7 @@
         })
         .then(r => r.json())
         .then(data => {
-            this.innerHTML = '<i class="ti ti-link"></i>Attach to Proposal';
+            this.innerHTML = '<i class="ti ti-link"></i>Attach to PPMP';
             this.disabled  = false;
 
             if (!data.success) {
@@ -560,7 +582,7 @@
 
             if (data.item_exists) {
                 showMsToast('References attached to "' + data.item_name + '".');
-                document.getElementById('saveHint').textContent = 'Redirecting to Budget Proposal…';
+                document.getElementById('saveHint').textContent = 'Redirecting to PPMP…';
                 document.getElementById('saveHint').className   = 'rp-save-hint hint-ok';
                 setTimeout(() => { window.location.href = '{{ route("office-head.budget-proposal") }}'; }, 1400);
             } else {
@@ -675,10 +697,11 @@
         renderNotices({});   /* clear notices from the previous search */
 
         try {
+            const department = document.getElementById('marketDeptSelect')?.value || undefined;
             const res  = await fetch(runUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body:    JSON.stringify({ item_id: 'manual', query, specs, budget }),
+                body:    JSON.stringify({ item_id: 'manual', query, specs, budget, department }),
             });
             const data = await res.json();
 
@@ -697,6 +720,7 @@
 
             lastResults = data.results;
             document.getElementById('filterBar').style.display = '';
+            populateStoreFilter();
             applyFilters();
 
         } catch (e) {
@@ -881,22 +905,38 @@
     /* ── Filters + sort (client-side on lastResults) ── */
     let lastResults = [];
 
+    function populateStoreFilter() {
+        const sel = document.getElementById('storeSel');
+        if (!sel) return;
+        const current = sel.value;
+        const stores = [...new Set(lastResults.map(r => r.source || 'Unknown'))].sort((a, b) => a.localeCompare(b));
+        sel.innerHTML = '<option value="">All stores</option>' +
+            stores.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+        if (stores.includes(current)) sel.value = current;
+    }
+
     function applyFilters() {
         const dynDiv = document.getElementById('dynamicResults');
-        const sortBy  = document.getElementById('sortSel').value;
-        const min     = parseFloat(document.getElementById('priceMin').value) || 0;
-        const max     = parseFloat(document.getElementById('priceMax').value) || Infinity;
-        const advOnly = document.getElementById('advOnly').checked;
+        const sortBy   = document.getElementById('sortSel').value;
+        const store    = document.getElementById('storeSel')?.value || '';
+        const min      = parseFloat(document.getElementById('priceMin').value) || 0;
+        const max      = parseFloat(document.getElementById('priceMax').value) || Infinity;
+        const advOnly  = document.getElementById('advOnly').checked;
+        const hasPrice = document.getElementById('hasPriceOnly')?.checked || false;
 
         let list = lastResults.filter(r => {
             const p = parseFloat(r.price) || 0;
             if (p < min || p > max) return false;
             if (advOnly && r.is_advantageous !== true) return false;
+            if (hasPrice && !(parseFloat(r.price) > 0)) return false;
+            if (store && (r.source || 'Unknown') !== store) return false;
             return true;
         });
 
-        if (sortBy === 'price_asc')  list = list.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
-        if (sortBy === 'price_desc') list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
+        if (sortBy === 'price_asc')   list = list.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
+        if (sortBy === 'price_desc')  list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
+        if (sortBy === 'score_desc')  list = list.slice().sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+        if (sortBy === 'store_az')    list = list.slice().sort((a, b) => (a.source || '').localeCompare(b.source || ''));
         /* 'match' keeps server order (already ranked by match score) */
 
         if (list.length === 0) {
@@ -907,15 +947,19 @@
         document.getElementById('refCount').textContent = list.length + ' of ' + lastResults.length + ' result' + (lastResults.length !== 1 ? 's' : '');
     }
 
-    ['sortSel', 'priceMin', 'priceMax', 'advOnly'].forEach(id => {
+    ['sortSel', 'storeSel', 'priceMin', 'priceMax', 'advOnly', 'hasPriceOnly'].forEach(id => {
         const el = document.getElementById(id);
         el && el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', applyFilters);
     });
     document.getElementById('filterClear')?.addEventListener('click', () => {
         document.getElementById('sortSel').value  = 'match';
+        const storeSel = document.getElementById('storeSel');
+        if (storeSel) storeSel.value = '';
         document.getElementById('priceMin').value = '';
         document.getElementById('priceMax').value = '';
         document.getElementById('advOnly').checked = false;
+        const hp = document.getElementById('hasPriceOnly');
+        if (hp) hp.checked = false;
         applyFilters();
     });
 
@@ -931,9 +975,9 @@
         if (!items.length) { closeSuggest(); return; }
         dropdown.innerHTML = items.map((s, i) =>
             '<div class="suggest-item" data-idx="' + i + '" data-text="' + esc(s.text) + '">' +
-            '<i class="ti ' + (s.type === 'item' ? 'ti-clipboard-list' : 'ti-history') + '"></i>' +
+            '<i class="ti ' + (s.fuzzy ? 'ti-sparkles' : (s.type === 'item' ? 'ti-clipboard-list' : 'ti-history')) + '"></i>' +
             esc(s.text) +
-            '<span class="sg-type">' + (s.type === 'item' ? 'My item' : 'Past search') + '</span>' +
+            '<span class="sg-type">' + (s.fuzzy ? 'Did you mean?' : (s.type === 'item' ? 'My item' : 'Past search')) + '</span>' +
             '</div>').join('');
         dropdown.classList.add('open');
         activeIdx = -1;
@@ -984,12 +1028,32 @@
         if (!e.target.closest('.search-wrap')) closeSuggest();
     });
 
-    /* ── Auto-search when arriving from Budget Proposal "Run scoping →" ── */
+    /* ── Auto-search when arriving from the PPMP "Run scoping →" link ── */
     (function () {
-        const q = new URLSearchParams(window.location.search).get('q');
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('q');
         if (q && queryInput) {
             queryInput.value = q;
             setTimeout(runSearch, 280);
+        }
+
+        /* Adaptive save row: arriving from the PPMP tab (?q= or ?from=ppmp)
+           keeps "Attach to PPMP" primary; standalone scoping leads with
+           "Save Market Study as File" instead. */
+        const fromPpmp = q !== null || params.get('from') === 'ppmp';
+        if (!fromPpmp) {
+            const saveRow  = document.querySelector('.rp-save-row');
+            const saveLink = saveRow?.querySelector('a[href*="mps"]');
+            const hint     = document.getElementById('saveHint');
+            if (saveRow && saveLink) {
+                saveRow.insertBefore(saveLink, saveRow.querySelector('#saveRefBtn'));
+                saveLink.style.background = 'var(--crimson)';
+                saveLink.style.color = '#fff';
+                saveLink.style.borderColor = 'var(--crimson)';
+                saveLink.onmouseover = null;
+                saveLink.onmouseout = null;
+            }
+            if (hint) hint.textContent = 'Save this scoping as a Market Study file, or attach 3 references directly to a PPMP item.';
         }
     })();
 

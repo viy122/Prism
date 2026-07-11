@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
+use App\Models\DocumentUpload;
 use App\Models\MarketPriceSurvey;
 use App\Models\MarketScopingReference;
 use App\Models\Office;
@@ -44,7 +45,7 @@ class PrismOfficeHeadController extends Controller
             ->take(5)
             ->get()
             ->map(fn ($r) => [
-                'title'   => $r->budgetProposal?->title ?? 'Budget Proposal',
+                'title'   => $r->budgetProposal?->title ?? 'PPMP',
                 'status'  => ucfirst(str_replace('_', ' ', $r->status_to ?? $r->action)),
                 'time'    => ($r->reviewed_at ?? $r->created_at)->format('M d, Y, g:i A'),
                 'details' => $r->remarks ?? '—',
@@ -58,17 +59,34 @@ class PrismOfficeHeadController extends Controller
         ]));
     }
 
-    public function budgetProposal(): View
+    public function budgetProposal(Request $request): View
     {
         $officeId = $this->officeId();
         $office   = Office::find($officeId);
 
-        $proposal = BudgetProposal::where('office_id', $officeId)
-            ->whereIn('status', ['draft', 'returned'])
-            ->latest()
-            ->first();
+        $fiscalYears = BudgetProposal::where('office_id', $officeId)
+            ->distinct()->orderByDesc('fiscal_year')
+            ->pluck('fiscal_year')->all();
 
-        $isReadOnly     = false;
+        // Fiscal-year selector: ?fy=YYYY shows that year's PPMP (read-only unless draft/returned)
+        $requestedFy = (int) $request->query('fy', 0);
+        $proposal    = null;
+
+        if ($requestedFy && in_array($requestedFy, $fiscalYears, true)) {
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->where('fiscal_year', $requestedFy)
+                ->latest()
+                ->first();
+        }
+
+        if (!$proposal) {
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->latest()
+                ->first();
+        }
+
+        $isReadOnly     = $proposal ? !in_array($proposal->status, ['draft', 'returned'], true) : false;
         $proposalStatus = $proposal?->status ?? 'draft';
         $canStartNew    = false;
         $nextFiscalYear = null;
@@ -81,12 +99,15 @@ class PrismOfficeHeadController extends Controller
             if ($proposal) {
                 $isReadOnly     = true;
                 $proposalStatus = $proposal->status;
-                $nextFiscalYear = $proposal->fiscal_year + 1;
-                $canStartNew    = !DB::table('budget_proposals')
-                    ->where('office_id', $officeId)
-                    ->where('fiscal_year', $nextFiscalYear)
-                    ->exists();
             }
+        }
+
+        if ($proposal && $isReadOnly) {
+            $nextFiscalYear = $proposal->fiscal_year + 1;
+            $canStartNew    = !DB::table('budget_proposals')
+                ->where('office_id', $officeId)
+                ->where('fiscal_year', $nextFiscalYear)
+                ->exists();
         }
 
         $proposalForm = [
@@ -97,7 +118,7 @@ class PrismOfficeHeadController extends Controller
         ];
 
         $encodedItems = $proposal
-            ? $proposal->items()->with('marketReferences')->get()
+            ? $proposal->items()->with(['marketReferences', 'sourceFiles'])->get()
                 ->map(fn ($item) => [
                     'id'                => (string) $item->id,
                     'description'       => $item->name,
@@ -107,6 +128,16 @@ class PrismOfficeHeadController extends Controller
                     'totalCost'         => (float) $item->estimated_total_cost,
                     'justification'     => $item->remarks ?? '',
                     'targetQuarter'     => $item->target_quarter ?? 'Q1',
+                    'category'          => $item->category ?? $item->ppmpCategoryLabel() ?? 'General',
+                    'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
+                    'attachments'       => $item->sourceFiles->map(fn ($doc) => [
+                        'id'        => $doc->id,
+                        'name'      => $doc->original_filename ?? $doc->title,
+                        'url'       => str_starts_with($doc->file_path, 'http')
+                            ? $doc->file_path
+                            : \Illuminate\Support\Facades\Storage::url($doc->file_path),
+                        'deleteUrl' => route('office-head.budget-proposal.attachment.delete', $doc->id),
+                    ])->values()->all(),
                     'scoping'           => $item->marketReferences
                         ->where('is_selected', true)
                         ->map(fn ($ref) => [
@@ -120,14 +151,28 @@ class PrismOfficeHeadController extends Controller
                 ])->all()
             : [];
 
+        // Readiness: an item is supported by market scoping refs OR an attached source file
+        $itemCount              = count($encodedItems);
+        $scopingReferenceCount  = collect($encodedItems)->sum(fn ($i) => count($i['scoping']));
+        $missingScopingCount    = collect($encodedItems)
+            ->filter(fn ($i) => empty($i['scoping']) && empty($i['attachments']))
+            ->count();
+        $proposalTotal          = collect($encodedItems)->sum('totalCost');
+
         return view('prism.office-head.budget-proposal', $this->withCommon('office-head', 'budget-proposal', [
-            'pageTitle'      => 'Annual Budget Proposal',
-            'proposalForm'   => $proposalForm,
-            'encodedItems'   => $encodedItems,
-            'isReadOnly'     => $isReadOnly,
-            'proposalStatus' => $proposalStatus,
-            'canStartNew'    => $canStartNew,
-            'nextFiscalYear' => $nextFiscalYear,
+            'pageTitle'             => 'PPMP — Project Procurement Management Plan',
+            'proposalForm'          => $proposalForm,
+            'encodedItems'          => $encodedItems,
+            'isReadOnly'            => $isReadOnly,
+            'proposalStatus'        => $proposalStatus,
+            'canStartNew'           => $canStartNew,
+            'nextFiscalYear'        => $nextFiscalYear,
+            'fiscalYears'           => $fiscalYears,
+            'selectedFiscalYear'    => $proposal?->fiscal_year,
+            'itemCount'             => $itemCount,
+            'scopingReferenceCount' => $scopingReferenceCount,
+            'missingScopingCount'   => $missingScopingCount,
+            'proposalTotal'         => $proposalTotal,
         ]));
     }
 
@@ -165,13 +210,13 @@ class PrismOfficeHeadController extends Controller
             'office_id'          => $officeId,
             'created_by_user_id' => auth()->id(),
             'code'               => $code,
-            'title'              => ($office?->name ?? 'Office') . ' Budget Proposal FY' . $nextYear,
+            'title'              => ($office?->name ?? 'Office') . ' PPMP FY' . $nextYear,
             'fiscal_year'        => $nextYear,
             'status'             => 'draft',
         ]);
 
         return redirect()->route('office-head.budget-proposal')
-            ->with('success', "FY {$nextYear} Budget Proposal started.");
+            ->with('success', "FY {$nextYear} PPMP started.");
     }
 
     public function marketScoping(): View
@@ -242,7 +287,7 @@ class PrismOfficeHeadController extends Controller
             ->all();
 
         return view('prism.office-head.my-proposals', $this->withCommon('office-head', 'my-proposals', [
-            'pageTitle'   => 'My Proposals',
+            'pageTitle'   => 'My PPMPs',
             'statuses'    => ['Draft', 'Submitted', 'Under Review', 'Endorsed', 'Returned', 'Approved'],
             'fiscalYears' => BudgetProposal::where('office_id', $this->officeId())
                                 ->distinct()->orderByDesc('fiscal_year')
@@ -323,7 +368,7 @@ class PrismOfficeHeadController extends Controller
                 'office_id'            => $officeId,
                 'created_by_user_id'   => auth()->id(),
                 'code'                 => $code,
-                'title'                => 'FY ' . $year . ' Annual Budget Proposal',
+                'title'                => 'FY ' . $year . ' PPMP',
                 'fiscal_year'          => $year,
                 'total_estimated_cost' => 0,
                 'status'               => 'draft',
@@ -360,7 +405,10 @@ class PrismOfficeHeadController extends Controller
                 'totalCost'         => (float) $item->estimated_total_cost,
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
+                'category'          => $item->category ?? 'General',
                 'scoping'           => [],
+                'attachments'       => [],
+                'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
             ],
         ]);
     }
@@ -427,6 +475,71 @@ class PrismOfficeHeadController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /** Attach a source file (e.g. a saved market study) to a PPMP item. */
+    public function storeItemAttachment(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $proposal = $item->budgetProposal;
+        if ($proposal->office_id !== $this->officeId()) {
+            abort(403);
+        }
+        if (!in_array($proposal->status, ['draft', 'returned'], true)) {
+            return response()->json(['error' => 'This PPMP is no longer editable.'], 422);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:pdf,jpeg,jpg,png,xlsx,xls,docx|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('ppmp-sources/' . now()->year, 'public');
+
+        $doc = DocumentUpload::create([
+            'uploaded_by_user_id' => auth()->id(),
+            'attachable_type'     => BudgetProposalItem::class,
+            'attachable_id'       => $item->id,
+            'document_type'       => 'market_study_source',
+            'title'               => 'Source file for ' . $item->name,
+            'original_filename'   => $file->getClientOriginalName(),
+            'file_path'           => $path,
+            'mime_type'           => $file->getClientMimeType(),
+            'file_size'           => $file->getSize(),
+            'status'              => 'uploaded',
+            'uploaded_at'         => now(),
+        ]);
+
+        return response()->json([
+            'success'    => true,
+            'attachment' => [
+                'id'        => $doc->id,
+                'name'      => $doc->original_filename,
+                'url'       => \Illuminate\Support\Facades\Storage::url($path),
+                'deleteUrl' => route('office-head.budget-proposal.attachment.delete', $doc->id),
+            ],
+        ]);
+    }
+
+    public function destroyItemAttachment(DocumentUpload $document): JsonResponse
+    {
+        if ($document->document_type !== 'market_study_source') {
+            return response()->json(['error' => 'Not a PPMP source attachment.'], 422);
+        }
+
+        $item = $document->attachable;
+        if (!$item instanceof BudgetProposalItem || $item->budgetProposal->office_id !== $this->officeId()) {
+            abort(403);
+        }
+        if (!in_array($item->budgetProposal->status, ['draft', 'returned'], true)) {
+            return response()->json(['error' => 'This PPMP is no longer editable.'], 422);
+        }
+
+        if (!str_starts_with($document->file_path, 'http')) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+        }
+        $document->delete();
+
+        return response()->json(['success' => true]);
+    }
+
     public function submitProposal(Request $request): JsonResponse
     {
         $proposal = BudgetProposal::where('office_id', $this->officeId())
@@ -438,6 +551,19 @@ class PrismOfficeHeadController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Please add at least one item before submitting.',
+            ], 422);
+        }
+
+        // Every item must be supported by market scoping refs or an attached source file
+        $unsupported = $proposal->items()
+            ->whereDoesntHave('marketReferences', fn ($q) => $q->where('is_selected', true))
+            ->whereDoesntHave('documents', fn ($q) => $q->where('document_type', 'market_study_source'))
+            ->count();
+
+        if ($unsupported > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "{$unsupported} item(s) still need market scoping references or an attached source file.",
             ], 422);
         }
 
@@ -470,11 +596,12 @@ class PrismOfficeHeadController extends Controller
     public function runMarketScoping(Request $request): JsonResponse
     {
         $request->validate([
-            'item_id' => 'required|string|max:100',
-            'query'   => 'required|string|max:300',
-            'specs'   => 'nullable|array|max:10',
-            'specs.*' => 'string|max:100',
-            'budget'  => 'nullable|numeric|min:0',
+            'item_id'    => 'required|string|max:100',
+            'query'      => 'required|string|max:300',
+            'specs'      => 'nullable|array|max:10',
+            'specs.*'    => 'string|max:100',
+            'budget'     => 'nullable|numeric|min:0',
+            'department' => 'nullable|string|in:appliances,medical,office,it,janitorial,hardware,furniture,sports',
         ]);
 
         $query = $this->sanitizeSearchQuery($request->input('query'));
@@ -487,7 +614,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         $service = new MarketScopingService();
-        $results = $service->search($query, 30);
+        $results = $service->search($query, 30, $request->input('department'));
 
         if (empty($results)) {
             return response()->json([
@@ -520,7 +647,8 @@ class PrismOfficeHeadController extends Controller
 
     public function marketScopingSuggestions(Request $request): JsonResponse
     {
-        $q = trim((string) $request->query('q', ''));
+        // Strip unwanted characters before matching so "bond@@ paper!!" still suggests
+        $q = $this->sanitizeSearchQuery((string) $request->query('q', ''));
         if (mb_strlen($q) < 2) {
             return response()->json(['suggestions' => []]);
         }
@@ -528,7 +656,7 @@ class PrismOfficeHeadController extends Controller
         $like     = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
         $officeId = $this->officeId();
 
-        // Item names already encoded by this office
+        // Fast pass: substring matches on the office's item names + past searches
         $itemNames = DB::table('budget_proposal_items')
             ->join('budget_proposals', 'budget_proposals.id', '=', 'budget_proposal_items.budget_proposal_id')
             ->where('budget_proposals.office_id', $officeId)
@@ -537,7 +665,6 @@ class PrismOfficeHeadController extends Controller
             ->limit(5)
             ->pluck('budget_proposal_items.name');
 
-        // Past search queries from cached market snapshots
         $pastQueries = DB::table('market_price_snapshots')
             ->where('query_used', 'like', $like)
             ->distinct()
@@ -548,9 +675,84 @@ class PrismOfficeHeadController extends Controller
             ->concat($pastQueries->map(fn ($s) => ['text' => $s, 'type' => 'search']))
             ->unique('text')
             ->take(8)
-            ->values();
+            ->values()
+            ->all();
+
+        // Fuzzy pass: when substring matching finds little, tolerate typos
+        // ("bond papre" → "bond paper", "epso printer" → "epson printer")
+        if (count($suggestions) < 8) {
+            $taken     = collect($suggestions)->pluck('text')->map(fn ($t) => mb_strtolower($t))->all();
+            $threshold = max(1, (int) floor(mb_strlen($q) * 0.34));
+
+            $fuzzy = $this->suggestionPool($officeId)
+                ->reject(fn ($c) => in_array(mb_strtolower($c['text']), $taken, true))
+                ->map(fn ($c) => $c + ['score' => $this->fuzzyScore($q, $c['text'])])
+                ->filter(fn ($c) => $c['score'] <= $threshold)
+                ->sortBy([['score', 'asc'], fn ($a, $b) => mb_strlen($a['text']) <=> mb_strlen($b['text'])])
+                ->take(8 - count($suggestions))
+                ->map(fn ($c) => ['text' => $c['text'], 'type' => $c['type'], 'fuzzy' => true])
+                ->values()
+                ->all();
+
+            $suggestions = array_merge($suggestions, $fuzzy);
+        }
 
         return response()->json(['suggestions' => $suggestions]);
+    }
+
+    /** Bounded candidate pool for fuzzy matching: office item names + past searches. */
+    private function suggestionPool(int $officeId): \Illuminate\Support\Collection
+    {
+        $items = DB::table('budget_proposal_items')
+            ->join('budget_proposals', 'budget_proposals.id', '=', 'budget_proposal_items.budget_proposal_id')
+            ->where('budget_proposals.office_id', $officeId)
+            ->distinct()
+            ->limit(300)
+            ->pluck('budget_proposal_items.name')
+            ->map(fn ($n) => ['text' => $n, 'type' => 'item']);
+
+        $searches = DB::table('market_price_snapshots')
+            ->distinct()
+            ->limit(300)
+            ->pluck('query_used')
+            ->map(fn ($s) => ['text' => $s, 'type' => 'search']);
+
+        return $items->concat($searches)->unique(fn ($c) => mb_strtolower($c['text']));
+    }
+
+    /**
+     * Token-level typo distance: each query token is scored against the
+     * closest candidate token (including its prefixes, so a partial word
+     * like "epso" matches "epson" with distance 0). Lower is closer.
+     */
+    private function fuzzyScore(string $query, string $candidate): int
+    {
+        $qTokens = preg_split('/\s+/', mb_strtolower(trim($query)), -1, PREG_SPLIT_NO_EMPTY);
+        $cTokens = preg_split('/\s+/', mb_strtolower(trim($candidate)), -1, PREG_SPLIT_NO_EMPTY);
+
+        if (!$qTokens || !$cTokens) {
+            return PHP_INT_MAX;
+        }
+
+        $total = 0;
+        foreach ($qTokens as $qt) {
+            $best = mb_strlen($qt);
+            foreach ($cTokens as $ct) {
+                if (str_starts_with($ct, $qt)) {
+                    $best = 0;
+                    break;
+                }
+                $dist = levenshtein($qt, $ct);
+                // Also compare against a same-length prefix so long candidate
+                // words don't get punished ("papre" vs "paper" in "paper A4")
+                $prefix = mb_substr($ct, 0, min(mb_strlen($qt) + 1, mb_strlen($ct)));
+                $dist   = min($dist, levenshtein($qt, $prefix));
+                $best   = min($best, $dist);
+            }
+            $total += $best;
+        }
+
+        return $total;
     }
 
     private function sanitizeSearchQuery(string $raw): string
@@ -562,25 +764,19 @@ class PrismOfficeHeadController extends Controller
 
     private function didYouMean(string $query): ?string
     {
-        $known = DB::table('budget_proposal_items')
-            ->join('budget_proposals', 'budget_proposals.id', '=', 'budget_proposal_items.budget_proposal_id')
-            ->where('budget_proposals.office_id', $this->officeId())
-            ->distinct()
-            ->limit(200)
-            ->pluck('budget_proposal_items.name')
-            ->concat(DB::table('market_price_snapshots')->distinct()->limit(200)->pluck('query_used'));
-
-        $qLower = mb_strtolower($query);
+        $qLower   = mb_strtolower($query);
         $best     = null;
         $bestDist = PHP_INT_MAX;
 
-        foreach ($known as $candidate) {
-            $cLower = mb_strtolower($candidate);
-            if ($cLower === $qLower) continue;
-            $dist = levenshtein($qLower, mb_substr($cLower, 0, 255));
+        foreach ($this->suggestionPool($this->officeId()) as $candidate) {
+            if (mb_strtolower($candidate['text']) === $qLower) {
+                continue;
+            }
+            // Token-level scoring so long item names aren't punished
+            $dist = $this->fuzzyScore($query, $candidate['text']);
             if ($dist < $bestDist) {
                 $bestDist = $dist;
-                $best     = $candidate;
+                $best     = $candidate['text'];
             }
         }
 
@@ -659,7 +855,7 @@ class PrismOfficeHeadController extends Controller
                 'office_id'            => $officeId,
                 'created_by_user_id'   => $request->user()?->id,
                 'code'                 => $code,
-                'title'                => 'FY ' . $year . ' Annual Budget Proposal',
+                'title'                => 'FY ' . $year . ' PPMP',
                 'fiscal_year'          => $year,
                 'total_estimated_cost' => 0,
                 'status'               => 'draft',
@@ -871,20 +1067,13 @@ class PrismOfficeHeadController extends Controller
             'activeOfficePage' => $activeOfficePage,
             'activeModulePage' => $activeOfficePage,
             'brandHref'        => route('office-head.dashboard'),
-            'roleNavigation'   => [
-                ['slug' => 'office-head',       'label' => 'Office Head / Dean',   'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office',    'label' => 'Finance Office',        'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office','label' => 'Procurement Office',    'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor',        'label' => 'Chancellor',            'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor',   'label' => 'Vice Chancellor',       'href' => route('vice-chancellor.dashboard')],
-                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
-            ],
+            'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Office Head / Dean pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',         'label' => 'Dashboard',         'href' => route('office-head.dashboard'),         'icon' => 'layout-dashboard'],
                 ['slug' => 'market-scoping',    'label' => 'Market Scoping',    'href' => route('office-head.market-scoping'),    'icon' => 'search'],
-                ['slug' => 'budget-proposal',   'label' => 'Budget Proposal',   'href' => route('office-head.budget-proposal'),   'icon' => 'file-plus'],
-                ['slug' => 'my-proposals',      'label' => 'My Proposals',      'href' => route('office-head.my-proposals'),      'icon' => 'folder'],
+                ['slug' => 'budget-proposal',   'label' => 'PPMP',              'href' => route('office-head.budget-proposal'),   'icon' => 'file-plus'],
+                ['slug' => 'my-proposals',      'label' => 'My PPMPs',          'href' => route('office-head.my-proposals'),      'icon' => 'folder'],
                 ['slug' => 'purchase-requests', 'label' => 'Purchase Requests', 'href' => route('office-head.purchase-requests'), 'icon' => 'receipt'],
             ],
         ], $data);

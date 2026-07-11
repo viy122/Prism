@@ -14,13 +14,20 @@ class PoSignatureLog extends Model
         'action',
         'remarks',
         'signed_at',
+        'photo_path',
+        'blurred_photo_path',
+        'signature_boxes_json',
+        'detection_status',
+        'photo_uploaded_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'signatory_number' => 'integer',
-            'signed_at'        => 'datetime',
+            'signatory_number'     => 'integer',
+            'signed_at'            => 'datetime',
+            'signature_boxes_json' => 'array',
+            'photo_uploaded_at'    => 'datetime',
         ];
     }
 

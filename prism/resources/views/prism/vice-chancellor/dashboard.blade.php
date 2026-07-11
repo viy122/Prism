@@ -86,6 +86,17 @@
         </div>
     </div>
 
+    @if(($awaitingSignature ?? 0) > 0)
+    <div class="card" style="display:flex;align-items:center;gap:14px;border-color:#fac775;background:#fdf7ec;">
+        <i class="ti ti-signature" style="font-size:24px;color:#854f0b;"></i>
+        <div style="flex:1;">
+            <p style="font-size:13px;font-weight:800;color:#854f0b;">{{ $awaitingSignature }} document{{ $awaitingSignature > 1 ? 's' : '' }} awaiting your signature</p>
+            <p style="font-size:12px;color:#a16207;">Take a photo of the signed document to record your signature.</p>
+        </div>
+        <a href="{{ route('vice-chancellor.for-my-signature') }}" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;background:#854f0b;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">Open Queue <i class="ti ti-arrow-right"></i></a>
+    </div>
+    @endif
+
     <div class="card">
         <div class="card-head">
             <div>

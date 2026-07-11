@@ -1,6 +1,6 @@
 # PRISM
 
-PRISM (Procurement, Requisition, Inventory, and Scoping Management) is a budget and procurement workflow system for BSU offices, roles, and approval chains.
+PRISM (Procurement Records, Intelligence, Scoping, and Monitoring System for Campus Budget Deliberation and Procurement Compliance) is a platform designed to improve the efficiency, transparency, and compliance of campus procurement and budgeting processes.
 
 ## Repository layout
 

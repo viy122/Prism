@@ -255,9 +255,10 @@
                     <div class="tl-line"></div>
                 </div>
                 <div class="tl-content">
-                    <p class="tl-date">${t.date || ''}</p>
-                    <p class="tl-action">${t.action || ''}</p>
+                    <p class="tl-date">${t.timestamp || t.date || ''}</p>
+                    <p class="tl-action">${t.step || t.action || ''}</p>
                     ${t.note ? `<p class="tl-note">${t.note}</p>` : ''}
+                    ${t.photoUrl ? `<a href="${t.photoUrl}" target="_blank" rel="noopener"><img src="${t.photoUrl}" alt="Signed document (signature blurred)" style="margin-top:6px;max-width:110px;border-radius:8px;border:1px solid var(--s200);"></a><p style="font-size:10px;color:var(--s400);">signature blurred for privacy</p>` : ''}
                 </div>
             </div>
         `).join('');

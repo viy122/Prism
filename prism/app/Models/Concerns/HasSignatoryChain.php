@@ -71,6 +71,16 @@ trait HasSignatoryChain
         return ($meta['type'] ?? 'signature') === 'routing' ? 'forwarded' : 'signed';
     }
 
+    /**
+     * Role code (roles.code) whose queue owns a stage, or null when the stage
+     * is driven centrally by the Procurement Office. Stages opt in via a
+     * 'role' key in SIGNATORY_STAGES; models may override for dynamic stages.
+     */
+    public function stageOwnerRole(?string $stageKey): ?string
+    {
+        return $this->stageMetaFor($stageKey)['role'] ?? null;
+    }
+
     public function getSignatoryLabelAttribute(): string
     {
         $meta = $this->stageMetaFor($this->signatory_stage);

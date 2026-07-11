@@ -257,6 +257,34 @@
             white-space: nowrap; transition: background .15s;
         }
         .btn-start-new-cycle:hover { background: #0f766e; }
+
+        /* ── PPMP document preview ── */
+        .ppmp-preview-wrap { padding: 6px 22px 18px; }
+        .ppmp-doc { border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; background: #fff; }
+        .ppmp-doc-head { text-align: center; padding: 18px 16px 12px; border-bottom: 1px solid var(--border2); }
+        .ppmp-doc-title { font-size: 14px; font-weight: 800; letter-spacing: .04em; color: var(--txt); }
+        .ppmp-doc-sub { font-size: 12px; font-weight: 600; color: var(--txt2); margin-top: 2px; }
+        .ppmp-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); text-align: left; white-space: nowrap; }
+        .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: var(--txt2); }
+        .ppmp-src-pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+        .ppmp-src-refs { background: #e0ecff; color: #1d4ed8; }
+        .ppmp-src-file { background: #dcfce7; color: #166534; }
+        .ppmp-src-none { background: #fee2e2; color: #b91c1c; }
+
+        /* ── Attach source file modal ── */
+        .attach-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .attach-modal-backdrop.open { display: flex; }
+        .attach-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+        .attach-dropzone { display: flex; flex-direction: column; align-items: center; gap: 8px; border: 2px dashed var(--border2); border-radius: 12px; background: #f8fafc; padding: 22px 16px; cursor: pointer; text-align: center; font-size: 12px; color: var(--txt3); }
+        .attach-dropzone i { font-size: 26px; }
+
+        /* Print: show only the PPMP document */
+        @media print {
+            body * { visibility: hidden !important; }
+            #ppmpPreviewDoc, #ppmpPreviewDoc * { visibility: visible !important; }
+            #ppmpPreviewDoc { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+        }
 </style>
 @endpush
 
@@ -282,7 +310,7 @@
             <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
                 @csrf
                 <button type="submit" class="btn-start-new-cycle">
-                    <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} Proposal
+                    <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} PPMP
                 </button>
             </form>
         </div>
@@ -327,8 +355,17 @@
                                 <input class="field-input readonly" readonly value="{{ $proposalForm['officeName'] }}">
                             </div>
                             <div class="field-group">
-                                <label class="field-label">Fiscal Year</label>
+                                <label class="field-label" for="fiscalYearSelect">Fiscal Year</label>
+                                @if(count($fiscalYears ?? []) > 1)
+                                <select id="fiscalYearSelect" class="field-select"
+                                    onchange="window.location.href='{{ route('office-head.budget-proposal') }}?fy=' + this.value;">
+                                    @foreach($fiscalYears as $fy)
+                                    <option value="{{ $fy }}" {{ (int) $fy === (int) ($selectedFiscalYear ?? $proposalForm['fiscalYear']) ? 'selected' : '' }}>FY {{ $fy }}</option>
+                                    @endforeach
+                                </select>
+                                @else
                                 <input class="field-input readonly" readonly value="FY {{ $proposalForm['fiscalYear'] }}">
+                                @endif
                             </div>
                             <div class="field-group">
                                 <label class="field-label" for="datePrepared">Date Prepared</label>
@@ -458,21 +495,65 @@
 
         </div>{{-- /top-grid --}}
 
-        {{-- ═══ FULL-WIDTH: Proposal Line Items ═══ --}}
-        <div class="card">
+        {{-- ═══ FULL-WIDTH: PPMP document (preview + editable table) ═══ --}}
+        <div class="card" id="ppmpCard">
             <div class="card-head">
                 <div class="card-head-icon"><i class="ti ti-list-details"></i></div>
                 <div class="card-head-text">
-                    <p class="card-eyebrow">Encoded items</p>
-                    <p class="card-title">Proposal Line Items</p>
+                    <p class="card-eyebrow">PPMP Document</p>
+                    <p class="card-title">Project Procurement Management Plan</p>
                     <p class="card-sub"><span id="proposalItemCount">{{ $itemCount }}</span> procurement items encoded.</p>
                 </div>
-                <button type="button" class="btn-ghost" style="margin-left:auto;">
-                    <i class="ti ti-download"></i>Export Draft
-                </button>
+                <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+                    @if(!$isReadOnly)
+                    <button type="button" class="btn-ghost" id="togglePpmpViewBtn">
+                        <i class="ti ti-pencil"></i><span id="togglePpmpViewLabel">Edit Items</span>
+                    </button>
+                    <a class="btn-ghost" href="{{ route('office-head.market-scoping') }}?from=ppmp" style="text-decoration:none;">
+                        <i class="ti ti-bolt"></i>Create via Market Scoping
+                    </a>
+                    @endif
+                    <button type="button" class="btn-ghost" id="exportDraftBtn">
+                        <i class="ti ti-printer"></i>Print / Export
+                    </button>
+                </div>
             </div>
 
-            <div class="table-outer">
+            {{-- PPMP-format document preview (default state) --}}
+            <div id="ppmpPreviewWrap" class="ppmp-preview-wrap">
+                <div class="ppmp-doc" id="ppmpPreviewDoc">
+                    <div class="ppmp-doc-head">
+                        <p class="ppmp-doc-title">PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</p>
+                        <p class="ppmp-doc-sub">FY {{ $proposalForm['fiscalYear'] }} — {{ $proposalForm['officeName'] }}</p>
+                        <p class="ppmp-doc-sub" style="color:var(--txt3);">Date Prepared: {{ \Carbon\Carbon::parse($proposalForm['date'])->format('F d, Y') }} · Status: {{ ucfirst($proposalStatus) }}</p>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="ppmp-preview-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:34px;">#</th>
+                                    <th>General Description</th>
+                                    <th>Category</th>
+                                    <th>Qty</th>
+                                    <th>Unit</th>
+                                    <th>Unit Cost</th>
+                                    <th>Estimated Budget</th>
+                                    <th>Schedule</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ppmpPreviewBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="total-row" style="border-top:1px solid var(--border2);">
+                        <span class="total-label">Total Estimated Budget</span>
+                        <span class="total-amount" id="ppmpPreviewTotal">PHP {{ number_format($proposalTotal) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Editable line-items table (shown via "Edit Items") --}}
+            <div class="table-outer" id="ppmpEditWrap" style="display:none;">
                 <div class="table-scroll">
                     <table>
                         <thead>
@@ -482,22 +563,40 @@
                                 <th>Unit Cost</th>
                                 <th>Total</th>
                                 <th>Quarter</th>
-                                <th>Market Scoping</th>
+                                <th>Market Scoping / Source</th>
                                 @if(!$isReadOnly)<th>Actions</th>@endif
                             </tr>
                         </thead>
                         <tbody id="encodedItemsTable"></tbody>
                     </table>
                 </div>
-            </div>
 
-            <div class="total-row">
-                <span class="total-label">Total Proposed Budget</span>
-                <span class="total-amount" id="proposalSummaryTotal">PHP {{ number_format($proposalTotal) }}</span>
+                <div class="total-row">
+                    <span class="total-label">Total Proposed Budget</span>
+                    <span class="total-amount" id="proposalSummaryTotal">PHP {{ number_format($proposalTotal) }}</span>
+                </div>
             </div>
         </div>
 
     </div>{{-- /page-shell --}}
+
+    {{-- ── Attach source file modal ── --}}
+    <div id="attachFileModal" class="attach-modal-backdrop">
+        <div class="attach-modal">
+            <h3 id="attachModalTitle" style="font-size:15px;font-weight:800;color:var(--txt);">Attach Source File</h3>
+            <p style="font-size:12px;color:var(--txt3);line-height:1.5;">Attach a saved market study or other price-reference file as this item's source (PDF, image, Excel, or Word — max 10 MB).</p>
+            <label class="attach-dropzone" id="attachDropzone">
+                <input type="file" id="attachFileInput" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.docx" hidden>
+                <i class="ti ti-paperclip"></i>
+                <span id="attachFileLabel">Tap to choose a file</span>
+            </label>
+            <div id="attachStatus" style="display:none;border-radius:9px;padding:9px 13px;font-size:12px;font-weight:600;"></div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button type="button" class="btn-ghost" id="attachCancelBtn">Cancel</button>
+                <button type="button" class="btn-primary" id="attachSubmitBtn" disabled><i class="ti ti-upload"></i>Attach File</button>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -541,19 +640,36 @@
                 return `<li><span class="ref-tree-icon">${tree}</span><a class="ref-tree-link"${href}>${label}</a></li>`;
             }).join('');
 
-            const scopingCell = refs.length
-                ? `<div class="scoping-block">
-                    <button class="scoping-toggle" onclick="window.prismBP.toggleRefs(this)" type="button">
+            const files = item.attachments || [];
+            const filesHtml = files.map(f =>
+                `<li><span class="ref-tree-icon">└──</span><a class="ref-tree-link" href="${esc(f.url)}" target="_blank" rel="noopener"><i class="ti ti-paperclip" style="font-size:11px"></i> ${esc(f.name)}</a>` +
+                (isReadOnly ? '' : ` <a style="color:#b91c1c;cursor:pointer;font-weight:700;" title="Remove file" onclick="prismBP.deleteAttachment('${esc(f.deleteUrl)}')">&times;</a>`) +
+                `</li>`).join('');
+
+            const attachBtn = isReadOnly ? '' :
+                `<span class="scoping-empty-hint"><a style="color:#166534;cursor:pointer;text-decoration:none;font-weight:700" onclick="prismBP.openAttach('${esc(item.id)}')"><i class="ti ti-paperclip" style="font-size:11px"></i> Attach source file</a></span>`;
+
+            let scopingCell;
+            if (refs.length || files.length) {
+                const refsBlock = refs.length
+                    ? `<button class="scoping-toggle" onclick="window.prismBP.toggleRefs(this)" type="button">
                         <i class="ti ti-list" style="font-size:14px"></i>
                         Market References (${refs.length})
                         <i class="ti ti-chevron-down scoping-chevron"></i>
                     </button>
-                    <ul class="scoping-refs-list" style="display:none">${refsHtml}</ul>
-                   </div>`
-                : `<div class="scoping-empty">
-                    <span class="scoping-empty-label">No references yet</span>
+                    <ul class="scoping-refs-list" style="display:none">${refsHtml}</ul>`
+                    : '';
+                const filesBlock = files.length
+                    ? `<ul class="scoping-refs-list" style="margin-top:4px;">${filesHtml}</ul>`
+                    : '';
+                scopingCell = `<div class="scoping-block">${refsBlock}${filesBlock}${attachBtn}</div>`;
+            } else {
+                scopingCell = `<div class="scoping-empty">
+                    <span class="scoping-empty-label">No references or source file yet</span>
                     <span class="scoping-empty-hint"><a href="${esc(scopingUrl)}?q=${encodeURIComponent(item.description)}" style="color:var(--crimson);text-decoration:none;font-weight:700">Run scoping →</a></span>
+                    ${attachBtn}
                    </div>`;
+            }
 
             if (editingId === item.id && !isReadOnly) {
                 return `<tr data-item-row="${esc(item.id)}" style="background:#FFF8F8;">
@@ -604,10 +720,15 @@
         }).join('');
     }
 
+    // An item is "supported" by market refs or an attached source file
+    function itemUnsupported(i) {
+        return (!i.scoping || !i.scoping.length) && (!i.attachments || !i.attachments.length);
+    }
+
     // ── Update summary panel ──────────────────────────────────────────────────
     function updateSummary() {
         const total   = items.reduce((s, i) => s + (i.totalCost || 0), 0);
-        const missing = items.filter(i => !i.scoping || !i.scoping.length).length;
+        const missing = items.filter(itemUnsupported).length;
 
         document.getElementById('proposalItemCount').textContent        = items.length;
         document.getElementById('proposalSummaryItems').textContent     = items.length;
@@ -636,8 +757,8 @@
                 if (msgEl) { msgEl.textContent = 'Add at least one item to submit.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
             } else if (missing > 0) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="ti ti-alert-triangle"></i>' + missing + ' item' + (missing > 1 ? 's' : '') + ' need' + (missing > 1 ? '' : 's') + ' market scoping';
-                if (msgEl) { msgEl.textContent = 'Run market scoping on all items before submitting the PPMP.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
+                submitBtn.innerHTML = '<i class="ti ti-alert-triangle"></i>' + missing + ' item' + (missing > 1 ? 's' : '') + ' need' + (missing > 1 ? '' : 's') + ' a source';
+                if (msgEl) { msgEl.textContent = 'Run market scoping or attach a source file on all items before submitting the PPMP.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
             } else {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP to Finance Office';
@@ -722,12 +843,13 @@
                 return;
             }
 
-            const missingScoping = items.filter(i => !i.scoping || !i.scoping.length).length;
+            const missingScoping = items.filter(itemUnsupported).length;
             if (missingScoping > 0) {
                 showMsg(
-                    `${missingScoping} item${missingScoping > 1 ? 's have' : ' has'} no market references attached. Consider adding price references before submitting.`,
-                    'warn'
+                    `${missingScoping} item${missingScoping > 1 ? 's have' : ' has'} no market references or source file attached. Add price references or a source file before submitting.`,
+                    'err'
                 );
+                return;
             }
 
             const btn = this;
@@ -807,8 +929,153 @@
         }
     }
 
+    // ── PPMP document preview ─────────────────────────────────────────────────
+    function renderPreview() {
+        const tbody = document.getElementById('ppmpPreviewBody');
+        if (!tbody) return;
+
+        if (!items.length) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--txt3);font-weight:600;">
+                No items encoded yet. Click "Edit Items" or "Create via Market Scoping" to start.</td></tr>`;
+        } else {
+            tbody.innerHTML = items.map((item, i) => {
+                let srcPill;
+                if (item.scoping && item.scoping.length) {
+                    srcPill = `<span class="ppmp-src-pill ppmp-src-refs"><i class="ti ti-list"></i>${item.scoping.length} market refs</span>`;
+                } else if (item.attachments && item.attachments.length) {
+                    srcPill = `<span class="ppmp-src-pill ppmp-src-file"><i class="ti ti-paperclip"></i>file attached</span>`;
+                } else {
+                    srcPill = `<span class="ppmp-src-pill ppmp-src-none"><i class="ti ti-alert-triangle"></i>missing</span>`;
+                }
+                return `<tr>
+                    <td>${i + 1}</td>
+                    <td><strong>${esc(item.description)}</strong>${item.justification ? `<br><span style="font-size:11px;color:var(--txt3);">${esc(item.justification)}</span>` : ''}</td>
+                    <td>${esc(item.category || 'General')}</td>
+                    <td>${esc(item.quantity)}</td>
+                    <td>${esc(item.unit)}</td>
+                    <td>PHP ${fmt(item.estimatedUnitCost)}</td>
+                    <td><strong>PHP ${fmt(item.totalCost)}</strong></td>
+                    <td>${esc(item.targetQuarter)}</td>
+                    <td>${srcPill}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        const total = items.reduce((s, i) => s + (i.totalCost || 0), 0);
+        const totalEl = document.getElementById('ppmpPreviewTotal');
+        if (totalEl) totalEl.textContent = 'PHP ' + fmt(total);
+    }
+
+    // ── Preview ⇄ edit toggle + print/export ─────────────────────────────────
+    let editMode = false;
+    function setViewMode(edit) {
+        editMode = edit;
+        document.getElementById('ppmpPreviewWrap').style.display = edit ? 'none' : '';
+        document.getElementById('ppmpEditWrap').style.display    = edit ? '' : 'none';
+        const label = document.getElementById('togglePpmpViewLabel');
+        const btn   = document.getElementById('togglePpmpViewBtn');
+        if (label && btn) {
+            label.textContent = edit ? 'View PPMP Preview' : 'Edit Items';
+            btn.querySelector('i').className = edit ? 'ti ti-eye' : 'ti ti-pencil';
+        }
+        if (!edit) renderPreview();
+    }
+
+    document.getElementById('togglePpmpViewBtn')?.addEventListener('click', () => setViewMode(!editMode));
+    document.getElementById('exportDraftBtn')?.addEventListener('click', () => {
+        renderPreview();
+        window.print();
+    });
+
+    // ── Attach source file modal ─────────────────────────────────────────────
+    const attachBackdrop = document.getElementById('attachFileModal');
+    const attachInput    = document.getElementById('attachFileInput');
+    const attachSubmit   = document.getElementById('attachSubmitBtn');
+    const attachStatus   = document.getElementById('attachStatus');
+    let attachItemId     = null;
+
+    function openAttach(itemId) {
+        attachItemId = itemId;
+        attachInput.value = '';
+        document.getElementById('attachFileLabel').textContent = 'Tap to choose a file';
+        attachStatus.style.display = 'none';
+        attachSubmit.disabled = true;
+        attachSubmit.innerHTML = '<i class="ti ti-upload"></i>Attach File';
+        attachBackdrop.classList.add('open');
+    }
+
+    function closeAttach() { attachBackdrop.classList.remove('open'); attachItemId = null; }
+
+    document.getElementById('attachDropzone')?.addEventListener('click', () => attachInput.click());
+    attachInput?.addEventListener('change', () => {
+        if (attachInput.files[0]) {
+            document.getElementById('attachFileLabel').textContent = attachInput.files[0].name;
+            attachSubmit.disabled = false;
+        }
+    });
+    document.getElementById('attachCancelBtn')?.addEventListener('click', closeAttach);
+    attachBackdrop?.addEventListener('click', e => { if (e.target === attachBackdrop) closeAttach(); });
+
+    attachSubmit?.addEventListener('click', async () => {
+        const item = items.find(i => i.id === attachItemId);
+        if (!item || !attachInput.files[0]) return;
+
+        attachSubmit.disabled = true;
+        attachSubmit.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite"></i> Uploading…';
+
+        const fd = new FormData();
+        fd.append('file', attachInput.files[0]);
+
+        try {
+            const res  = await fetch(item.attachUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: fd,
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                item.attachments = item.attachments || [];
+                item.attachments.push(data.attachment);
+                renderTable();
+                renderPreview();
+                updateSummary();
+                closeAttach();
+            } else {
+                attachStatus.style.display = 'block';
+                attachStatus.style.background = '#fee2e2';
+                attachStatus.style.color = '#b91c1c';
+                attachStatus.textContent = data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Upload failed.');
+                attachSubmit.disabled = false;
+                attachSubmit.innerHTML = '<i class="ti ti-upload"></i>Attach File';
+            }
+        } catch {
+            attachStatus.style.display = 'block';
+            attachStatus.style.background = '#fee2e2';
+            attachStatus.style.color = '#b91c1c';
+            attachStatus.textContent = 'Network error — please try again.';
+            attachSubmit.disabled = false;
+            attachSubmit.innerHTML = '<i class="ti ti-upload"></i>Attach File';
+        }
+    });
+
+    async function deleteAttachment(url) {
+        if (!confirm('Remove this source file?')) return;
+        try {
+            const res  = await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                items.forEach(i => { i.attachments = (i.attachments || []).filter(f => f.deleteUrl !== url); });
+                renderTable();
+                renderPreview();
+                updateSummary();
+            } else {
+                alert(data.error || 'Could not remove the file.');
+            }
+        } catch { alert('Network error. Please try again.'); }
+    }
+
     // expose functions globally for inline onclick
-    window.prismBP = { deleteItem, editItem, cancelEdit, saveEdit };
+    window.prismBP = { deleteItem, editItem, cancelEdit, saveEdit, openAttach, deleteAttachment };
 
     prismBP.toggleRefs = function (btn) {
         const list = btn.nextElementSibling;
@@ -820,6 +1087,7 @@
 
     // ── Init ──────────────────────────────────────────────────────────────────
     renderTable();
+    renderPreview();
     updateSummary();
 })();
 </script>

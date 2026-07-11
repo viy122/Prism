@@ -98,6 +98,11 @@ class PurchaseRequest extends Model
         return $this->morphMany(DocumentUpload::class, 'attachable');
     }
 
+    public function canvassDocuments(): MorphMany
+    {
+        return $this->documents()->where('document_type', 'canvass_quotation');
+    }
+
     public function signatureLogs(): HasMany
     {
         return $this->hasMany(PrSignatureLog::class);
@@ -117,10 +122,10 @@ class PurchaseRequest extends Model
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',              'label' => 'Created',                      'type' => 'routing'],
         ['key' => 'at_end_user',        'label' => 'End User',                     'type' => 'signature'],
-        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature'],
+        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature', 'role' => 'vice-chancellor'],
         ['key' => 'at_third_sign',      'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
         ['key' => 'at_fourth_sign',     'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
-        ['key' => 'at_chancellor',      'label' => 'Chancellor',                   'type' => 'signature'],
+        ['key' => 'at_chancellor',      'label' => 'Chancellor',                   'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'fully_signed',       'label' => 'Fully Signed',                 'type' => 'signature'],
     ];
 
@@ -133,6 +138,25 @@ class PurchaseRequest extends Model
         $fourth        = $this->third_signer === 'accounting' ? 'Vice Chancellor' : 'Accounting';
         $meta['label'] = $meta['key'] === 'at_third_sign' ? $third : $fourth;
         return $meta;
+    }
+
+    /**
+     * 3rd/4th slots are Accounting + Vice Chancellor in flexible order —
+     * `third_signer` (validated when the VC completes their own stage)
+     * determines whose queue owns each slot.
+     */
+    public function stageOwnerRole(?string $stageKey): ?string
+    {
+        if (in_array($stageKey, ['at_third_sign', 'at_fourth_sign'], true)) {
+            if (!$this->third_signer) {
+                return null; // undetermined — procurement resolves it
+            }
+            $thirdRole = $this->third_signer === 'accounting' ? 'accounting-office' : 'vice-chancellor';
+            $fourthRole = $this->third_signer === 'accounting' ? 'vice-chancellor' : 'accounting-office';
+            return $stageKey === 'at_third_sign' ? $thirdRole : $fourthRole;
+        }
+
+        return $this->stageMetaFor($stageKey)['role'] ?? null;
     }
 
     public function getCanvassingLabelAttribute(): string

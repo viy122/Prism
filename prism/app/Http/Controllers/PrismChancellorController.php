@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
@@ -14,6 +15,26 @@ use Illuminate\View\View;
 
 class PrismChancellorController extends Controller
 {
+    use HandlesSignatureQueue;
+
+    protected function queueRoleCode(): string
+    {
+        return 'chancellor';
+    }
+
+    protected function queueRoutePrefix(): string
+    {
+        return 'chancellor';
+    }
+
+    public function forMySignature(): View
+    {
+        return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
+            'pageTitle' => 'For My Signature',
+            'queueRows' => $this->signatureQueueRows(),
+        ]));
+    }
+
     public function dashboard(): View
     {
         $allItems = BudgetProposalItem::whereHas(
@@ -108,6 +129,7 @@ class PrismChancellorController extends Controller
 
         return view('prism.chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Chancellor Campus Monitoring Dashboard',
+            'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole('chancellor'),
             'summary'   => [
                 'totalAppItems'     => $totalAppItems,
                 'itemsProcured'     => $itemsProcured,
@@ -286,18 +308,12 @@ class PrismChancellorController extends Controller
             'brandHref'        => route('chancellor.dashboard'),
             'roleLabel'        => "Chancellor's Office",
             'roleInitials'     => 'CH',
-            'roleNavigation'   => [
-                ['slug' => 'office-head',        'label' => 'Office Head / Dean', 'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office',     'label' => 'Finance Office',      'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
-                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
-            ],
+            'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Chancellor pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',           'label' => 'Campus Monitoring',   'href' => route('chancellor.dashboard'),           'icon' => 'layout-dashboard'],
-                ['slug' => 'budget-approval',     'label' => 'Budget Approval',     'href' => route('chancellor.budget-approval'),     'icon' => 'shield-check'],
+                ['slug' => 'budget-approval',     'label' => 'PPMP Approval',       'href' => route('chancellor.budget-approval'),     'icon' => 'shield-check'],
+                ['slug' => 'for-my-signature',    'label' => 'For My Signature',    'href' => route('chancellor.for-my-signature'),    'icon' => 'signature'],
                 ['slug' => 'procurement-reports', 'label' => 'Procurement Reports', 'href' => route('chancellor.procurement-reports'), 'icon' => 'trending-up'],
             ],
         ], $data);

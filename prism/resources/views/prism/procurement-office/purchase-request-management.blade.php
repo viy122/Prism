@@ -366,6 +366,11 @@
                         <span class="badge" id="canvassingBadge" style="font-size:10px;"></span>
                     </div>
                     <p id="canvassingDesc" style="font-size:12px;color:var(--s500);line-height:1.5;"></p>
+                    <p style="font-size:11px;margin:4px 0 0;">
+                        <a href="{{ route('procurement-office.canvassing') }}" style="font-weight:700;color:var(--crimson);text-decoration:none;">
+                            <i class="ti ti-clipboard-list"></i> Upload supplier quotations in the Canvassing tab (min. 3 required) →
+                        </a>
+                    </p>
                     <div class="canvassing-btns" id="canvassingBtns"></div>
                     <div id="marketPanel" style="display:none; margin-top:14px;">
                         <div class="market-controls">
@@ -871,7 +876,14 @@
                 time: e.timestamp,
             }));
             (pr.signatureLogs || []).forEach(l => {
-                logs[pr.id].push({ text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : ''), time: l.at });
+                let text = `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : '');
+                if (l.photoUrl) {
+                    text += `<br><a href="${l.photoUrl}" target="_blank" rel="noopener"><img src="${l.photoUrl}" alt="Signed document (signature blurred)" style="margin-top:6px;max-width:120px;border-radius:8px;border:1px solid #e2e8f0;"></a> <span style="font-size:10px;color:#64748b;">signature blurred for privacy</span>`;
+                } else if (l.photoStatus === 'pending' || l.photoStatus === 'failed') {
+                    text += `<br><span style="font-size:11px;color:#854f0b;">photo withheld — processing</span>`
+                        + (l.reprocessUrl ? ` <button type="button" class="sig-reprocess-btn" data-url="${l.reprocessUrl}" style="font-size:10px;font-weight:700;border:1px solid #fac775;background:#fdf7ec;color:#854f0b;border-radius:6px;padding:2px 8px;cursor:pointer;">Reprocess</button>` : '');
+                }
+                logs[pr.id].push({ text, time: l.at });
             });
         }
 
@@ -893,6 +905,31 @@
         row.addEventListener('keydown', e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
         });
+    });
+
+    /* ── Reprocess a pending/failed signature photo ── */
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.sig-reprocess-btn');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.textContent = 'Reprocessing…';
+        try {
+            const resp = await fetch(btn.dataset.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                btn.textContent = json.detection === 'detected' ? 'Processed ✓ (reload to view)' : 'No signature found';
+            } else {
+                btn.textContent = json.error || 'Failed';
+                btn.disabled = false;
+            }
+        } catch {
+            btn.textContent = 'Network error';
+            btn.disabled = false;
+        }
     });
 
     /* ── Route Forward ── */

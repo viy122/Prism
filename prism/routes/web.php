@@ -3,11 +3,15 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PrismAccountingOfficeController;
+use App\Http\Controllers\PrismAdminController;
+use App\Http\Controllers\PrismBacController;
+use App\Http\Controllers\PrismCashierController;
 use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
 use App\Http\Controllers\PrismProcurementOfficeController;
 use App\Http\Controllers\PrismViceChancellorController;
+use App\Http\Controllers\SignaturePhotoController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'prism.landing')->name('prism.home');
@@ -26,6 +30,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
         Route::put('/budget-proposal/item/{item}', 'updateItem')->name('budget-proposal.update-item');
         Route::delete('/budget-proposal/item/{item}', 'destroyItem')->name('budget-proposal.destroy-item');
+        Route::post('/budget-proposal/item/{item}/attachment', 'storeItemAttachment')->name('budget-proposal.item-attachment');
+        Route::delete('/budget-proposal/attachment/{document}', 'destroyItemAttachment')->name('budget-proposal.attachment.delete');
         Route::post('/budget-proposal/submit', 'submitProposal')->name('budget-proposal.submit');
         Route::post('/budget-proposal/start-new-cycle', 'startNewCycle')->name('budget-proposal.start-new-cycle');
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
@@ -47,13 +53,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/proposal-review/item/{item}/remark', 'saveItemRemark')->name('proposal-review.item-remark');
         Route::post('/proposal-review/{proposal}/endorse', 'endorse')->name('proposal-review.endorse');
         Route::post('/proposal-review/{proposal}/return', 'returnProposal')->name('proposal-review.return');
-        Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
-        Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
         Route::get('/budget-utilization-report', 'budgetUtilizationReport')->name('budget-utilization-report');
     });
 
     Route::prefix('procurement-office')->name('procurement-office.')->middleware('role:Procurement Office')->controller(PrismProcurementOfficeController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
+        Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
+        Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
+        Route::get('/canvassing', 'canvassing')->name('canvassing');
+        Route::post('/purchase-request/{pr}/canvass-document', 'uploadCanvassDocument')->name('purchase-request.canvass-document');
+        Route::delete('/canvass-document/{document}', 'deleteCanvassDocument')->name('canvass-document.delete');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
@@ -74,6 +83,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-order/{po}/return-po', 'returnPo')->name('po.return');
         Route::get('/procurement-status-tracking', 'procurementStatusTracking')->name('procurement-status-tracking');
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
+        Route::post('/signature-photo/{docType}/{logId}/reprocess', 'reprocessSignaturePhoto')->name('signature-photo.reprocess')->whereIn('docType', ['pr', 'aoc', 'po']);
     });
 
     Route::prefix('chancellor')->name('chancellor.')->middleware('role:Chancellor')->controller(PrismChancellorController::class)->group(function () {
@@ -81,19 +91,55 @@ Route::middleware('auth')->group(function () {
         Route::get('/budget-approval', 'budgetApproval')->name('budget-approval');
         Route::post('/budget-approval/{proposal}/approve', 'approve')->name('budget-approval.approve');
         Route::post('/budget-approval/{proposal}/return', 'returnProposal')->name('budget-approval.return');
+        Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
+        Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
+        Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
     });
 
     Route::prefix('vice-chancellor')->name('vice-chancellor.')->middleware('role:Vice Chancellor')->controller(PrismViceChancellorController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
+        Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
+        Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
+        Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
         Route::get('/division-procurement-status', 'divisionProcurementStatus')->name('division-procurement-status');
         Route::get('/division-performance-report', 'divisionPerformanceReport')->name('division-performance-report');
     });
 
     Route::prefix('accounting-office')->name('accounting-office.')->middleware('role:Accounting Office')->controller(PrismAccountingOfficeController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
-        Route::post('/purchase-order/{po}/confirm-payment', 'confirmPayment')->name('po.confirm-payment');
+        Route::post('/purchase-order/{po}/process-payment', 'startPaymentProcessing')->name('po.process-payment');
+        Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
+        Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
+        Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
     });
+
+    Route::prefix('bac')->name('bac.')->middleware('role:BAC')->controller(PrismBacController::class)->group(function () {
+        Route::get('/', 'dashboard')->name('dashboard');
+        Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
+        Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
+        Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
+    });
+
+    Route::prefix('cashier')->name('cashier.')->middleware('role:Cashier')->controller(PrismCashierController::class)->group(function () {
+        Route::get('/', 'dashboard')->name('dashboard');
+        Route::post('/purchase-order/{po}/upload-receipt', 'uploadReceipt')->name('po.upload-receipt');
+    });
+
+    Route::prefix('admin')->name('admin.')->middleware('role:System Administrator')->controller(PrismAdminController::class)->group(function () {
+        Route::get('/', 'dashboard')->name('dashboard');
+        Route::get('/user-management', 'userManagement')->name('user-management');
+        Route::post('/users', 'storeUser')->name('users.store');
+        Route::put('/users/{user}', 'updateUser')->name('users.update');
+        Route::post('/users/{user}/deactivate', 'deactivateUser')->name('users.deactivate');
+        Route::post('/users/{user}/reactivate', 'reactivateUser')->name('users.reactivate');
+        Route::post('/users/{user}/reset-password', 'resetPassword')->name('users.reset-password');
+    });
+
+    // Unblurred signed-document photo — procurement / admin / uploader only
+    Route::get('/signature-photo/{docType}/{logId}/original', [SignaturePhotoController::class, 'original'])
+        ->name('signature-photo.original')
+        ->whereIn('docType', ['pr', 'aoc', 'po']);
 
     // ── Notifications (all authenticated users) ───────────────────────────────
     Route::controller(NotificationController::class)->prefix('notifications')->name('notifications.')->group(function () {

@@ -25,6 +25,7 @@ class PurchaseOrder extends Model
         'expected_delivery_date',
         'paid_by_user_id',
         'paid_at',
+        'payment_processing_at',
         'remarks',
     ];
 
@@ -35,6 +36,7 @@ class PurchaseOrder extends Model
             'issued_at'              => 'datetime',
             'expected_delivery_date' => 'date',
             'paid_at'                => 'datetime',
+            'payment_processing_at'  => 'datetime',
         ];
     }
 
@@ -53,6 +55,11 @@ class PurchaseOrder extends Model
         return $this->belongsTo(User::class, 'paid_by_user_id');
     }
 
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(DocumentUpload::class, 'attachable');
+    }
+
     public function signatureLogs(): HasMany
     {
         return $this->hasMany(PoSignatureLog::class);
@@ -67,10 +74,10 @@ class PurchaseOrder extends Model
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',         'label' => 'Created',                  'type' => 'routing'],
         ['key' => 'at_budget_ors', 'label' => 'Budget Office – ORS',      'type' => 'routing'],
-        ['key' => 'at_accounting', 'label' => 'Accounting',               'type' => 'signature'],
-        ['key' => 'at_vc_review',  'label' => 'Vice Chancellor – Review', 'type' => 'routing'],
+        ['key' => 'at_accounting', 'label' => 'Accounting',               'type' => 'signature', 'role' => 'accounting-office'],
+        ['key' => 'at_vc_review',  'label' => 'Vice Chancellor – Review', 'type' => 'routing',   'role' => 'vice-chancellor'],
         ['key' => 'at_audit',      'label' => 'Internal Audit – Review',  'type' => 'routing'],
-        ['key' => 'at_chancellor', 'label' => 'Chancellor',               'type' => 'signature'],
+        ['key' => 'at_chancellor', 'label' => 'Chancellor',               'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'at_supplier',   'label' => 'Supplier',                 'type' => 'signature'],
         ['key' => 'fully_signed',  'label' => 'Fully Signed',             'type' => 'signature'],
     ];
@@ -84,15 +91,15 @@ class PurchaseOrder extends Model
             'awaiting_delivery' => 'Awaiting Delivery (Supply Office)',
             'partial_delivery'  => 'Partial Delivery (Supply Office)',
             'complete_delivery' => 'Complete Delivery (Supply Office)',
-            'receipt_uploaded'  => 'At Accounting – For Payment',
-            'paid'              => 'Paid – Cashier Payment Made',
+            'processing_payment' => 'At Accounting – Processing Payment',
+            'paid'              => 'Paid – Payment Made (Cashier)',
             default             => ucfirst(str_replace('_', ' ', $this->status)),
         };
     }
 
     public static function statusChain(): array
     {
-        return ['issued', 'awaiting_delivery', 'partial_delivery', 'complete_delivery', 'receipt_uploaded', 'paid'];
+        return ['issued', 'awaiting_delivery', 'partial_delivery', 'complete_delivery', 'processing_payment', 'paid'];
     }
 
     public function nextStatus(): ?string

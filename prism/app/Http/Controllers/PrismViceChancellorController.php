@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
@@ -9,6 +10,26 @@ use Illuminate\View\View;
 
 class PrismViceChancellorController extends Controller
 {
+    use HandlesSignatureQueue;
+
+    protected function queueRoleCode(): string
+    {
+        return 'vice-chancellor';
+    }
+
+    protected function queueRoutePrefix(): string
+    {
+        return 'vice-chancellor';
+    }
+
+    public function forMySignature(): View
+    {
+        return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
+            'pageTitle' => 'For My Signature',
+            'queueRows' => $this->signatureQueueRows(),
+        ]));
+    }
+
     public function dashboard(): View
     {
         $currentQ = $this->currentQuarter();
@@ -57,7 +78,8 @@ class PrismViceChancellorController extends Controller
         })->filter(fn ($r) => $r['pendingPrs'] + $r['inProgress'] > 0)->values()->all();
 
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
-            'pageTitle'        => 'Vice Chancellor Division Dashboard',
+            'pageTitle'         => 'Vice Chancellor Division Dashboard',
+            'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole('vice-chancellor'),
             'divisionName'     => 'Campus Division',
             'offices'          => $offices->pluck('name')->all(),
             'summary'          => [
@@ -72,20 +94,64 @@ class PrismViceChancellorController extends Controller
 
     public function divisionProcurementStatus(): View
     {
-        $items = BudgetProposalItem::with('budgetProposal.office')
-            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+        $items = PurchaseRequest::with([
+                'office',
+                'statusUpdates' => fn ($q) => $q->latest(),
+                'signatureLogs.signedBy',
+                'abstractOfCanvass.purchaseOrder',
+            ])
             ->latest()
             ->get()
-            ->map(fn ($item) => [
-                'id'                  => $item->id,
-                'office'              => $item->budgetProposal?->office?->name ?? '—',
-                'item'                => $item->name,
-                'targetQuarter'       => $item->target_quarter ?? '—',
-                'currentStatus'       => 'Pending',
-                'remarks'             => $item->remarks ?? '—',
-                'procurementRemarks'  => '—',
-                'timeline'            => [],
-            ])
+            ->map(function ($pr) {
+                $aoc = $pr->abstractOfCanvass;
+                $po  = $aoc?->purchaseOrder;
+
+                // Furthest point in the pipeline wins: PO delivery > PO/AOC signing > PR
+                if ($po) {
+                    $currentStatus = $po->signatory_stage === 'fully_signed'
+                        ? $po->status_label
+                        : $po->signatory_label;
+                } elseif ($aoc) {
+                    $currentStatus = $aoc->signatory_label;
+                } elseif ($pr->signatory_stage === 'fully_signed') {
+                    $currentStatus = $pr->canvassing_label;
+                } else {
+                    $currentStatus = $pr->signatory_label;
+                }
+
+                $timeline = collect();
+
+                foreach ($pr->signatureLogs as $log) {
+                    $timeline->push([
+                        'step'      => $pr->describeSignatureLog($log) . ($log->signedBy ? ' — ' . $log->signedBy->name : ''),
+                        'timestamp' => $log->signed_at?->format('M d, Y g:i A') ?? '—',
+                        'sortKey'   => $log->signed_at?->timestamp ?? 0,
+                        'photoUrl'  => $log->blurred_photo_path
+                            ? \Illuminate\Support\Facades\Storage::url($log->blurred_photo_path)
+                            : null,
+                    ]);
+                }
+
+                foreach ($pr->statusUpdates as $update) {
+                    $timeline->push([
+                        'step'      => ucwords(str_replace('_', ' ', $update->status)),
+                        'timestamp' => $update->created_at->format('M d, Y g:i A'),
+                        'sortKey'   => $update->created_at->timestamp,
+                        'photoUrl'  => null,
+                    ]);
+                }
+
+                return [
+                    'id'                 => $pr->id,
+                    'office'             => $pr->office?->name ?? '—',
+                    'item'               => $pr->title,
+                    'targetQuarter'      => $pr->fiscal_year ? 'FY ' . $pr->fiscal_year : '—',
+                    'currentStatus'      => $currentStatus,
+                    'remarks'            => $pr->remarks ?? '—',
+                    'procurementRemarks' => $pr->statusUpdates->first()?->remarks ?: '—',
+                    'timeline'           => $timeline->sortBy('sortKey')->map(fn ($t) => collect($t)->except('sortKey')->all())->values()->all(),
+                ];
+            })
             ->all();
 
         return view('prism.vice-chancellor.division-procurement-status', $this->withCommon('division-procurement-status', [
@@ -152,17 +218,11 @@ class PrismViceChancellorController extends Controller
             'brandHref'        => route('vice-chancellor.dashboard'),
             'roleLabel'        => 'Vice Chancellor',
             'roleInitials'     => 'VC',
-            'roleNavigation'   => [
-                ['slug' => 'office-head',        'label' => 'Office Head / Dean', 'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office',     'label' => 'Finance Office',      'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office', 'label' => 'Procurement Office',  'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor',    'label' => 'Vice Chancellor',      'href' => route('vice-chancellor.dashboard')],
-                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
-            ],
+            'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Vice Chancellor pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                    'label' => 'Division Dashboard',          'href' => route('vice-chancellor.dashboard'),                    'icon' => 'layout-dashboard'],
+                ['slug' => 'for-my-signature',             'label' => 'For My Signature',            'href' => route('vice-chancellor.for-my-signature'),             'icon' => 'signature'],
                 ['slug' => 'division-procurement-status',  'label' => 'Division Procurement Status', 'href' => route('vice-chancellor.division-procurement-status'),  'icon' => 'list-check'],
                 ['slug' => 'division-performance-report',  'label' => 'Division Performance Report', 'href' => route('vice-chancellor.division-performance-report'),  'icon' => 'trending-up'],
             ],

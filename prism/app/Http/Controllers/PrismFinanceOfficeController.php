@@ -93,41 +93,6 @@ class PrismFinanceOfficeController extends Controller
         ]));
     }
 
-    public function annualProcurementPlan(): View
-    {
-        $items = BudgetProposalItem::with('budgetProposal.office')
-            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
-            ->get()
-            ->map(function ($item) {
-                $abc             = (float) $item->estimated_total_cost;
-                $recommendedMode = ProcurementModeService::recommend($abc);
-
-                return [
-                    'itemId'          => $item->id,
-                    'office'          => $item->budgetProposal?->office?->name ?? '—',
-                    'item'            => $item->name,
-                    'quantity'        => (int) $item->quantity,
-                    'abcAmount'       => $abc,
-                    'targetQuarter'   => $item->target_quarter ?? 'Q1',
-                    'recommendedMode' => $recommendedMode,
-                    'rationale'       => ProcurementModeService::rationale($abc),
-                    'procurementMode' => $item->procurement_mode ?? $recommendedMode,
-                    'isOverridden'    => (bool) $item->is_overridden,
-                    'overrideReason'  => $item->override_reason ?? '',
-                    'saveUrl'         => route('finance-office.annual-procurement-plan.save-mode', $item->id),
-                ];
-            })
-            ->all();
-
-        return view('prism.finance-office.annual-procurement-plan', $this->withCommon('annual-procurement-plan', [
-            'pageTitle'        => 'Annual Procurement Plan',
-            'appItems'         => $items,
-            'offices'          => collect($items)->pluck('office')->unique()->values()->all(),
-            'quarters'         => ['Q1', 'Q2', 'Q3', 'Q4'],
-            'procurementModes' => ProcurementModeService::MODES,
-        ]));
-    }
-
     public function saveItemRemark(Request $request, BudgetProposalItem $item): JsonResponse
     {
         $validated = $request->validate([
@@ -145,33 +110,6 @@ class PrismFinanceOfficeController extends Controller
         $item->update([
             'finance_ok'     => $validated['ok'],
             'finance_remark' => $validated['ok'] ? null : trim($validated['remark']),
-        ]);
-
-        return response()->json(['success' => true]);
-    }
-
-    public function saveProcurementMode(Request $request, BudgetProposalItem $item): JsonResponse
-    {
-        $validated = $request->validate([
-            'procurement_mode' => 'required|string|in:' . implode(',', ProcurementModeService::MODES),
-            'override_reason'  => 'nullable|string|max:1000',
-        ]);
-
-        $recommended  = ProcurementModeService::recommend((float) $item->estimated_total_cost);
-        $isOverridden = $validated['procurement_mode'] !== $recommended;
-
-        if ($isOverridden && empty(trim($validated['override_reason'] ?? ''))) {
-            return response()->json([
-                'success' => false,
-                'message' => 'A reason is required when overriding the system recommendation.',
-            ], 422);
-        }
-
-        $item->update([
-            'recommended_mode' => $recommended,
-            'procurement_mode' => $validated['procurement_mode'],
-            'is_overridden'    => $isOverridden,
-            'override_reason'  => $isOverridden ? trim($validated['override_reason']) : null,
         ]);
 
         return response()->json(['success' => true]);
@@ -267,7 +205,7 @@ class PrismFinanceOfficeController extends Controller
         NotificationService::proposalEndorsed($proposal);
 
         return redirect()->route('finance-office.proposal-review.show', $proposal->id)
-            ->with('success', 'Proposal endorsed and forwarded to the Chancellor.');
+            ->with('success', 'PPMP approved and forwarded to the Chancellor.');
     }
 
     public function returnProposal(Request $request, BudgetProposal $proposal): RedirectResponse
@@ -357,14 +295,7 @@ class PrismFinanceOfficeController extends Controller
             'brandHref'        => route('finance-office.dashboard'),
             'roleLabel'        => 'Finance Office',
             'roleInitials'     => 'FO',
-            'roleNavigation'   => [
-                ['slug' => 'office-head',       'label' => 'Office Head / Dean',   'href' => route('office-head.dashboard')],
-                ['slug' => 'finance-office',    'label' => 'Finance Office',        'href' => route('finance-office.dashboard')],
-                ['slug' => 'procurement-office','label' => 'Procurement Office',    'href' => route('procurement-office.dashboard')],
-                ['slug' => 'chancellor',        'label' => 'Chancellor',            'href' => route('chancellor.dashboard')],
-                ['slug' => 'vice-chancellor',   'label' => 'Vice Chancellor',       'href' => route('vice-chancellor.dashboard')],
-                ['slug' => 'accounting-office',  'label' => 'Accounting Office',    'href' => route('accounting-office.dashboard')],
-            ],
+            'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Finance Office pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                 'label' => 'Dashboard',                 'href' => route('finance-office.dashboard'),                  'icon' => 'layout-dashboard'],

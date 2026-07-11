@@ -94,6 +94,17 @@
         </div>
     </div>
 
+    @if(($awaitingSignature ?? 0) > 0)
+    <div class="card" style="display:flex;align-items:center;gap:14px;border-color:#fac775;background:#fdf7ec;">
+        <i class="ti ti-signature" style="font-size:24px;color:#854f0b;"></i>
+        <div style="flex:1;">
+            <p style="font-size:13px;font-weight:800;color:#854f0b;">{{ $awaitingSignature }} document{{ $awaitingSignature > 1 ? 's' : '' }} awaiting your signature</p>
+            <p style="font-size:12px;color:#a16207;">Take a photo of the signed document to record your signature.</p>
+        </div>
+        <a href="{{ route('chancellor.for-my-signature') }}" style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px;border-radius:9px;background:#854f0b;color:#fff;font-size:12px;font-weight:700;text-decoration:none;">Open Queue <i class="ti ti-arrow-right"></i></a>
+    </div>
+    @endif
+
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg></div>

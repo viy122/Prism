@@ -49,12 +49,12 @@ class AbstractOfCanvass extends Model
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',             'label' => 'Created',                       'type' => 'routing'],
         ['key' => 'at_end_user',       'label' => 'End User',                      'type' => 'signature'],
-        ['key' => 'at_bac_member',     'label' => 'BAC Member',                    'type' => 'signature'],
-        ['key' => 'at_bac_vice_chair', 'label' => 'BAC Vice Chairperson',          'type' => 'signature'],
-        ['key' => 'at_bac_chair',      'label' => 'BAC Chairperson',               'type' => 'signature'],
-        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature'],
+        ['key' => 'at_bac_member',     'label' => 'BAC Member',                    'type' => 'signature', 'role' => 'bac'],
+        ['key' => 'at_bac_vice_chair', 'label' => 'BAC Vice Chairperson',          'type' => 'signature', 'role' => 'bac'],
+        ['key' => 'at_bac_chair',      'label' => 'BAC Chairperson',               'type' => 'signature', 'role' => 'bac'],
+        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature', 'role' => 'vice-chancellor'],
         ['key' => 'at_audit',          'label' => 'Internal Audit – Review',       'type' => 'routing'],
-        ['key' => 'at_chancellor',     'label' => 'Chancellor',                    'type' => 'signature'],
+        ['key' => 'at_chancellor',     'label' => 'Chancellor',                    'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'fully_signed',      'label' => 'Fully Signed',                  'type' => 'signature'],
     ];
 }
