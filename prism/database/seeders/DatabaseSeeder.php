@@ -16,5 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PrismInitialSeeder::class);
         $this->call(PrismWorkflowSeeder::class);
+        $this->call(MobileTestUsersSeeder::class);
+        $this->call(RealUsersSeeder::class);
     }
 }
