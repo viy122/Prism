@@ -180,6 +180,7 @@
         }
         @media print {
             html, body { height: auto; overflow: visible; }
+            .sb, .univ-header { display: none !important; }
             .main { height: auto; overflow: visible; }
         }
     </style>
@@ -202,19 +203,19 @@
     </a>
     <div class="sb-divider"></div>
     <nav class="sb-nav">
-        <a href="{{ route('office-head.dashboard') }}" title="Dashboard"{{ ($activeOfficePage ?? '') === 'dashboard' ? ' class="active"' : '' }}>
+        <a href="{{ route('office-head.dashboard') }}" title="Dashboard" @if(($activeOfficePage ?? '') === 'dashboard') class="active" @endif>
             <i class="ti ti-layout-dashboard"></i><span class="sb-label">Dashboard</span>
         </a>
-        <a href="{{ route('office-head.budget-proposal') }}" title="PPMP"{{ ($activeOfficePage ?? '') === 'budget-proposal' ? ' class="active"' : '' }}>
+        <a href="{{ route('office-head.budget-proposal') }}" title="PPMP" @if(($activeOfficePage ?? '') === 'budget-proposal') class="active" @endif>
             <i class="ti ti-file-text"></i><span class="sb-label">PPMP</span>
         </a>
-        <a href="{{ route('office-head.market-scoping') }}" title="Market Scoping"{{ ($activeOfficePage ?? '') === 'market-scoping' ? ' class="active"' : '' }}>
+        <a href="{{ route('office-head.market-scoping') }}" title="Market Scoping" @if(($activeOfficePage ?? '') === 'market-scoping') class="active" @endif>
             <i class="ti ti-search"></i><span class="sb-label">Market Scoping</span>
         </a>
-        <a href="{{ route('office-head.my-proposals') }}" title="My PPMPs"{{ ($activeOfficePage ?? '') === 'my-proposals' ? ' class="active"' : '' }}>
+        <a href="{{ route('office-head.my-proposals') }}" title="My PPMPs" @if(($activeOfficePage ?? '') === 'my-proposals') class="active" @endif>
             <i class="ti ti-folder-open"></i><span class="sb-label">My PPMPs</span>
         </a>
-        <a href="{{ route('office-head.purchase-requests') }}" title="Purchase Requests"{{ ($activeOfficePage ?? '') === 'purchase-requests' ? ' class="active"' : '' }}>
+        <a href="{{ route('office-head.purchase-requests') }}" title="Purchase Requests" @if(($activeOfficePage ?? '') === 'purchase-requests') class="active" @endif>
             <i class="ti ti-cloud-upload"></i><span class="sb-label">Purchase Requests</span>
         </a>
     </nav>
@@ -240,7 +241,7 @@
 
     {{-- University banner with clock --}}
     <div class="univ-header">
-        <img class="hdr-bg" src="{{ asset('images/headers.png') }}" alt="Batangas State University"
+        <img class="hdr-bg" src="{{ asset('images/headers2.png') }}" alt="Batangas State University"
              onerror="this.parentElement.style.background='linear-gradient(135deg,#8B1A1C,#1E3A8A)';this.style.display='none'">
         <div class="univ-header-overlay"></div>
         <div class="univ-header-right">

@@ -7,9 +7,9 @@
         --s50:   #f8fafc; --s100: #f1f5f9; --s200: #e2e8f0; --s300: #cbd5e1;
         --s400:  #94a3b8; --s500: #64748b; --s600: #475569;
         --s700:  #334155; --s900: #0f172a;
-        --gold:  #c9a84c;
         --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
         --sh-md: 0 4px 16px rgba(15,23,42,.08), 0 1px 4px rgba(15,23,42,.04);
+        --sh-lg: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05);
     }
 
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
@@ -30,11 +30,17 @@
         position: relative; overflow: hidden;
         background: var(--white); border: 1px solid var(--s200);
         border-radius: 18px; padding: 20px 20px 20px 24px;
-        box-shadow: var(--sh-sm); transition: border-color .2s, box-shadow .2s;
+        box-shadow: var(--sh-sm); transition: border-color .2s, box-shadow .2s, transform .2s;
     }
-    .stat-card:hover { border-color: var(--crimson-border); box-shadow: 0 12px 28px rgba(15,23,42,.07); }
-    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: var(--gold); }
-    .stat-card::after  { content: ''; position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--crimson-border); background: var(--crimson-mid); }
+    .stat-card:hover { border-color: var(--crimson-border); box-shadow: var(--sh-lg); transform: translateY(-2px); }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: var(--crimson); }
+    .stat-icon {
+        position: absolute; right: 16px; top: 16px;
+        width: 38px; height: 38px; border-radius: 11px;
+        background: var(--crimson-mid); border: 1px solid var(--crimson-border);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .stat-icon svg { width: 19px; height: 19px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
     .stat-value { font-size: 1.55rem; font-weight: 800; color: var(--crimson); margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
     .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
@@ -88,7 +94,7 @@
 <div class="page-shell">
 
     <div class="page-hdr">
-        <div class="page-hdr-icon"><i class="ti ti-chart-no-axes-combined"></i></div>
+        <div class="page-hdr-icon"><i class="ti ti-report-money"></i></div>
         <div>
             <p class="page-hdr-eyebrow">Finance Office</p>
             <h1 class="page-hdr-title">Budget Utilization Report</h1>
@@ -98,21 +104,25 @@
 
     <div class="stats-grid">
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
             <p class="stat-label">Total campus budget</p>
-            <strong class="stat-value">PHP {{ number_format($summary['campusBudget']) }}</strong>
+            <strong class="stat-value">₱ {{ number_format($summary['campusBudget']) }}</strong>
             <p class="stat-desc">Approved allocation for monitored offices</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <p class="stat-label">Total utilized</p>
-            <strong class="stat-value">PHP {{ number_format($summary['totalUtilized']) }}</strong>
+            <strong class="stat-value">₱ {{ number_format($summary['totalUtilized']) }}</strong>
             <p class="stat-desc">Posted utilization across procurement activity</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
             <p class="stat-label">Overall utilization</p>
             <strong class="stat-value">{{ $summary['utilizationPercent'] }}%</strong>
             <p class="stat-desc">Campus-wide budget utilization percentage</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
             <p class="stat-label">Offices at risk</p>
             <strong class="stat-value">{{ $summary['officesAtRisk'] }}</strong>
             <p class="stat-desc">Low utilization or delayed procurement movement</p>
@@ -172,8 +182,8 @@
                         <tr data-util-row data-office="{{ $row['office'] }}" data-quarter="{{ $row['quarter'] }}">
                             <td style="font-size:13px;font-weight:600;color:var(--s600);">{{ $row['office'] }}</td>
                             <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $row['quarter'] }}</td>
-                            <td><p class="amount-val">PHP {{ number_format($row['budget']) }}</p></td>
-                            <td><p class="amount-val">PHP {{ number_format($row['utilized']) }}</p></td>
+                            <td><p class="amount-val">₱ {{ number_format($row['budget']) }}</p></td>
+                            <td><p class="amount-val">₱ {{ number_format($row['utilized']) }}</p></td>
                             <td>
                                 <div class="progress-wrap">
                                     <p class="progress-pct">{{ $pct }}%</p>

@@ -78,13 +78,9 @@ class PrismFinanceOfficeController extends Controller
             ->map(fn ($p) => $this->formatProposal($p))
             ->all();
 
-        if (empty($proposals)) {
-            $selectedProposal = null;
-        } else {
-            $selectedProposal = $proposal
-                ? (collect($proposals)->firstWhere('id', (int) $proposal) ?? $proposals[0])
-                : $proposals[0];
-        }
+        $selectedProposal = $proposal
+            ? collect($proposals)->firstWhere('id', (int) $proposal)
+            : null;
 
         return view('prism.finance-office.proposal-review', $this->withCommon('proposal-review', [
             'pageTitle'        => 'Proposal Review',

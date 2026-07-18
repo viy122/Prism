@@ -26,6 +26,8 @@
             --s900:  #0f172a;
             --sh:    0 2px 8px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
             --sh-md: 0 4px 20px rgba(15,23,42,.09), 0 1px 4px rgba(15,23,42,.04);
+            --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+            --sh-lg: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05);
         }
 
         .content {
@@ -76,31 +78,73 @@
         .stats-bar {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
+            gap: 13px;
             margin-bottom: 24px;
         }
         .stat-box {
-            background: var(--s50);
+            background: var(--white);
             border: 1px solid var(--s200);
-            border-radius: 14px;
-            padding: 18px 20px;
+            border-radius: 15px;
+            padding: 18px 20px 16px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--sh-sm);
+            transition: box-shadow .25s, border-color .25s, transform .2s;
+        }
+        .stat-box:hover {
+            box-shadow: var(--sh-lg);
+            border-color: rgba(104,16,18,.2);
+            transform: translateY(-2px);
+        }
+        .stat-box::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 16px;
+            width: 4px;
+            height: 38px;
+            background: var(--m);
+            border-radius: 0 4px 4px 0;
+        }
+        .stat-icon {
+            position: absolute;
+            right: 16px;
+            top: 16px;
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            background: rgba(104,16,18,.07);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stat-icon svg {
+            width: 19px;
+            height: 19px;
+            stroke: var(--m);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
         .stat-box dt {
-            font-size: 9px;
+            font-size: 10px;
             font-weight: 700;
-            letter-spacing: .14em;
+            letter-spacing: .12em;
             text-transform: uppercase;
             color: var(--s400);
-            margin-bottom: 6px;
+            margin-bottom: 9px;
+            padding-right: 46px;
         }
         .stat-box dd {
             font-size: 28px;
             font-weight: 800;
-            color: var(--s900);
+            color: var(--m);
+            letter-spacing: -.7px;
             line-height: 1;
         }
         .stat-box dd.maroon { color: var(--m); }
-        .stat-box dd.sm { font-size: 17px; }
+        .stat-box dd.sm { font-size: 18px; letter-spacing: -.3px; }
 
         /* ─── Filters row ─── */
         .filters-row {
@@ -182,6 +226,15 @@
         .col-sticky {
             position: sticky;
             top: 86px;
+            align-self: start;
+            max-height: calc(100vh - 106px);
+            display: flex;
+            flex-direction: column;
+        }
+        .col-sticky #timelineContent {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
         }
 
         /* ─── Proposal queue ─── */
@@ -344,20 +397,24 @@
 
             <dl class="stats-bar">
                 <div class="stat-box">
+                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
                     <dt>Proposals</dt>
                     <dd>{{ $proposalCount }}</dd>
                 </div>
                 <div class="stat-box">
+                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
                     <dt>Active Review</dt>
                     <dd class="maroon">{{ $activeReviewCount }}</dd>
                 </div>
                 <div class="stat-box">
+                    <div class="stat-icon"><svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg></div>
                     <dt>Returned</dt>
                     <dd>{{ $returnedCount }}</dd>
                 </div>
                 <div class="stat-box">
+                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
                     <dt>Approved Amount</dt>
-                    <dd class="sm">PHP {{ number_format($approvedAmount) }}</dd>
+                    <dd class="sm">₱ {{ number_format($approvedAmount) }}</dd>
                 </div>
             </dl>
 
@@ -444,7 +501,7 @@
                 <div class="card-head">
                     <div class="min-w-0" style="flex:1;">
                         <p class="card-eyebrow">Approval movement</p>
-                        <h2 class="card-title" id="timelineTitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Select a proposal</h2>
+                        <h2 class="card-title" id="timelineTitle" style="white-space:normal;overflow-wrap:break-word;">Select a proposal</h2>
                         <p class="card-sub" id="timelineMeta">Timeline details will appear here.</p>
                     </div>
                     <span class="pill pill-gray" id="timelineStatusBadge">Status</span>

@@ -378,44 +378,105 @@
     .mod-card p  { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
     /* ── WORKFLOW ── */
-.workflow{
-    padding: 90px 60px;
-    background: white;
-}
+    .workflow {
+      padding: 90px 60px;
+      background: white;
+    }
 
-.workflow-head{
-    text-align: center;
-    margin-bottom: 55px;
-}
+    .workflow-head {
+      text-align: center;
+      margin-bottom: 64px;
+    }
 
-.workflow-head h2{
-    font-size: 36px;       /* same as User Roles */
-    line-height: 1.2;
-    font-weight: 800;
-    color: #071634;
-    margin-bottom: 10px;
-}
+    .workflow-head h2 {
+      font-size: 36px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: #071634;
+      margin-bottom: 10px;
+    }
 
-.workflow-head h2 .accent{
-    color: var(--red);
-}
+    .workflow-head h2 .accent {
+      color: var(--red);
+    }
 
-.workflow-head p{
-    font-size: 15px;       /* same as User Roles */
-    line-height: 1.8;
-    color: #667085;
-    max-width: 600px;
-    margin: auto;
-}
-    .workflow-steps { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
-    .workflow-steps::before { content: ''; position: absolute; top: 27px; left: 40px; right: 40px; height: 2px; background: var(--border); z-index: 0; }
-    .wf-fill { position: absolute; top: 27px; left: 40px; height: 2px; width: 0; z-index: 1; background: var(--red); transition: width 1.5s ease; }
-    .wf-fill.go { width: calc(100% - 80px); }
-    .wf-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; z-index: 2; opacity: 0; transform: translateY(16px); }
+    .workflow-head p {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #667085;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    /* Steps track — equal-width columns so the connector line and every
+       label stay perfectly aligned regardless of step count */
+    .workflow-steps {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    .workflow-steps::before {
+      content: '';
+      position: absolute;
+      top: 27px;
+      left: calc(50% / 9);
+      right: calc(50% / 9);
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .wf-fill {
+      position: absolute;
+      top: 27px;
+      left: calc(50% / 9);
+      height: 2px;
+      width: 0;
+      z-index: 1;
+      background: var(--red);
+      transition: width 1.5s ease;
+    }
+    .wf-fill.go { width: calc(100% - (100% / 9)); }
+
+    .wf-step {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      opacity: 0;
+      transform: translateY(16px);
+      padding: 0 10px;
+    }
     .wf-step.vis { opacity: 1; transform: translateY(0); transition: opacity .45s ease, transform .45s ease; }
-    .wf-num { width: 54px; height: 54px; border-radius: 50%; background: white; border: 2.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 800; color: var(--muted); margin-bottom: 14px; transition: all .3s; }
+
+    .wf-num {
+      width: 54px; height: 54px; border-radius: 50%;
+      background: white; border: 2.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 800; color: var(--muted);
+      margin-bottom: 16px;
+      flex-shrink: 0;
+      transition: all .3s;
+    }
     .wf-step:hover .wf-num { background: var(--red); border-color: var(--red); color: white; transform: scale(1.1); }
-    .wf-label { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.4; }
+
+    .wf-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+      max-width: 108px;
+      min-height: 36px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
 
     /* ── CTA ── */
     .cta {
@@ -438,16 +499,30 @@
     .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
 
     /* ── FOOTER ── */
-    footer { background: #0d0101; padding: 60px 56px 28px; }
-    .footer-top { display: grid; grid-template-columns: 1fr auto auto; gap: 80px; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 24px; }
-    .footer-brand .name { font-size: 22px; font-weight: 900; color: white; letter-spacing: 2px; }
-    .footer-brand p { font-size: 12px; line-height: 2; color: rgba(255,255,255,.45); max-width: 260px; margin-top: 10px; }
-    .footer-col h5 { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #c9a84c; margin-bottom: 18px; }
-    .footer-col a { display: block; text-decoration: none; color: rgba(255,255,255,.45); font-size: 13px; margin-bottom: 10px; transition: color .2s; }
+    footer {
+      background: #0d0101;
+      padding: 68px 56px 32px;
+    }
+    .footer-top {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr 0.8fr;
+      column-gap: 60px;
+      padding-bottom: 44px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      margin-bottom: 28px;
+    }
+    .footer-brand { padding-right: 24px; }
+    .footer-brand .name { font-size: 22px; font-weight: 900; color: white; letter-spacing: 2px; line-height: 1; }
+    .footer-brand p { font-size: 12px; line-height: 1.95; color: rgba(255,255,255,.45); max-width: 280px; margin-top: 16px; }
+    .footer-brand-desc { max-width: none !important; white-space: normal; }
+    .footer-brand-desc .nowrap-line { display: inline-block; white-space: nowrap; }
+    .footer-col h5 { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #ffffff; margin-bottom: 20px; }
+    .footer-col a { display: block; text-decoration: none; color: rgba(255,255,255,.45); font-size: 13px; margin-bottom: 12px; line-height: 1.4; transition: color .2s; }
+    .footer-col a:last-child { margin-bottom: 0; }
     .footer-col a:hover { color: white; }
-    .footer-bottom { display: flex; justify-content: space-between; align-items: center; }
+    .footer-bottom { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
     .footer-bottom p { font-size: 11.5px; color: rgba(255,255,255,.28); }
-    .footer-tagline { font-size: 10.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #c9a84c; }
+    .footer-tagline { font-size: 10.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #ffffff; opacity: .55; }
 
     /* ── RESPONSIVE ── */
     @media (max-width: 991px) {
@@ -464,13 +539,25 @@
       .modules { padding: 60px 30px; }
       .modules-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
       .modules-dots-left { display: none; }
+
       .workflow { padding: 60px 30px; }
-      .workflow-steps { flex-wrap: wrap; gap: 20px; }
+      .workflow-head { margin-bottom: 46px; }
+      .workflow-steps {
+        flex-wrap: wrap;
+        row-gap: 40px;
+        column-gap: 0;
+        justify-content: flex-start;
+      }
       .workflow-steps::before, .wf-fill { display: none; }
-      .wf-step { flex: 0 0 calc(33.3% - 14px); }
+      .wf-step { flex: 0 0 33.333%; padding: 0 8px; }
+      .wf-label { max-width: none; }
+
       .cta { flex-direction: column; padding: 60px 30px; text-align: center; }
-      .footer-top { grid-template-columns: 1fr; gap: 30px; }
-      footer { padding: 50px 30px 24px; }
+      .footer-top { grid-template-columns: 1fr; row-gap: 34px; column-gap: 0; }
+      .footer-brand { padding-right: 0; }
+      .footer-brand p { max-width: none; }
+      footer { padding: 50px 30px 26px; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
     }
     @media (max-width: 600px) {
       header { padding: 0 20px; }
@@ -480,7 +567,10 @@
       .about-right { grid-template-columns: 1fr 1fr; gap: 9px; }
       .about-feat { padding: 13px 10px 11px; }
       .modules-grid { grid-template-columns: 1fr; gap: 14px; }
-      .wf-step { flex: 0 0 calc(50% - 10px); }
+
+      .wf-step { flex: 0 0 50%; row-gap: 28px; }
+      .wf-num { width: 46px; height: 46px; font-size: 15px; margin-bottom: 12px; }
+      .wf-label { font-size: 11.5px; }
     }
   </style>
 </head>
@@ -500,7 +590,6 @@
       <a href="#about">About</a>
       <a href="#features">Features</a>
       <a href="#workflow">Workflow</a>
-      <a href="#">Contact</a>
     </nav>
     <a href="{{ route('login') }}" class="nav-btn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -525,7 +614,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
         </svg>
-        Get Started
+        Sign In
       </a>
       <a href="#about" class="hero-btn-ghost">
         Learn More
@@ -629,8 +718,8 @@
         <div class="mod-num-underline"></div>
       </div>
       <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></div>
-      <h4>Budget Proposal Approval</h4>
-      <p>Route proposals through Finance and Chancellor review with a transparent, trackable workflow.</p>
+      <h4>Project Plan Approval</h4>
+      <p>Route plan through offices with a transparent trackable flow.</p>
     </div>
     <div class="mod-card">
       <div class="mod-num-wrap">
@@ -682,13 +771,15 @@
     </div>
   <div class="workflow-steps" id="wfSteps">
     <div class="wf-fill" id="wfLine"></div>
-    <div class="wf-step"><div class="wf-num">1</div><div class="wf-label">Budget<br>Proposal</div></div>
-    <div class="wf-step"><div class="wf-num">2</div><div class="wf-label">Market<br>Scoping</div></div>
-    <div class="wf-step"><div class="wf-num">3</div><div class="wf-label">Approval<br>Workflow</div></div>
-    <div class="wf-step"><div class="wf-num">4</div><div class="wf-label">APP<br>Consolidation</div></div>
-    <div class="wf-step"><div class="wf-num">5</div><div class="wf-label">Purchase<br>Request</div></div>
-    <div class="wf-step"><div class="wf-num">6</div><div class="wf-label">Procurement<br>Tracking</div></div>
-    <div class="wf-step"><div class="wf-num">7</div><div class="wf-label">Dashboard<br>&amp; Analytics</div></div>
+    <div class="wf-step"><div class="wf-num">1</div><div class="wf-label">Project Plan Preparation</div></div>
+    <div class="wf-step"><div class="wf-num">2</div><div class="wf-label">Market Scoping</div></div>
+    <div class="wf-step"><div class="wf-num">3</div><div class="wf-label">Approval Workflow</div></div>
+    <div class="wf-step"><div class="wf-num">4</div><div class="wf-label">APP Consolidation</div></div>
+    <div class="wf-step"><div class="wf-num">5</div><div class="wf-label">Purchase Request</div></div>
+    <div class="wf-step"><div class="wf-num">6</div><div class="wf-label">Abstract of Canvas</div></div>
+    <div class="wf-step"><div class="wf-num">7</div><div class="wf-label">Purchase Order</div></div>
+    <div class="wf-step"><div class="wf-num">8</div><div class="wf-label">Tracking and Monitoring</div></div>
+    <div class="wf-step"><div class="wf-num">9</div><div class="wf-label">Dashboard and Analytics</div></div>
   </div>
 </section>
 
@@ -711,7 +802,7 @@
   <div class="footer-top">
     <div class="footer-brand">
       <div class="name">PRISM</div>
-      <p>Batangas State University<br>TNEU ARASOF-Nasugbu Campus<br>College of Information and Computing Sciences</p>
+      <p class="footer-brand-desc"><span class="nowrap-line">Batangas State University TNEU ARASOF-Nasugbu Campus</span><br>College of Information and Computing Sciences</p>
     </div>
     <div class="footer-col">
       <h5>System</h5>
@@ -721,13 +812,12 @@
     </div>
     <div class="footer-col">
       <h5>Access</h5>
-      <a href="#">Login</a>
-      <a href="#">User Roles</a>
+      <a href="{{ route('login') }}">Login</a>
     </div>
   </div>
   <div class="footer-bottom">
-    <p>© 2025 PRISM Prototype. All rights reserved.</p>
-    <span class="footer-tagline">Leading Innovations, Transforming Lives</span>
+    <p>© 2026 PRISM. All rights reserved.</p>
+    <span class="footer-tagline">Smart Procurement System</span>
   </div>
 </footer>
 

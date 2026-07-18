@@ -21,8 +21,8 @@
     .mps-back:hover { border-color: var(--crimson); color: var(--crimson); }
     .mps-action-spacer { flex: 1; }
     .btn-mps { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .18s; }
-    .btn-mps-print  { background: var(--s100); color: var(--s700); border: 1.5px solid var(--s200); }
-    .btn-mps-print:hover { background: var(--s200); }
+    .btn-mps-print  { background: var(--blue-bg); color: var(--blue); border: 1.5px solid #BFDBFE; }
+    .btn-mps-print:hover { background: #BFDBFE; }
     .btn-mps-submit { background: var(--crimson); color: #fff; box-shadow: 0 3px 12px rgba(139,26,28,.25); }
     .btn-mps-submit:hover { background: var(--crimson-dark); }
     .btn-mps-submit:disabled { background: var(--s300); box-shadow: none; cursor: not-allowed; }

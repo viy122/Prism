@@ -28,6 +28,8 @@
             --s700:  #334155;
             --s900:  #0f172a;
             --sh:    0 2px 8px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
+            --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+            --sh-lg: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05);
         }
 
         .content { padding: 32px 32px 64px; flex: 1; display: flex; flex-direction: column; gap: 24px; }
@@ -43,14 +45,32 @@
         .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
 
         /* ─── Stats bar ─── */
-        .stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
-        .stat-box  { background: var(--s50); border: 1px solid var(--s200); border-radius: 14px; padding: 18px 20px; }
-        .stat-box dt { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--s400); margin-bottom: 6px; }
-        .stat-box dd { font-size: 26px; font-weight: 800; color: var(--s900); line-height: 1; }
+        .stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; }
+        .stat-box  {
+            background: var(--white); border: 1px solid var(--s200);
+            border-radius: 15px; padding: 18px 20px 16px;
+            position: relative; overflow: hidden; box-shadow: var(--sh-sm);
+            transition: box-shadow .25s, border-color .25s, transform .2s;
+        }
+        .stat-box:hover { box-shadow: var(--sh-lg); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+        .stat-box::before {
+            content: ""; position: absolute; left: 0; top: 16px;
+            width: 4px; height: 38px; background: var(--m); border-radius: 0 4px 4px 0;
+        }
+        .stat-icon {
+            position: absolute; right: 16px; top: 16px;
+            width: 38px; height: 38px; border-radius: 11px;
+            background: rgba(104,16,18,.07);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .stat-icon svg { width: 19px; height: 19px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .stat-box dt { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 9px; padding-right: 46px; }
+        .stat-box dd { font-size: 28px; font-weight: 800; color: var(--m); letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
         .stat-box dd.maroon { color: var(--m); }
         .stat-box dd.amber  { color: #92400e; }
-        .stat-box dd.sm     { font-size: 16px; }
-        .stat-box small { display: block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--s400); }
+        .stat-box dd.green  { color: #15803d; }
+        .stat-box dd.sm     { font-size: 18px; letter-spacing: -.3px; }
+        .stat-box small { display: block; font-size: 11.5px; font-weight: 500; color: var(--s400); line-height: 1.5; }
         .stat-box small.green { color: #15803d; }
         .stat-box small.amber { color: #92400e; }
 
@@ -167,22 +187,39 @@
 @section('content')
     <div class="content">
 
+        {{-- Page header --}}
+        <div class="card">
+            <div class="card-head" style="margin-bottom:0;">
+                <div>
+                    <p class="card-eyebrow">Purchase Request Monitoring</p>
+                    <h2 class="card-title">Purchase Requests</h2>
+                    <p class="card-sub">Track the purchase requests submitted by your office and their procurement status.</p>
+                </div>
+            </div>
+        </div>
+
         {{-- Stats --}}
         <dl class="stats-bar">
             <div class="stat-box">
+                <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></div>
                 <dt>Total PRs</dt>
                 <dd>{{ $prs->count() }}</dd>
-                <small class="green">{{ $completedCount }} completed</small>
             </div>
             <div class="stat-box">
+                <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
                 <dt>Total Amount</dt>
-                <dd class="sm">PHP {{ number_format($totalAmount) }}</dd>
-                <small>Across all quarters</small>
+                <dd class="sm">₱ {{ number_format($totalAmount) }}</dd>
+                
             </div>
             <div class="stat-box">
+                <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                 <dt>In Progress</dt>
                 <dd class="maroon">{{ $inProgressCount }}</dd>
-                <small>{{ $delayedCount }} delayed</small>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                <dt>Completed</dt>
+                <dd class="maroon">{{ $completedCount }}</dd>
             </div>
         </dl>
 
@@ -197,12 +234,11 @@
                         <h2 class="card-title">My Purchase Requests</h2>
                         <p class="card-sub">Purchase requests submitted by your office. PDF upload is handled by the Procurement Office.</p>
                     </div>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div class="search-wrap" style="min-width:200px;">
-                            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input class="search-input" type="search" id="prSearch" placeholder="Search PR number or title">
-                        </div>
-                    </div>
+                </div>
+
+                <div class="search-wrap" style="width:100%;margin-bottom:14px;">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input class="search-input" type="search" id="prSearch" placeholder="Search Purchase Request number or title">
                 </div>
 
                 <div class="pr-list" id="prList">

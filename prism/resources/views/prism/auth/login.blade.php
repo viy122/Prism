@@ -9,16 +9,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        *,
-        *::before,
-        *::after {
+        *, *::before, *::after {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
 
-        html,
-        body {
+        html, body {
             font-family: 'Poppins', sans-serif;
             min-height: 100vh;
             overflow-x: hidden;
@@ -29,15 +26,17 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
+            justify-content: center;
             overflow: hidden;
+            padding: 24px;
         }
 
         .page-bg {
             position: absolute;
             inset: 0;
-            background-image: url('{{ asset("images/login.png") }}');
+            background-image: url('{{ asset("images/prism3.png") }}');
             background-size: cover;
-            background-position: center center;
+            background-position: center 80%;
             background-attachment: fixed;
             z-index: 0;
             transform-origin: center;
@@ -45,28 +44,17 @@
         }
 
         @keyframes subtlePan {
-            0% {
-                transform: scale(1.04) translate(0px, 0px);
-            }
-
-            50% {
-                transform: scale(1.04) translate(-8px, -4px);
-            }
-
-            100% {
-                transform: scale(1.04) translate(6px, 4px);
-            }
+            0% { transform: scale(1.04) translate(0px, 0px); }
+            50% { transform: scale(1.04) translate(-8px, -4px); }
+            100% { transform: scale(1.04) translate(6px, 4px); }
         }
 
-        /* Lighter overlay */
         .page-overlay {
             position: absolute;
             inset: 0;
-            background: linear-gradient(to right,
-                    rgba(104, 16, 18, 0.55) 0%,
-                    rgba(104, 16, 18, 0.38) 40%,
-                    rgba(60, 10, 12, 0.50) 65%,
-                    rgba(40, 6, 8, 0.62) 100%);
+            background: linear-gradient(to bottom,
+                    rgba(30, 6, 7, 0.55) 0%,
+                    rgba(20, 4, 5, 0.65) 100%);
             z-index: 1;
         }
 
@@ -90,15 +78,8 @@
         }
 
         @keyframes barGlow {
-
-            0%,
-            100% {
-                opacity: .85;
-            }
-
-            50% {
-                opacity: 1;
-            }
+            0%, 100% { opacity: .85; }
+            50% { opacity: 1; }
         }
 
         .particles {
@@ -117,154 +98,146 @@
         }
 
         @keyframes floatUp {
-            0% {
-                transform: translateY(100vh) scale(0);
-                opacity: 0;
-            }
-
-            10% {
-                opacity: .7;
-            }
-
-            90% {
-                opacity: .15;
-            }
-
-            100% {
-                transform: translateY(-120px) scale(1.5);
-                opacity: 0;
-            }
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            10% { opacity: .7; }
+            90% { opacity: .15; }
+            100% { transform: translateY(-120px) scale(1.5); opacity: 0; }
         }
 
-        /* ── LAYOUT ── */
-        .login-inner {
+        /* ── UNIFIED CARD ── */
+        .auth-card {
             position: relative;
             z-index: 2;
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 44px 56px;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 56px;
-            min-height: 100vh;
-        }
-
-        /* ── LEFT CONTENT ── */
-        .left-content {
-            flex: 1;
-            min-width: 0;
-            color: #fff;
+            width: 100%;
+            max-width: 860px;
+            min-height: 520px;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow:
+                0 24px 60px rgba(0, 0, 0, 0.35),
+                0 6px 20px rgba(0, 0, 0, 0.18);
             opacity: 0;
-            transform: translateX(-30px);
-            animation: slideInLeft .8s ease .2s forwards;
+            transform: translateY(20px);
+            animation: cardIn .7s ease .15s forwards;
         }
 
-        @keyframes slideInLeft {
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+        @keyframes cardIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── LEFT PANEL (info) ── */
+        .auth-left {
+            flex: 0 0 42%;
+            background: linear-gradient(160deg, #6f1214 0%, #4a0c0e 100%);
+            color: #fff;
+            padding: 44px 38px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            position: relative;
+        }
+
+        .auth-left::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.12);
         }
 
         .left-logo {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 56px;
             text-decoration: none;
         }
 
         .left-logo-img {
-            width: 48px;
-            height: 48px;
+            width: 42px;
+            height: 42px;
             background: #fff;
-            border-radius: 13px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
             flex-shrink: 0;
-            transition: transform .3s;
-        }
-
-        .left-logo-img:hover {
-            transform: scale(1.08) rotate(-2deg);
+            overflow: visible;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
         }
 
         .left-logo-img img {
-            width: 80%;
-            height: 80%;
+            width: 66px;
+            height: 66px;
             object-fit: contain;
         }
 
         .left-logo-name {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 900;
-            color: #fff;
-            letter-spacing: .5px;
+            letter-spacing: .4px;
         }
 
         .left-logo-sub {
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 600;
             color: rgba(255, 255, 255, 0.55);
-            letter-spacing: .07em;
-            margin-top: 1px;
+            letter-spacing: .06em;
+        }
+
+        /* Left body now fills remaining space and centers its content
+           both horizontally and vertically inside the red card */
+        .left-body {
+            margin-top: 30px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
         }
 
         .left-eyebrow {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             color: #f0d080;
             letter-spacing: .12em;
             text-transform: uppercase;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .left-eyebrow::before {
             content: '';
-            display: inline-block;
-            width: 22px;
+            width: 20px;
             height: 2px;
             background: #f0d080;
             border-radius: 2px;
-            flex-shrink: 0;
         }
 
         .left-title {
-            font-size: clamp(2.6rem, 4.5vw, 4rem);
-            font-weight: 900;
-            line-height: 1.04;
-            letter-spacing: -2px;
-            color: #fff;
-            margin-bottom: 6px;
-            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.18);
+            font-size: 30px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -.5px;
+            margin-bottom: 14px;
         }
 
         .left-title .dot {
             color: #f0d080;
         }
 
-        .left-rule {
-            width: 36px;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.4);
-            border-radius: 2px;
-            margin: 20px 0 18px;
-        }
-
         .left-desc {
-            font-size: 13.5px;
-            font-weight: 400;
-            line-height: 1.85;
-            color: rgba(255, 255, 255, 0.75);
-            max-width: 380px;
-            margin-bottom: 36px;
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 300px;
+            margin: 0 auto;
         }
 
         .left-desc strong {
@@ -272,173 +245,43 @@
             font-weight: 700;
         }
 
-        /* Stats row */
-        .left-stats {
-            display: flex;
-            gap: 28px;
-            margin-bottom: 36px;
+        .left-footer {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 500;
         }
 
-        .stat-item {
+        /* ── RIGHT PANEL (form) ── */
+        .auth-right {
+            flex: 1;
+            background: #ffffff;
+            padding: 44px 42px;
             display: flex;
             flex-direction: column;
-            gap: 2px;
-        }
-
-        .stat-value {
-            font-size: 26px;
-            font-weight: 900;
-            color: #fff;
-            letter-spacing: -1px;
-            line-height: 1;
-            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .stat-value span {
-            color: #f0d080;
-        }
-
-        .stat-label {
-            font-size: 10.5px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.55);
-            letter-spacing: .06em;
-            text-transform: uppercase;
-        }
-
-        .stat-divider {
-            width: 1px;
-            background: rgba(255, 255, 255, 0.2);
-            align-self: stretch;
-            margin: 2px 0;
-        }
-
-        /* Feature pills */
-        .left-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 7px 14px;
-            border-radius: 100px;
-            background: rgba(255, 255, 255, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            font-size: 11.5px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-            transition: background .2s, border-color .2s, transform .2s;
-            cursor: default;
-        }
-
-        .pill:hover {
-            background: rgba(240, 208, 128, 0.22);
-            border-color: rgba(240, 208, 128, 0.5);
-            color: #fff;
-            transform: translateY(-2px);
-        }
-
-        .pill-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #f0d080;
-            flex-shrink: 0;
-        }
-
-        /* ── RIGHT CARD ── */
-        .right-card-wrap {
-            width: 370px;
-            flex-shrink: 0;
-            opacity: 0;
-            transform: translateX(30px);
-            animation: slideInRight .8s ease .35s forwards;
-        }
-
-        @keyframes slideInRight {
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .login-card {
-            position: relative;
-            background: rgba(255, 255, 255, 0.98);
-            border-radius: 28px;
-            padding: 34px 30px 28px;
-            box-shadow:
-                0 24px 60px rgba(0, 0, 0, 0.28),
-                0 6px 20px rgba(0, 0, 0, 0.14);
-            overflow: hidden;
-        }
-
-        .card-shimmer {
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 60%;
-            height: 100%;
-            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.14), transparent);
-            transform: skewX(-15deg);
-            animation: shimmer 4s ease-in-out 1.5s infinite;
-            pointer-events: none;
-        }
-
-        @keyframes shimmer {
-
-            0%,
-            100% {
-                left: -100%;
-            }
-
-            50% {
-                left: 150%;
-            }
-        }
-
-        .card-dots {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 95px;
-            height: 95px;
-            pointer-events: none;
-            overflow: hidden;
-            border-radius: 0 28px 0 0;
-            opacity: .07;
+            justify-content: center;
         }
 
         .card-h1 {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 800;
             color: #0f172a;
             letter-spacing: -.5px;
+            text-align: center;
         }
 
-        .card-h1 span {
-            color: #681012;
+        .card-h1 span { color: #681012; }
+
+        .card-sub {
+            font-size: 12px;
+            color: #94a3b8;
+            font-weight: 500;
+            margin-top: 4px;
+            margin-bottom: 22px;
+            text-align: center;
         }
 
-        .card-rule {
-            width: 30px;
-            height: 3px;
-            background: #681012;
-            border-radius: 2px;
-            margin: 11px 0 22px;
-        }
-
-        .field {
-            margin-bottom: 13px;
-        }
-
-        .input-wrap {
-            position: relative;
-        }
+        .field { margin-bottom: 13px; }
+        .input-wrap { position: relative; }
 
         .input-icon {
             position: absolute;
@@ -453,7 +296,6 @@
             align-items: center;
             justify-content: center;
             pointer-events: none;
-            z-index: 1;
             transition: background .2s;
         }
 
@@ -482,25 +324,14 @@
             transition: border-color .2s, box-shadow .2s, background .2s;
         }
 
-        .field-input::placeholder {
-            color: #b8a8a8;
-            font-weight: 400;
-        }
-
-        .field-input:hover {
-            border-color: #d0c4c4;
-            background: #fff;
-        }
-
+        .field-input::placeholder { color: #b8a8a8; font-weight: 400; }
+        .field-input:hover { border-color: #d0c4c4; background: #fff; }
         .field-input:focus {
             border-color: #681012;
             background: #fff;
             box-shadow: 0 0 0 3.5px rgba(104, 16, 18, 0.1);
         }
-
-        .field-input:focus~.input-icon {
-            background: #f8e0e0;
-        }
+        .field-input:focus ~ .input-icon { background: #f8e0e0; }
 
         .pw-toggle {
             position: absolute;
@@ -516,19 +347,11 @@
             transition: color .15s, background .15s;
         }
 
-        .pw-toggle:hover {
-            color: #681012;
-            background: #f1f5f9;
-        }
-
+        .pw-toggle:hover { color: #681012; background: #f1f5f9; }
         .pw-toggle svg {
-            width: 16px;
-            height: 16px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
+            width: 16px; height: 16px;
+            stroke: currentColor; fill: none;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
             display: block;
         }
 
@@ -544,10 +367,7 @@
             margin-top: 4px;
             display: none;
         }
-
-        .field-error.show {
-            display: block;
-        }
+        .field-error.show { display: block; }
 
         .server-error {
             display: flex;
@@ -592,8 +412,7 @@
         }
 
         .remember-label input {
-            width: 14px;
-            height: 14px;
+            width: 14px; height: 14px;
             accent-color: #681012;
             cursor: pointer;
         }
@@ -605,11 +424,7 @@
             text-decoration: none;
             transition: opacity .15s;
         }
-
-        .forgot-link:hover {
-            opacity: .75;
-            text-decoration: underline;
-        }
+        .forgot-link:hover { opacity: .75; text-decoration: underline; }
 
         .btn-login {
             width: 100%;
@@ -640,28 +455,17 @@
             transform: translateX(-100%);
             transition: transform .4s;
         }
-
-        .btn-login:hover::before {
-            transform: translateX(100%);
-        }
-
+        .btn-login:hover::before { transform: translateX(100%); }
         .btn-login:hover {
             opacity: .92;
             box-shadow: 0 8px 26px rgba(104, 16, 18, 0.45);
         }
+        .btn-login:active { transform: scale(.98); }
 
-        .btn-login:active {
-            transform: scale(.98);
-        }
-
-        .btn-login-text {
-            flex: 1;
-            text-align: left;
-        }
+        .btn-login-text { flex: 1; text-align: center; }
 
         .btn-arrow {
-            width: 34px;
-            height: 34px;
+            width: 34px; height: 34px;
             flex-shrink: 0;
             background: rgba(255, 255, 255, 0.18);
             border-radius: 9px;
@@ -670,39 +474,21 @@
             justify-content: center;
             transition: background .2s;
         }
-
-        .btn-login:hover .btn-arrow {
-            background: rgba(255, 255, 255, 0.28);
-        }
-
+        .btn-login:hover .btn-arrow { background: rgba(255, 255, 255, 0.28); }
         .btn-arrow svg {
-            width: 14px;
-            height: 14px;
-            stroke: #fff;
-            fill: none;
-            stroke-width: 2.5;
-            stroke-linecap: round;
-            stroke-linejoin: round;
+            width: 14px; height: 14px;
+            stroke: #fff; fill: none;
+            stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
             transition: transform .2s;
         }
-
-        .btn-login:hover .btn-arrow svg {
-            transform: translateX(2px);
-        }
-
-        .btn-login.loading {
-            pointer-events: none;
-        }
-
+        .btn-login:hover .btn-arrow svg { transform: translateX(2px); }
+        .btn-login.loading { pointer-events: none; }
         .btn-login.loading .btn-login-text,
-        .btn-login.loading .btn-arrow {
-            opacity: 0;
-        }
+        .btn-login.loading .btn-arrow { opacity: 0; }
 
         .spinner {
             position: absolute;
-            width: 20px;
-            height: 20px;
+            width: 20px; height: 20px;
             border: 2.5px solid rgba(255, 255, 255, 0.3);
             border-top-color: #fff;
             border-radius: 50%;
@@ -710,36 +496,39 @@
             opacity: 0;
             transition: opacity .2s;
         }
-
-        .btn-login.loading .spinner {
-            opacity: 1;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
+        .btn-login.loading .spinner { opacity: 1; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .demo-box {
-            margin-top: 16px;
-            border: 1.5px solid #ede4e4;
-            border-radius: 15px;
-            padding: 14px 16px;
+            margin-top: 18px;
         }
 
-        .demo-eyebrow {
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .14em;
-            color: #681012;
-            margin-bottom: 10px;
+        .demo-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
         }
 
+        .demo-divider::before,
+        .demo-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e7e2e2;
+        }
+
+        .demo-divider span {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            white-space: nowrap;
+        }
+
+        /* 3 equal columns so every demo button is the same width */
         .demo-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 6px;
         }
 
@@ -747,81 +536,71 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
-            height: 36px;
-            border-radius: 9px;
-            border: 1.5px solid #ede4e4;
-            background: #faf7f7;
+            gap: 6px;
+            height: 38px;
+            border-radius: 10px;
+            border: 1.5px solid #e9edf2;
+            background: #ffffff;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 600;
             color: #334155;
             font-family: 'Poppins', sans-serif;
             text-decoration: none;
             transition: border-color .15s, background .15s, color .15s, transform .15s;
         }
-
         .demo-btn:hover {
             border-color: #681012;
             background: rgba(104, 16, 18, 0.04);
             color: #681012;
             transform: translateY(-1px);
         }
+        .demo-btn.full { grid-column: 1 / -1; }
 
-        .demo-btn.full {
-            grid-column: 1 / -1;
+        /* Fixed-size icon wrapper so every icon lines up the same
+           regardless of its internal SVG proportions */
+        .demo-icon {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
-
-        .demo-btn svg {
-            width: 11px;
-            height: 11px;
+        .demo-icon svg {
+            width: 100%;
+            height: 100%;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
+            display: block;
+        }
+        /* the peso icon is text-based, so it needs a fill instead of a stroke */
+        .demo-icon svg.icon-peso {
+            stroke: none;
+            fill: currentColor;
         }
 
         /* ── RESPONSIVE ── */
-        @media (max-width: 1023px) {
-            .login-inner {
+        @media (max-width: 760px) {
+            .auth-card {
                 flex-direction: column;
-                justify-content: center;
-                padding: 40px 20px;
-                gap: 32px;
+                max-width: 420px;
             }
-
-            .left-content {
-                text-align: center;
+            .auth-left {
+                flex: none;
+                padding: 32px 30px;
             }
-
-            .left-logo {
-                justify-content: center;
+            .auth-left::after {
+                width: auto;
+                height: 1px;
+                right: 0; left: 0; bottom: 0; top: auto;
             }
-
-            .left-eyebrow {
-                justify-content: center;
-            }
-
-            .left-rule {
-                margin: 20px auto 18px;
-            }
-
-            .left-desc {
-                margin: 0 auto 32px;
-            }
-
-            .left-stats {
-                justify-content: center;
-            }
-
-            .left-pills {
-                justify-content: center;
-            }
-
-            .right-card-wrap {
-                width: 100%;
-                max-width: 400px;
-            }
+            .left-body { margin-top: 20px; }
+            .left-footer { display: none; }
+            .auth-right { padding: 32px 28px; }
+            .demo-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -835,214 +614,189 @@
         <div class="page-bar"></div>
         <div class="particles" id="particles"></div>
 
-        <div class="login-inner">
+        <div class="auth-card">
 
-            {{-- ── LEFT CONTENT ── --}}
-            <div class="left-content">
+            {{-- ── LEFT: INFO PANEL ── --}}
+            <div class="auth-left">
                 <a class="left-logo" href="{{ route('prism.home') }}">
                     <div class="left-logo-img">
-                        <img src="{{ asset('images/bsu-seal.png') }}" alt="BSU"
-                            onerror="this.parentElement.innerHTML='🎓'">
+                        <img src="{{ asset('images/login1.png') }}" alt="PRISM">
                     </div>
                     <div>
                         <p class="left-logo-name">PRISM</p>
-                        <p class="left-logo-sub">Batangas State University</p>
+                        <p class="left-logo-sub">Batangas State University TNEU ARASOF-Nasugbu Campus</p>
                     </div>
                 </a>
 
-                <p class="left-eyebrow">Welcome Back</p>
-                <h1 class="left-title">Your procurement<br>command center<span class="dot">.</span></h1>
-                <div class="left-rule"></div>
-                <p class="left-desc">
-                    <strong>PRISM</strong> centralizes procurement workflows, budget monitoring,
-                    and compliance tracking — giving every stakeholder a clear, real-time view
-                    of university spending.
-                </p>
-
-                <div class="left-stats">
-                    <div class="stat-item">
-                        <span class="stat-value">360<span>°</span></span>
-                        <span class="stat-label">Budget Visibility</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat-item">
-                        <span class="stat-value">5<span>+</span></span>
-                        <span class="stat-label">Office Roles</span>
-                    </div>
-                    <div class="stat-divider"></div>
-                    <div class="stat-item">
-                        <span class="stat-value">AI<span>‑</span>On</span>
-                        <span class="stat-label">Market Scoping</span>
-                    </div>
+                <div class="left-body">
+                    <p class="left-eyebrow">Welcome Back</p>
+                    <h1 class="left-title">Your procurement<br>command center<span class="dot">.</span></h1>
+                    <p class="left-desc">
+                        <strong>PRISM</strong> centralizes procurement workflows, budget monitoring,
+                        and compliance tracking for the university.
+                    </p>
                 </div>
 
-                <div class="left-pills">
-                    <span class="pill"><span class="pill-dot"></span>Market Scoping</span>
-                    <span class="pill"><span class="pill-dot"></span>Procurement Monitoring</span>
-                    <span class="pill"><span class="pill-dot"></span>Budget Analytics</span>
-                    <span class="pill"><span class="pill-dot"></span>Compliance Tracking</span>
-                    <span class="pill"><span class="pill-dot"></span>Role-Based Access</span>
-                </div>
             </div>
 
-            {{-- ── RIGHT CARD ── --}}
-            <div class="right-card-wrap">
-                <div class="login-card">
-                    <div class="card-shimmer"></div>
-                    <div class="card-dots">
-                        <svg width="100" height="100" viewBox="0 0 100 100">
-                            <circle cx="85" cy="15" r="7" fill="#681012" />
-                            <circle cx="70" cy="15" r="7" fill="#681012" />
-                            <circle cx="55" cy="15" r="7" fill="#681012" />
-                            <circle cx="85" cy="30" r="7" fill="#681012" />
-                            <circle cx="70" cy="30" r="7" fill="#681012" />
-                            <circle cx="85" cy="45" r="7" fill="#681012" />
+            {{-- ── RIGHT: LOGIN FORM ── --}}
+            <div class="auth-right">
+                <h1 class="card-h1">Welcome to PRISM</h1>
+                <p class="card-sub">Sign in to your account</p>
+
+                @if ($errors->any())
+                    <div class="server-error" role="alert">
+                        <svg viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
                         </svg>
+                        <span>{{ $errors->first() }}</span>
+                    </div>
+                @endif
+                <form id="loginForm" method="POST" action="{{ route('login.post') }}">
+                    @csrf
+
+                    <div class="field">
+                        <div class="input-wrap">
+                            <div class="input-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                </svg>
+                            </div>
+                            <input class="field-input @error('email') error @enderror" type="text" id="emailInput" name="email"
+                                autocomplete="username" placeholder="Username"
+                                value="{{ old('email') }}">
+                        </div>
+                        <p class="field-error" id="emailError">Please enter your username or email.</p>
                     </div>
 
-                    <h1 class="card-h1">Log <span>in</span></h1>
-                    <div class="card-rule"></div>
-
-                    @if ($errors->any())
-                        <div class="server-error" role="alert">
-                            <svg viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span>{{ $errors->first() }}</span>
-                        </div>
-                    @endif
-
-                    <form id="loginForm" method="POST" action="{{ route('login') }}">
-                        @csrf
-
-                        <div class="field">
-                            <div class="input-wrap">
-                                <div class="input-icon">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                        <circle cx="12" cy="7" r="4" />
-                                    </svg>
-                                </div>
-                                <input class="field-input @error('email') error @enderror" type="text" id="emailInput" name="email"
-                                    autocomplete="username" placeholder="Username"
-                                    value="{{ old('email') }}">
-                            </div>
-                            <p class="field-error" id="emailError">Please enter your username or email.</p>
-                        </div>
-
-                        <div class="field">
-                            <div class="input-wrap">
-                                <div class="input-icon">
-                                    <svg viewBox="0 0 24 24">
-                                        <rect x="3" y="11" width="18" height="11" rx="2" />
-                                        <path d="M7 11V7a5 5 0 0110 0v4" />
-                                    </svg>
-                                </div>
-                                <input class="field-input @error('password') error @enderror" type="password" id="passwordInput" name="password"
-                                    autocomplete="current-password" placeholder="Password">
-                                <button class="pw-toggle" type="button" id="pwToggle" aria-label="Toggle password">
-                                    <svg id="eyeIcon" viewBox="0 0 24 24">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                        <circle cx="12" cy="12" r="3" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <p class="field-error" id="passwordError">Please enter your password.</p>
-                        </div>
-
-                        <div class="extras-row">
-                            <label class="remember-label">
-                                <input type="checkbox" name="remember"> Remember Me
-                            </label>
-                            <a class="forgot-link" href="#">Forgot Password?</a>
-                        </div>
-
-                        <button class="btn-login" type="submit" id="loginBtn">
-                            <div class="spinner"></div>
-                            <span class="btn-login-text">Log In</span>
-                            <span class="btn-arrow">
+                    <div class="field">
+                        <div class="input-wrap">
+                            <div class="input-icon">
                                 <svg viewBox="0 0 24 24">
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                    <polyline points="12 5 19 12 12 19" />
+                                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                                </svg>
+                            </div>
+                            <input class="field-input @error('password') error @enderror" type="password" id="passwordInput" name="password"
+                                autocomplete="current-password" placeholder="Password">
+                            <button class="pw-toggle" type="button" id="pwToggle" aria-label="Toggle password">
+                                <svg id="eyeIcon" viewBox="0 0 24 24">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="field-error" id="passwordError">Please enter your password.</p>
+                    </div>
+
+                    <div class="extras-row">
+                        <label class="remember-label">
+                            <input type="checkbox" name="remember"> Remember Me
+                        </label>
+                        <a class="forgot-link" href="#">Forgot Password?</a>
+                    </div>
+
+                    <button class="btn-login" type="submit" id="loginBtn">
+                        <div class="spinner"></div>
+                        <span class="btn-login-text">Sign in</span>
+                        
+                    </button>
+                </form>
+
+                <div class="demo-box">
+                    <div class="demo-divider"><span>or continue as (prototype demo access)</span></div>
+                    <div class="demo-grid">
+                        <a class="demo-btn" href="{{ route('demo.login', 'office-head') }}">
+                            <span class="demo-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
                                 </svg>
                             </span>
-                        </button>
-                    </form>
-
-                    <div class="demo-box">
-                        <p class="demo-eyebrow">Prototype Demo Access</p>
-                        <div class="demo-grid">
-                            <a class="demo-btn" href="{{ route('demo.login', 'office-head') }}">
+                            Office Head
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'finance-office') }}">
+                            <span class="demo-icon">
+                                <svg class="icon-peso" viewBox="0 0 24 24">
+                                    <text x="12" y="18" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">&#8369;</text>
+                                </svg>
+                            </span>
+                            Finance
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'procurement-office') }}">
+                            <span class="demo-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                    <line x1="9" y1="13" x2="15" y2="13" />
+                                    <line x1="9" y1="17" x2="15" y2="17" />
+                                </svg>
+                            </span>
+                            Procurement
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'chancellor') }}">
+                            <span class="demo-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <circle cx="12" cy="8" r="6" />
+                                    <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11" />
+                                </svg>
+                            </span>
+                            Chancellor
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'vice-chancellor') }}">
+                            <span class="demo-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                    <polyline points="9 12 11 14 15 10" />
+                                </svg>
+                            </span>
+                            Vice Chancellor
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'accounting-office') }}">
+                            <span class="demo-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <line x1="3" y1="9" x2="21" y2="9" />
+                                    <line x1="9" y1="9" x2="9" y2="21" />
+                                    <line x1="15" y1="9" x2="15" y2="21" />
+                                </svg>
+                            </span>
+                            Accounting
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'bac') }}">
+                            <span class="demo-icon">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
                                     <path d="M23 21v-2a4 4 0 00-3-3.87" />
                                     <path d="M16 3.13a4 4 0 010 7.75" />
                                 </svg>
-                                Office Head
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'finance-office') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <line x1="12" y1="1" x2="12" y2="23" />
-                                    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                                </svg>
-                                Finance
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'procurement-office') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                                    <rect x="9" y="3" width="6" height="4" rx="1" />
-                                </svg>
-                                Procurement
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'chancellor') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <circle cx="12" cy="8" r="6" />
-                                    <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11" />
-                                </svg>
-                                Chancellor
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'vice-chancellor') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                </svg>
-                                Vice Chancellor
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'accounting-office') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <rect x="2" y="5" width="20" height="14" rx="2" />
-                                    <line x1="2" y1="10" x2="22" y2="10" />
-                                </svg>
-                                Accounting
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'bac') }}">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                    <path d="M9 15l2 2 4-4" />
-                                </svg>
-                                BAC
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'cashier') }}">
+                            </span>
+                            BAC
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'cashier') }}">
+                            <span class="demo-icon">
                                 <svg viewBox="0 0 24 24">
                                     <rect x="1" y="4" width="22" height="16" rx="2" />
                                     <line x1="1" y1="10" x2="23" y2="10" />
                                     <line x1="6" y1="15" x2="10" y2="15" />
                                 </svg>
-                                Cashier
-                            </a>
-                            <a class="demo-btn" href="{{ route('demo.login', 'system-admin') }}">
+                            </span>
+                            Cashier
+                        </a>
+                        <a class="demo-btn" href="{{ route('demo.login', 'system-admin') }}">
+                            <span class="demo-icon">
                                 <svg viewBox="0 0 24 24">
                                     <circle cx="12" cy="12" r="3" />
                                     <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
                                 </svg>
-                                Admin
-                            </a>
-                        </div>
+                            </span>
+                            Admin
+                        </a>
                     </div>
-
                 </div>
             </div>
 
@@ -1066,16 +820,6 @@
         `;
                 container.appendChild(p);
             }
-
-            document.querySelectorAll('.pill').forEach((el, i) => {
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(8px)';
-                el.style.transition = 'opacity .4s ease, transform .4s ease';
-                setTimeout(() => {
-                    el.style.opacity = '1';
-                    el.style.transform = 'translateY(0)';
-                }, 800 + i * 100);
-            });
 
             const pwInput = document.getElementById('passwordInput');
             const pwToggle = document.getElementById('pwToggle');

@@ -103,8 +103,8 @@ const slugStatus = (value) => String(value ?? '')
     .toLowerCase()
     .replaceAll(' ', '-');
 
-const neutralBadgeClass = 'inline-flex min-h-7 items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200';
-const badgeBaseClass = 'inline-flex min-h-7 items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset';
+const neutralBadgeClass = 'inline-flex min-h-7 items-center justify-center rounded-full bg-slate-100 px-4 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-inset ring-slate-200';
+const badgeBaseClass = 'inline-flex min-h-7 items-center justify-center rounded-full px-4 py-1.5 text-xs font-bold ring-1 ring-inset';
 const badgeTones = {
     draft: 'bg-slate-100 text-slate-700 ring-slate-200',
     submitted: 'bg-blue-50 text-blue-700 ring-blue-200',
@@ -122,6 +122,26 @@ const badgeTones = {
     critical: 'bg-red-50 text-red-700 ring-red-200',
 };
 const badgeClass = (status) => `${badgeBaseClass} ${badgeTones[slugStatus(status)] ?? badgeTones.draft}`;
+const badgeColors = {
+    draft: ['#F1F5F9', '#334155', '#E2E8F0'],
+    submitted: ['#DBEAFE', '#1E40AF', '#BFDBFE'],
+    'under-review': ['#FEF3C7', '#92400E', '#FDE68A'],
+    endorsed: ['#EDE9FE', '#4C1D95', '#DDD6FE'],
+    returned: ['#FEE2E2', '#991B1B', '#FECACA'],
+    approved: ['#DCFCE7', '#166534', '#BBF7D0'],
+    pending: ['#FEF3C7', '#92400E', '#FDE68A'],
+    'in-progress': ['#DBEAFE', '#1E40AF', '#BFDBFE'],
+    completed: ['#DCFCE7', '#166534', '#BBF7D0'],
+    delayed: ['#FEE2E2', '#991B1B', '#FECACA'],
+    'on-track': ['#DCFCE7', '#166534', '#BBF7D0'],
+    'at-risk': ['#FEF3C7', '#92400E', '#FDE68A'],
+    watch: ['#FEF3C7', '#92400E', '#FDE68A'],
+    critical: ['#FEE2E2', '#991B1B', '#FECACA'],
+};
+const badgeInlineStyle = (status) => {
+    const [bg, fg, border] = badgeColors[slugStatus(status)] ?? badgeColors.draft;
+    return `display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 14px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;background:${bg};color:${fg};border:1px solid ${border};`;
+};
 const primaryButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-bsu-maroon px-4 text-sm font-bold text-white shadow-sm shadow-bsu-maroon/15 transition hover:bg-bsu-maroon-900 focus:outline-none focus:ring-2 focus:ring-bsu-gold/70';
 const secondaryButtonClass = 'inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-bsu-maroon/35 bg-white px-4 text-sm font-bold text-bsu-maroon shadow-sm transition hover:border-bsu-maroon hover:bg-bsu-maroon/5 focus:outline-none focus:ring-2 focus:ring-bsu-gold/70';
 const rowActionsClass = 'flex flex-wrap gap-2';
@@ -130,7 +150,41 @@ const tableActionDangerClass = 'inline-flex h-9 w-9 items-center justify-center 
 const scopeListClass = 'grid min-w-60 gap-2.5';
 const scopeItemClass = 'rounded-xl border border-slate-200 bg-white p-3 text-sm leading-6 shadow-sm [&_strong]:block [&_strong]:font-bold [&_strong]:text-slate-950 [&_span]:block [&_span]:text-slate-600 [&_a]:font-bold [&_a]:text-bsu-maroon [&_a:hover]:underline';
 const noteClass = 'mt-1.5 block text-sm leading-6 text-slate-500';
-const timelineClass = 'relative grid gap-3 border-l border-bsu-gold/60 pl-5 [&_li]:relative [&_li]:grid [&_li]:gap-1.5 [&_li]:rounded-2xl [&_li]:border [&_li]:border-slate-200 [&_li]:bg-white [&_li]:p-4 [&_li]:shadow-sm [&_li:before]:absolute [&_li:before]:-left-[1.62rem] [&_li:before]:top-5 [&_li:before]:h-3 [&_li:before]:w-3 [&_li:before]:rounded-full [&_li:before]:bg-bsu-maroon [&_strong]:text-sm [&_strong]:font-bold [&_strong]:text-slate-950 [&_span]:text-xs [&_span]:font-bold [&_span]:text-slate-500 [&_p]:text-sm [&_p]:leading-6 [&_p]:text-slate-600';
+const activityLogClass = 'relative grid gap-4 [&_li]:relative [&_li]:grid [&_li]:gap-1.5 [&_li]:rounded-xl [&_li]:border [&_li]:border-slate-200 [&_li]:bg-white [&_li]:px-6 [&_li]:py-5 [&_li]:shadow-sm [&_strong]:text-sm [&_strong]:font-bold [&_strong]:text-slate-950 [&_span]:text-xs [&_span]:font-bold [&_span]:text-slate-500 [&_p]:text-sm [&_p]:leading-6 [&_p]:text-slate-600 [&_p]:break-words [&_p]:whitespace-pre-wrap';
+const timelineClass = 'relative grid';
+const timelineDotColor = (step) => {
+    const colors = {
+        submitted: '#4F46E5',
+        'under-review': '#F59E0B',
+        endorse: '#F59E0B',
+        endorsed: '#F59E0B',
+        approve: '#16A34A',
+        approved: '#16A34A',
+        return: '#DC2626',
+        returned: '#DC2626',
+    };
+
+    return colors[slugStatus(step)] ?? '#64748B';
+};
+const timelineItemMarkup = (event, isLast) => {
+    const connector = isLast
+        ? ''
+        : `<span style="position:absolute;left:50%;top:36px;bottom:0;width:0;border-left:2px dashed #cbd5e1;transform:translateX(-50%);"></span>`;
+
+    return `
+        <li style="position:relative;display:flex;gap:16px;padding-bottom:16px;">
+            <div style="position:relative;flex-shrink:0;width:36px;">
+                <span style="display:block;height:36px;width:36px;border-radius:9999px;background:${timelineDotColor(event.step)};box-shadow:0 1px 3px rgba(15,23,42,.15);"></span>
+                ${connector}
+            </div>
+            <div style="flex:1;min-width:0;border-radius:12px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:16px 24px;">
+                <strong style="display:block;font-size:14px;font-weight:700;color:#0f172a;">${escapeHtml(event.step)}</strong>
+                <span style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-top:2px;">${escapeHtml(event.timestamp)}</span>
+                <p style="margin-top:6px;font-size:13px;line-height:1.6;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
+            </div>
+        </li>
+    `;
+};
 const timelineEmptyClass = 'flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-base leading-7 text-slate-500 [&_svg]:h-10 [&_svg]:w-10 [&_svg]:text-bsu-maroon/70';
 const returnedBoxClass = 'rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800 shadow-sm';
 const panelHeaderClass = 'mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950';
@@ -228,14 +282,14 @@ const initBudgetProposal = () => {
 
     const scopeMarkup = (scoping) => {
         if (!scoping?.length) {
-            return `<span class="${neutralBadgeClass}">No references</span>`;
+            return `<span class="${neutralBadgeClass}">No References</span>`;
         }
 
         const lowest = [...scoping].sort((first, second) => Number(first.price) - Number(second.price))[0];
 
         return `
             <div class="grid gap-1.5">
-                <span class="inline-flex min-h-7 w-max items-center rounded-full bg-bsu-maroon/10 px-3 py-1 text-xs font-bold text-bsu-maroon ring-1 ring-inset ring-bsu-maroon/20">${scoping.length} refs</span>
+                <span class="inline-flex min-h-7 w-max items-center justify-center rounded-full bg-bsu-maroon/10 px-4 py-1.5 text-xs font-bold text-bsu-maroon ring-1 ring-inset ring-bsu-maroon/20 whitespace-nowrap">${scoping.length} references</span>
                 ${lowest ? `<span class="text-xs font-semibold text-slate-500">Lowest: ${escapeHtml(lowest.supplierName)} · ${money(lowest.price)}</span>` : ''}
             </div>
         `;
@@ -250,7 +304,7 @@ const initBudgetProposal = () => {
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                         <p class="truncate text-sm font-bold text-slate-950">${escapeHtml(item.description)}</p>
-                        <p class="mt-1 text-xs font-semibold text-slate-500">${escapeHtml(item.targetQuarter)} · ${scoping.length} references</p>
+                        <p class="mt-1 text-xs font-semibold text-slate-500">${escapeHtml(item.targetQuarter)} · ${scoping.length} References</p>
                     </div>
                     <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-bsu-maroon ring-1 ring-inset ring-slate-200">${escapeHtml(item.unit)}</span>
                 </div>
@@ -504,7 +558,8 @@ const initProposalTimeline = () => {
 
         if (statusBadge) {
             statusBadge.textContent = 'Status';
-            statusBadge.className = badgeClass('Draft');
+            statusBadge.className = '';
+            statusBadge.style.cssText = badgeInlineStyle('Draft');
         }
 
         if (amount) {
@@ -539,7 +594,8 @@ const initProposalTimeline = () => {
 
         if (statusBadge) {
             statusBadge.textContent = proposal.status;
-            statusBadge.className = badgeClass(proposal.status);
+            statusBadge.className = '';
+            statusBadge.style.cssText = badgeInlineStyle(proposal.status);
         }
 
         if (amount) {
@@ -553,13 +609,7 @@ const initProposalTimeline = () => {
 
         content.innerHTML = `
             <ol class="${timelineClass}">
-                ${proposal.timeline.map((event) => `
-                    <li>
-                        <strong>${escapeHtml(event.step)}</strong>
-                        <span>${escapeHtml(event.timestamp)}</span>
-                        <p>${escapeHtml(event.remarks)}</p>
-                    </li>
-                `).join('')}
+                ${proposal.timeline.map((event, idx) => timelineItemMarkup(event, idx === proposal.timeline.length - 1)).join('')}
             </ol>
             ${proposal.status === 'Returned' ? `
                 <div class="${returnedBoxClass}">
@@ -825,7 +875,7 @@ const initProcurementRequestManagement = () => {
     const statuses = ['Pending', 'In Progress', 'Completed', 'Delayed'];
 
     const renderActivityLog = (request) => `
-        <ol class="${timelineClass}">
+        <ol class="${activityLogClass}">
             ${request.activityLog.map((entry) => `
                 <li>
                     <strong>${escapeHtml(entry.status)}</strong>
@@ -1021,7 +1071,7 @@ const initChancellorBudgetApproval = () => {
     const proposalMap = new Map(proposals.map((proposal) => [proposal.id, proposal]));
 
     const trailMarkup = (proposal) => `
-        <ol class="${timelineClass}">
+        <ol class="${activityLogClass}">
             <li>
                 <strong>Finance Endorsement</strong>
                 <span>${escapeHtml(proposal.financeEndorsementTimestamp)}</span>
@@ -1194,7 +1244,7 @@ const initViceChancellorStatus = () => {
     const itemMap = new Map(items.map((item) => [item.id, item]));
 
     const renderTimeline = (item) => `
-        <ol class="${timelineClass}">
+        <ol class="${activityLogClass}">
             ${item.timeline.map((entry) => `
                 <li>
                     <strong>${escapeHtml(entry.status)}</strong>

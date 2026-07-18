@@ -4,6 +4,7 @@
 @php
     $isReadOnly            = $isReadOnly ?? false;
     $proposalStatus        = $proposalStatus ?? 'draft';
+    $isDraft                = $proposalStatus === 'draft';
     $itemCount             = count($encodedItems);
     $scopingReferenceCount = collect($encodedItems)->sum(fn ($item) => count($item['scoping']));
     $missingScopingCount   = collect($encodedItems)->filter(fn ($item) => empty($item['scoping']))->count();
@@ -17,15 +18,19 @@
             display: grid;
             grid-template-columns: minmax(0, 1fr) 320px;
             gap: 16px;
-            align-items: start;
+            align-items: stretch;
         }
         .col-left  { display: flex; flex-direction: column; gap: 16px; }
         .col-right {
-            position: sticky;
-            top: 22px;
             display: flex;
             flex-direction: column;
             gap: 14px;
+        }
+        .top-grid .col-left .card,
+        .top-grid .col-right .card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ══ CARD ══ */
@@ -77,7 +82,7 @@
             background: var(--crimson-mid); font-weight: 700; color: var(--crimson);
             border-color: var(--crimson-border); cursor: default;
         }
-        .form-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .form-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
         .item-row1   { display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
         .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; }
 
@@ -203,7 +208,7 @@
         .summary-stat dd.crimson { color: var(--crimson); }
         .summary-stat dd.sm { font-size: 14px; font-weight: 700; }
 
-        .submit-wrap { padding: 0 22px 18px; }
+        .submit-wrap { padding: 0 22px 18px; margin-top: auto; }
 
         /* ══ RESPONSIVE ══ */
         @media (max-width: 1280px) {
@@ -236,7 +241,7 @@
         .submit-msg.warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
 
         /* ── Submitted state in right panel ── */
-        .submitted-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 22px 22px; text-align: center; }
+        .submitted-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 22px 22px; text-align: center; margin-top: auto; }
         .submitted-state i { font-size: 32px; color: #2563EB; }
         .submitted-state-title { font-size: 13px; font-weight: 800; color: var(--txt); }
         .submitted-state-sub   { font-size: 11.5px; color: var(--txt3); line-height: 1.5; }
@@ -333,7 +338,7 @@
         </div>
         @endif
 
-        {{-- ═══ TOP GRID ═══ --}}
+        {{-- ═══ TOP GRID — PPMP Info (left) aligned with Readiness Check (right) ═══ --}}
         <div class="top-grid">
             <div class="col-left">
 
@@ -379,70 +384,9 @@
                     </div>
                 </div>
 
-                {{-- ADD ITEMS --}}
-                @if(!$isReadOnly)
-                <div class="card">
-                    <div class="card-head">
-                        <div class="card-head-icon"><i class="ti ti-plus"></i></div>
-                        <div class="card-head-text">
-                            <p class="card-eyebrow">Procurement items</p>
-                            <p class="card-title">Add Items</p>
-                            <p class="card-sub">Encode item details, then run market scoping for price references.</p>
-                        </div>
-                        <button id="runMarketScopingButton" type="button" class="btn-primary" style="margin-left:auto;">
-                            <i class="ti ti-bolt"></i>Run Market Scoping
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <form id="proposalItemForm">
-                            <input id="itemId" name="itemId" type="hidden">
-                            <div class="item-row1">
-                                <div class="field-group">
-                                    <label class="field-label" for="itemDescription">Item Description</label>
-                                    <input id="itemDescription" name="description" class="field-input" placeholder="e.g. Laptop computer for laboratory use" required>
-                                </div>
-                                <div class="field-group">
-                                    <label class="field-label" for="itemUnit">Unit</label>
-                                    <select id="itemUnit" name="unit" class="field-select">
-                                        <option>unit</option><option>set</option>
-                                        <option>lot</option><option>piece</option>
-                                    </select>
-                                </div>
-                                <div class="field-group">
-                                    <label class="field-label" for="itemQuantity">Quantity</label>
-                                    <input id="itemQuantity" name="quantity" class="field-input" type="number" min="1" value="1" required>
-                                </div>
-                                <div class="field-group">
-                                    <label class="field-label" for="itemUnitCost">Unit Cost</label>
-                                    <input id="itemUnitCost" name="estimatedUnitCost" class="field-input" type="number" min="0" value="0" required>
-                                </div>
-                            </div>
-                            <div class="item-row2">
-                                <div class="field-group" style="grid-column:span 2;">
-                                    <label class="field-label" for="itemJustification">Purpose / Justification</label>
-                                    <input id="itemJustification" name="justification" class="field-input" placeholder="Short procurement justification">
-                                </div>
-                                <div class="field-group">
-                                    <label class="field-label" for="itemQuarter">Target Quarter</label>
-                                    <select id="itemQuarter" name="targetQuarter" class="field-select">
-                                        <option>Q1</option><option>Q2</option>
-                                        <option>Q3</option><option>Q4</option>
-                                    </select>
-                                </div>
-                                <div style="display:flex;align-items:flex-end;">
-                                    <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
-                                        <i class="ti ti-plus"></i>Add Item
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                @endif
-
             </div>{{-- /col-left --}}
 
-            {{-- ═══ RIGHT — sticky readiness panel ═══ --}}
+            {{-- ═══ RIGHT — sticky readiness panel, height-matched to the PPMP Info card ═══ --}}
             <div class="col-right">
                 <div class="card">
                     <div class="card-head">
@@ -452,11 +396,6 @@
                             <p class="card-title">PPMP Submission Readiness</p>
                             <p class="card-sub">Market scoping must support all encoded items.</p>
                         </div>
-                    </div>
-                    <div style="padding:12px 22px 0;">
-                        <span id="proposalReadyBadge" class="readiness-badge {{ $missingScopingCount === 0 ? 'ready' : 'draft' }}">
-                            {{ $missingScopingCount === 0 ? '✓ Ready for Review' : 'Draft' }}
-                        </span>
                     </div>
                     <dl class="summary-grid">
                         <div class="summary-stat">
@@ -476,27 +415,82 @@
                             <dd class="sm crimson">PHP {{ number_format($proposalTotal) }}</dd>
                         </div>
                     </dl>
+                    @if(!$isReadOnly)
                     <div class="submit-wrap">
-                        @if($isReadOnly)
-                        <div class="submitted-state">
-                            <i class="ti ti-circle-check"></i>
-                            <p class="submitted-state-title">Proposal Submitted</p>
-                            <p class="submitted-state-sub">Awaiting Finance Office review. You will be notified of any updates.</p>
-                        </div>
-                        @else
                         <p id="submitMsg" class="submit-msg"></p>
                         <button id="submitProposalButton" type="button" class="btn-submit">
-                            <i class="ti ti-send"></i>Submit PPMP
+                            <i class="ti ti-send"></i>Submit PPMP to Finance Office
                         </button>
-                        @endif
                     </div>
+                    @endif
                 </div>
             </div>{{-- /col-right --}}
 
         </div>{{-- /top-grid --}}
 
+        {{-- ═══ ADD ITEMS — full-width, stretched, only shown while the PPMP is still in Draft status ═══ --}}
+        @if($isDraft)
+        <div class="card" id="addItemsCard" style="margin-top:16px;">
+            <div class="card-head">
+                <div class="card-head-icon"><i class="ti ti-plus"></i></div>
+                <div class="card-head-text">
+                    <p class="card-eyebrow">Procurement items</p>
+                    <p class="card-title">Add Items</p>
+                    <p class="card-sub">Encode item details, then run market scoping for price references.</p>
+                </div>
+                <button id="runMarketScopingButton" type="button" class="btn-primary" style="margin-left:auto;">
+                    <i class="ti ti-bolt"></i>Run Market Scoping
+                </button>
+            </div>
+            <div class="card-body">
+                <form id="proposalItemForm">
+                    <input id="itemId" name="itemId" type="hidden">
+                    <div class="item-row1">
+                        <div class="field-group">
+                            <label class="field-label" for="itemDescription">Item Description</label>
+                            <input id="itemDescription" name="description" class="field-input" placeholder="e.g. Laptop computer for laboratory use" required>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemUnit">Unit</label>
+                            <select id="itemUnit" name="unit" class="field-select">
+                                <option>unit</option><option>set</option>
+                                <option>lot</option><option>piece</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemQuantity">Quantity</label>
+                            <input id="itemQuantity" name="quantity" class="field-input" type="number" min="1" value="1" required>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemUnitCost">Unit Cost</label>
+                            <input id="itemUnitCost" name="estimatedUnitCost" class="field-input" type="number" min="0" value="0" required>
+                        </div>
+                    </div>
+                    <div class="item-row2">
+                        <div class="field-group" style="grid-column:span 2;">
+                            <label class="field-label" for="itemJustification">Purpose / Justification</label>
+                            <input id="itemJustification" name="justification" class="field-input" placeholder="Short procurement justification">
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemQuarter">Target Quarter</label>
+                            <select id="itemQuarter" name="targetQuarter" class="field-select">
+                                <option>Q1</option><option>Q2</option>
+                                <option>Q3</option><option>Q4</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
+                                <i class="ti ti-plus"></i>Add Item
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @endif
+
         {{-- ═══ FULL-WIDTH: PPMP document (preview + editable table) ═══ --}}
-        <div class="card" id="ppmpCard">
+        <div class="card" id="ppmpCard" style="margin-top:16px;">
             <div class="card-head">
                 <div class="card-head-icon"><i class="ti ti-list-details"></i></div>
                 <div class="card-head-text">
@@ -624,6 +618,7 @@
     // ── Render table ─────────────────────────────────────────────────────────
     function renderTable() {
         const tbody = document.getElementById('encodedItemsTable');
+        if (!tbody) return;
         if (!items.length) {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--txt3);font-weight:600;">
                 No items added yet. Use the form above to add procurement items.</td></tr>`;
@@ -733,7 +728,9 @@
         document.getElementById('proposalItemCount').textContent        = items.length;
         document.getElementById('proposalSummaryItems').textContent     = items.length;
         document.getElementById('proposalSummaryMissing').textContent   = missing;
-        document.getElementById('proposalSummaryTotal').textContent     = 'PHP ' + fmt(total);
+
+        const totalEl = document.getElementById('proposalSummaryTotal');
+        if (totalEl) totalEl.textContent = 'PHP ' + fmt(total);
 
         const refs = items.reduce((s, i) => s + (i.scoping?.length || 0), 0);
         document.getElementById('proposalSummaryReferences').textContent = refs;
@@ -792,6 +789,7 @@
             if (data.success) {
                 items.push(data.item);
                 renderTable();
+                renderPreview();
                 updateSummary();
                 f.reset();
                 f.quantity.value = 1;
@@ -819,6 +817,7 @@
             if (data.success) {
                 items = items.filter(i => i.id !== id);
                 renderTable();
+                renderPreview();
                 updateSummary();
             }
         } catch {
@@ -920,6 +919,7 @@
                 if (idx !== -1) items[idx] = { ...items[idx], ...data.item };
                 editingId = null;
                 renderTable();
+                renderPreview();
                 updateSummary();
             } else {
                 alert(data.message || 'Could not save changes.');
@@ -936,12 +936,12 @@
 
         if (!items.length) {
             tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--txt3);font-weight:600;">
-                No items encoded yet. Click "Edit Items" or "Create via Market Scoping" to start.</td></tr>`;
+                No items encoded yet. ${isReadOnly ? '' : 'Click "Edit Items" or "Create via Market Scoping" to start.'}</td></tr>`;
         } else {
             tbody.innerHTML = items.map((item, i) => {
                 let srcPill;
                 if (item.scoping && item.scoping.length) {
-                    srcPill = `<span class="ppmp-src-pill ppmp-src-refs"><i class="ti ti-list"></i>${item.scoping.length} market refs</span>`;
+                    srcPill = `<span class="ppmp-src-pill ppmp-src-refs"><i class="ti ti-list"></i>${item.scoping.length} market references</span>`;
                 } else if (item.attachments && item.attachments.length) {
                     srcPill = `<span class="ppmp-src-pill ppmp-src-file"><i class="ti ti-paperclip"></i>file attached</span>`;
                 } else {

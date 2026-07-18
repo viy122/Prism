@@ -52,10 +52,16 @@
     .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
     .field-select {
         height: 44px; width: 100%; border-radius: 10px;
-        border: 1px solid var(--s300); background: var(--white);
-        padding: 0 14px; font-size: 13.5px; font-weight: 500;
+        border: 1px solid var(--s300); background-color: var(--white);
+        padding: 0 40px 0 14px; font-size: 13.5px; font-weight: 500;
         color: var(--s900); font-family: 'Poppins', sans-serif; outline: none;
         transition: border-color .15s, box-shadow .15s;
+        appearance: none; -webkit-appearance: none; -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 16px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .field-select:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
     .field-textarea {
@@ -120,12 +126,16 @@
     .verdict-status { font-size: 11px; font-weight: 700; }
     .verdict-status.ok { color: #166534; }
     .verdict-status.err { color: #991b1b; }
+    .remark-display { display: flex; flex-direction: column; gap: 6px; background: var(--s50); border: 1px solid var(--s200); border-radius: 8px; padding: 10px 12px; }
+    .remark-text { font-size: 12px; color: var(--s700); line-height: 1.5; white-space: pre-wrap; }
+    .btn-edit-remark { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--crimson); background: none; border: none; cursor: pointer; padding: 0; font-family: 'Poppins', sans-serif; }
+    .btn-edit-remark:hover { text-decoration: underline; }
 
     /* ── Overall action buttons (endorse / return) ── */
     .btn-endorse { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: #16a34a; color: #fff; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 2px 10px rgba(22,163,74,.25); transition: background .2s; white-space: nowrap; flex: 1; min-width: 220px; }
     .btn-endorse:hover { background: #15803d; }
     .btn-endorse i { font-size: 17px; }
-    .btn-return { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: var(--white); color: #dc2626; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1.5px solid #fecaca; transition: all .2s; white-space: nowrap; }
+    .btn-return { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: var(--white); color: #dc2626; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1.5px solid #fecaca; transition: all .2s; white-space: nowrap; flex: 1; min-width: 220px; }
     .btn-return:hover { background: #fef2f2; border-color: #dc2626; }
     .btn-return i { font-size: 17px; }
 
@@ -158,9 +168,10 @@
                 <p class="card-sub">Review office details, encoded procurement items, justifications, target quarters, and AI market scoping references.</p>
             </div>
         </div>
-        <div style="max-width:480px;">
+        <div style="max-width:100%;">
             <label class="field-label" for="financeProposalSelector">Select Proposal</label>
             <select class="field-select" id="financeProposalSelector">
+                <option value="" @selected(!$selectedProposal)>@if(count($proposals)) — Select a proposal to review — @else No proposals pending review @endif</option>
                 @foreach ($proposals as $proposal)
                     <option value="{{ route('finance-office.proposal-review.show', ['proposal' => $proposal['id']]) }}"
                         @selected($selectedProposal && $selectedProposal['id'] === $proposal['id'])>
@@ -173,8 +184,13 @@
 
     @if(!$selectedProposal)
     <div class="card" style="padding:40px 22px;text-align:center;color:#64748b;">
-        <p style="font-size:15px;font-weight:700;">No proposals pending review.</p>
-        <p style="font-size:13px;margin-top:6px;">Submitted proposals from Office Heads will appear here.</p>
+        @if(count($proposals))
+            <p style="font-size:15px;font-weight:700;">Select a proposal above to view its details.</p>
+            <p style="font-size:13px;margin-top:6px;">Line items, justifications, and market scoping references will appear here once you pick one.</p>
+        @else
+            <p style="font-size:15px;font-weight:700;">No proposals pending review.</p>
+            <p style="font-size:13px;margin-top:6px;">Submitted proposals from Office Heads will appear here.</p>
+        @endif
     </div>
     @else
 
@@ -265,16 +281,20 @@
                             <td style="min-width:210px;">
                                 <div class="fin-verdict" data-item-id="{{ $item['id'] }}" data-remark-url="{{ $item['remarkUrl'] }}">
                                     <div class="verdict-btns">
-                                        <button type="button" class="btn-verdict btn-ok{{ $item['financeOk'] === true ? ' active' : '' }}" title="Budget OK for this item">
-                                            <i class="ti ti-check"></i> OK
+                                        <button type="button" class="btn-verdict btn-ok{{ $item['financeOk'] === true ? ' active' : '' }}" title="Approve this item">
+                                            <i class="ti ti-check"></i> Approve
                                         </button>
-                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Issue with this item">
-                                            <i class="ti ti-x"></i> Issue
+                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Add remarks for this item">
+                                            <i class="ti ti-message-2"></i> Remarks
                                         </button>
                                     </div>
-                                    <div class="verdict-remark" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
+                                    <div class="remark-display" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
+                                        <p class="remark-text">{{ $item['financeRemark'] }}</p>
+                                        <button type="button" class="btn-edit-remark"><i class="ti ti-pencil"></i> Edit</button>
+                                    </div>
+                                    <div class="verdict-remark" style="display:none;">
                                         <textarea class="field-textarea remark-input" rows="3"
-                                            placeholder="What's the issue with this item? (required)">{{ $item['financeRemark'] }}</textarea>
+                                            placeholder="Add remarks for this item (required)">{{ $item['financeRemark'] }}</textarea>
                                         <button type="button" class="btn-save-remark">
                                             <i class="ti ti-device-floppy"></i> Save Remark
                                         </button>
@@ -318,13 +338,13 @@
                     data-url="{{ route('finance-office.proposal-review.endorse', $selectedProposal['id']) }}"
                     onclick="return submitFinanceForm(this)">
                     <i class="ti ti-circle-check"></i>
-                    Approve &amp; Forward to Chancellor
+                    Endorse
                 </button>
                 <button class="btn-return" type="submit"
                     data-url="{{ route('finance-office.proposal-review.return', $selectedProposal['id']) }}"
                     onclick="return submitFinanceReturn(this)">
                     <i class="ti ti-arrow-back-up"></i>
-                    Return to Office Head
+                    Return
                 </button>
             </div>
             @else
@@ -343,7 +363,7 @@
 @push('scripts')
 <script>
 document.getElementById('financeProposalSelector')?.addEventListener('change', function () {
-    window.location.href = this.value;
+    if (this.value) window.location.href = this.value;
 });
 
 function submitFinanceForm(btn) {
@@ -381,7 +401,7 @@ function submitFinanceReturn(btn) {
             const json = await res.json();
             status.style.display = '';
             if (res.ok && json.success) {
-                status.textContent = ok ? '✓ Marked as budget OK' : '✓ Issue remark saved';
+                status.textContent = ok ? '✓ Marked as budget OK' : '✓ Remarks saved';
                 status.className = 'verdict-status ok';
                 setTimeout(() => { status.style.display = 'none'; }, 2200);
                 return true;
@@ -398,17 +418,21 @@ function submitFinanceReturn(btn) {
     }
 
     document.querySelectorAll('.fin-verdict').forEach(box => {
-        const btnOk    = box.querySelector('.btn-ok');
-        const btnFlag  = box.querySelector('.btn-flag');
-        const remarkEl = box.querySelector('.verdict-remark');
-        const input    = box.querySelector('.remark-input');
-        const btnSave  = box.querySelector('.btn-save-remark');
+        const btnOk      = box.querySelector('.btn-ok');
+        const btnFlag    = box.querySelector('.btn-flag');
+        const display    = box.querySelector('.remark-display');
+        const remarkText = box.querySelector('.remark-text');
+        const remarkEl   = box.querySelector('.verdict-remark');
+        const input      = box.querySelector('.remark-input');
+        const btnSave    = box.querySelector('.btn-save-remark');
+        const btnEdit    = box.querySelector('.btn-edit-remark');
 
         btnOk.addEventListener('click', async () => {
             const wasActive = btnOk.classList.contains('active');
             btnOk.classList.add('active');
             btnFlag.classList.remove('active');
             remarkEl.style.display = 'none';
+            display.style.display = 'none';
             if (!wasActive) {
                 const saved = await saveVerdict(box, true);
                 if (!saved) btnOk.classList.remove('active');
@@ -418,6 +442,13 @@ function submitFinanceReturn(btn) {
         btnFlag.addEventListener('click', () => {
             btnFlag.classList.add('active');
             btnOk.classList.remove('active');
+            display.style.display = 'none';
+            remarkEl.style.display = '';
+            input.focus();
+        });
+
+        btnEdit.addEventListener('click', () => {
+            display.style.display = 'none';
             remarkEl.style.display = '';
             input.focus();
         });
@@ -431,8 +462,13 @@ function submitFinanceReturn(btn) {
             }
             input.style.borderColor = '';
             btnSave.disabled = true;
-            await saveVerdict(box, false, remark);
+            const saved = await saveVerdict(box, false, remark);
             btnSave.disabled = false;
+            if (saved) {
+                remarkText.textContent = remark;
+                remarkEl.style.display = 'none';
+                display.style.display = '';
+            }
         });
     });
 })();

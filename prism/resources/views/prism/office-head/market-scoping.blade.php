@@ -756,6 +756,12 @@
         }
     }
 
+    window.msRefLogoError = function (img) {
+        img.style.display = 'none';
+        const parent = img.parentElement;
+        if (parent) parent.innerHTML = '<i class="ti ti-shopping-bag"></i>';
+    };
+
     function renderDynamic(results, container) {
         container.innerHTML = '';
         results.forEach((item, idx) => {
@@ -782,7 +788,7 @@
             card.dataset.itemId   = '';
             const imgUrl = item.image_url || item.source_icon || '';
             const logoHtml = imgUrl
-                ? '<img src="' + esc(imgUrl) + '" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i class=\\\"ti ti-shopping-bag\\\"></i>\'">'
+                ? '<img src="' + esc(imgUrl) + '" alt="" loading="lazy" onerror="window.msRefLogoError(this)">'
                 : '<i class="ti ti-shopping-bag"></i>';
 
             const matchScore = item.match_score ? Math.round(item.match_score * 100) : null;

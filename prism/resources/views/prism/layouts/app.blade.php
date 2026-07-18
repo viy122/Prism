@@ -232,7 +232,7 @@
 
     {{-- University banner with clock --}}
     <div class="univ-header">
-        <img class="hdr-bg" src="{{ asset('images/headers.png') }}" alt="Batangas State University"
+        <img class="hdr-bg" src="{{ asset('images/headers2.png') }}" alt="Batangas State University"
              onerror="this.parentElement.style.background='linear-gradient(135deg,#8B1A1C,#1E3A8A)';this.style.display='none'">
         <div class="univ-header-overlay"></div>
         <div class="univ-header-right">
