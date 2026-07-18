@@ -4,6 +4,10 @@
 /storage
 /vendor
 /bootstrap
+/node_modules
+/public/build
+/package-lock.json
+.env
 /.fleet
 /.idea
 /.nova
