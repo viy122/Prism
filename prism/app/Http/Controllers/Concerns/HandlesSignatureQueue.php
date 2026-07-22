@@ -24,6 +24,12 @@ trait HandlesSignatureQueue
     /** route name prefix (e.g. 'bac' → routes bac.sign / bac.sign.confirm) */
     abstract protected function queueRoutePrefix(): string;
 
+    /** Office IDs to scope the queue to, or null for no office filter. */
+    protected function queueOfficeIds(): ?array
+    {
+        return null;
+    }
+
     public function signDocument(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
     {
         $doc = $this->resolveSignableDoc($docType, $id);
@@ -93,7 +99,7 @@ trait HandlesSignatureQueue
             $row['signUrl']    = route($this->queueRoutePrefix() . '.sign', [$row['docType'], $row['id']]);
             $row['confirmUrl'] = route($this->queueRoutePrefix() . '.sign.confirm', [$row['docType'], $row['id']]);
             return $row;
-        }, $queue->forRole($this->queueRoleCode()));
+        }, $queue->forRole($this->queueRoleCode(), $this->queueOfficeIds()));
     }
 
     protected function resolveSignableDoc(string $docType, int $id): Model

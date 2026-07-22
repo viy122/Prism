@@ -32,6 +32,7 @@ class User extends Authenticatable
         'position_title',
         'password',
         'account_status',
+        'expo_push_token',
         'last_login_at',
     ];
 

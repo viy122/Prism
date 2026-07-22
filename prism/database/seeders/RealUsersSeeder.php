@@ -177,5 +177,36 @@ class RealUsersSeeder extends Seeder
                 ],
             ]);
         }
+
+        // ── VC jurisdiction office assignments ────────────────────────────────────
+        // Each VC is assigned a set of offices they supervise.
+        // These are non-primary (is_primary = false) and are used to scope
+        // their dashboard/reports to only the offices under their authority.
+
+        $vcAssignments = [
+            'ljbuenas@bsu.edu.ph'  => ['CICS', 'COE', 'CBA', 'CAS', 'CCJE', 'CHS', 'CTE', 'LS', 'RS', 'SDS', 'LIB', 'NSTP', 'CULT', 'SPORTS', 'SCHOL', 'HLTHO', 'SCILAB'],
+            'fdestreza@bsu.edu.ph' => ['RES', 'EXT', 'PD'],
+            'jvergara@bsu.edu.ph'  => ['HRMO', 'BUD', 'ACCT', 'CASH', 'PROC', 'PS', 'GS', 'EMU', 'ICTS', 'RMO', 'PFM'],
+            'lbalan@bsu.edu.ph'    => ['EA', 'RG', 'AJPO'],
+        ];
+
+        $vcRole = $roles['vice-chancellor'];
+
+        foreach ($vcAssignments as $email => $officeCodes) {
+            $vc = User::where('email', $email)->first();
+            if (!$vc) continue;
+
+            $assignmentMap = collect($officeCodes)->mapWithKeys(function (string $code) use ($offices, $vcRole) {
+                return [
+                    $offices[$code]->id => [
+                        'role_in_office' => $vcRole->name,
+                        'starts_on'      => now()->toDateString(),
+                        'is_primary'     => false,
+                    ],
+                ];
+            })->all();
+
+            $vc->officeAssignments()->syncWithoutDetaching($assignmentMap);
+        }
     }
 }

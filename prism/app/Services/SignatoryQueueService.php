@@ -13,13 +13,20 @@ use App\Models\PurchaseRequest;
  */
 class SignatoryQueueService
 {
-    /** @return array<int, array<string, mixed>> uniform queue rows, oldest first */
-    public function forRole(string $roleCode): array
+    /**
+     * @param  array<int>|null  $officeIds  when set, only documents originating
+     *                                      from these offices are included
+     *                                      (used to scope VC queues to their
+     *                                      assigned jurisdiction)
+     * @return array<int, array<string, mixed>> uniform queue rows, oldest first
+     */
+    public function forRole(string $roleCode, ?array $officeIds = null): array
     {
         $rows = [];
 
         PurchaseRequest::with('office')
             ->whereNotIn('signatory_stage', ['draft', 'fully_signed'])
+            ->when($officeIds, fn ($q, $ids) => $q->whereIn('office_id', $ids))
             ->orderBy('updated_at')
             ->get()
             ->filter(fn ($pr) => $pr->stageOwnerRole($pr->signatory_stage) === $roleCode)
@@ -29,6 +36,7 @@ class SignatoryQueueService
 
         AbstractOfCanvass::with('purchaseRequest.office')
             ->whereNotIn('signatory_stage', ['draft', 'fully_signed'])
+            ->when($officeIds, fn ($q, $ids) => $q->whereHas('purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
             ->orderBy('updated_at')
             ->get()
             ->filter(fn ($aoc) => $aoc->stageOwnerRole($aoc->signatory_stage) === $roleCode)
@@ -44,6 +52,7 @@ class SignatoryQueueService
 
         PurchaseOrder::with('abstractOfCanvass.purchaseRequest.office')
             ->whereNotIn('signatory_stage', ['draft', 'fully_signed'])
+            ->when($officeIds, fn ($q, $ids) => $q->whereHas('abstractOfCanvass.purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
             ->orderBy('updated_at')
             ->get()
             ->filter(fn ($po) => $po->stageOwnerRole($po->signatory_stage) === $roleCode)

@@ -50,7 +50,15 @@ class SignatoryController extends Controller
             return response()->json(['items' => $items]);
         }
 
-        return response()->json(['items' => $queue->forRole($roleCode)]);
+        // VCs only see documents from offices under their jurisdiction.
+        // No assignments yet → null → unfiltered fallback.
+        $officeIds = null;
+        if ($roleCode === 'vice-chancellor') {
+            $ids       = $user->officeAssignments()->pluck('offices.id')->all();
+            $officeIds = count($ids) > 0 ? $ids : null;
+        }
+
+        return response()->json(['items' => $queue->forRole($roleCode, $officeIds)]);
     }
 
     public function sign(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
@@ -112,6 +120,118 @@ class SignatoryController extends Controller
         );
 
         return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
+    }
+
+    public function document(string $docType, int $id): JsonResponse
+    {
+        $doc = match ($docType) {
+            'pr'    => PurchaseRequest::with(['office', 'items', 'signatureLogs.signedBy'])->findOrFail($id),
+            'aoc'   => AbstractOfCanvass::with(['purchaseRequest.office'])->findOrFail($id),
+            'po'    => PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office'])->findOrFail($id),
+            default => abort(404),
+        };
+
+        $allStages    = $doc->signatoryStages();
+        $currentIndex = $doc->stageIndex($doc->signatory_stage);
+        $resolvedMeta = $doc->resolvedStageMeta();
+
+        // Build chain — skip draft and fully_signed (not real signatory steps)
+        $chain = collect($resolvedMeta)
+            ->filter(fn ($m) => !in_array($m['key'], ['draft', 'fully_signed']))
+            ->values()
+            ->map(function ($meta, $loopIdx) use ($allStages, $currentIndex) {
+                $stageIdx = array_search($meta['key'], $allStages);
+                if ($stageIdx === false) $stageIdx = $loopIdx + 1;
+
+                return [
+                    'step'   => $loopIdx + 1,
+                    'key'    => $meta['key'],
+                    'label'  => $meta['label'],
+                    'type'   => $meta['type'] ?? 'signature',
+                    'status' => $stageIdx < $currentIndex ? 'signed'
+                              : ($stageIdx === $currentIndex ? 'current' : 'pending'),
+                ];
+            })
+            ->all();
+
+        $response = [
+            'id'              => $doc->id,
+            'docType'         => $docType,
+            'signatory_stage' => $doc->signatory_stage,
+            'stage_label'     => $doc->stageMetaFor($doc->signatory_stage)['label'] ?? $doc->signatory_stage,
+            'chain'           => $chain,
+        ];
+
+        if ($doc instanceof AbstractOfCanvass) {
+            $pr = $doc->purchaseRequest;
+            $response = array_merge($response, [
+                'number'       => $doc->code ?? ('AOC-' . str_pad($doc->id, 4, '0', STR_PAD_LEFT)),
+                'title'        => $pr?->title ?? '—',
+                'description'  => $doc->remarks ?? '',
+                'office'       => $pr?->office?->name ?? '—',
+                'office_code'  => $pr?->office?->code ?? '—',
+                'fiscal_year'  => $pr?->fiscal_year,
+                'total_amount' => (float) ($pr?->total_amount ?? 0),
+                'items'        => [],
+                'logs'         => [],
+            ]);
+        }
+
+        if ($doc instanceof PurchaseOrder) {
+            $pr = $doc->abstractOfCanvass?->purchaseRequest;
+            $response = array_merge($response, [
+                'number'       => $doc->po_number ?? ('PO-' . str_pad($doc->id, 4, '0', STR_PAD_LEFT)),
+                'title'        => ($pr?->title ?? '—') . ($doc->supplier_name ? ' — ' . $doc->supplier_name : ''),
+                'description'  => $doc->remarks ?? '',
+                'office'       => $pr?->office?->name ?? '—',
+                'office_code'  => $pr?->office?->code ?? '—',
+                'fiscal_year'  => $pr?->fiscal_year,
+                'total_amount' => (float) $doc->total_amount,
+                'items'        => [],
+                'logs'         => [],
+            ]);
+        }
+
+        if ($doc instanceof PurchaseRequest) {
+            $response = array_merge($response, [
+                'number'      => $doc->number ?? ('PR-' . str_pad($doc->id, 4, '0', STR_PAD_LEFT)),
+                'title'       => $doc->title ?? '—',
+                'description' => $doc->description ?? '',
+                'office'      => $doc->office?->name ?? '—',
+                'office_code' => $doc->office?->code ?? '—',
+                'fiscal_year' => $doc->fiscal_year,
+                'total_amount'=> (float) $doc->total_amount,
+                'print_url'   => \Illuminate\Support\Facades\URL::temporarySignedRoute('print.pr', now()->addDay(), ['id' => $doc->id]),
+                'items'       => $doc->items->map(fn ($item) => [
+                    'id'        => $item->id,
+                    'name'      => $item->name,
+                    'description'=> $item->description ?? '',
+                    'quantity'  => (float) $item->quantity,
+                    'unit'      => $item->unit,
+                    'unit_cost' => (float) $item->estimated_unit_cost,
+                    'total'     => (float) $item->estimated_total_cost,
+                ])->values()->all(),
+                'logs'        => $doc->signatureLogs()
+                    ->with('signedBy')
+                    ->where('action', '!=', 'returned')
+                    ->orderBy('signatory_number')
+                    ->get()
+                    ->map(function ($log) use ($doc, $allStages) {
+                        $key   = $allStages[$log->signatory_number] ?? null;
+                        $label = $doc->stageMetaFor($key)['label'] ?? ('Stage ' . $log->signatory_number);
+                        return [
+                            'stage_label'      => $label,
+                            'action'           => $log->action,
+                            'signed_by'        => $log->signedBy?->name ?? '—',
+                            'signed_at'        => $log->signed_at?->format('M d, Y g:i A') ?? '—',
+                            'remarks'          => $log->remarks,
+                            'detection_status' => $log->detection_status,
+                        ];
+                    })->values()->all(),
+            ]);
+        }
+
+        return response()->json($response);
     }
 
     private function resolveDoc(string $docType, int $id): Model

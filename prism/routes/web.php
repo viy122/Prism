@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PrintController;
 use App\Http\Controllers\PrismAccountingOfficeController;
 use App\Http\Controllers\PrismAdminController;
 use App\Http\Controllers\PrismBacController;
@@ -15,6 +16,11 @@ use App\Http\Controllers\SignaturePhotoController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'prism.landing')->name('prism.home');
+
+// Signed URL only — mobile gets a temporary signed link from the document API
+Route::get('/print/pr/{id}', [PrintController::class, 'purchaseRequest'])
+    ->middleware('signed')
+    ->name('print.pr');
 
 // Authentication routes
 Route::get('/login', fn() => view('prism.auth.login'))->name('login');

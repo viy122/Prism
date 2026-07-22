@@ -22,6 +22,11 @@ class PrismViceChancellorController extends Controller
         return 'vice-chancellor';
     }
 
+    protected function queueOfficeIds(): ?array
+    {
+        return $this->assignedOfficeIds();
+    }
+
     public function forMySignature(): View
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
@@ -39,6 +44,7 @@ class PrismViceChancellorController extends Controller
                 'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
                 'purchaseRequests',
             ])
+            ->when($this->assignedOfficeIds(), fn ($q, $ids) => $q->whereIn('id', $ids))
             ->get();
 
         $totalAppItems = BudgetProposalItem::whereHas(
@@ -64,6 +70,8 @@ class PrismViceChancellorController extends Controller
             return ['office' => $office->name, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
+        $vcName = auth()->user()->name ?? 'Vice Chancellor';
+
         $pendingPrSummary = $offices->map(function ($office) {
             $pending    = $office->purchaseRequests->where('status', 'pending')->count();
             $inProgress = $office->purchaseRequests->where('status', 'in_progress')->count();
@@ -80,7 +88,7 @@ class PrismViceChancellorController extends Controller
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle'         => 'Vice Chancellor Division Dashboard',
             'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole('vice-chancellor'),
-            'divisionName'     => 'Campus Division',
+            'divisionName'     => $vcName . "'s Division",
             'offices'          => $offices->pluck('name')->all(),
             'summary'          => [
                 'totalAppItems'      => $totalAppItems,
@@ -100,6 +108,7 @@ class PrismViceChancellorController extends Controller
                 'signatureLogs.signedBy',
                 'abstractOfCanvass.purchaseOrder',
             ])
+            ->when($this->assignedOfficeIds(), fn ($q, $ids) => $q->whereIn('office_id', $ids))
             ->latest()
             ->get()
             ->map(function ($pr) {
@@ -170,6 +179,7 @@ class PrismViceChancellorController extends Controller
                 'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
                 'purchaseRequests',
             ])
+            ->when($this->assignedOfficeIds(), fn ($q, $ids) => $q->whereIn('id', $ids))
             ->get();
 
         $rows = $offices->map(function ($office) {
@@ -199,6 +209,16 @@ class PrismViceChancellorController extends Controller
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Returns the office IDs assigned to this VC, or null if none are set
+     * (null causes ->when() to skip the filter, showing all offices as fallback).
+     */
+    private function assignedOfficeIds(): ?array
+    {
+        $ids = auth()->user()->officeAssignments()->pluck('offices.id')->all();
+        return count($ids) > 0 ? $ids : null;
+    }
 
     private function currentQuarter(): string
     {

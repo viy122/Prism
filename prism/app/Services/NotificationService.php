@@ -6,6 +6,8 @@ use App\Models\BudgetProposal;
 use App\Models\PrismNotification;
 use App\Models\PurchaseRequest;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -27,6 +29,32 @@ class NotificationService
             'action_url' => $actionUrl,
             'data_json'  => $data,
         ]);
+
+        self::sendExpoPush($userId, $title, $message, $data);
+    }
+
+    /**
+     * Fire-and-forget Expo push. Failure never blocks the in-app notification.
+     */
+    private static function sendExpoPush(int $userId, string $title, string $message, array $data = []): void
+    {
+        $token = User::find($userId)?->expo_push_token;
+
+        if (!$token || !str_starts_with($token, 'ExponentPushToken')) {
+            return;
+        }
+
+        try {
+            Http::timeout(5)->post('https://exp.host/--/api/v2/push/send', [
+                'to'    => $token,
+                'title' => $title,
+                'body'  => $message,
+                'sound' => 'default',
+                'data'  => $data,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Expo push failed for user ' . $userId . ': ' . $e->getMessage());
+        }
     }
 
     public static function sendToRole(

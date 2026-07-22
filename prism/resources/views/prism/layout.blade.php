@@ -66,10 +66,13 @@
                             <span class="block truncate text-xs font-semibold text-white/55">{{ $currentRole['label'] ?? 'PRISM User' }}</span>
                         </div>
                     </div>
-                    <a class="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-semibold text-white transition hover:bg-white hover:text-[#681012] focus:outline-none focus:ring-2 focus:ring-white/60" href="{{ route('login') }}">
-                        <i class="h-4 w-4" data-lucide="log-out" aria-hidden="true"></i>
-                        Logout
-                    </a>
+                    <form method="POST" action="{{ route('logout') }}" style="margin:0">
+                        @csrf
+                        <button type="submit" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-semibold text-white transition hover:bg-white hover:text-[#681012] focus:outline-none focus:ring-2 focus:ring-white/60">
+                            <i class="h-4 w-4" data-lucide="log-out" aria-hidden="true"></i>
+                            Logout
+                        </button>
+                    </form>
                 </div>
             </aside>
 
@@ -103,10 +106,13 @@
                         <div class="flex shrink-0 items-center gap-2">
                             <span class="hidden items-center text-[26px] font-bold leading-8 text-slate-950 xl:inline-flex">{{ $currentModule['label'] ?? 'Dashboard' }}</span>
                             <span class="inline-flex h-10 items-center rounded-md bg-bsu-maroon/5 px-3 text-sm font-semibold text-bsu-maroon xl:hidden">{{ $currentModule['label'] ?? 'Dashboard' }}</span>
-                            <a class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-bsu-maroon hover:bg-bsu-maroon/5 hover:text-bsu-maroon" href="{{ route('login') }}">
-                                <i class="h-4 w-4" data-lucide="log-out" aria-hidden="true"></i>
-                                <span class="hidden sm:inline">Logout</span>
-                            </a>
+                            <form method="POST" action="{{ route('logout') }}" style="margin:0">
+                                @csrf
+                                <button type="submit" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-bsu-maroon hover:bg-bsu-maroon/5 hover:text-bsu-maroon">
+                                    <i class="h-4 w-4" data-lucide="log-out" aria-hidden="true"></i>
+                                    <span class="hidden sm:inline">Logout</span>
+                                </button>
+                            </form>
                         </div>
                     </div>
 
