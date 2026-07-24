@@ -280,6 +280,9 @@
     }
 })();
 </script>
+
+<x-prism.confirm-modal />
+
 @stack('scripts')
 
 </body>

@@ -3,6 +3,7 @@
 
 @php
     $isReadOnly            = $isReadOnly ?? false;
+    $itemsLocked           = $itemsLocked ?? $isReadOnly;
     $proposalStatus        = $proposalStatus ?? 'draft';
     $isDraft                = $proposalStatus === 'draft';
     $itemCount             = count($encodedItems);
@@ -411,8 +412,19 @@
                                 <input id="datePrepared" class="field-input" type="date" value="{{ $proposalForm['date'] }}">
                             </div>
                             <div class="field-group">
-                                <label class="field-label" for="proposedBudget">Proposed Budget</label>
+                                <label class="field-label" for="proposedBudget">Proposed Budget (PHP)</label>
+                                @if($isReadOnly)
                                 <input id="proposedBudget" class="field-input readonly" readonly value="PHP {{ number_format($proposalForm['totalProposedBudget']) }}">
+                                @else
+                                <div style="display:flex; gap:8px;">
+                                    <input id="proposedBudget" class="field-input" type="number" min="0" step="0.01"
+                                        value="{{ $proposalForm['totalProposedBudget'] }}" placeholder="0.00">
+                                    <button type="button" class="btn-outline" id="btnSaveProposedBudget" style="white-space:nowrap;">
+                                        <i class="ti ti-device-floppy"></i> Save
+                                    </button>
+                                </div>
+                                <p id="proposedBudgetSaveStatus" style="display:none; font-size:11px; font-weight:600; margin-top:4px;"></p>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -462,8 +474,8 @@
 
         </div>{{-- /top-grid --}}
 
-        {{-- ═══ ADD ITEMS — full-width, stretched, only shown while the PPMP is still in Draft status ═══ --}}
-        @if($isDraft)
+        {{-- ═══ ADD ITEMS — full-width, stretched, only shown while the PPMP is still in Draft status and items aren't locked ═══ --}}
+        @if($isDraft && !$itemsLocked)
         <div class="card" id="addItemsCard" style="margin-top:16px;">
             <div class="card-head">
                 <div class="card-head-icon"><i class="ti ti-plus"></i></div>
@@ -533,13 +545,10 @@
                     <p class="card-sub"><span id="proposalItemCount">{{ $itemCount }}</span> procurement items encoded.</p>
                 </div>
                 <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
-                    @if(!$isReadOnly)
+                    @if(!$itemsLocked)
                     <button type="button" class="btn-ghost" id="togglePpmpViewBtn">
                         <i class="ti ti-pencil"></i><span id="togglePpmpViewLabel">Edit Items</span>
                     </button>
-                    <a class="btn-ghost" href="{{ route('office-head.market-scoping') }}?from=ppmp" style="text-decoration:none;">
-                        <i class="ti ti-bolt"></i>Create via Market Scoping
-                    </a>
                     @endif
                     <button type="button" class="btn-ghost" id="exportDraftBtn">
                         <i class="ti ti-printer"></i>Print / Export
@@ -592,7 +601,7 @@
                                 <th>Total</th>
                                 <th>Quarter</th>
                                 <th>Market Scoping / Source</th>
-                                @if(!$isReadOnly)<th>Actions</th>@endif
+                                @if(!$itemsLocked)<th>Actions</th>@endif
                             </tr>
                         </thead>
                         <tbody id="encodedItemsTable"></tbody>
@@ -637,7 +646,9 @@
     const submitUrl   = '{{ route("office-head.budget-proposal.submit") }}';
     const scopingUrl  = '{{ route("office-head.market-scoping") }}';
     const titleUrl    = @json($titleUpdateUrl);
+    const proposedBudgetUrl = @json($proposedBudgetUpdateUrl);
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
+    const itemsLocked = {{ $itemsLocked ? 'true' : 'false' }};
     const proposalId  = {{ $selectedProposalId ?? 'null' }};
 
     // ── PPMP name (title) ───────────────────────────────────────────────────
@@ -670,6 +681,47 @@
                 setTimeout(() => { status.style.display = 'none'; }, 2000);
             } else {
                 status.textContent = json.message || 'Could not save the name.';
+                status.style.color = '#991b1b';
+            }
+        } catch {
+            status.style.display = '';
+            status.textContent = 'Network error.';
+            status.style.color = '#991b1b';
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    // ── Proposed Budget ──────────────────────────────────────────────────────
+    document.getElementById('btnSaveProposedBudget')?.addEventListener('click', async function () {
+        const input  = document.getElementById('proposedBudget');
+        const status = document.getElementById('proposedBudgetSaveStatus');
+        const value  = parseFloat(input.value);
+
+        if (isNaN(value) || value < 0) {
+            input.style.borderColor = '#dc2626';
+            input.focus();
+            return;
+        }
+        if (!proposedBudgetUrl) return;
+
+        input.style.borderColor = '';
+        this.disabled = true;
+
+        try {
+            const res  = await fetch(proposedBudgetUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ proposed_budget: value }),
+            });
+            const json = await res.json();
+            status.style.display = '';
+            if (res.ok && json.success) {
+                status.textContent = 'Saved.';
+                status.style.color = '#166534';
+                setTimeout(() => { status.style.display = 'none'; }, 2000);
+            } else {
+                status.textContent = json.message || 'Could not save the budget.';
                 status.style.color = '#991b1b';
             }
         } catch {
@@ -715,10 +767,10 @@
             const files = item.attachments || [];
             const filesHtml = files.map(f =>
                 `<li><span class="ref-tree-icon">└──</span><a class="ref-tree-link" href="${esc(f.url)}" target="_blank" rel="noopener"><i class="ti ti-paperclip" style="font-size:11px"></i> ${esc(f.name)}</a>` +
-                (isReadOnly ? '' : ` <a style="color:#b91c1c;cursor:pointer;font-weight:700;" title="Remove file" onclick="prismBP.deleteAttachment('${esc(f.deleteUrl)}')">&times;</a>`) +
+                (itemsLocked ? '' : ` <a style="color:#b91c1c;cursor:pointer;font-weight:700;" title="Remove file" onclick="prismBP.deleteAttachment('${esc(f.deleteUrl)}')">&times;</a>`) +
                 `</li>`).join('');
 
-            const attachBtn = isReadOnly ? '' :
+            const attachBtn = itemsLocked ? '' :
                 `<span class="scoping-empty-hint"><a style="color:#166534;cursor:pointer;text-decoration:none;font-weight:700" onclick="prismBP.openAttach('${esc(item.id)}')"><i class="ti ti-paperclip" style="font-size:11px"></i> Attach source file</a></span>`;
 
             let scopingCell;
@@ -743,7 +795,7 @@
                    </div>`;
             }
 
-            if (editingId === item.id && !isReadOnly) {
+            if (editingId === item.id && !itemsLocked) {
                 return `<tr data-item-row="${esc(item.id)}" style="background:#FFF8F8;">
                     <td colspan="2">
                         <input class="field-input" id="edit-desc" value="${esc(item.description)}" placeholder="Item description" style="margin-bottom:6px;">
@@ -768,7 +820,7 @@
                         <button class="tbl-btn" type="button" title="Save changes" style="background:var(--green-bg);color:var(--green);border-color:#bbf7d0;" onclick="prismBP.saveEdit('${esc(item.id)}')">
                             <i class="ti ti-check"></i>
                         </button>
-                        <button class="tbl-btn" type="button" title="Cancel" onclick="prismBP.cancelEdit()">
+                        <button class="tbl-btn" type="button" title="Cancel" style="background:var(--red-bg, #fee2e2);color:var(--red, #991b1b);border-color:#fecaca;" onclick="prismBP.cancelEdit()">
                             <i class="ti ti-x"></i>
                         </button>
                     </div></td>
@@ -785,7 +837,7 @@
                 <td class="td-bold">PHP ${fmt(item.totalCost)}</td>
                 <td>${esc(item.targetQuarter)}</td>
                 <td>${scopingCell}</td>
-                ${isReadOnly ? '' : `<td><div class="tbl-actions">
+                ${itemsLocked ? '' : `<td><div class="tbl-actions">
                     <button class="tbl-btn" title="Edit item" type="button" onclick="prismBP.editItem('${esc(item.id)}')">
                         <i class="ti ti-pencil"></i>
                     </button>
@@ -892,7 +944,12 @@
 
     // ── Delete item ───────────────────────────────────────────────────────────
     async function deleteItem(id) {
-        if (!confirm('Remove this item from the proposal?')) return;
+        const ok = await window.prismConfirm({
+            title: 'Remove item?',
+            message: 'Remove this item from the proposal?',
+            confirmText: 'Remove',
+        });
+        if (!ok) return;
         try {
             const res  = await fetch(destroyBase + id, {
                 method: 'DELETE',
@@ -1021,7 +1078,7 @@
 
         if (!items.length) {
             tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--txt3);font-weight:600;">
-                No items encoded yet. ${isReadOnly ? '' : 'Click "Edit Items" or "Create via Market Scoping" to start.'}</td></tr>`;
+                No items encoded yet. ${itemsLocked ? '' : 'Click "Edit Items" to start.'}</td></tr>`;
         } else {
             tbody.innerHTML = items.map((item, i) => {
                 let srcPill;
@@ -1068,7 +1125,7 @@
 
     document.getElementById('togglePpmpViewBtn')?.addEventListener('click', () => setViewMode(!editMode));
     document.getElementById('exportDraftBtn')?.addEventListener('click', () => {
-        renderPreview();
+        setViewMode(false); // force preview mode — #ppmpPreviewDoc must be visible (not display:none) to print
         window.print();
     });
 
@@ -1144,7 +1201,12 @@
     });
 
     async function deleteAttachment(url) {
-        if (!confirm('Remove this source file?')) return;
+        const ok = await window.prismConfirm({
+            title: 'Remove file?',
+            message: 'Remove this source file?',
+            confirmText: 'Remove',
+        });
+        if (!ok) return;
         try {
             const res  = await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' } });
             const data = await res.json();

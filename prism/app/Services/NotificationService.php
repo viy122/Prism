@@ -134,7 +134,7 @@ class NotificationService
                 'proposal_returned',
                 'Proposal Returned for Revision',
                 "Your FY {$year} PPMP was returned by the Budget Office.{$remarkNote} Please revise and resubmit.",
-                route('office-head.budget-proposal'),
+                route('office-head.budget-proposal', ['proposal' => $proposal->id]),
             );
         }
     }

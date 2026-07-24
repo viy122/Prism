@@ -169,24 +169,24 @@ const timelineDotColor = (step) => {
 const timelineItemMarkup = (event, isLast) => {
     const connector = isLast
         ? ''
-        : `<span style="position:absolute;left:50%;top:36px;bottom:0;width:0;border-left:2px dashed #cbd5e1;transform:translateX(-50%);"></span>`;
+        : `<span style="position:absolute;left:50%;top:24px;bottom:0;width:0;border-left:2px dashed #cbd5e1;transform:translateX(-50%);"></span>`;
 
     return `
-        <li style="position:relative;display:flex;gap:16px;padding-bottom:22px;">
-            <div style="position:relative;flex-shrink:0;width:36px;">
-                <span style="display:block;height:36px;width:36px;border-radius:9999px;background:${timelineDotColor(event.step)};box-shadow:0 1px 3px rgba(15,23,42,.15);"></span>
+        <li style="position:relative;display:flex;gap:12px;padding-bottom:14px;">
+            <div style="position:relative;flex-shrink:0;width:22px;">
+                <span style="display:block;height:22px;width:22px;border-radius:9999px;background:${timelineDotColor(event.step)};box-shadow:0 1px 3px rgba(15,23,42,.15);"></span>
                 ${connector}
             </div>
-            <div style="flex:1;min-width:0;border-radius:12px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:18px 22px;">
-                <strong style="display:block;font-size:14px;font-weight:700;color:#0f172a;">${escapeHtml(event.step)}</strong>
-                <span style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-top:3px;">${escapeHtml(event.timestamp)}</span>
-                <p style="margin-top:10px;font-size:13px;line-height:1.6;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
+            <div style="flex:1;min-width:0;border-radius:10px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:10px 12px;">
+                <strong style="display:block;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(event.step)}</strong>
+                <span style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-top:2px;">${escapeHtml(event.timestamp)}</span>
+                <p style="margin-top:6px;font-size:12px;line-height:1.5;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
             </div>
         </li>
     `;
 };
 const timelineEmptyClass = 'flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-base leading-7 text-slate-500 [&_svg]:h-10 [&_svg]:w-10 [&_svg]:text-bsu-maroon/70';
-const returnedBoxClass = 'grid gap-3 justify-items-start rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-800 shadow-sm';
+const returnedBoxClass = 'grid gap-2 justify-items-start rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800 shadow-sm [&_p]:m-0';
 const panelHeaderClass = 'mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950';
 const eyebrowClass = 'text-xs font-extrabold uppercase tracking-[0.12em] text-bsu-maroon';
 const detailGridClass = 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [&_div]:rounded-2xl [&_div]:border [&_div]:border-slate-200 [&_div]:bg-slate-50 [&_div]:p-4 [&_dt]:text-xs [&_dt]:font-extrabold [&_dt]:uppercase [&_dt]:tracking-[0.07em] [&_dt]:text-slate-500 [&_dd]:mt-1.5 [&_dd]:text-sm [&_dd]:font-bold [&_dd]:text-slate-950';
@@ -222,285 +222,6 @@ const showToast = (message) => {
     document.body.appendChild(toast);
 
     window.setTimeout(() => toast.remove(), 2800);
-};
-
-const marketScopeFor = (item) => {
-    const unitCost = Number(item.estimatedUnitCost) || 0;
-    const retrieved = new Intl.DateTimeFormat('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-    }).format(new Date());
-
-    return [
-        {
-            supplierName: 'Validated Market Source A',
-            price: Math.round(unitCost * 0.97),
-            sourceLink: 'https://example.com/validated-market-source-a',
-            dateRetrieved: retrieved,
-        },
-        {
-            supplierName: 'Validated Market Source B',
-            price: Math.round(unitCost * 1.03),
-            sourceLink: 'https://example.com/validated-market-source-b',
-            dateRetrieved: retrieved,
-        },
-    ];
-};
-
-const initBudgetProposal = () => {
-    const tableBody = document.getElementById('encodedItemsTable');
-    const form = document.getElementById('proposalItemForm');
-
-    if (!tableBody || !form) {
-        return;
-    }
-
-    let items = readJson('initialProposalItems');
-
-    const fields = {
-        id: document.getElementById('itemId'),
-        description: document.getElementById('itemDescription'),
-        unit: document.getElementById('itemUnit'),
-        quantity: document.getElementById('itemQuantity'),
-        unitCost: document.getElementById('itemUnitCost'),
-        quarter: document.getElementById('itemQuarter'),
-        justification: document.getElementById('itemJustification'),
-    };
-    const saveButton = document.getElementById('saveItemButton');
-    const clearButton = document.getElementById('clearItemButton');
-    const scopeButton = document.getElementById('runMarketScopingButton');
-    const itemCount = document.getElementById('proposalItemCount');
-    const submitButton = document.getElementById('submitProposalButton');
-    const summaryItems = document.getElementById('proposalSummaryItems');
-    const summaryTotal = document.getElementById('proposalSummaryTotal');
-    const summaryReferences = document.getElementById('proposalSummaryReferences');
-    const summaryMissing = document.getElementById('proposalSummaryMissing');
-    const readyBadge = document.getElementById('proposalReadyBadge');
-    const referenceList = document.getElementById('proposalReferenceList');
-    const referenceTotalBadge = document.getElementById('proposalReferenceTotalBadge');
-
-    const scopeMarkup = (scoping) => {
-        if (!scoping?.length) {
-            return `<span class="${neutralBadgeClass}">No References</span>`;
-        }
-
-        const lowest = [...scoping].sort((first, second) => Number(first.price) - Number(second.price))[0];
-
-        return `
-            <div class="grid gap-1.5">
-                <span class="inline-flex min-h-7 w-max items-center justify-center rounded-full bg-bsu-maroon/10 px-4 py-1.5 text-xs font-bold text-bsu-maroon ring-1 ring-inset ring-bsu-maroon/20 whitespace-nowrap">${scoping.length} references</span>
-                ${lowest ? `<span class="text-xs font-semibold text-slate-500">Lowest: ${escapeHtml(lowest.supplierName)} · ${money(lowest.price)}</span>` : ''}
-            </div>
-        `;
-    };
-
-    const referenceCardMarkup = (item) => {
-        const scoping = item.scoping ?? [];
-        const lowest = [...scoping].sort((first, second) => Number(first.price) - Number(second.price))[0];
-
-        return `
-            <article class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <p class="truncate text-sm font-bold text-slate-950">${escapeHtml(item.description)}</p>
-                        <p class="mt-1 text-xs font-semibold text-slate-500">${escapeHtml(item.targetQuarter)} · ${scoping.length} References</p>
-                    </div>
-                    <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-bsu-maroon ring-1 ring-inset ring-slate-200">${escapeHtml(item.unit)}</span>
-                </div>
-                ${lowest
-                    ? `<p class="mt-2 text-xs font-semibold text-slate-600">Lowest: ${escapeHtml(lowest.supplierName)} · ${money(lowest.price)}</p>`
-                    : '<p class="mt-2 text-xs font-semibold text-amber-700">Needs market scoping before submission.</p>'}
-            </article>
-        `;
-    };
-
-    const renderItems = () => {
-        tableBody.innerHTML = items.map((item) => `
-            <tr>
-                <td class="min-w-72">
-                    <strong class="text-sm font-bold text-slate-950">${escapeHtml(item.description)}</strong>
-                    <span class="${noteClass}">${escapeHtml(item.justification)}</span>
-                </td>
-                <td class="whitespace-nowrap">${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</td>
-                <td class="whitespace-nowrap">${money(item.estimatedUnitCost)}</td>
-                <td class="whitespace-nowrap font-bold text-slate-950">${money(item.totalCost)}</td>
-                <td class="whitespace-nowrap">${escapeHtml(item.targetQuarter)}</td>
-                <td>${scopeMarkup(item.scoping)}</td>
-                <td class="text-right">
-                    <div class="flex justify-end gap-2">
-                        <button class="${tableActionClass}" type="button" data-action="scope" data-id="${escapeHtml(item.id)}" title="Run market scoping" aria-label="Run market scoping">
-                            <i data-lucide="sparkles" aria-hidden="true"></i>
-                        </button>
-                        <button class="${tableActionClass}" type="button" data-action="edit" data-id="${escapeHtml(item.id)}" title="Edit item" aria-label="Edit item">
-                            <i data-lucide="pencil" aria-hidden="true"></i>
-                        </button>
-                        <button class="${tableActionDangerClass}" type="button" data-action="delete" data-id="${escapeHtml(item.id)}" title="Delete item" aria-label="Delete item">
-                            <i data-lucide="trash-2" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
-
-        if (itemCount) {
-            itemCount.textContent = items.length;
-        }
-
-        const total = items.reduce((sum, item) => sum + (Number(item.totalCost) || 0), 0);
-        const references = items.reduce((sum, item) => sum + (item.scoping?.length ?? 0), 0);
-        const missing = items.filter((item) => !(item.scoping?.length)).length;
-        const isReady = items.length > 0 && missing === 0;
-
-        if (summaryItems) {
-            summaryItems.textContent = items.length;
-        }
-
-        if (summaryTotal) {
-            summaryTotal.textContent = money(total);
-        }
-
-        if (summaryReferences) {
-            summaryReferences.textContent = references;
-        }
-
-        if (summaryMissing) {
-            summaryMissing.textContent = missing;
-        }
-
-        if (readyBadge) {
-            readyBadge.textContent = isReady ? 'Ready for Review' : 'Draft';
-            readyBadge.className = `${badgeBaseClass} ${isReady ? 'bg-green-50 text-green-700 ring-green-200' : 'bg-slate-100 text-slate-700 ring-slate-200'}`;
-        }
-
-        if (referenceTotalBadge) {
-            referenceTotalBadge.textContent = `${references} total`;
-        }
-
-        if (referenceList) {
-            referenceList.innerHTML = items.length
-                ? items.map(referenceCardMarkup).join('')
-                : '<p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-500">No encoded items yet.</p>';
-        }
-
-        refreshIcons();
-    };
-
-    const clearForm = () => {
-        fields.id.value = '';
-        fields.description.value = '';
-        fields.unit.value = '';
-        fields.quantity.value = '1';
-        fields.unitCost.value = '0';
-        fields.quarter.value = 'Q1';
-        fields.justification.value = '';
-        saveButton.innerHTML = '<i data-lucide="plus" aria-hidden="true"></i>Add Item';
-        refreshIcons();
-    };
-
-    form.addEventListener('submit', (event) => {
-        event.preventDefault();
-
-        const quantity = Number(fields.quantity.value) || 0;
-        const estimatedUnitCost = Number(fields.unitCost.value) || 0;
-        const item = {
-            id: fields.id.value || `item-${Date.now()}`,
-            description: fields.description.value.trim(),
-            unit: fields.unit.value.trim(),
-            quantity,
-            estimatedUnitCost,
-            totalCost: quantity * estimatedUnitCost,
-            justification: fields.justification.value.trim(),
-            targetQuarter: fields.quarter.value,
-            scoping: fields.id.value
-                ? (items.find((existingItem) => existingItem.id === fields.id.value)?.scoping ?? [])
-                : [],
-        };
-
-        if (!item.description || !item.unit || !item.justification) {
-            showToast('Complete the item description, unit, and justification before saving.');
-            return;
-        }
-
-        if (fields.id.value) {
-            items = items.map((existingItem) => existingItem.id === item.id ? item : existingItem);
-            showToast('Item row updated.');
-        } else {
-            items = [...items, item];
-            showToast('Item row added.');
-        }
-
-        clearForm();
-        renderItems();
-    });
-
-    tableBody.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-action]');
-
-        if (!button) {
-            return;
-        }
-
-        const item = items.find((candidate) => candidate.id === button.dataset.id);
-
-        if (!item) {
-            return;
-        }
-
-        if (button.dataset.action === 'edit') {
-            fields.id.value = item.id;
-            fields.description.value = item.description;
-            fields.unit.value = item.unit;
-            fields.quantity.value = item.quantity;
-            fields.unitCost.value = item.estimatedUnitCost;
-            fields.quarter.value = item.targetQuarter;
-            fields.justification.value = item.justification;
-            saveButton.innerHTML = '<i data-lucide="save" aria-hidden="true"></i>Update Item';
-            fields.description.focus();
-            refreshIcons();
-        }
-
-        if (button.dataset.action === 'delete') {
-            items = items.filter((candidate) => candidate.id !== item.id);
-            renderItems();
-            showToast('Item row deleted.');
-        }
-
-        if (button.dataset.action === 'scope') {
-            items = items.map((candidate) => candidate.id === item.id
-                ? { ...candidate, scoping: marketScopeFor(candidate) }
-                : candidate);
-            renderItems();
-            showToast('Market scoping results refreshed for this item.');
-        }
-    });
-
-    clearButton?.addEventListener('click', clearForm);
-
-    scopeButton?.addEventListener('click', () => {
-        if (!items.length) {
-            showToast('Add at least one item before running market scoping.');
-            return;
-        }
-
-        items = items.map((item) => ({
-            ...item,
-            scoping: marketScopeFor(item),
-        }));
-        renderItems();
-        showToast('Market scoping results refreshed for all encoded items.');
-    });
-
-    submitButton?.addEventListener('click', () => {
-        if (!items.length) {
-            showToast('Add at least one item before submitting the proposal.');
-            return;
-        }
-
-        showToast('Proposal submitted for Finance Review.');
-    });
-
-    renderItems();
 };
 
 const initProposalTimeline = () => {
@@ -612,10 +333,10 @@ const initProposalTimeline = () => {
                 ${proposal.timeline.map((event, idx) => timelineItemMarkup(event, idx === proposal.timeline.length - 1)).join('')}
             </ol>
             ${proposal.status === 'Returned' ? `
-                <div class="${returnedBoxClass}">
-                    <p><strong>Returned remarks:</strong> ${escapeHtml(proposal.returnedRemarks)}</p>
-                    <a class="${primaryButtonClass}" href="/office-head/budget-proposal">
-                        <i data-lucide="refresh-cw" aria-hidden="true"></i>
+                <div class="rounded-xl border border-red-200 bg-red-50 text-red-800 shadow-sm" style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;">
+                    <p style="margin:0;font-size:12px;line-height:1.5;"><strong>Returned remarks:</strong> ${escapeHtml(proposal.returnedRemarks)}</p>
+                    <a class="${primaryButtonClass}" style="align-self:flex-start;flex:none;height:30px;padding:0 12px;font-size:12px;gap:5px;" href="/office-head/budget-proposal?proposal=${encodeURIComponent(proposal.proposalId)}">
+                        <i data-lucide="refresh-cw" aria-hidden="true" style="width:13px;height:13px;"></i>
                         Revise Proposal
                     </a>
                 </div>
@@ -1345,7 +1066,6 @@ const initViceChancellorReports = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     refreshIcons();
-    initBudgetProposal();
     initProposalTimeline();
     initPurchaseRequests();
     initFinanceProposalReview();

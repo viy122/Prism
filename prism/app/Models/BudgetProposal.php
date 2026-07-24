@@ -25,6 +25,7 @@ class BudgetProposal extends Model
         'description',
         'fiscal_year',
         'total_estimated_cost',
+        'proposed_budget',
         'approved_budget',
         'status',
         'remarks',
@@ -39,6 +40,7 @@ class BudgetProposal extends Model
         return [
             'fiscal_year' => 'integer',
             'total_estimated_cost' => 'decimal:2',
+            'proposed_budget' => 'decimal:2',
             'approved_budget' => 'decimal:2',
             'form_data_json' => 'array',
             'submitted_at' => 'datetime',

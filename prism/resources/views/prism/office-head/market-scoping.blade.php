@@ -197,6 +197,18 @@
     .filter-clear { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); font-size: 11px; font-weight: 700; color: var(--txt2); cursor: pointer; font-family: 'Poppins', sans-serif; transition: all .15s; }
     .filter-clear:hover { border-color: var(--crimson); color: var(--crimson); }
 
+    /* ── Multi-select checklist dropdown (Store, Reviews) ── */
+    .filter-multisel { position: relative; }
+    .filter-multisel-btn { height: 32px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .filter-multisel-btn:hover, .filter-multisel-btn.open { border-color: var(--crimson); }
+    .filter-multisel-btn i { font-size: 12px; color: var(--txt3); }
+    .filter-multisel-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 200px; max-height: 240px; overflow-y: auto; background: var(--white); border: 1px solid var(--border2); border-radius: 10px; box-shadow: var(--sh); padding: 8px; display: none; }
+    .filter-multisel-panel.open { display: block; }
+    .filter-multisel-panel label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: normal; color: var(--txt); padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+    .filter-multisel-panel label:hover { background: var(--bg2); }
+    .filter-multisel-panel input[type="checkbox"] { margin: 0; cursor: pointer; }
+    .filter-multisel-empty { font-size: 11px; color: var(--txt3); padding: 6px; font-style: italic; }
+
     /* ── Did you mean ── */
     .dym-box { margin: 12px 18px 0; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 600; color: #1d4ed8; }
     .dym-box a { color: #1d4ed8; text-decoration: underline; cursor: pointer; }
@@ -250,7 +262,7 @@
                 <input id="marketBudgetInput" class="budget-input" type="number" min="0" step="0.01"
                        placeholder="Budget (optional)">
             </div>
-            <button id="runMarketBtn" class="btn-run" type="button">
+            <button id="runMarketBtn" class="btn-run" type="button" title="Searches live prices and flags items that look like good value for your budget">
                 <i class="ti ti-brand-google"></i>Run Market Scoping
             </button>
         </div>
@@ -271,8 +283,8 @@
             {{-- Service notices (quota / AI matcher availability) --}}
             <div id="noticeArea"></div>
 
-            {{-- Filter / Sort bar --}}
-            <div class="filter-bar" id="filterBar" style="display:none;">
+            {{-- Filter / Sort bar — always visible; Store/Reviews options populate once results load --}}
+            <div class="filter-bar" id="filterBar">
                 <label>Sort</label>
                 <select id="sortSel" class="filter-sel">
                     <option value="match">Best Match</option>
@@ -281,10 +293,29 @@
                     <option value="price_desc">Price: High → Low</option>
                     <option value="store_az">Store: A → Z</option>
                 </select>
+
                 <label>Store</label>
-                <select id="storeSel" class="filter-sel">
-                    <option value="">All stores</option>
-                </select>
+                <div class="filter-multisel" id="storeMultiselWrap">
+                    <button type="button" class="filter-multisel-btn" id="storeMultiselBtn">
+                        <span id="storeMultiselLabel">All stores</span><i class="ti ti-chevron-down"></i>
+                    </button>
+                    <div class="filter-multisel-panel" id="storeMultiselPanel">
+                        <div class="filter-multisel-empty">Run a search to see stores.</div>
+                    </div>
+                </div>
+
+                <label>Reviews</label>
+                <div class="filter-multisel" id="reviewsMultiselWrap">
+                    <button type="button" class="filter-multisel-btn" id="reviewsMultiselBtn">
+                        <span id="reviewsMultiselLabel">Any rating</span><i class="ti ti-chevron-down"></i>
+                    </button>
+                    <div class="filter-multisel-panel" id="reviewsMultiselPanel">
+                        <label><input type="checkbox" value="4"> 4 stars &amp; up</label>
+                        <label><input type="checkbox" value="3"> 3 stars &amp; up</label>
+                        <label><input type="checkbox" value="unrated"> No rating yet</label>
+                    </div>
+                </div>
+
                 <label>Price</label>
                 <input id="priceMin" class="filter-price" type="number" min="0" placeholder="Min ₱">
                 <span style="color:var(--txt3);font-size:11px;">–</span>
@@ -600,7 +631,7 @@
     function openAddItemModal(data) {
         pendingRefsData = data.refs_data;
         document.getElementById('modalItemName').value = data.query || '';
-        document.getElementById('modalCost').value     = data.lowest_price ? parseFloat(data.lowest_price).toFixed(2) : '';
+        document.getElementById('modalCost').value     = data.average_price ? parseFloat(data.average_price).toFixed(2) : '';
         document.getElementById('modalUnit').value     = 'unit';
         document.getElementById('modalQty').value      = '';
         document.getElementById('modalQuarter').value  = 'Q1';
@@ -713,15 +744,15 @@
                     html = '<div class="dym-box">Did you mean: <a onclick="document.getElementById(\'marketQueryInput\').value=this.textContent;window.msRunSearch();">' + esc(data.suggestion) + '</a>?</div>' + html;
                 }
                 dynDiv.innerHTML = html;
-                document.getElementById('filterBar').style.display = 'none';
                 lastResults = [];
+                populateStoreFilter();
                 return;
             }
 
             lastResults = data.results;
-            document.getElementById('filterBar').style.display = '';
             populateStoreFilter();
             applyFilters();
+            saveSearchState(query, budget, department);
 
         } catch (e) {
             dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">Network error</p><p class="state-sub">Check your connection and try again.</p></div>';
@@ -911,20 +942,63 @@
     /* ── Filters + sort (client-side on lastResults) ── */
     let lastResults = [];
 
+    /* ── Generic checkbox-dropdown wiring (Store, Reviews) ── */
+    function wireMultiselect(btnId, panelId, labelId, emptyLabel) {
+        const btn   = document.getElementById(btnId);
+        const panel = document.getElementById(panelId);
+        const label = document.getElementById(labelId);
+        if (!btn || !panel) return null;
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.filter-multisel-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
+            document.querySelectorAll('.filter-multisel-btn.open').forEach(b => { if (b !== btn) b.classList.remove('open'); });
+            panel.classList.toggle('open');
+            btn.classList.toggle('open');
+        });
+
+        function refreshLabel() {
+            const checked = [...panel.querySelectorAll('input[type="checkbox"]:checked')];
+            label.textContent = checked.length === 0 ? emptyLabel
+                : checked.length === 1 ? checked[0].closest('label').textContent.trim()
+                : checked.length + ' selected';
+        }
+        panel.addEventListener('change', () => { refreshLabel(); applyFilters(); });
+
+        return { panel, refreshLabel };
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.filter-multisel')) {
+            document.querySelectorAll('.filter-multisel-panel.open').forEach(p => p.classList.remove('open'));
+            document.querySelectorAll('.filter-multisel-btn.open').forEach(b => b.classList.remove('open'));
+        }
+    });
+
+    const storeMultisel   = wireMultiselect('storeMultiselBtn', 'storeMultiselPanel', 'storeMultiselLabel', 'All stores');
+    const reviewsMultisel = wireMultiselect('reviewsMultiselBtn', 'reviewsMultiselPanel', 'reviewsMultiselLabel', 'Any rating');
+
     function populateStoreFilter() {
-        const sel = document.getElementById('storeSel');
-        if (!sel) return;
-        const current = sel.value;
-        const stores = [...new Set(lastResults.map(r => r.source || 'Unknown'))].sort((a, b) => a.localeCompare(b));
-        sel.innerHTML = '<option value="">All stores</option>' +
-            stores.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
-        if (stores.includes(current)) sel.value = current;
+        if (!storeMultisel) return;
+        const panel   = storeMultisel.panel;
+        const checked = new Set([...panel.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value));
+        const stores  = [...new Set(lastResults.map(r => r.source || 'Unknown'))].sort((a, b) => a.localeCompare(b));
+
+        panel.innerHTML = stores.length === 0
+            ? '<div class="filter-multisel-empty">Run a search to see stores.</div>'
+            : stores.map(s => '<label><input type="checkbox" value="' + esc(s) + '"' + (checked.has(s) ? ' checked' : '') + '> ' + esc(s) + '</label>').join('');
+        storeMultisel.refreshLabel();
+    }
+
+    function selectedValues(panel) {
+        return [...panel.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
     }
 
     function applyFilters() {
         const dynDiv = document.getElementById('dynamicResults');
         const sortBy   = document.getElementById('sortSel').value;
-        const store    = document.getElementById('storeSel')?.value || '';
+        const stores   = storeMultisel ? selectedValues(storeMultisel.panel) : [];
+        const ratings  = reviewsMultisel ? selectedValues(reviewsMultisel.panel) : [];
         const min      = parseFloat(document.getElementById('priceMin').value) || 0;
         const max      = parseFloat(document.getElementById('priceMax').value) || Infinity;
         const advOnly  = document.getElementById('advOnly').checked;
@@ -935,7 +1009,12 @@
             if (p < min || p > max) return false;
             if (advOnly && r.is_advantageous !== true) return false;
             if (hasPrice && !(parseFloat(r.price) > 0)) return false;
-            if (store && (r.source || 'Unknown') !== store) return false;
+            if (stores.length && !stores.includes(r.source || 'Unknown')) return false;
+            if (ratings.length) {
+                const rating = parseFloat(r.rating) || 0;
+                const matches = ratings.some(rv => rv === 'unrated' ? !r.rating : rating >= parseFloat(rv));
+                if (!matches) return false;
+            }
             return true;
         });
 
@@ -953,14 +1032,14 @@
         document.getElementById('refCount').textContent = list.length + ' of ' + lastResults.length + ' result' + (lastResults.length !== 1 ? 's' : '');
     }
 
-    ['sortSel', 'storeSel', 'priceMin', 'priceMax', 'advOnly', 'hasPriceOnly'].forEach(id => {
+    ['sortSel', 'priceMin', 'priceMax', 'advOnly', 'hasPriceOnly'].forEach(id => {
         const el = document.getElementById(id);
         el && el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', applyFilters);
     });
     document.getElementById('filterClear')?.addEventListener('click', () => {
         document.getElementById('sortSel').value  = 'match';
-        const storeSel = document.getElementById('storeSel');
-        if (storeSel) storeSel.value = '';
+        if (storeMultisel)   { storeMultisel.panel.querySelectorAll('input:checked').forEach(cb => cb.checked = false); storeMultisel.refreshLabel(); }
+        if (reviewsMultisel) { reviewsMultisel.panel.querySelectorAll('input:checked').forEach(cb => cb.checked = false); reviewsMultisel.refreshLabel(); }
         document.getElementById('priceMin').value = '';
         document.getElementById('priceMax').value = '';
         document.getElementById('advOnly').checked = false;
@@ -1041,6 +1120,8 @@
         if (q && queryInput) {
             queryInput.value = q;
             setTimeout(runSearch, 280);
+        } else {
+            restoreSearchState();
         }
 
         /* Adaptive save row: arriving from the PPMP tab (?q= or ?from=ppmp)
@@ -1066,6 +1147,37 @@
     function esc(s) {
         if (!s) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Persist in-progress search across navigation (e.g. "Save Market Study"
+       and back) — sessionStorage survives a full page reload within the tab,
+       so results don't disappear just because the user stepped away. ── */
+    const SEARCH_STATE_KEY = 'prismMarketScopingState';
+
+    function saveSearchState(query, budget, department) {
+        try {
+            sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, budget, department, results: lastResults }));
+        } catch { /* storage full/unavailable — not critical, just skip persisting */ }
+    }
+
+    function restoreSearchState() {
+        let saved;
+        try { saved = JSON.parse(sessionStorage.getItem(SEARCH_STATE_KEY) || 'null'); } catch { saved = null; }
+        if (!saved || !Array.isArray(saved.results) || !saved.results.length) return false;
+
+        if (queryInput) queryInput.value = saved.query || '';
+        const budgetInput = document.getElementById('marketBudgetInput');
+        if (budgetInput && saved.budget) budgetInput.value = saved.budget;
+        const deptSelect = document.getElementById('marketDeptSelect');
+        if (deptSelect && saved.department) deptSelect.value = saved.department;
+
+        const sp = document.getElementById('searchPrompt');
+        if (sp) sp.style.display = 'none';
+
+        lastResults = saved.results;
+        populateStoreFilter();
+        applyFilters();
+        return true;
     }
 
 })();

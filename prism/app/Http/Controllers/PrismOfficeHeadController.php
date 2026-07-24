@@ -100,6 +100,9 @@ class PrismOfficeHeadController extends Controller
         }
 
         $isReadOnly     = $proposal ? !in_array($proposal->status, ['draft', 'returned'], true) : false;
+        // Line items lock once a market study has been submitted for this proposal —
+        // separate from $isReadOnly, which only tracks the proposal's own status.
+        $itemsLocked    = $isReadOnly || (bool) $proposal?->marketPriceSurvey;
         $proposalStatus = $proposal?->status ?? 'draft';
         $canStartNew    = false;
         $nextFiscalYear = null;
@@ -130,15 +133,19 @@ class PrismOfficeHeadController extends Controller
             ->where('status', 'draft')
             ->exists();
 
+        // Proposed Budget is a manually-set target/ceiling, separate from the auto-derived
+        // item-sum total (total_estimated_cost) — falls back to that sum until the office
+        // head explicitly sets their own figure.
         $proposalForm = [
             'officeName'          => $office?->name ?? 'Your Office',
             'title'               => $proposal?->title ?? '',
             'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
             'date'                => $proposal?->created_at?->format('Y-m-d') ?? now()->format('Y-m-d'),
-            'totalProposedBudget' => $proposal?->total_estimated_cost ?? 0,
+            'totalProposedBudget' => $proposal?->proposed_budget ?? $proposal?->total_estimated_cost ?? 0,
         ];
 
-        $titleUpdateUrl = $proposal ? route('office-head.budget-proposal.update-title', $proposal->id) : null;
+        $titleUpdateUrl          = $proposal ? route('office-head.budget-proposal.update-title', $proposal->id) : null;
+        $proposedBudgetUpdateUrl = $proposal ? route('office-head.budget-proposal.update-proposed-budget', $proposal->id) : null;
 
         $encodedItems = $proposal
             ? $proposal->items()->with(['marketReferences', 'sourceFiles'])->get()
@@ -189,6 +196,7 @@ class PrismOfficeHeadController extends Controller
             'proposalForm'          => $proposalForm,
             'encodedItems'          => $encodedItems,
             'isReadOnly'            => $isReadOnly,
+            'itemsLocked'           => $itemsLocked,
             'proposalStatus'        => $proposalStatus,
             'canStartNew'           => $canStartNew,
             'nextFiscalYear'        => $nextFiscalYear,
@@ -196,6 +204,7 @@ class PrismOfficeHeadController extends Controller
             'proposalOptions'       => $proposalOptions,
             'selectedProposalId'    => $proposal?->id,
             'titleUpdateUrl'        => $titleUpdateUrl,
+            'proposedBudgetUpdateUrl' => $proposedBudgetUpdateUrl,
             'itemCount'             => $itemCount,
             'scopingReferenceCount' => $scopingReferenceCount,
             'missingScopingCount'   => $missingScopingCount,
@@ -300,6 +309,20 @@ class PrismOfficeHeadController extends Controller
         return response()->json(['success' => true, 'title' => $proposal->title]);
     }
 
+    public function updateProposedBudget(Request $request, BudgetProposal $proposal): JsonResponse
+    {
+        abort_if($proposal->office_id !== $this->officeId(), 403);
+        abort_if(!in_array($proposal->status, ['draft', 'returned'], true), 403);
+
+        $validated = $request->validate([
+            'proposed_budget' => 'required|numeric|min:0',
+        ]);
+
+        $proposal->update(['proposed_budget' => $validated['proposed_budget']]);
+
+        return response()->json(['success' => true, 'proposed_budget' => (float) $proposal->proposed_budget]);
+    }
+
     public function marketScoping(): View
     {
         $officeId    = $this->officeId();
@@ -352,6 +375,7 @@ class PrismOfficeHeadController extends Controller
             ->get()
             ->map(fn ($proposal) => [
                 'id'              => $proposal->code ?: "bp-{$proposal->id}",
+                'proposalId'      => $proposal->id,
                 'title'           => $proposal->title,
                 'fiscalYear'      => (string) $proposal->fiscal_year,
                 'dateSubmitted'   => ($proposal->submitted_at ?? $proposal->created_at)->format('M d, Y'),
@@ -443,7 +467,7 @@ class PrismOfficeHeadController extends Controller
                 ->whereIn('status', ['draft', 'returned'])
                 ->first();
 
-            if (!$proposal) {
+            if (!$proposal || $proposal->marketPriceSurvey) {
                 return response()->json([
                     'success' => false,
                     'message' => 'This PPMP is no longer editable.',
@@ -518,7 +542,7 @@ class PrismOfficeHeadController extends Controller
     public function updateItem(Request $request, BudgetProposalItem $item): JsonResponse
     {
         $proposal = $item->budgetProposal;
-        if (!in_array($proposal->status, ['draft', 'returned'])) {
+        if (!in_array($proposal->status, ['draft', 'returned']) || $proposal->marketPriceSurvey) {
             return response()->json([
                 'success' => false,
                 'message' => 'This PPMP is no longer editable.',
@@ -569,6 +593,13 @@ class PrismOfficeHeadController extends Controller
     public function destroyItem(BudgetProposalItem $item): JsonResponse
     {
         $proposal = $item->budgetProposal;
+        if (!in_array($proposal->status, ['draft', 'returned']) || $proposal->marketPriceSurvey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This PPMP is no longer editable.',
+            ], 422);
+        }
+
         $item->delete();
         $proposal->update([
             'total_estimated_cost' => $proposal->items()->sum('estimated_total_cost'),
@@ -914,14 +945,15 @@ class PrismOfficeHeadController extends Controller
             ]);
         }
 
-        $lowestPrice = collect($refs)->min(fn ($r) => (float) ($r['price'] ?? 0));
+        $prices = collect($refs)->map(fn ($r) => (float) ($r['price'] ?? 0));
 
         return response()->json([
-            'success'      => true,
-            'item_exists'  => false,
-            'query'        => $query,
-            'lowest_price' => $lowestPrice,
-            'refs_data'    => $refs,
+            'success'       => true,
+            'item_exists'   => false,
+            'query'         => $query,
+            'lowest_price'  => $prices->min(),
+            'average_price' => round($prices->avg(), 2),
+            'refs_data'     => $refs,
         ]);
     }
 

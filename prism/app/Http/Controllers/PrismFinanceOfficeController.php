@@ -220,12 +220,9 @@ class PrismFinanceOfficeController extends Controller
     {
         abort_if($proposal->status !== 'submitted', 403);
 
-        $request->validate(
-            ['remarks' => 'required|string|min:5'],
-            ['remarks.required' => 'Return remarks are required.', 'remarks.min' => 'Remarks must be at least 5 characters.']
-        );
+        $request->validate(['remarks' => 'nullable|string']);
 
-        $remarks = $request->input('remarks');
+        $remarks = $request->input('remarks', '');
 
         $proposal->update(['status' => 'returned', 'reviewed_at' => now(), 'remarks' => $remarks]);
 

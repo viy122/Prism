@@ -230,7 +230,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($item->marketReferences->take(3) as $ref)
+                        @foreach ($item->marketReferences as $ref)
                         <tr>
                             <td>{{ $ref->supplier_name ?? $ref->title ?? '—' }}</td>
                             <td class="mps-ref-price">₱{{ number_format((float) $ref->price, 2) }}</td>
@@ -247,7 +247,7 @@
                     </tbody>
                 </table>
                 @php
-                    $prices = $item->marketReferences->take(3)->pluck('price')->map(fn ($p) => (float) $p);
+                    $prices = $item->marketReferences->pluck('price')->map(fn ($p) => (float) $p);
                     $avg    = $prices->isNotEmpty() ? $prices->avg() : 0;
                 @endphp
                 <div class="mps-item-avg">

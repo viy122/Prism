@@ -290,8 +290,8 @@
                                         <button type="button" class="btn-verdict btn-ok{{ $item['financeOk'] === true ? ' active' : '' }}" title="Approve this item">
                                             <i class="ti ti-check"></i> Approve
                                         </button>
-                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Disapprove this item">
-                                            <i class="ti ti-message-2"></i> Disapprove
+                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Issue this item">
+                                            <i class="ti ti-message-2"></i> Issue
                                         </button>
                                     </div>
                                     <div class="remark-display" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
@@ -355,7 +355,7 @@
                 </button>
             </div>
             <p id="endorseBlockedMsg" style="margin-top:10px;font-size:12px;font-weight:600;color:#991b1b;{{ $anyDisapproved ? '' : 'display:none;' }}">
-                {{ collect($selectedProposal['items'])->where('financeOk', false)->count() }} item(s) disapproved — return the proposal instead.
+                {{ collect($selectedProposal['items'])->where('financeOk', false)->count() }} item(s) issued — return the proposal instead.
             </p>
             @else
             <p style="margin-top:14px;font-size:13px;font-weight:600;color:var(--s500);">
@@ -384,13 +384,6 @@ function submitFinanceForm(btn) {
 
 function submitFinanceReturn(btn) {
     const remarks = document.getElementById('financeOverallRemarks').value.trim();
-    const ta = document.getElementById('financeOverallRemarks');
-    if (!remarks) {
-        ta.style.borderColor = '#a32d2d';
-        ta.focus();
-        return false;
-    }
-    ta.style.borderColor = '';
     document.getElementById('financeRemarksHidden').value = remarks;
     document.getElementById('financeReviewForm').action = btn.dataset.url;
     return true;
