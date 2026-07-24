@@ -64,15 +64,28 @@ class PrismOfficeHeadController extends Controller
         $officeId = $this->officeId();
         $office   = Office::find($officeId);
 
-        $fiscalYears = BudgetProposal::where('office_id', $officeId)
-            ->distinct()->orderByDesc('fiscal_year')
-            ->pluck('fiscal_year')->all();
+        // One office can have several PPMPs within the same fiscal year (e.g. a
+        // supplemental proposal), so the selector lists individual proposals —
+        // not just distinct years — and is keyed by proposal id.
+        $proposalOptions = BudgetProposal::where('office_id', $officeId)
+            ->orderByDesc('fiscal_year')->orderByDesc('created_at')
+            ->get(['id', 'fiscal_year', 'code', 'status'])
+            ->map(fn ($p) => [
+                'id'     => $p->id,
+                'label'  => 'FY ' . $p->fiscal_year . ' — ' . $p->code
+                    . ($p->status === 'returned' ? ' — Returned, needs revision' : ' — ' . ucfirst($p->status)),
+                'status' => $p->status,
+            ])->all();
 
-        // Fiscal-year selector: ?fy=YYYY shows that year's PPMP (read-only unless draft/returned)
+        // Proposal selector: ?proposal=ID shows that specific PPMP (read-only unless draft/returned).
+        // ?fy=YYYY is kept as a fallback for old links — resolves to the latest proposal for that year.
+        $requestedId = (int) $request->query('proposal', 0);
         $requestedFy = (int) $request->query('fy', 0);
         $proposal    = null;
 
-        if ($requestedFy && in_array($requestedFy, $fiscalYears, true)) {
+        if ($requestedId) {
+            $proposal = BudgetProposal::where('office_id', $officeId)->find($requestedId);
+        } elseif ($requestedFy) {
             $proposal = BudgetProposal::where('office_id', $officeId)
                 ->where('fiscal_year', $requestedFy)
                 ->latest()
@@ -110,12 +123,22 @@ class PrismOfficeHeadController extends Controller
                 ->exists();
         }
 
+        // "Create New PPMP" (a supplemental proposal within the same fiscal year) is only
+        // blocked by an open draft — a 'returned' proposal can sit alongside a new one and
+        // stays reachable/editable via the proposal selector above.
+        $canCreateNew = !BudgetProposal::where('office_id', $officeId)
+            ->where('status', 'draft')
+            ->exists();
+
         $proposalForm = [
             'officeName'          => $office?->name ?? 'Your Office',
+            'title'               => $proposal?->title ?? '',
             'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
             'date'                => $proposal?->created_at?->format('Y-m-d') ?? now()->format('Y-m-d'),
             'totalProposedBudget' => $proposal?->total_estimated_cost ?? 0,
         ];
+
+        $titleUpdateUrl = $proposal ? route('office-head.budget-proposal.update-title', $proposal->id) : null;
 
         $encodedItems = $proposal
             ? $proposal->items()->with(['marketReferences', 'sourceFiles'])->get()
@@ -127,6 +150,8 @@ class PrismOfficeHeadController extends Controller
                     'estimatedUnitCost' => (float) $item->estimated_unit_cost,
                     'totalCost'         => (float) $item->estimated_total_cost,
                     'justification'     => $item->remarks ?? '',
+                    'financeOk'         => $item->finance_ok,
+                    'financeRemark'     => $item->finance_remark ?? '',
                     'targetQuarter'     => $item->target_quarter ?? 'Q1',
                     'category'          => $item->category ?? $item->ppmpCategoryLabel() ?? 'General',
                     'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
@@ -167,8 +192,10 @@ class PrismOfficeHeadController extends Controller
             'proposalStatus'        => $proposalStatus,
             'canStartNew'           => $canStartNew,
             'nextFiscalYear'        => $nextFiscalYear,
-            'fiscalYears'           => $fiscalYears,
-            'selectedFiscalYear'    => $proposal?->fiscal_year,
+            'canCreateNew'          => $canCreateNew,
+            'proposalOptions'       => $proposalOptions,
+            'selectedProposalId'    => $proposal?->id,
+            'titleUpdateUrl'        => $titleUpdateUrl,
             'itemCount'             => $itemCount,
             'scopingReferenceCount' => $scopingReferenceCount,
             'missingScopingCount'   => $missingScopingCount,
@@ -217,6 +244,60 @@ class PrismOfficeHeadController extends Controller
 
         return redirect()->route('office-head.budget-proposal')
             ->with('success', "FY {$nextYear} PPMP started.");
+    }
+
+    /**
+     * Start a supplemental PPMP within the same fiscal year as the office's most
+     * recent proposal — offices can have several PPMPs per year (e.g. a main PPMP
+     * plus a mid-year supplemental one), unlike startNewCycle() which advances the year.
+     */
+    public function createNewPpmp(): RedirectResponse
+    {
+        $officeId = $this->officeId();
+
+        if (BudgetProposal::where('office_id', $officeId)->where('status', 'draft')->exists()) {
+            return redirect()->route('office-head.budget-proposal')
+                ->with('error', 'You already have an open PPMP draft. Submit or finish it before creating another.');
+        }
+
+        $latestYear = DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year');
+        $year       = $latestYear ? (int) $latestYear : now()->year + 1;
+        $sequence   = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $year)->count() + 1;
+
+        $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
+        $code     = $sequence > 1 ? $baseCode . '-' . $sequence : $baseCode;
+        while (DB::table('budget_proposals')->where('code', $code)->exists()) {
+            $code = $baseCode . '-' . ++$sequence;
+        }
+
+        $office = auth()->user()->office;
+        $title  = ($office?->name ?? 'Office') . ' PPMP FY' . $year . ($sequence > 1 ? " (Supplemental {$sequence})" : '');
+
+        BudgetProposal::create([
+            'office_id'          => $officeId,
+            'created_by_user_id' => auth()->id(),
+            'code'               => $code,
+            'title'              => $title,
+            'fiscal_year'        => $year,
+            'status'             => 'draft',
+        ]);
+
+        return redirect()->route('office-head.budget-proposal')
+            ->with('success', "New PPMP ({$code}) created for FY {$year}.");
+    }
+
+    public function updateTitle(Request $request, BudgetProposal $proposal): JsonResponse
+    {
+        abort_if($proposal->office_id !== $this->officeId(), 403);
+        abort_if(!in_array($proposal->status, ['draft', 'returned'], true), 403);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+        ]);
+
+        $proposal->update(['title' => $validated['title']]);
+
+        return response()->json(['success' => true, 'title' => $proposal->title]);
     }
 
     public function marketScoping(): View
@@ -347,14 +428,35 @@ class PrismOfficeHeadController extends Controller
             'estimatedUnitCost' => 'required|numeric|min:0',
             'justification'     => 'nullable|string|max:1000',
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
+            'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
 
         $officeId = $this->officeId();
 
-        $proposal = BudgetProposal::where('office_id', $officeId)
-            ->whereIn('status', ['draft', 'returned'])
-            ->orderByDesc('fiscal_year')
-            ->first();
+        // A draft and a returned PPMP can now exist side by side, so which proposal
+        // an item belongs to must come from the page the user is actually looking
+        // at — never guessed — or it can silently land on the wrong one.
+        $proposal = null;
+        if (!empty($validated['proposal_id'])) {
+            $proposal = BudgetProposal::where('id', $validated['proposal_id'])
+                ->where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->first();
+
+            if (!$proposal) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This PPMP is no longer editable.',
+                ], 422);
+            }
+        }
+
+        if (!$proposal) {
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->orderByDesc('fiscal_year')
+                ->first();
+        }
 
         if (!$proposal) {
             $year     = now()->year + 1;

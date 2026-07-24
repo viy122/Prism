@@ -1,5 +1,5 @@
 @extends('prism.layouts.app')
-@section('title', 'Dashboard | Finance Office')
+@section('title', 'Dashboard | Budget Office')
 
 @push('head-extras')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -112,7 +112,7 @@
     <div class="page-hdr">
         <div class="page-hdr-icon"><i class="ti ti-layout-dashboard"></i></div>
         <div>
-            <p class="page-hdr-eyebrow">Finance Office</p>
+            <p class="page-hdr-eyebrow">Budget Office</p>
             <h1 class="page-hdr-title">Dashboard</h1>
             <p class="page-hdr-sub">Monitor proposal review workload, office submission status, and the campus-wide proposed budget.</p>
         </div>

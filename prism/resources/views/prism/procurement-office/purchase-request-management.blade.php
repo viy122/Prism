@@ -1237,6 +1237,24 @@
             document.getElementById('impPurpose').value  = ex.purpose   || '';
             document.getElementById('impTotal').value    = ex.total     || '';
 
+            // Auto-select the requesting office if the extracted text matches one by name.
+            if (ex.office) {
+                const officeSel = document.getElementById('impOfficeId');
+                const needle = ex.office.trim().toLowerCase();
+                const match = Array.from(officeSel.options).find(o =>
+                    o.value && (o.text.toLowerCase() === needle || o.text.toLowerCase().includes(needle) || needle.includes(o.text.toLowerCase()))
+                );
+                if (match) officeSel.value = match.value;
+            }
+
+            // Pre-fill the items table with whatever rows were detected in the PDF.
+            itemsBody.innerHTML = '';
+            if (Array.isArray(ex.items) && ex.items.length) {
+                ex.items.forEach(item => addItemRow(item.name, item.qty, item.unit, item.unit_cost));
+            } else {
+                addItemRow();
+            }
+
             step1.style.display = 'none';
             step2.style.display = '';
         } catch {

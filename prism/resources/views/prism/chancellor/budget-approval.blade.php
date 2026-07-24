@@ -95,7 +95,7 @@
         <div>
             <p class="page-hdr-eyebrow">Chancellor</p>
             <h1 class="page-hdr-title">Budget Approval</h1>
-            <p class="page-hdr-sub">Review proposals endorsed by Finance Office, inspect item details and market scoping, then approve or return with required remarks.</p>
+            <p class="page-hdr-sub">Review proposals endorsed by Budget Office, inspect item details and market scoping, then approve or return with required remarks.</p>
         </div>
     </div>
 

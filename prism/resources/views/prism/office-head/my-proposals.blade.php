@@ -219,7 +219,7 @@
         /* ─── 2-col layout ─── */
         .two-col {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 400px;
+            grid-template-columns: minmax(0, 1fr) 440px;
             gap: 24px;
             align-items: start;
         }
@@ -356,7 +356,7 @@
 
         /* ─── Responsive ─── */
         @media (max-width: 1280px) {
-            .two-col { grid-template-columns: minmax(0,1fr) 340px; }
+            .two-col { grid-template-columns: minmax(0,1fr) 380px; }
             .stats-bar { grid-template-columns: repeat(2,1fr); }
         }
         @media (max-width: 1024px) {

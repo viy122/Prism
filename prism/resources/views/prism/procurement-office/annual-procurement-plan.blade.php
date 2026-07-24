@@ -1,5 +1,5 @@
 @extends('prism.layouts.app')
-@section('title', 'Annual Procurement Plan | Finance Office')
+@section('title', 'Annual Procurement Plan | Budget Office')
 
 @push('page-css')
 <style>
@@ -146,7 +146,7 @@
     <div class="page-hdr">
         <div class="page-hdr-icon"><i class="ti ti-file-stack"></i></div>
         <div>
-            <p class="page-hdr-eyebrow">Finance Office</p>
+            <p class="page-hdr-eyebrow">Budget Office</p>
             <h1 class="page-hdr-title">Annual Procurement Plan</h1>
             <p class="page-hdr-sub">System-recommended procurement modes per RA 9184 IRR thresholds. Override requires a written reason.</p>
         </div>

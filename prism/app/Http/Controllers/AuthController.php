@@ -71,7 +71,7 @@ class AuthController extends Controller
     {
         return match ($roleName) {
             'Office Head / Dean' => redirect()->route('office-head.dashboard'),
-            'Finance Office'     => redirect()->route('finance-office.dashboard'),
+            'Budget Office'      => redirect()->route('finance-office.dashboard'),
             'Procurement Office' => redirect()->route('procurement-office.dashboard'),
             'Chancellor'         => redirect()->route('chancellor.dashboard'),
             'Vice Chancellor'    => redirect()->route('vice-chancellor.dashboard'),

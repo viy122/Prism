@@ -57,7 +57,7 @@ class PrismFinanceOfficeController extends Controller
             ->all();
 
         return view('prism.finance-office.dashboard', $this->withCommon('dashboard', [
-            'pageTitle' => 'Finance Office Dashboard',
+            'pageTitle' => 'Budget Office Dashboard',
             'summary' => [
                 'awaitingReview'    => $awaitingReview,
                 'endorsedThisMonth' => $endorsedThisMonth,
@@ -75,17 +75,24 @@ class PrismFinanceOfficeController extends Controller
             ->whereIn('status', ['submitted', 'endorsed', 'returned'])
             ->latest('submitted_at')
             ->get()
+            // Submitted (awaiting endorsement) proposals surface first — stable sort
+            // keeps each status group ordered by latest('submitted_at') above.
+            ->sortBy(fn ($p) => $p->status === 'submitted' ? 0 : 1)
+            ->values()
             ->map(fn ($p) => $this->formatProposal($p))
             ->all();
 
+        // Land directly on the first proposal awaiting endorsement instead of a
+        // blank "select one" state — that's what Finance actually needs to see first.
         $selectedProposal = $proposal
             ? collect($proposals)->firstWhere('id', (int) $proposal)
-            : null;
+            : collect($proposals)->firstWhere('status', 'Submitted');
 
         return view('prism.finance-office.proposal-review', $this->withCommon('proposal-review', [
             'pageTitle'        => 'Proposal Review',
             'proposals'        => $proposals,
             'selectedProposal' => $selectedProposal,
+            'pendingCount'     => collect($proposals)->where('status', 'Submitted')->count(),
         ]));
     }
 
@@ -182,6 +189,11 @@ class PrismFinanceOfficeController extends Controller
     public function endorse(Request $request, BudgetProposal $proposal): RedirectResponse
     {
         abort_if($proposal->status !== 'submitted', 403);
+
+        if ($proposal->items()->where('finance_ok', false)->exists()) {
+            return redirect()->route('finance-office.proposal-review.show', $proposal->id)
+                ->withErrors(['endorse' => 'Cannot endorse: one or more items were disapproved. Return the proposal to the office instead.']);
+        }
 
         $statusFrom = $proposal->status;
         $remarks    = $request->input('remarks', '');
@@ -289,10 +301,10 @@ class PrismFinanceOfficeController extends Controller
             'activeRole'       => 'finance-office',
             'activeModulePage' => $activeFinancePage,
             'brandHref'        => route('finance-office.dashboard'),
-            'roleLabel'        => 'Finance Office',
-            'roleInitials'     => 'FO',
+            'roleLabel'        => 'Budget Office',
+            'roleInitials'     => 'BO',
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
-            'moduleNavLabel'   => 'Finance Office pages',
+            'moduleNavLabel'   => 'Budget Office pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                 'label' => 'Dashboard',                 'href' => route('finance-office.dashboard'),                  'icon' => 'layout-dashboard'],
                 ['slug' => 'proposal-review',           'label' => 'Proposal Review',           'href' => route('finance-office.proposal-review'),            'icon' => 'clipboard-check'],

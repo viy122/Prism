@@ -172,21 +172,21 @@ const timelineItemMarkup = (event, isLast) => {
         : `<span style="position:absolute;left:50%;top:36px;bottom:0;width:0;border-left:2px dashed #cbd5e1;transform:translateX(-50%);"></span>`;
 
     return `
-        <li style="position:relative;display:flex;gap:16px;padding-bottom:16px;">
+        <li style="position:relative;display:flex;gap:16px;padding-bottom:22px;">
             <div style="position:relative;flex-shrink:0;width:36px;">
                 <span style="display:block;height:36px;width:36px;border-radius:9999px;background:${timelineDotColor(event.step)};box-shadow:0 1px 3px rgba(15,23,42,.15);"></span>
                 ${connector}
             </div>
-            <div style="flex:1;min-width:0;border-radius:12px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:16px 24px;">
+            <div style="flex:1;min-width:0;border-radius:12px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:18px 22px;">
                 <strong style="display:block;font-size:14px;font-weight:700;color:#0f172a;">${escapeHtml(event.step)}</strong>
-                <span style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-top:2px;">${escapeHtml(event.timestamp)}</span>
-                <p style="margin-top:6px;font-size:13px;line-height:1.6;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
+                <span style="display:block;font-size:12px;font-weight:700;color:#64748b;margin-top:3px;">${escapeHtml(event.timestamp)}</span>
+                <p style="margin-top:10px;font-size:13px;line-height:1.6;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
             </div>
         </li>
     `;
 };
 const timelineEmptyClass = 'flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-base leading-7 text-slate-500 [&_svg]:h-10 [&_svg]:w-10 [&_svg]:text-bsu-maroon/70';
-const returnedBoxClass = 'rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800 shadow-sm';
+const returnedBoxClass = 'grid gap-3 justify-items-start rounded-2xl border border-red-200 bg-red-50 p-5 text-sm leading-6 text-red-800 shadow-sm';
 const panelHeaderClass = 'mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950';
 const eyebrowClass = 'text-xs font-extrabold uppercase tracking-[0.12em] text-bsu-maroon';
 const detailGridClass = 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [&_div]:rounded-2xl [&_div]:border [&_div]:border-slate-200 [&_div]:bg-slate-50 [&_div]:p-4 [&_dt]:text-xs [&_dt]:font-extrabold [&_dt]:uppercase [&_dt]:tracking-[0.07em] [&_dt]:text-slate-500 [&_dd]:mt-1.5 [&_dd]:text-sm [&_dd]:font-bold [&_dd]:text-slate-950';

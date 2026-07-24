@@ -1,5 +1,5 @@
 @extends('prism.layouts.app')
-@section('title', 'Budget Utilization Report | Finance Office')
+@section('title', 'Budget Utilization Report | Budget Office')
 
 @push('page-css')
 <style>
@@ -96,7 +96,7 @@
     <div class="page-hdr">
         <div class="page-hdr-icon"><i class="ti ti-report-money"></i></div>
         <div>
-            <p class="page-hdr-eyebrow">Finance Office</p>
+            <p class="page-hdr-eyebrow">Budget Office</p>
             <h1 class="page-hdr-title">Budget Utilization Report</h1>
             <p class="page-hdr-sub">Track campus budget utilization, offices at risk, and office-level spending progress by quarter.</p>
         </div>

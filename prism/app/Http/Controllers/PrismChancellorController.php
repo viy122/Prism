@@ -181,9 +181,57 @@ class PrismChancellorController extends Controller
             'reviewed_at'         => now(),
         ]);
 
+        $this->createPurchaseRequestsFromProposal($proposal);
+
         NotificationService::proposalApproved($proposal);
 
         return response()->json(['success' => true, 'message' => 'Proposal approved.']);
+    }
+
+    /**
+     * Give Procurement an immediate row in Purchase Request Management for each
+     * approved PPMP item, grouped by target quarter (matching the PR-{OFFICE}-{FY}-{Q}
+     * numbering already used across the system). If a PR for that office/year/quarter
+     * already exists (e.g. from an earlier proposal cycle), items are appended to it
+     * instead of creating a duplicate — 'number' is unique, so this must never collide.
+     */
+    private function createPurchaseRequestsFromProposal(BudgetProposal $proposal): void
+    {
+        $office = $proposal->office;
+        if (!$office) {
+            return;
+        }
+
+        $itemsByQuarter = $proposal->items()->get()->groupBy(fn ($item) => $item->target_quarter ?: 'Q1');
+
+        foreach ($itemsByQuarter as $quarter => $items) {
+            $pr = PurchaseRequest::firstOrCreate(
+                ['number' => "PR-{$office->code}-{$proposal->fiscal_year}-{$quarter}"],
+                [
+                    'office_id'          => $office->id,
+                    'created_by_user_id' => auth()->id(),
+                    'title'              => "Approved PPMP Items – {$office->name} – {$quarter} {$proposal->fiscal_year}",
+                    'description'        => "Auto-generated from approved PPMP: {$proposal->title}",
+                    'fiscal_year'        => $proposal->fiscal_year,
+                    'status'             => 'new',
+                    'signatory_stage'    => 'draft',
+                    'canvassing_stage'   => 'not_started',
+                    'remarks'            => 'Auto-generated from approved PPMP.',
+                ]
+            );
+
+            foreach ($items as $item) {
+                $pr->items()->create([
+                    'name'                 => $item->name,
+                    'quantity'             => $item->quantity,
+                    'unit'                 => $item->unit,
+                    'estimated_unit_cost'  => $item->estimated_unit_cost,
+                    'estimated_total_cost' => $item->estimated_total_cost,
+                ]);
+            }
+
+            $pr->update(['total_amount' => $pr->items()->sum('estimated_total_cost')]);
+        }
     }
 
     public function returnProposal(Request $request, BudgetProposal $proposal): JsonResponse
@@ -209,7 +257,7 @@ class PrismChancellorController extends Controller
 
         NotificationService::proposalReturnedByChancellor($proposal, $remarks);
 
-        return response()->json(['success' => true, 'message' => 'Proposal returned to Finance Office.']);
+        return response()->json(['success' => true, 'message' => 'Proposal returned to Budget Office.']);
     }
 
     public function procurementReports(): View

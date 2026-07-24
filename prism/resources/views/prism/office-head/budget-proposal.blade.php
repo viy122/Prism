@@ -9,6 +9,7 @@
     $scopingReferenceCount = collect($encodedItems)->sum(fn ($item) => count($item['scoping']));
     $missingScopingCount   = collect($encodedItems)->filter(fn ($item) => empty($item['scoping']))->count();
     $proposalTotal         = collect($encodedItems)->sum('totalCost');
+    $needsRevisionCount    = collect($encodedItems)->filter(fn ($item) => $item['financeOk'] === false)->count();
 @endphp
 
 @push('page-css')
@@ -64,6 +65,7 @@
         .badge-gray  { background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
         .badge-green { background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
         .badge-blue  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+        .badge-red   { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
 
         /* ── Form fields ── */
         .field-group { display: flex; flex-direction: column; gap: 5px; }
@@ -149,6 +151,7 @@
         tbody td:last-child { text-align: right; vertical-align: middle; }
         .td-name { font-weight: 700; color: var(--txt); max-width: 240px; vertical-align: top !important; }
         .td-name small { display: block; font-size: 11px; font-weight: 500; color: var(--txt3); margin-top: 2px; line-height: 1.5; }
+        .item-flag-remark { margin-top: 6px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 6px 9px; font-size: 11.5px; color: #991B1B; line-height: 1.45; white-space: pre-wrap; }
         .td-bold    { font-weight: 700; color: var(--txt); white-space: nowrap; }
         .td-crimson { font-weight: 700; color: var(--crimson); }
 
@@ -301,23 +304,37 @@
             <i class="ti ti-send"></i>
             <div>
                 <p class="submitted-banner-title">PPMP Submitted — Under Review</p>
-                <p class="submitted-banner-sub">This PPMP has been submitted and is awaiting Finance Office review. Editing is disabled.</p>
+                <p class="submitted-banner-sub">This PPMP has been submitted and is awaiting Budget Office review. Editing is disabled.</p>
             </div>
         </div>
         @endif
 
-        @if($isReadOnly && ($canStartNew ?? false))
+        @if($isReadOnly && ($canCreateNew ?? false))
         <div class="bp-new-cycle-banner">
             <div>
                 <strong>FY{{ $proposalForm['fiscalYear'] }} PPMP is {{ ucfirst($proposalStatus) }}.</strong>
-                Ready to begin FY{{ $nextFiscalYear }} budget planning?
+                @if($canStartNew ?? false)
+                    Ready to begin FY{{ $nextFiscalYear }} budget planning, or add a supplemental PPMP for FY{{ $proposalForm['fiscalYear'] }}?
+                @else
+                    Need another PPMP for FY{{ $proposalForm['fiscalYear'] }} (e.g. a supplemental request)?
+                @endif
             </div>
-            <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
-                @csrf
-                <button type="submit" class="btn-start-new-cycle">
-                    <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} PPMP
-                </button>
-            </form>
+            <div style="display:flex;gap:8px;">
+                <form method="POST" action="{{ route('office-head.budget-proposal.create-new') }}">
+                    @csrf
+                    <button type="submit" class="btn-start-new-cycle">
+                        <i class="ti ti-plus"></i> Create New PPMP
+                    </button>
+                </form>
+                @if($canStartNew ?? false)
+                <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
+                    @csrf
+                    <button type="submit" class="btn-start-new-cycle">
+                        <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} PPMP
+                    </button>
+                </form>
+                @endif
+            </div>
         </div>
         @endif
 
@@ -351,21 +368,38 @@
                             <p class="card-title">PPMP Details</p>
                             <p class="card-sub">Basic information for the annual procurement PPMP.</p>
                         </div>
-                        <span class="badge {{ $isReadOnly ? 'badge-blue' : 'badge-gray' }}" style="margin-left:auto;">{{ ucfirst($proposalStatus) }}</span>
+                        <span class="badge {{ $proposalStatus === 'returned' ? 'badge-red' : ($isReadOnly ? 'badge-blue' : 'badge-gray') }}" style="margin-left:auto;">{{ ucfirst($proposalStatus) }}</span>
+                        @if($needsRevisionCount > 0)
+                            <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
+                        @endif
                     </div>
                     <div class="card-body">
+                        <div class="field-group" style="margin-bottom:14px;">
+                            <label class="field-label" for="ppmpTitle">PPMP Name</label>
+                            <div style="display:flex; gap:8px;">
+                                <input class="field-input {{ $isReadOnly ? 'readonly' : '' }}" id="ppmpTitle"
+                                    value="{{ $proposalForm['title'] }}" {{ $isReadOnly ? 'readonly' : '' }}
+                                    placeholder="e.g. College of Engineering PPMP FY2026">
+                                @unless($isReadOnly)
+                                <button type="button" class="btn-outline" id="btnSaveTitle" style="white-space:nowrap;">
+                                    <i class="ti ti-device-floppy"></i> Save Name
+                                </button>
+                                @endunless
+                            </div>
+                            <p id="titleSaveStatus" style="display:none; font-size:11px; font-weight:600; margin-top:4px;"></p>
+                        </div>
                         <div class="form-grid-4">
                             <div class="field-group">
                                 <label class="field-label">Office / College</label>
                                 <input class="field-input readonly" readonly value="{{ $proposalForm['officeName'] }}">
                             </div>
                             <div class="field-group">
-                                <label class="field-label" for="fiscalYearSelect">Fiscal Year</label>
-                                @if(count($fiscalYears ?? []) > 1)
+                                <label class="field-label" for="fiscalYearSelect">Select PPMP</label>
+                                @if(count($proposalOptions ?? []) > 0)
                                 <select id="fiscalYearSelect" class="field-select"
-                                    onchange="window.location.href='{{ route('office-head.budget-proposal') }}?fy=' + this.value;">
-                                    @foreach($fiscalYears as $fy)
-                                    <option value="{{ $fy }}" {{ (int) $fy === (int) ($selectedFiscalYear ?? $proposalForm['fiscalYear']) ? 'selected' : '' }}>FY {{ $fy }}</option>
+                                    onchange="window.location.href='{{ route('office-head.budget-proposal') }}?proposal=' + this.value;">
+                                    @foreach($proposalOptions as $opt)
+                                    <option value="{{ $opt['id'] }}" {{ $opt['id'] === ($selectedProposalId ?? null) ? 'selected' : '' }}>{{ $opt['label'] }}</option>
                                     @endforeach
                                 </select>
                                 @else
@@ -419,7 +453,7 @@
                     <div class="submit-wrap">
                         <p id="submitMsg" class="submit-msg"></p>
                         <button id="submitProposalButton" type="button" class="btn-submit">
-                            <i class="ti ti-send"></i>Submit PPMP to Finance Office
+                            <i class="ti ti-send"></i>Submit PPMP to Budget Office
                         </button>
                     </div>
                     @endif
@@ -602,7 +636,50 @@
     const destroyBase = '{{ url("office-head/budget-proposal/item") }}/';
     const submitUrl   = '{{ route("office-head.budget-proposal.submit") }}';
     const scopingUrl  = '{{ route("office-head.market-scoping") }}';
+    const titleUrl    = @json($titleUpdateUrl);
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
+    const proposalId  = {{ $selectedProposalId ?? 'null' }};
+
+    // ── PPMP name (title) ───────────────────────────────────────────────────
+    document.getElementById('btnSaveTitle')?.addEventListener('click', async function () {
+        const input  = document.getElementById('ppmpTitle');
+        const status = document.getElementById('titleSaveStatus');
+        const title  = input.value.trim();
+
+        if (!title) {
+            input.style.borderColor = '#dc2626';
+            input.focus();
+            return;
+        }
+        if (!titleUrl) return;
+
+        input.style.borderColor = '';
+        this.disabled = true;
+
+        try {
+            const res  = await fetch(titleUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ title }),
+            });
+            const json = await res.json();
+            status.style.display = '';
+            if (res.ok && json.success) {
+                status.textContent = 'Saved.';
+                status.style.color = '#166534';
+                setTimeout(() => { status.style.display = 'none'; }, 2000);
+            } else {
+                status.textContent = json.message || 'Could not save the name.';
+                status.style.color = '#991b1b';
+            }
+        } catch {
+            status.style.display = '';
+            status.textContent = 'Network error.';
+            status.style.color = '#991b1b';
+        } finally {
+            this.disabled = false;
+        }
+    });
 
     let items = JSON.parse(document.getElementById('initialProposalItems').textContent || '[]');
     let editingId = null;
@@ -671,6 +748,8 @@
                     <td colspan="2">
                         <input class="field-input" id="edit-desc" value="${esc(item.description)}" placeholder="Item description" style="margin-bottom:6px;">
                         <input class="field-input" id="edit-just" value="${esc(item.justification)}" placeholder="Purpose / justification">
+                        ${item.financeOk === false ? `<span class="badge badge-red" style="margin-top:6px;display:inline-block;"><i class="ti ti-alert-triangle"></i> Needs Revision</span>
+                        <div class="item-flag-remark">${esc(item.financeRemark)}</div>` : ''}
                     </td>
                     <td>
                         <div style="display:flex;gap:6px;">
@@ -696,8 +775,11 @@
                 </tr>`;
             }
 
-            return `<tr data-item-row="${esc(item.id)}">
-                <td class="td-name">${esc(item.description)}<small>${esc(item.justification)}</small></td>
+            return `<tr data-item-row="${esc(item.id)}"${item.financeOk === false ? ' style="background:#FEF9F9;border-left:3px solid #991B1B;"' : ''}>
+                <td class="td-name">${esc(item.description)}<small>${esc(item.justification)}</small>
+                    ${item.financeOk === false ? `<br><span class="badge badge-red" style="margin-top:4px;display:inline-block;"><i class="ti ti-alert-triangle"></i> Needs Revision</span>
+                    <div class="item-flag-remark">${esc(item.financeRemark)}</div>` : ''}
+                </td>
                 <td>${esc(item.quantity)} ${esc(item.unit)}</td>
                 <td class="td-bold">PHP ${fmt(item.estimatedUnitCost)}</td>
                 <td class="td-bold">PHP ${fmt(item.totalCost)}</td>
@@ -736,12 +818,14 @@
         document.getElementById('proposalSummaryReferences').textContent = refs;
 
         const badge = document.getElementById('proposalReadyBadge');
-        if (items.length > 0 && missing === 0) {
-            badge.className   = 'readiness-badge ready';
-            badge.textContent = '✓ Ready for Review';
-        } else {
-            badge.className   = 'readiness-badge draft';
-            badge.textContent = 'Draft';
+        if (badge) {
+            if (items.length > 0 && missing === 0) {
+                badge.className   = 'readiness-badge ready';
+                badge.textContent = '✓ Ready for Review';
+            } else {
+                badge.className   = 'readiness-badge draft';
+                badge.textContent = 'Draft';
+            }
         }
 
         // Submit button state follows readiness
@@ -758,7 +842,7 @@
                 if (msgEl) { msgEl.textContent = 'Run market scoping or attach a source file on all items before submitting the PPMP.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
             } else {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP to Finance Office';
+                submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP to Budget Office';
                 if (msgEl) { msgEl.style.display = 'none'; }
             }
         }
@@ -783,6 +867,7 @@
                     estimatedUnitCost: parseFloat(f.estimatedUnitCost.value),
                     justification:     f.justification.value.trim(),
                     targetQuarter:     f.targetQuarter.value,
+                    proposal_id:       proposalId,
                 }),
             });
             const data = await res.json();

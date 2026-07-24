@@ -40,6 +40,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/budget-proposal/attachment/{document}', 'destroyItemAttachment')->name('budget-proposal.attachment.delete');
         Route::post('/budget-proposal/submit', 'submitProposal')->name('budget-proposal.submit');
         Route::post('/budget-proposal/start-new-cycle', 'startNewCycle')->name('budget-proposal.start-new-cycle');
+        Route::post('/budget-proposal/create-new', 'createNewPpmp')->name('budget-proposal.create-new');
+        Route::post('/budget-proposal/{proposal}/title', 'updateTitle')->name('budget-proposal.update-title');
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
         Route::post('/market-scoping/run', 'runMarketScoping')->name('market-scoping.run');
         Route::get('/market-scoping/suggestions', 'marketScopingSuggestions')->name('market-scoping.suggestions');
@@ -52,7 +54,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/purchase-requests', 'purchaseRequests')->name('purchase-requests');
     });
 
-    Route::prefix('finance-office')->name('finance-office.')->middleware('role:Finance Office')->controller(PrismFinanceOfficeController::class)->group(function () {
+    Route::prefix('finance-office')->name('finance-office.')->middleware('role:Budget Office')->controller(PrismFinanceOfficeController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/proposal-review', 'proposalReview')->name('proposal-review');
         Route::get('/proposal-review/{proposal}', 'proposalReview')->name('proposal-review.show');

@@ -43,7 +43,7 @@ class PrismInitialSeeder extends Seeder
                 'permissions' => ['view_dashboard', 'manage_budget_proposals', 'run_market_scoping', 'upload_purchase_requests'],
             ],
             'finance-office' => [
-                'name' => 'Finance Office',
+                'name' => 'Budget Office',
                 'permissions' => ['view_dashboard', 'review_budget_proposals', 'consolidate_app'],
             ],
             'procurement-office' => [

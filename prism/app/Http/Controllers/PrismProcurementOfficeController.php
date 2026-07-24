@@ -17,6 +17,7 @@ use App\Services\MarketScopingService;
 use App\Services\NotificationService;
 use App\Services\ProcurementModeService;
 use App\Services\SignatoryActionService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -85,7 +86,7 @@ class PrismProcurementOfficeController extends Controller
             ->get()
             ->map(fn ($pr) => [
                 'id'             => $pr->id,
-                'office'         => $pr->office?->name ?? '—',
+                'office'         => $pr->office?->code ?? $pr->office?->name ?? '—',
                 'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
                 'item'           => $pr->title,
                 'dateSubmitted'  => $pr->submitted_at?->format('M d, Y') ?? $pr->created_at->format('M d, Y'),
@@ -212,7 +213,7 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // ── Annual Procurement Plan (moved from Finance Office) ──────────────────
+    // ── Annual Procurement Plan (moved from Budget Office) ──────────────────
 
     public function annualProcurementPlan(): View
     {
@@ -781,38 +782,72 @@ class PrismProcurementOfficeController extends Controller
     {
         $data = $request->validate([
             'office_id'          => 'required|integer|exists:offices,id',
-            'number'             => 'nullable|string|max:100',
+            'number'             => 'nullable|string|max:100|unique:purchase_requests,number',
             'title'              => 'required|string|max:500',
             'purpose'            => 'nullable|string|max:2000',
             'total_amount'       => 'nullable|numeric|min:0',
-            'file_path'          => 'nullable|string|max:500',
+            'file_path'          => [
+                'nullable', 'string', 'max:500', 'unique:purchase_requests,file_path',
+                function ($attribute, $value, $fail) {
+                    if (!$value) {
+                        return;
+                    }
+                    if (!preg_match('#^purchase-requests/\d{4}/[A-Za-z0-9._-]+\.pdf$#i', $value)) {
+                        $fail('The uploaded document reference is invalid.');
+                        return;
+                    }
+                    if (!Storage::disk('public')->exists($value)) {
+                        $fail('The uploaded document could not be found. Please re-upload the PDF.');
+                    }
+                },
+            ],
             'items'              => 'nullable|array',
             'items.*.name'       => 'required_with:items|string|max:500',
-            'items.*.qty'        => 'nullable|numeric|min:0',
+            'items.*.qty'        => 'required_with:items.*.name|numeric|min:0.01',
             'items.*.unit'       => 'nullable|string|max:50',
-            'items.*.unit_cost'  => 'nullable|numeric|min:0',
+            'items.*.unit_cost'  => 'required_with:items.*.name|numeric|min:0.01',
+        ], [
+            'number.unique'    => 'A purchase request with this PR number has already been imported.',
+            'file_path.unique' => 'This document has already been attached to another purchase request.',
         ]);
 
-        $pr = PurchaseRequest::create([
-            'office_id'             => $data['office_id'],
-            'created_by_user_id'    => auth()->id(),
-            'number'                => $data['number'] ?: ('BSU-' . now()->format('YmdHis')),
-            'title'                 => $data['title'],
-            'description'           => $data['purpose'] ?? null,
-            'fiscal_year'           => now()->year,
-            'total_amount'          => $data['total_amount'] ?? 0,
-            'status'                => 'in_progress',
-            'signatory_stage'       => 'draft',
-            'canvassing_stage'      => 'completed',
-            'file_path'             => $data['file_path'] ?? null,
-            'extracted_fields_json' => ['imported_from_bsu' => true],
-            'uploaded_at'           => now(),
-            'remarks'               => 'Imported from BSU procurement system.',
-        ]);
+        $items = $data['items'] ?? [];
 
-        foreach (($data['items'] ?? []) as $item) {
-            $qty      = (float) ($item['qty'] ?? 1);
-            $unitCost = (float) ($item['unit_cost'] ?? 0);
+        // Items are the source of truth for the amount — derive it from them
+        // rather than trusting a client-editable total that can drift out of sync.
+        $itemsTotal = round(array_sum(array_map(
+            fn ($item) => (float) $item['qty'] * (float) $item['unit_cost'],
+            $items
+        )), 2);
+        $totalAmount = $items ? $itemsTotal : ($data['total_amount'] ?? 0);
+
+        try {
+            $pr = PurchaseRequest::create([
+                'office_id'             => $data['office_id'],
+                'created_by_user_id'    => auth()->id(),
+                'number'                => $data['number'] ?: ('BSU-' . now()->format('YmdHis')),
+                'title'                 => $data['title'],
+                'description'           => $data['purpose'] ?? null,
+                'fiscal_year'           => now()->year,
+                'total_amount'          => $totalAmount,
+                'status'                => 'in_progress',
+                'signatory_stage'       => 'draft',
+                'canvassing_stage'      => 'completed',
+                'file_path'             => $data['file_path'] ?? null,
+                'extracted_fields_json' => ['imported_from_bsu' => true],
+                'uploaded_at'           => now(),
+                'remarks'               => 'Imported from BSU procurement system.',
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A purchase request with this PR number or document has already been imported.',
+            ], 422);
+        }
+
+        foreach ($items as $item) {
+            $qty      = (float) $item['qty'];
+            $unitCost = (float) $item['unit_cost'];
             $pr->items()->create([
                 'name'                => $item['name'],
                 'quantity'            => $qty,
@@ -836,22 +871,22 @@ class PrismProcurementOfficeController extends Controller
         $clean = fn (string $s) => trim(preg_replace('/\s+/', ' ', $s));
 
         $prNumber = null;
-        if (preg_match('/PR\s*No\.?\s*[:\|]?\s*([A-Z0-9\-\/]+)/i', $text, $m)) {
+        if (preg_match('/(?:P\.?\s*R\.?\s*No\.?|Purchase\s+Request\s+No\.?)\s*[:\|]?\s*([A-Z0-9\-\/]+)/i', $text, $m)) {
             $prNumber = $clean($m[1]);
         }
 
         $office = null;
-        if (preg_match('/Department\s*[\/]?\s*Office\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+        if (preg_match('/(?:Requesting\s+Office(?:\s*\/\s*Section)?|Department\s*\/?\s*Office|Office\s*\/\s*Department)\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
             $office = $clean($m[1]);
         }
 
         $title = null;
-        if (preg_match('/Name\s+of\s+Project\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+        if (preg_match('/(?:Name\s+of\s+Project|Document\s+Title|Project\s+Title)\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
             $title = $clean($m[1]);
         }
 
         $purpose = null;
-        if (preg_match('/Purpose\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
+        if (preg_match('/Purpose(?:\s*\/\s*Justification)?\s*[:\|]\s*([^\n\r]+)/i', $text, $m)) {
             $purpose = $clean($m[1]);
         }
 
@@ -861,8 +896,13 @@ class PrismProcurementOfficeController extends Controller
         }
 
         $total = null;
-        if (preg_match('/TOTAL\s+COST[^0-9₱]*([0-9,]+\.?\d*)/i', $text, $m)) {
+        if (preg_match('/TOTAL\s+(?:AMOUNT|COST)[^0-9₱]*([0-9,]+\.?\d*)/i', $text, $m)) {
             $total = (float) str_replace(',', '', $m[1]);
+        }
+
+        $items = $this->parsePrItems($text);
+        if ($total === null && $items) {
+            $total = round(array_sum(array_map(fn ($i) => $i['qty'] * $i['unit_cost'], $items)), 2);
         }
 
         return [
@@ -872,7 +912,81 @@ class PrismProcurementOfficeController extends Controller
             'purpose'   => $purpose,
             'date'      => $date,
             'total'     => $total,
+            'items'     => $items,
         ];
+    }
+
+    /**
+     * Best-effort extraction of item rows from a PR's item table. PDF text
+     * extraction flattens table cells into plain lines, so this matches lines
+     * that end in a qty + unit cost + total cost column triplet (the shape
+     * shared by the BatStateU-FO-PRO-02 form and this system's own PR print).
+     */
+    private function parsePrItems(string $text): array
+    {
+        $clean = fn (string $s) => trim(preg_replace('/\s+/', ' ', $s));
+        $units = ['pc', 'pcs', 'piece', 'pieces', 'unit', 'units', 'set', 'sets', 'box', 'boxes',
+            'ream', 'reams', 'bottle', 'bottles', 'pack', 'packs', 'roll', 'rolls', 'kg', 'kgs',
+            'ltr', 'ltrs', 'liter', 'liters', 'gal', 'gallon', 'gallons', 'can', 'cans',
+            'bundle', 'bundles', 'lot', 'lots', 'pair', 'pairs'];
+
+        $items = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $text) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            // Trailing qty + unit cost + total cost triplet — the shape shared by the
+            // BatStateU-FO-PRO-02 form and this system's own PR print table.
+            if (!preg_match(
+                '/^(?<prefix>.+?)\s+(?<qty>\d+(?:\.\d+)?)\s+(?:₱\s*)?(?<unitcost>[\d,]+\.\d{2})\s+(?:₱\s*)?(?<totalcost>[\d,]+\.\d{2})\s*$/',
+                $line,
+                $m
+            )) {
+                continue;
+            }
+
+            $qty       = (float) $m['qty'];
+            $unitCost  = (float) str_replace(',', '', $m['unitcost']);
+            $totalCost = (float) str_replace(',', '', $m['totalcost']);
+
+            // qty * unitCost should roughly match totalCost, otherwise this line is
+            // probably not an item row (e.g. a stray date or signature block).
+            if ($qty <= 0 || $unitCost <= 0 || abs(($qty * $unitCost) - $totalCost) > max(1, $totalCost * 0.02)) {
+                continue;
+            }
+
+            $prefix = trim($m['prefix']);
+            // Drop a leading row number ("1", "12.", "3)").
+            $prefix = preg_replace('/^\d+[\.\)]?\s+(?=\S)/', '', $prefix);
+            // Drop a leading dash/N-A placeholder (empty stock/property no. column).
+            $prefix = preg_replace('/^(?:—|-{1,2}|N\/?A)\s+(?=\S)/i', '', $prefix);
+            // Drop a leading stock/property code — only if that token itself contains a digit,
+            // so plain description words (no digit) are never mistaken for a code.
+            $prefix = preg_replace('/^(?=\S*\d)[A-Za-z0-9\-\/]{1,15}\s+(?=\S)/', '', $prefix);
+
+            $words = explode(' ', $prefix);
+            $unit  = 'pc';
+            if (count($words) > 1 && in_array(strtolower($words[0]), $units, true)) {
+                $unit = array_shift($words);
+            }
+
+            $desc = $clean(implode(' ', $words));
+            if ($desc === '' || stripos($desc, 'total') !== false || stripos($desc, 'grand') !== false) {
+                continue;
+            }
+
+            $items[] = [
+                'name'      => $desc,
+                'qty'       => $qty,
+                'unit'      => $unit,
+                'unit_cost' => $unitCost,
+            ];
+        }
+
+        return $items;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

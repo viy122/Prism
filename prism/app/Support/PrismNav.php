@@ -9,7 +9,7 @@ class PrismNav
     {
         return [
             ['slug' => 'office-head',        'label' => 'Office Head / Dean',  'href' => route('office-head.dashboard')],
-            ['slug' => 'finance-office',     'label' => 'Finance Office',       'href' => route('finance-office.dashboard')],
+            ['slug' => 'finance-office',     'label' => 'Budget Office',        'href' => route('finance-office.dashboard')],
             ['slug' => 'procurement-office', 'label' => 'Procurement Office',   'href' => route('procurement-office.dashboard')],
             ['slug' => 'bac',                'label' => 'BAC',                  'href' => route('bac.dashboard')],
             ['slug' => 'chancellor',         'label' => 'Chancellor',           'href' => route('chancellor.dashboard')],

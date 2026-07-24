@@ -74,7 +74,7 @@ class NotificationService
 
     /**
      * Triggered when: Office Head submits a proposal.
-     * Notifies: Finance Office — they need to review it.
+     * Notifies: Budget Office — they need to review it.
      */
     public static function proposalSubmitted(BudgetProposal $proposal): void
     {
@@ -82,7 +82,7 @@ class NotificationService
         $year   = $proposal->fiscal_year;
 
         self::sendToRole(
-            'Finance Office',
+            'Budget Office',
             'proposal_submitted',
             'New PPMP for Review',
             "{$office} submitted their FY {$year} PPMP. Please review and approve.",
@@ -91,7 +91,7 @@ class NotificationService
     }
 
     /**
-     * Triggered when: Finance Office endorses a proposal.
+     * Triggered when: Budget Office endorses a proposal.
      * Notifies: Chancellor — next approver.
      *           Office Head — their proposal moved forward.
      */
@@ -104,7 +104,7 @@ class NotificationService
             'Chancellor',
             'proposal_endorsed',
             'PPMP Ready for Approval',
-            "{$office}'s FY {$year} PPMP has been approved by the Finance Office and is ready for your approval.",
+            "{$office}'s FY {$year} PPMP has been approved by the Budget Office and is ready for your approval.",
             route('chancellor.budget-approval'),
         );
 
@@ -113,14 +113,14 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_endorsed',
                 'Your Proposal Has Been Endorsed',
-                "Your FY {$year} PPMP has been approved by the Finance Office and forwarded to the Chancellor for approval.",
+                "Your FY {$year} PPMP has been approved by the Budget Office and forwarded to the Chancellor for approval.",
                 route('office-head.my-proposals'),
             );
         }
     }
 
     /**
-     * Triggered when: Finance Office returns a proposal.
+     * Triggered when: Budget Office returns a proposal.
      * Notifies: Office Head — they need to revise and resubmit.
      */
     public static function proposalReturnedByFinance(BudgetProposal $proposal, string $remarks = ''): void
@@ -133,7 +133,7 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_returned',
                 'Proposal Returned for Revision',
-                "Your FY {$year} PPMP was returned by the Finance Office.{$remarkNote} Please revise and resubmit.",
+                "Your FY {$year} PPMP was returned by the Budget Office.{$remarkNote} Please revise and resubmit.",
                 route('office-head.budget-proposal'),
             );
         }
@@ -170,7 +170,7 @@ class NotificationService
 
     /**
      * Triggered when: Chancellor returns a proposal.
-     * Notifies: Finance Office — for awareness.
+     * Notifies: Budget Office — for awareness.
      *           Office Head — needs revision.
      */
     public static function proposalReturnedByChancellor(BudgetProposal $proposal, string $remarks = ''): void
@@ -179,7 +179,7 @@ class NotificationService
         $year   = $proposal->fiscal_year;
 
         self::sendToRole(
-            'Finance Office',
+            'Budget Office',
             'proposal_returned',
             'Proposal Returned by Chancellor',
             "{$office}'s FY {$year} PPMP was returned by the Chancellor for revision." . ($remarks ? " Remarks: \"{$remarks}\"" : ''),
@@ -192,7 +192,7 @@ class NotificationService
                 $proposal->submitted_by_user_id,
                 'proposal_returned',
                 'Proposal Returned by Chancellor',
-                "Your FY {$year} PPMP was returned by the Chancellor.{$remarkNote} Please coordinate with the Finance Office.",
+                "Your FY {$year} PPMP was returned by the Chancellor.{$remarkNote} Please coordinate with the Budget Office.",
                 route('office-head.my-proposals'),
             );
         }

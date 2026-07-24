@@ -13,7 +13,7 @@ class AuthController extends Controller
     private const ROLE_MAP = [
         'system-admin'       => 'System Administrator',
         'office-head'        => 'Office Head / Dean',
-        'finance-office'     => 'Finance Office',
+        'finance-office'     => 'Budget Office',
         'procurement-office' => 'Procurement Office',
         'chancellor'         => 'Chancellor',
         'vice-chancellor'    => 'Vice Chancellor',

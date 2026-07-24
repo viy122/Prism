@@ -1,5 +1,5 @@
 @extends('prism.layouts.app')
-@section('title', 'Proposal Review | Finance Office')
+@section('title', 'Proposal Review | Budget Office')
 
 @push('page-css')
 <style>
@@ -134,6 +134,7 @@
     /* ── Overall action buttons (endorse / return) ── */
     .btn-endorse { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: #16a34a; color: #fff; font-size: 14px; font-weight: 700; border: none; cursor: pointer; font-family: 'Poppins', sans-serif; box-shadow: 0 2px 10px rgba(22,163,74,.25); transition: background .2s; white-space: nowrap; flex: 1; min-width: 220px; }
     .btn-endorse:hover { background: #15803d; }
+    .btn-endorse:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; background: #16a34a; }
     .btn-endorse i { font-size: 17px; }
     .btn-return { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 28px; border-radius: 10px; background: var(--white); color: #dc2626; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1.5px solid #fecaca; transition: all .2s; white-space: nowrap; flex: 1; min-width: 220px; }
     .btn-return:hover { background: #fef2f2; border-color: #dc2626; }
@@ -154,7 +155,7 @@
     <div class="page-hdr">
         <div class="page-hdr-icon"><i class="ti ti-clipboard-check"></i></div>
         <div>
-            <p class="page-hdr-eyebrow">Finance Office</p>
+            <p class="page-hdr-eyebrow">Budget Office</p>
             <h1 class="page-hdr-title">Proposal Review</h1>
             <p class="page-hdr-sub">Review office details, encoded procurement items, justifications, and market scoping references.</p>
         </div>
@@ -163,8 +164,13 @@
     <div class="card">
         <div class="card-head">
             <div>
-                <p class="card-eyebrow">Finance Office</p>
-                <h2 class="card-title">Proposal Review</h2>
+                <p class="card-eyebrow">Budget Office</p>
+                <h2 class="card-title">
+                    Proposal Review
+                    @if($pendingCount > 0)
+                        <span class="badge" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:11px;vertical-align:middle;margin-left:6px;">{{ $pendingCount }} awaiting endorsement</span>
+                    @endif
+                </h2>
                 <p class="card-sub">Review office details, encoded procurement items, justifications, target quarters, and AI market scoping references.</p>
             </div>
         </div>
@@ -175,7 +181,7 @@
                 @foreach ($proposals as $proposal)
                     <option value="{{ route('finance-office.proposal-review.show', ['proposal' => $proposal['id']]) }}"
                         @selected($selectedProposal && $selectedProposal['id'] === $proposal['id'])>
-                        {{ $proposal['title'] }}
+                        {{ $proposal['status'] === 'Submitted' ? '[Awaiting Endorsement] ' : '' }}{{ $proposal['title'] }} — {{ $proposal['status'] }}
                     </option>
                 @endforeach
             </select>
@@ -284,8 +290,8 @@
                                         <button type="button" class="btn-verdict btn-ok{{ $item['financeOk'] === true ? ' active' : '' }}" title="Approve this item">
                                             <i class="ti ti-check"></i> Approve
                                         </button>
-                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Add remarks for this item">
-                                            <i class="ti ti-message-2"></i> Remarks
+                                        <button type="button" class="btn-verdict btn-flag{{ $item['financeOk'] === false ? ' active' : '' }}" title="Disapprove this item">
+                                            <i class="ti ti-message-2"></i> Disapprove
                                         </button>
                                     </div>
                                     <div class="remark-display" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
@@ -333,8 +339,9 @@
             <textarea class="field-textarea" id="financeOverallRemarks" rows="5"
                 placeholder="Add approval notes or return instructions for the office"></textarea>
             @if($selectedProposal['status'] === 'Submitted')
+            @php $anyDisapproved = collect($selectedProposal['items'])->contains('financeOk', false); @endphp
             <div class="action-row" style="margin-top:14px;">
-                <button class="btn-endorse" type="submit"
+                <button id="btnEndorse" class="btn-endorse" type="submit" {{ $anyDisapproved ? 'disabled' : '' }}
                     data-url="{{ route('finance-office.proposal-review.endorse', $selectedProposal['id']) }}"
                     onclick="return submitFinanceForm(this)">
                     <i class="ti ti-circle-check"></i>
@@ -347,6 +354,9 @@
                     Return
                 </button>
             </div>
+            <p id="endorseBlockedMsg" style="margin-top:10px;font-size:12px;font-weight:600;color:#991b1b;{{ $anyDisapproved ? '' : 'display:none;' }}">
+                {{ collect($selectedProposal['items'])->where('financeOk', false)->count() }} item(s) disapproved — return the proposal instead.
+            </p>
             @else
             <p style="margin-top:14px;font-size:13px;font-weight:600;color:var(--s500);">
                 This proposal has already been <strong>{{ strtolower($selectedProposal['status']) }}</strong> — no further action available.
@@ -417,6 +427,14 @@ function submitFinanceReturn(btn) {
         }
     }
 
+    function updateEndorseGate() {
+        const anyDisapproved = document.querySelectorAll('.btn-flag.active').length > 0;
+        const btn = document.getElementById('btnEndorse');
+        if (btn) btn.disabled = anyDisapproved;
+        const msg = document.getElementById('endorseBlockedMsg');
+        if (msg) msg.style.display = anyDisapproved ? '' : 'none';
+    }
+
     document.querySelectorAll('.fin-verdict').forEach(box => {
         const btnOk      = box.querySelector('.btn-ok');
         const btnFlag    = box.querySelector('.btn-flag');
@@ -437,6 +455,7 @@ function submitFinanceReturn(btn) {
                 const saved = await saveVerdict(box, true);
                 if (!saved) btnOk.classList.remove('active');
             }
+            updateEndorseGate();
         });
 
         btnFlag.addEventListener('click', () => {
@@ -445,6 +464,7 @@ function submitFinanceReturn(btn) {
             display.style.display = 'none';
             remarkEl.style.display = '';
             input.focus();
+            updateEndorseGate();
         });
 
         btnEdit.addEventListener('click', () => {
@@ -469,8 +489,11 @@ function submitFinanceReturn(btn) {
                 remarkEl.style.display = 'none';
                 display.style.display = '';
             }
+            updateEndorseGate();
         });
     });
+
+    updateEndorseGate();
 })();
 </script>
 @endpush

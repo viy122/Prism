@@ -10,7 +10,7 @@ class EnsureUserRole
 {
     private array $roleRoutes = [
         'Office Head / Dean'  => 'office-head.dashboard',
-        'Finance Office'      => 'finance-office.dashboard',
+        'Budget Office'       => 'finance-office.dashboard',
         'Procurement Office'  => 'procurement-office.dashboard',
         'Chancellor'          => 'chancellor.dashboard',
         'Vice Chancellor'     => 'vice-chancellor.dashboard',
