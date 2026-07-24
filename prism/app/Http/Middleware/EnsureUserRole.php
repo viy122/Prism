@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserRole
@@ -21,7 +22,7 @@ class EnsureUserRole
 
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        $userRole = auth()->user()?->roles()->first()?->name;
+        $userRole = Auth::user()?->roles()->first()?->name;
 
         if ($userRole === 'System Administrator') {
             return $next($request);
