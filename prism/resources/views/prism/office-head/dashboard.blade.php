@@ -224,7 +224,7 @@
                     <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                     <div class="pd-stat-label">Pending Approval</div>
                     <div class="pd-stat-value">{{ number_format($summary['pendingItems']) }}</div>
-                    <div class="pd-stat-hint">Under Finance or Chancellor review</div>
+                    <div class="pd-stat-hint">Under Budget or Chancellor review</div>
                 </article>
             </div>
 
@@ -280,7 +280,7 @@
                                     'pending'                                    => 'pd-badge-pending',
                                     'submitted'                                  => 'pd-badge-submitted',
                                     'in progress', 'progress'                    => 'pd-badge-progress',
-                                    'finance review completed', 'finance review' => 'pd-badge-finance',
+                                    'budget review completed', 'budget review'   => 'pd-badge-finance',
                                     default                                      => 'pd-badge-info',
                                 };
                             @endphp
@@ -359,7 +359,7 @@
                                 <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 Review proposal status
                             </div>
-                            <div class="pd-pr-link-sub">Check Finance and Chancellor remarks for returned items.</div>
+                            <div class="pd-pr-link-sub">Check Budget and Chancellor remarks for returned items.</div>
                         </a>
                         <a href="{{ route('office-head.purchase-requests') }}" class="pd-pr-link">
                             <div class="pd-pr-link-title">

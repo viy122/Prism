@@ -252,7 +252,7 @@
                         <th>Estimated Cost</th>
                         <th>Quarter</th>
                         <th>AI Market Scoping</th>
-                        <th>Finance Remarks</th>
+                        <th>Budget Remarks</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -319,7 +319,7 @@
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">Overall proposal</p>
-                <h2 class="card-title">Finance Remarks</h2>
+                <h2 class="card-title">Budget Remarks</h2>
             </div>
         </div>
         @if(session('success'))

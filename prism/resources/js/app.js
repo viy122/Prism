@@ -262,7 +262,7 @@ const initProposalTimeline = () => {
         }
 
         if (proposal.status === 'Submitted') {
-            return 'Await Finance';
+            return 'Await Budget';
         }
 
         return 'Continue draft';
@@ -794,7 +794,7 @@ const initChancellorBudgetApproval = () => {
     const trailMarkup = (proposal) => `
         <ol class="${activityLogClass}">
             <li>
-                <strong>Finance Endorsement</strong>
+                <strong>Budget Endorsement</strong>
                 <span>${escapeHtml(proposal.financeEndorsementTimestamp)}</span>
                 <p>${escapeHtml(proposal.financeRemarks)}</p>
             </li>
@@ -863,7 +863,7 @@ const initChancellorBudgetApproval = () => {
             </div>
 
             <div class="${returnedBoxClass}">
-                <p><strong>Finance remarks:</strong> ${escapeHtml(proposal.financeRemarks)}</p>
+                <p><strong>Budget remarks:</strong> ${escapeHtml(proposal.financeRemarks)}</p>
             </div>
 
             <label class="block [&>span]:mb-1.5 [&>span]:block [&>span]:text-sm [&>span]:font-bold [&>span]:text-slate-700 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-slate-300 [&_textarea]:bg-white [&_textarea]:px-4 [&_textarea]:py-3 [&_textarea]:text-base [&_textarea:focus]:border-bsu-maroon [&_textarea:focus]:outline-none [&_textarea:focus]:ring-2 [&_textarea:focus]:ring-bsu-gold/40">
@@ -886,7 +886,7 @@ const initChancellorBudgetApproval = () => {
                 <div class="${panelHeaderClass}">
                     <div>
                         <p class="${eyebrowClass}">Approval trail</p>
-                        <h2>Finance and Chancellor Actions</h2>
+                        <h2>Budget and Chancellor Actions</h2>
                     </div>
                 </div>
                 <div id="chancellorApprovalTrail">${trailMarkup(proposal)}</div>

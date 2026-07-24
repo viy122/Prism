@@ -125,7 +125,7 @@
             </div>
             <div class="pd-stat-label">Awaiting Review</div>
             <div class="pd-stat-value">{{ number_format($summary['awaitingReview']) }}</div>
-            <div class="pd-stat-hint">Submitted proposals pending Finance action</div>
+            <div class="pd-stat-hint">Submitted proposals pending Budget action</div>
         </article>
         <article class="pd-stat">
             <div class="pd-stat-icon">

@@ -106,7 +106,7 @@
         <div class="card">
             <div class="card-head">
                 <div>
-                    <p class="card-eyebrow">Finance-endorsed proposals</p>
+                    <p class="card-eyebrow">Budget-endorsed proposals</p>
                     <h2 class="card-title">Approval Queue</h2>
                 </div>
                 <span class="count-chip">{{ count($proposals) }} endorsed</span>
@@ -114,7 +114,7 @@
             <div class="table-wrap">
                 <table>
                     <thead>
-                        <tr><th>Office</th><th>Total Amount</th><th>Date Endorsed</th><th>Finance Remarks</th></tr>
+                        <tr><th>Office</th><th>Total Amount</th><th>Date Endorsed</th><th>Budget Remarks</th></tr>
                     </thead>
                     <tbody>
                         @foreach ($proposals as $proposal)
@@ -141,7 +141,7 @@
             <div id="chancellorProposalDetails">
                 <div class="detail-empty">
                     <svg viewBox="0 0 24 24"><path d="M15 15l6 6m-11-4a7 7 0 110-14 7 7 0 010 14z"/></svg>
-                    <p>Click a proposal row to view items, costs, justifications, market scoping, Finance remarks, and approval trail.</p>
+                    <p>Click a proposal row to view items, costs, justifications, market scoping, Budget remarks, and approval trail.</p>
                 </div>
             </div>
 
@@ -213,7 +213,7 @@
                     <div class="meta-item"><p class="meta-label">Status</p><p class="meta-value"><span class="badge ${badgeClass(proposal.status)}">${proposal.status ?? 'Endorsed'}</span></p></div>
                 </div>
                 <div class="remark-box">
-                    <p class="remark-label">Finance Remarks</p>
+                    <p class="remark-label">Budget Remarks</p>
                     <p>${proposal.financeRemarks ?? '—'}</p>
                 </div>
                 <div>

@@ -724,7 +724,7 @@
                                     <text x="12" y="18" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">&#8369;</text>
                                 </svg>
                             </span>
-                            Finance
+                            Budget
                         </a>
                         <a class="demo-btn" href="{{ route('demo.login', 'procurement-office') }}">
                             <span class="demo-icon">
