@@ -69,6 +69,7 @@ class SignatoryActionService
         }
 
         $doc->update($updateData);
+        $this->clearTrackingOverride($doc);
 
         $this->createLog($doc, array_merge([
             'signatory_number'  => $signatoryNumber,
@@ -113,46 +114,75 @@ class SignatoryActionService
         return $payload;
     }
 
-    public function returnToDraft(Model $doc, string $remarks): array
+    /**
+     * Return moves the document back exactly ONE stage — to whoever owned
+     * the step right before the current one — not all the way to draft.
+     * Only when returning from the very first real stage (e.g. at_end_user)
+     * does that "one step back" land on 'draft', same as before.
+     */
+    public function returnOneStep(Model $doc, string $remarks): array
     {
-        $prev = $doc->signatory_stage;
+        $prev      = $doc->signatory_stage;
+        $stages    = $doc::signatoryStages();
+        $prevIndex = $doc->stageIndex($prev);
+        $newIndex  = max(0, $prevIndex - 1);
+        $newStage  = $stages[$newIndex];
 
-        $updateData = ['signatory_stage' => 'draft'];
+        $updateData = ['signatory_stage' => $newStage];
+
         if ($doc instanceof PurchaseRequest) {
-            $updateData['third_signer'] = null;
+            // third_signer only matters at/after the flexible 3rd slot —
+            // clear it if returning to a stage before that point was chosen.
+            $thirdSignIndex = array_search('at_third_sign', $stages, true);
+            if ($thirdSignIndex !== false && $newIndex < $thirdSignIndex) {
+                $updateData['third_signer'] = null;
+            }
         }
+
         $doc->update($updateData);
+        $this->clearTrackingOverride($doc);
 
         $this->createLog($doc, [
-            'signatory_number'  => $doc->stageIndex($prev),
+            'signatory_number'  => $prevIndex,
             'signed_by_user_id' => auth()->id(),
             'action'            => 'returned',
             'remarks'           => $remarks,
             'signed_at'         => now(),
         ]);
 
-        if ($doc instanceof PurchaseRequest) {
+        $fresh = $doc->fresh();
+
+        if ($fresh instanceof PurchaseRequest) {
             ProcurementStatusUpdate::create([
-                'purchase_request_id' => $doc->id,
+                'purchase_request_id' => $fresh->id,
                 'updated_by_user_id'  => auth()->id(),
-                'status'              => 'returned_to_draft',
+                'status'              => 'returned_one_step',
                 'remarks'             => $remarks,
             ]);
         }
 
-        return ['success' => true];
+        return [
+            'success'        => true,
+            'signatoryStage' => $newStage,
+            'signatoryLabel' => $fresh->signatory_label,
+            'stageMeta'      => $fresh->resolvedStageMeta(),
+            'thirdSigner'    => $fresh instanceof PurchaseRequest ? $fresh->third_signer : null,
+        ];
     }
 
     /**
-     * The signature photo pipeline: store the original privately, auto-detect
-     * the signature, blur it, and advance the stage when detection succeeds.
+     * The signature photo pipeline: store the original privately and
+     * auto-detect the signature. Never advances the stage itself — always
+     * hands back to the caller so a distinct "Next" action (confirmSign)
+     * commits the advance, matching the physical "sign it, then walk it to
+     * the next office" flow.
      *
      * Outcomes:
-     *  - detected            → stage advanced, blurred copy publicly visible
+     *  - detected            → needsConfirmation, blurredPath already ready
      *  - not detected        → needsConfirmation (caller shows manual confirm + drag-box)
      *  - microservice down   → needsConfirmation with detection 'pending'
      */
-    public function signWithPhoto(Model $doc, UploadedFile $photo, ?string $remarks = null, ?string $thirdSigner = null): array
+    public function signWithPhoto(Model $doc, UploadedFile $photo): array
     {
         $stageMeta = $doc->stageMetaFor($doc->signatory_stage);
         if (($stageMeta['type'] ?? 'signature') !== 'signature') {
@@ -187,47 +217,62 @@ class SignatoryActionService
 
         $blurredPath = $this->storeBlurred($doc, base64_decode($detection['blurred_image_b64']));
 
-        return $this->advance($doc, $remarks, $thirdSigner, [
-            'photo_path'           => $originalPath,
-            'blurred_photo_path'   => $blurredPath,
-            'signature_boxes_json' => $detection['boxes'] ?? [],
-            'detection_status'     => 'detected',
-            'photo_uploaded_at'    => now(),
-        ]) + ['detection' => 'detected', 'confidence' => $detection['confidence'] ?? null];
+        return [
+            'success'           => true,
+            'needsConfirmation' => true,
+            'detection'         => 'detected',
+            'photoPath'         => $originalPath,
+            'blurredPath'       => $blurredPath,
+            'confidence'        => $detection['confidence'] ?? null,
+            'message'           => 'Signature detected and blurred. Click Next to send it to the next signatory.',
+        ];
     }
 
     /**
-     * Manual-confirm fallback after signWithPhoto returned needsConfirmation.
+     * The "Next" action — the sole place that actually advances a signature-
+     * type stage. Called after signWithPhoto (photoPath/blurredPath already
+     * known — no signature was captured yet if $photoPath is null, which is
+     * fine since a photo is optional) or directly for the no-photo case.
      * Optional $boxes ({x,y,w,h} fractions) let the signer blur the signature
-     * region themselves when auto-detection missed it.
+     * region themselves when auto-detection missed it or wasn't run.
      */
-    public function confirmSign(Model $doc, string $photoPath, ?array $boxes = null, ?string $remarks = null, ?string $thirdSigner = null): array
+    public function confirmSign(Model $doc, ?string $photoPath = null, ?array $boxes = null, ?string $remarks = null, ?string $thirdSigner = null, ?string $blurredPath = null): array
     {
-        if (!$this->photoBelongsToDoc($doc, $photoPath) || !Storage::disk('signatures')->exists($photoPath)) {
+        if ($photoPath && (!$this->photoBelongsToDoc($doc, $photoPath) || !Storage::disk('signatures')->exists($photoPath))) {
             return ['success' => false, 'error' => 'Uploaded photo not found — please re-upload.', 'status' => 422];
         }
 
-        $blurredPath     = null;
-        $detectionStatus = 'pending';
+        // Only trust a client-supplied blurred_path if it's actually one of
+        // this doc's own blurred copies — otherwise treat it as not provided.
+        if ($blurredPath && (!$this->blurredPhotoBelongsToDoc($doc, $blurredPath) || !Storage::disk('public')->exists($blurredPath))) {
+            $blurredPath = null;
+        }
 
-        if ($boxes) {
+        $detectionStatus = $photoPath ? 'pending' : 'none';
+
+        if ($blurredPath) {
+            // Already detected & blurred by signWithPhoto — nothing left to do
+            $detectionStatus = 'detected';
+        } elseif ($photoPath && $boxes) {
             $blurred = $this->detector->blurRegion(Storage::disk('signatures')->get($photoPath), $boxes);
             if ($blurred !== null) {
                 $blurredPath     = $this->storeBlurred($doc, $blurred);
                 $detectionStatus = 'manual_confirmed';
             }
-        } elseif ($this->detector->isAvailable()) {
+        } elseif ($photoPath && $this->detector->isAvailable()) {
             // Service is up but found nothing and the signer confirmed anyway
             $detectionStatus = 'manual_confirmed';
         }
 
-        return $this->advance($doc, $remarks, $thirdSigner, [
+        $photoColumns = $photoPath ? [
             'photo_path'           => $photoPath,
             'blurred_photo_path'   => $blurredPath,
             'signature_boxes_json' => $boxes ?? [],
             'detection_status'     => $detectionStatus,
             'photo_uploaded_at'    => now(),
-        ]) + ['detection' => $detectionStatus];
+        ] : [];
+
+        return $this->advance($doc, $remarks, $thirdSigner, $photoColumns) + ['detection' => $detectionStatus];
     }
 
     /**
@@ -261,6 +306,23 @@ class SignatoryActionService
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
+    /**
+     * Any real progress event invalidates a manual tracking-status pin — clear
+     * it so the computed status (PurchaseRequest::currentTrackingStage()) takes
+     * over again rather than silently going stale.
+     */
+    private function clearTrackingOverride(Model $doc): void
+    {
+        $pr = match (true) {
+            $doc instanceof PurchaseRequest   => $doc,
+            $doc instanceof AbstractOfCanvass => $doc->purchaseRequest,
+            $doc instanceof PurchaseOrder     => $doc->abstractOfCanvass?->purchaseRequest,
+            default                           => null,
+        };
+
+        $pr?->clearTrackingOverride();
+    }
+
     private function createLog(Model $doc, array $attributes): void
     {
         [$logClass, $fk] = self::DOC_MAP[get_class($doc)];
@@ -288,5 +350,10 @@ class SignatoryActionService
     private function photoBelongsToDoc(Model $doc, string $photoPath): bool
     {
         return str_starts_with($photoPath, $this->docPrefix($doc) . '/' . $doc->id . '/');
+    }
+
+    private function blurredPhotoBelongsToDoc(Model $doc, string $blurredPath): bool
+    {
+        return str_starts_with($blurredPath, 'signature-photos/' . $this->docPrefix($doc) . '/' . $doc->id . '/');
     }
 }

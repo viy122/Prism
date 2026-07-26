@@ -50,17 +50,22 @@ class SignatoryController extends Controller
             return response()->json(['items' => $items]);
         }
 
-        // VCs only see documents from offices under their jurisdiction.
-        // No assignments yet → null → unfiltered fallback.
-        $officeIds = null;
+        // VCAA/VCAF are each the fixed, university-wide signatory for their
+        // owned stages — not scoped to division jurisdiction, so no office
+        // filter here regardless of which office originated the document.
         if ($roleCode === 'vice-chancellor') {
-            $ids       = $user->officeAssignments()->pluck('offices.id')->all();
-            $officeIds = count($ids) > 0 ? $ids : null;
+            $roleCode = $user->vc_type ?? 'vice-chancellor'; // only VCAA/VCAF actually sign
         }
 
-        return response()->json(['items' => $queue->forRole($roleCode, $officeIds)]);
+        return response()->json(['items' => $queue->forRole($roleCode, null)]);
     }
 
+    /**
+     * Step 1 of 2: sign. Routing stages are still a one-click forward. Signature
+     * stages never advance here — a photo is optional, but either way this only
+     * processes/detects the photo (if any) and hands back "ready" so a distinct
+     * "Next" call (confirm) is what actually sends it to the next signatory.
+     */
     public function sign(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
     {
         $doc      = $this->resolveDoc($docType, $id);
@@ -79,22 +84,22 @@ class SignatoryController extends Controller
             return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
         }
 
-        $rules = ['photo' => 'required|image|mimes:jpeg,jpg,png|max:10240', 'remarks' => 'nullable|string|max:1000'];
-        if ($docType === 'pr' && $doc->nextSignatoryStage() === 'at_third_sign') {
-            $rules['third_signer'] = 'required|in:accounting,vice_chancellor';
-        }
-        $request->validate($rules);
+        $request->validate(['photo' => 'nullable|image|mimes:jpeg,jpg,png|max:10240']);
 
-        $result = $signatory->signWithPhoto(
-            $doc,
-            $request->file('photo'),
-            $request->input('remarks'),
-            $request->input('third_signer'),
-        );
+        if (!$request->hasFile('photo')) {
+            return response()->json(['success' => true, 'needsConfirmation' => true, 'detection' => 'none', 'photoPath' => null]);
+        }
+
+        $result = $signatory->signWithPhoto($doc, $request->file('photo'));
 
         return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
     }
 
+    /**
+     * Step 2 of 2 ("Next"): the sole point that actually advances a
+     * signature-type stage. `photo_path` is optional — null means no photo
+     * was ever attached (signing without one is allowed).
+     */
     public function confirm(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
     {
         $doc      = $this->resolveDoc($docType, $id);
@@ -105,7 +110,11 @@ class SignatoryController extends Controller
             return response()->json(['error' => 'This document is not at your signature stage.'], 403);
         }
 
-        $rules = ['photo_path' => 'required|string|max:500', 'remarks' => 'nullable|string|max:1000'];
+        $rules = [
+            'photo_path'   => 'nullable|string|max:500',
+            'blurred_path' => 'nullable|string|max:500',
+            'remarks'      => 'nullable|string|max:1000',
+        ];
         if ($docType === 'pr' && $doc->nextSignatoryStage() === 'at_third_sign') {
             $rules['third_signer'] = 'required|in:accounting,vice_chancellor';
         }
@@ -117,6 +126,7 @@ class SignatoryController extends Controller
             null,
             $request->input('remarks'),
             $request->input('third_signer'),
+            $request->input('blurred_path'),
         );
 
         return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
@@ -251,6 +261,10 @@ class SignatoryController extends Controller
             && $doc->signatory_stage === 'at_end_user'
         ) {
             return $doc->office_id === $user->office_id;
+        }
+
+        if ($roleCode === 'vice-chancellor') {
+            $roleCode = $user->vc_type ?? 'vice-chancellor'; // only VCAA/VCAF actually sign
         }
 
         return $doc->stageOwnerRole($doc->signatory_stage) === $roleCode;

@@ -19,7 +19,16 @@ class AbstractOfCanvass extends Model
         'code',
         'signatory_stage',
         'remarks',
+        'file_path',
+        'uploaded_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'uploaded_at' => 'datetime',
+        ];
+    }
 
     public function purchaseRequest(): BelongsTo
     {
@@ -42,18 +51,16 @@ class AbstractOfCanvass extends Model
     }
 
     // ── Signatory chain ──────────────────────────────────────────────────────
-    // Internal Audit reviews the AOC but does not sign (routing step).
 
     public const SIGNATORY_DOC_PREFIX = 'AOC';
 
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',             'label' => 'Created',                       'type' => 'routing'],
-        ['key' => 'at_end_user',       'label' => 'End User',                      'type' => 'signature'],
+        ['key' => 'at_end_user',       'label' => 'End User',                      'type' => 'signature', 'role' => 'office-head'],
         ['key' => 'at_bac_member',     'label' => 'BAC Member',                    'type' => 'signature', 'role' => 'bac'],
         ['key' => 'at_bac_vice_chair', 'label' => 'BAC Vice Chairperson',          'type' => 'signature', 'role' => 'bac'],
         ['key' => 'at_bac_chair',      'label' => 'BAC Chairperson',               'type' => 'signature', 'role' => 'bac'],
-        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature', 'role' => 'vice-chancellor'],
-        ['key' => 'at_audit',          'label' => 'Internal Audit – Review',       'type' => 'routing'],
+        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature', 'role' => 'vcaf'],
         ['key' => 'at_chancellor',     'label' => 'Chancellor',                    'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'fully_signed',      'label' => 'Fully Signed',                  'type' => 'signature'],
     ];

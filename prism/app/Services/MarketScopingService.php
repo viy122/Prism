@@ -146,6 +146,91 @@ class MarketScopingService
         }
     }
 
+    /**
+     * Resolve a Google Shopping result's actual merchant link, on demand.
+     *
+     * shopping_results only ever gives a Google Shopping intermediary link
+     * (product_link) — the real store URL requires a separate call to
+     * SerpApi's Product API. Only called when a result is actually clicked,
+     * so the extra quota cost is bounded by real clicks, not by every
+     * result of every search. Fail-soft: returns null on any failure, and
+     * the caller falls back to the original Google Shopping link.
+     */
+    public function resolveDirectLink(string $pageToken): ?string
+    {
+        $product = $this->fetchImmersiveProduct($pageToken);
+        $link    = $product['stores'][0]['link'] ?? null;
+
+        return ($link && preg_match('#^https?://#i', $link)) ? $link : null;
+    }
+
+    /**
+     * Essential product info (brand, price range, spec features) for the
+     * "click to see details" popup on a result card — kept intentionally
+     * separate from resolveDirectLink()'s job of sending the user to the
+     * merchant site; this stays inside the app.
+     */
+    public function fetchProductDetails(string $pageToken): ?array
+    {
+        $product = $this->fetchImmersiveProduct($pageToken);
+        if (!$product) {
+            return null;
+        }
+
+        return [
+            'title'       => $product['title']      ?? null,
+            'brand'       => $product['brand']       ?? null,
+            'price_range' => $product['price_range'] ?? null,
+            'thumbnail'   => $product['thumbnails'][0] ?? null,
+            'features'    => collect($product['about_the_product']['features'] ?? [])
+                ->map(fn ($f) => ['title' => $f['title'] ?? '', 'value' => $f['value'] ?? ''])
+                ->filter(fn ($f) => $f['title'] !== '' && $f['value'] !== '')
+                ->values()
+                ->all(),
+            'store_count' => count($product['stores'] ?? []),
+        ];
+    }
+
+    /**
+     * Shared fetch behind resolveDirectLink() and fetchProductDetails() —
+     * both need the same google_immersive_product response, just different
+     * slices of it. Caching the raw product_results once means clicking
+     * both "Source" and "details" on the same result only costs one call.
+     */
+    private function fetchImmersiveProduct(string $pageToken): ?array
+    {
+        $apiKey = config('services.serpapi.key');
+        if (!$apiKey || $pageToken === '') {
+            return null;
+        }
+
+        $cacheKey = 'market_scoping_immersive_' . md5($pageToken);
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey) ?: null;
+        }
+
+        try {
+            // shopping_results only carries an opaque `immersive_product_page_token` —
+            // that (not product_id) is what this engine needs to return the same
+            // "Buying options" / spec detail Google's own product page shows.
+            $response = Http::timeout(10)->get(self::SERPAPI_URL, [
+                'engine'     => 'google_immersive_product',
+                'page_token' => $pageToken,
+                'api_key'    => $apiKey,
+            ]);
+
+            $product = $response->successful() ? $response->json('product_results') : null;
+
+            // Cache the miss too (null → stored as empty array), so a bad/expired
+            // page token doesn't hit SerpApi again on every click.
+            Cache::put($cacheKey, $product ?? [], self::CACHE_TTL);
+
+            return $product;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function searchGoogleShopping(string $query, int $limit): array
     {
         $apiKey = config('services.serpapi.key');
@@ -194,6 +279,9 @@ class MarketScopingService
                         'image_url'       => $item['thumbnail']    ?? null,
                         'source_icon'     => $item['source_icon']  ?? null,
                         'source_url'      => $item['product_link'] ?? 'https://shopping.google.com/',
+                        // Used to resolve the actual merchant link on click (see resolveDirectLink) —
+                        // shopping_results only ever gives a Google Shopping intermediary link.
+                        'page_token'      => $item['immersive_product_page_token'] ?? null,
                         'source'          => $item['source']       ?? 'Google Shopping',
                         'rating'          => $item['rating']       ?? null,
                         'reviews'         => $item['reviews']      ?? null,

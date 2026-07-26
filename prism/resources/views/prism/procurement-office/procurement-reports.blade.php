@@ -72,6 +72,11 @@
     .delayed-item-reason { font-size: 12px; color: var(--s600); margin-top: 4px; line-height: 1.5; }
     .badge-delayed { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; flex-shrink: 0; }
 
+    /* PPMP validation flags */
+    .badge-ok      { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+    .badge-flag    { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+    .badge-neutral { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
+
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .bottom-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
     @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
@@ -248,6 +253,62 @@
             </div>
         </div>
 
+    </div>
+
+    @php
+        $flaggedCount = collect($ppmpValidationRows)->whereNotIn('flag', ['ok', 'pending'])->count();
+    @endphp
+
+    <div class="card">
+        <div class="card-head">
+            <div>
+                <p class="card-eyebrow">PPMP Validation</p>
+                <h2 class="card-title">Planned vs. Actually Purchased</h2>
+            </div>
+            <span class="badge-flag">{{ $flaggedCount }} flagged</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Office</th>
+                        <th>PPMP Item</th>
+                        <th>Planned Qty</th>
+                        <th>Planned Amount</th>
+                        <th>Matched PR Item</th>
+                        <th>Purchased Qty</th>
+                        <th>Purchased Amount</th>
+                        <th>Tracking Status</th>
+                        <th>Flag</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($ppmpValidationRows as $row)
+                        @php
+                            $flagBadge = match ($row['flag']) {
+                                'ok'      => ['badge-ok', 'OK'],
+                                'pending' => ['badge-neutral', 'Not Yet Purchased'],
+                                'qty_and_over_budget' => ['badge-flag', 'Qty & Over Budget'],
+                                'qty_mismatch' => ['badge-flag', 'Qty Mismatch'],
+                                'over_budget'  => ['badge-flag', 'Over Budget'],
+                                default   => ['badge-neutral', '—'],
+                            };
+                        @endphp
+                        <tr>
+                            <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $row['office'] }}</td>
+                            <td style="font-size:13px;color:var(--s900);font-weight:500;">{{ $row['item'] }}</td>
+                            <td style="font-size:13px;color:var(--s700);white-space:nowrap;">{{ rtrim(rtrim(number_format($row['plannedQty'], 2), '0'), '.') }}</td>
+                            <td style="font-size:13px;font-weight:600;color:var(--s700);white-space:nowrap;">PHP {{ number_format($row['plannedTotal']) }}</td>
+                            <td style="font-size:13px;color:var(--s600);">{{ $row['matchedItem'] ?? '—' }}</td>
+                            <td style="font-size:13px;color:var(--s700);white-space:nowrap;">{{ $row['purchasedQty'] !== null ? rtrim(rtrim(number_format($row['purchasedQty'], 2), '0'), '.') : '—' }}</td>
+                            <td style="font-size:13px;font-weight:600;color:var(--s700);white-space:nowrap;">{{ $row['purchasedTotal'] !== null ? 'PHP ' . number_format($row['purchasedTotal']) : '—' }}</td>
+                            <td style="font-size:12px;color:var(--s600);white-space:nowrap;">{{ $row['trackingStatus']['label'] }}</td>
+                            <td><span class="{{ $flagBadge[0] }}">{{ $flagBadge[1] }}</span></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>

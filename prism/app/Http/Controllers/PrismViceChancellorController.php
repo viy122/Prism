@@ -12,9 +12,16 @@ class PrismViceChancellorController extends Controller
 {
     use HandlesSignatureQueue;
 
+    /**
+     * Only two real Vice Chancellors sign procurement documents — VCAA and
+     * VCAF — recorded per-user via `users.vc_type`. Resolving this dynamically
+     * (rather than the generic 'vice-chancellor') is what makes
+     * HandlesSignatureQueue::authorizeStageOwnership() correctly reject a VCAA
+     * user trying to sign a VCAF-designated document, and vice versa.
+     */
     protected function queueRoleCode(): string
     {
-        return 'vice-chancellor';
+        return auth()->user()?->vc_type ?? 'vice-chancellor';
     }
 
     protected function queueRoutePrefix(): string
@@ -22,16 +29,34 @@ class PrismViceChancellorController extends Controller
         return 'vice-chancellor';
     }
 
+    /**
+     * The signature queue is NOT scoped to division jurisdiction — VCAA and
+     * VCAF are each the fixed, university-wide signatory for their owned
+     * stages (PR's 2nd signatory, AOC countersign, PO review) regardless of
+     * which office originated the document. `assignedOfficeIds()` below is
+     * only for the division-level dashboard/report views.
+     */
     protected function queueOfficeIds(): ?array
     {
-        return $this->assignedOfficeIds();
+        return null;
     }
 
+    /**
+     * Shows EVERY document the current VC type could ever be a signatory
+     * for — created, in-progress, or already fully signed — not just the
+     * ones currently awaiting action. `canAct` tells the UI which one row
+     * is actually actionable right now.
+     */
     public function forMySignature(): View
     {
+        // VCAA is only ever a PR signatory. VCAF is a PR signatory too (the
+        // flexible 3rd/4th slot, alongside Accounting), plus AOC's countersign
+        // and PO's review — so her list needs all three document types.
+        $docTypes = $this->queueRoleCode() === 'vcaf' ? ['pr', 'aoc', 'po'] : ['pr'];
+
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'queueRows' => $this->signatureQueueRows(),
+            'documents' => $this->signatureHistoryRows($docTypes),
         ]));
     }
 
@@ -87,7 +112,7 @@ class PrismViceChancellorController extends Controller
 
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle'         => 'Vice Chancellor Division Dashboard',
-            'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole('vice-chancellor'),
+            'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole($this->queueRoleCode(), $this->queueOfficeIds()),
             'divisionName'     => $vcName . "'s Division",
             'offices'          => $offices->pluck('name')->all(),
             'summary'          => [

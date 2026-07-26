@@ -29,6 +29,9 @@ class PurchaseRequest extends Model
         'total_amount',
         'status',
         'signatory_stage',
+        'tracking_status_override',
+        'tracking_status_overridden_by_user_id',
+        'tracking_status_overridden_at',
         'third_signer',
         'canvassing_stage',
         'remarks',
@@ -50,6 +53,7 @@ class PurchaseRequest extends Model
             'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
             'uploaded_at' => 'datetime',
+            'tracking_status_overridden_at' => 'datetime',
         ];
     }
 
@@ -121,8 +125,8 @@ class PurchaseRequest extends Model
 
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',              'label' => 'Created',                      'type' => 'routing'],
-        ['key' => 'at_end_user',        'label' => 'End User',                     'type' => 'signature'],
-        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature', 'role' => 'vice-chancellor'],
+        ['key' => 'at_end_user',        'label' => 'End User',                     'type' => 'signature', 'role' => 'office-head'],
+        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature', 'role' => 'vcaa'],
         ['key' => 'at_third_sign',      'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
         ['key' => 'at_fourth_sign',     'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
         ['key' => 'at_chancellor',      'label' => 'Chancellor',                   'type' => 'signature', 'role' => 'chancellor'],
@@ -151,8 +155,8 @@ class PurchaseRequest extends Model
             if (!$this->third_signer) {
                 return null; // undetermined — procurement resolves it
             }
-            $thirdRole = $this->third_signer === 'accounting' ? 'accounting-office' : 'vice-chancellor';
-            $fourthRole = $this->third_signer === 'accounting' ? 'vice-chancellor' : 'accounting-office';
+            $thirdRole = $this->third_signer === 'accounting' ? 'accounting-office' : 'vcaf';
+            $fourthRole = $this->third_signer === 'accounting' ? 'vcaf' : 'accounting-office';
             return $stageKey === 'at_third_sign' ? $thirdRole : $fourthRole;
         }
 
@@ -173,5 +177,164 @@ class PurchaseRequest extends Model
     {
         return $this->signatory_stage === 'fully_signed'
             && $this->canvassing_stage === 'completed';
+    }
+
+    /**
+     * Overrides HasSignatoryChain's default: a draft-stage PR with no attached
+     * document was never actually imported from BSU (the only real creation
+     * path always sets file_path) — likely placeholder/planned data, so it
+     * reads "PR to be Created" rather than the misleading "PR Created".
+     */
+    public function getSignatoryLabelAttribute(): string
+    {
+        if ($this->signatory_stage === 'draft' && !$this->file_path) {
+            return 'PR to be Created';
+        }
+
+        $meta = $this->stageMetaFor($this->signatory_stage);
+        if (!$meta) {
+            return ucfirst(str_replace('_', ' ', $this->signatory_stage ?? 'draft'));
+        }
+        return match ($meta['key']) {
+            'draft'        => static::SIGNATORY_DOC_PREFIX . ' Created',
+            'fully_signed' => static::SIGNATORY_DOC_PREFIX . ' – Fully Signed',
+            default        => static::SIGNATORY_DOC_PREFIX . ' – At ' . $meta['label'],
+        };
+    }
+
+    // ── Unified tracking status (PR → AOC → PO → Payment) ──────────────────────
+    // Derived live from the chain rather than stored, so it can never drift out
+    // of sync with the real signatory/delivery state the way `status` can.
+
+    /** Terminal states set via the manual "Update Processing Status" dropdown that
+     *  halt the journey outright — these override the chain, since a cancelled or
+     *  denied PR isn't "still progressing" no matter what stage it stopped at. */
+    private const HALTED_STATUS_LABELS = [
+        'pr_denied'              => 'PR Denied',
+        'cancelled'              => 'Cancelled',
+        'cancelled_system_error' => 'Cancelled – System Error',
+    ];
+
+    /** Where this PR's whole journey currently stands, computed from the chain. */
+    public function currentTrackingStage(): array
+    {
+        if (isset(self::HALTED_STATUS_LABELS[$this->status])) {
+            return ['key' => 'halted:' . $this->status, 'label' => self::HALTED_STATUS_LABELS[$this->status]];
+        }
+
+        if ($this->signatory_stage === 'draft' && !$this->file_path) {
+            return ['key' => 'pr:not_yet_created', 'label' => $this->signatory_label];
+        }
+
+        if ($this->signatory_stage !== 'fully_signed') {
+            return ['key' => 'pr:' . $this->signatory_stage, 'label' => $this->signatory_label];
+        }
+
+        $aoc = $this->abstractOfCanvass;
+        if (!$aoc) {
+            return ['key' => 'awaiting_aoc', 'label' => 'Awaiting Abstract of Canvass'];
+        }
+
+        if ($aoc->signatory_stage !== 'fully_signed') {
+            return ['key' => 'aoc:' . $aoc->signatory_stage, 'label' => $aoc->signatory_label];
+        }
+
+        $po = $aoc->purchaseOrder;
+        if (!$po) {
+            return ['key' => 'awaiting_po', 'label' => 'Awaiting Purchase Order'];
+        }
+
+        if ($po->signatory_stage !== 'fully_signed') {
+            return ['key' => 'po:' . $po->signatory_stage, 'label' => $po->signatory_label];
+        }
+
+        if ($po->status === 'paid') {
+            return ['key' => 'paid', 'label' => 'Paid – Payment Made (Cashier)'];
+        }
+
+        return ['key' => 'po_status:' . $po->status, 'label' => $po->status_label];
+    }
+
+    /** Invalidate a manual tracking-status pin — called whenever real progress happens. */
+    public function clearTrackingOverride(): void
+    {
+        if ($this->tracking_status_override !== null) {
+            $this->update([
+                'tracking_status_override'             => null,
+                'tracking_status_overridden_by_user_id' => null,
+                'tracking_status_overridden_at'         => null,
+            ]);
+        }
+    }
+
+    /** Effective displayed tracking status — manual override wins when set. */
+    public function effectiveTrackingStatus(): array
+    {
+        if ($this->tracking_status_override) {
+            $option = collect(static::allTrackingStageOptions())
+                ->firstWhere('key', $this->tracking_status_override);
+
+            return [
+                'key'      => $this->tracking_status_override,
+                'label'    => $option['label'] ?? $this->tracking_status_override,
+                'override' => true,
+            ];
+        }
+
+        return $this->currentTrackingStage() + ['override' => false];
+    }
+
+    /** Full ordered list of every possible tracking-stage key/label, for the dropdown. */
+    public static function allTrackingStageOptions(): array
+    {
+        $options = [
+            ['key' => 'pr:not_yet_created', 'label' => 'PR to be Created'],
+        ];
+
+        foreach (static::SIGNATORY_STAGES as $stage) {
+            if ($stage['key'] === 'fully_signed') {
+                continue;
+            }
+            $options[] = ['key' => 'pr:' . $stage['key'], 'label' => static::formatStageLabel(static::SIGNATORY_DOC_PREFIX, $stage)];
+        }
+
+        $options[] = ['key' => 'awaiting_aoc', 'label' => 'Awaiting Abstract of Canvass'];
+
+        foreach (AbstractOfCanvass::SIGNATORY_STAGES as $stage) {
+            if ($stage['key'] === 'fully_signed') {
+                continue;
+            }
+            $options[] = ['key' => 'aoc:' . $stage['key'], 'label' => static::formatStageLabel(AbstractOfCanvass::SIGNATORY_DOC_PREFIX, $stage)];
+        }
+
+        $options[] = ['key' => 'awaiting_po', 'label' => 'Awaiting Purchase Order'];
+
+        foreach (PurchaseOrder::SIGNATORY_STAGES as $stage) {
+            if ($stage['key'] === 'fully_signed') {
+                continue;
+            }
+            $options[] = ['key' => 'po:' . $stage['key'], 'label' => static::formatStageLabel(PurchaseOrder::SIGNATORY_DOC_PREFIX, $stage)];
+        }
+
+        foreach (array_diff(PurchaseOrder::statusChain(), ['paid']) as $status) {
+            $options[] = ['key' => 'po_status:' . $status, 'label' => (new PurchaseOrder(['status' => $status]))->status_label];
+        }
+
+        $options[] = ['key' => 'paid', 'label' => 'Paid – Payment Made (Cashier)'];
+
+        foreach (self::HALTED_STATUS_LABELS as $status => $label) {
+            $options[] = ['key' => 'halted:' . $status, 'label' => $label];
+        }
+
+        return $options;
+    }
+
+    private static function formatStageLabel(string $prefix, array $stage): string
+    {
+        return match ($stage['key']) {
+            'draft'        => $prefix . ' Created',
+            'fully_signed' => $prefix . ' – Fully Signed',
+            default        => $prefix . ' – At ' . $stage['label'],
+        };
     }
 }

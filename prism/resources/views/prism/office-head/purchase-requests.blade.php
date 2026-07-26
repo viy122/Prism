@@ -254,6 +254,12 @@
                             'delayed'     => 'badge-delayed',
                             default       => 'badge-default',
                         };
+                        $trackingKey = $pr['trackingStatus']['key'] ?? null;
+                        $trackingBadgeCls = match(true) {
+                            $trackingKey === 'paid' => 'badge-completed',
+                            in_array($trackingKey, ['pr:draft', 'awaiting_aoc', 'awaiting_po'], true) => 'badge-pending',
+                            default => 'badge-progress',
+                        };
                     @endphp
                     <div class="pr-card" data-search="{{ strtolower($pr['title'] . ' ' . $pr['number']) }}">
                         <div class="pr-card-header" onclick="this.closest('.pr-card').classList.toggle('open')">
@@ -271,6 +277,9 @@
                             </div>
                             <div class="pr-card-right">
                                 <span class="badge {{ $badgeCls }}">{{ $pr['statusLabel'] }}</span>
+                                @if($trackingKey)
+                                    <span class="badge {{ $trackingBadgeCls }}" title="Tracking Status">{{ $pr['trackingStatus']['label'] }}</span>
+                                @endif
                                 <i class="ti ti-chevron-down pr-chevron"></i>
                             </div>
                         </div>

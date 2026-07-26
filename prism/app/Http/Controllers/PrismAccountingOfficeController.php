@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HandlesSignatureQueue;
+use App\Models\DocumentUpload;
 use App\Models\PurchaseOrder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class PrismAccountingOfficeController extends Controller
@@ -21,11 +24,16 @@ class PrismAccountingOfficeController extends Controller
         return 'accounting-office';
     }
 
+    /**
+     * Accounting signs PO (fixed 'at_accounting') and, conditionally, PR (the
+     * flexible 3rd/4th slot, whenever a VCAA picks Accounting to go first) —
+     * never AOC. Shows EVERY PR/PO, not just currently-actionable ones.
+     */
     public function forMySignature(): View
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'queueRows' => $this->signatureQueueRows(),
+            'documents' => $this->signatureHistoryRows(['pr', 'po']),
         ]));
     }
 
@@ -93,8 +101,8 @@ class PrismAccountingOfficeController extends Controller
         ]));
     }
 
-    /** Delivered → Accounting starts processing payment; the Cashier finishes it. */
-    public function startPaymentProcessing(PurchaseOrder $po): JsonResponse
+    /** Delivered → Accounting attaches proof and starts payment processing; the Cashier finishes it. */
+    public function startPaymentProcessing(Request $request, PurchaseOrder $po): JsonResponse
     {
         if ($po->status !== 'complete_delivery') {
             return response()->json(['error' => 'Only fully delivered POs can enter payment processing.'], 422);
@@ -103,10 +111,34 @@ class PrismAccountingOfficeController extends Controller
             return response()->json(['error' => 'PO must be fully signed before payment processing.'], 422);
         }
 
+        $request->validate([
+            'attachment' => 'required|file|mimes:pdf,jpeg,jpg,png|max:10240',
+            'remarks'    => 'nullable|string|max:1000',
+        ]);
+
+        $file = $request->file('attachment');
+        $path = $file->store('payment-processing/' . now()->year, 'public');
+
+        DocumentUpload::create([
+            'uploaded_by_user_id' => auth()->id(),
+            'attachable_type'     => PurchaseOrder::class,
+            'attachable_id'       => $po->id,
+            'document_type'       => 'payment_processing_proof',
+            'title'               => 'Payment processing attachment for ' . ($po->po_number ?? 'PO-' . $po->id),
+            'original_filename'   => $file->getClientOriginalName(),
+            'file_path'           => $path,
+            'mime_type'           => $file->getClientMimeType(),
+            'file_size'           => $file->getSize(),
+            'status'              => 'uploaded',
+            'remarks'             => $request->input('remarks'),
+            'uploaded_at'         => now(),
+        ]);
+
         $po->update([
             'status'                => 'processing_payment',
             'payment_processing_at' => now(),
         ]);
+        $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
 
         return response()->json([
             'success'      => true,

@@ -13,7 +13,7 @@ use App\Models\ProcurementStatusUpdate;
 use App\Models\PrSignatureLog;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
-use App\Services\MarketScopingService;
+use App\Models\PurchaseRequestItem;
 use App\Services\NotificationService;
 use App\Services\ProcurementModeService;
 use App\Services\SignatoryActionService;
@@ -81,7 +81,7 @@ class PrismProcurementOfficeController extends Controller
 
     public function purchaseRequestManagement(): View
     {
-        $prs = PurchaseRequest::with(['office', 'items', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy'])
+        $prs = PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy', 'abstractOfCanvass.purchaseOrder'])
             ->latest()
             ->get()
             ->map(fn ($pr) => [
@@ -94,10 +94,9 @@ class PrismProcurementOfficeController extends Controller
                 'signatoryStage'   => $pr->signatory_stage,
                 'signatoryLabel'   => $pr->signatory_label,
                 'nextStage'        => $pr->nextSignatoryStage(),
-                'canvassingStage'  => $pr->canvassing_stage,
-                'canvassingLabel'  => $pr->canvassing_label,
-                'readyForAoc'      => $pr->isReadyForAoc(),
-                'canvassingUrl'    => route('procurement-office.purchase-request.canvassing', $pr->id),
+                'trackingStatus'      => $pr->effectiveTrackingStatus(),
+                'trackingStatusAuto'  => $pr->currentTrackingStage(),
+                'trackingStatusUrl'   => route('procurement-office.purchase-request.update-tracking-status', $pr->id),
                 'pdfFile'          => $pr->file_path,
                 'remarks'          => $pr->remarks ?? '—',
                 'ocr'            => $pr->extracted_fields_json ?? [],
@@ -124,11 +123,6 @@ class PrismProcurementOfficeController extends Controller
                 'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
                 'uploadUrl'         => route('procurement-office.purchase-request.upload', $pr->id),
-                'marketPricesUrl'   => route('procurement-office.purchase-request.market-prices', $pr->id),
-                'prItems'           => $pr->items->map(fn ($i) => [
-                    'name'    => $i->name,
-                    'budget'  => (float) $i->estimated_unit_cost,
-                ])->all(),
             ])
             ->all();
 
@@ -136,6 +130,7 @@ class PrismProcurementOfficeController extends Controller
             'pageTitle'        => 'Purchase Request Management',
             'purchaseRequests' => $prs,
             'stageMeta'        => PurchaseRequest::signatoryStageMeta(),
+            'trackingStageOptions' => PurchaseRequest::allTrackingStageOptions(),
             'offices'          => Office::select('id', 'name')->orderBy('name')->get()->toArray(),
             'importPdfUrl'     => route('procurement-office.purchase-request.import-pdf'),
             'importConfirmUrl' => route('procurement-office.purchase-request.import-confirm'),
@@ -157,39 +152,7 @@ class PrismProcurementOfficeController extends Controller
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        return response()->json($signatory->returnToDraft($pr, $request->input('remarks')));
-    }
-
-    public function updateCanvassing(Request $request, PurchaseRequest $pr): JsonResponse
-    {
-        if ($pr->signatory_stage !== 'fully_signed') {
-            return response()->json(['error' => 'PR must be fully signed before canvassing.'], 422);
-        }
-
-        $request->validate(['action' => 'required|in:start,complete']);
-
-        $newStage = $request->input('action') === 'start' ? 'in_progress' : 'completed';
-
-        // Three-quotation rule: canvassing needs at least 3 supplier quotations
-        if ($newStage === 'completed' && $pr->canvassDocuments()->count() < 3) {
-            return response()->json(['error' => 'At least 3 supplier quotations must be uploaded before completing canvassing. Use the Canvassing tab to attach them.'], 422);
-        }
-
-        $pr->update(['canvassing_stage' => $newStage]);
-
-        ProcurementStatusUpdate::create([
-            'purchase_request_id' => $pr->id,
-            'updated_by_user_id'  => auth()->id(),
-            'status'              => 'canvassing_' . $newStage,
-            'remarks'             => $request->input('remarks', ''),
-        ]);
-
-        return response()->json([
-            'success'           => true,
-            'canvassingStage'   => $newStage,
-            'canvassingLabel'   => $pr->fresh()->canvassing_label,
-            'readyForAoc'       => $pr->fresh()->isReadyForAoc(),
-        ]);
+        return response()->json($signatory->returnOneStep($pr, $request->input('remarks')));
     }
 
     public function updatePrStatus(Request $request, PurchaseRequest $pr): JsonResponse
@@ -213,6 +176,38 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Manually pin the unified Tracking Status (PR→AOC→PO→Payment). Passing an
+     * empty value clears the pin and reverts to the auto-computed status — the
+     * pin itself is also auto-cleared the next time any real progress happens
+     * (see SignatoryActionService::clearTrackingOverride and the PO delivery/
+     * payment endpoints).
+     */
+    public function updateTrackingStatus(Request $request, PurchaseRequest $pr): JsonResponse
+    {
+        $request->validate(['trackingStatus' => 'nullable|string|max:50']);
+
+        $value = $request->input('trackingStatus') ?: null;
+
+        if ($value !== null) {
+            $valid = collect(PurchaseRequest::allTrackingStageOptions())->pluck('key')->all();
+            if (!in_array($value, $valid, true)) {
+                return response()->json(['error' => 'Invalid tracking status.'], 422);
+            }
+        }
+
+        $pr->update([
+            'tracking_status_override'              => $value,
+            'tracking_status_overridden_by_user_id'  => $value !== null ? auth()->id() : null,
+            'tracking_status_overridden_at'          => $value !== null ? now() : null,
+        ]);
+
+        return response()->json([
+            'success'        => true,
+            'trackingStatus' => $pr->fresh()->effectiveTrackingStatus(),
+        ]);
+    }
+
     // ── Annual Procurement Plan (moved from Budget Office) ──────────────────
 
     public function annualProcurementPlan(): View
@@ -220,33 +215,74 @@ class PrismProcurementOfficeController extends Controller
         $items = BudgetProposalItem::with('budgetProposal.office')
             ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
             ->get()
-            ->map(function ($item) {
-                $abc             = (float) $item->estimated_total_cost;
-                $recommendedMode = ProcurementModeService::recommend($abc);
+            // Most recently approved first; endorsed-but-not-yet-approved items
+            // fall back to their proposal's last update so they still sort by recency.
+            ->sortByDesc(fn ($item) => $item->budgetProposal?->approved_at ?? $item->budgetProposal?->updated_at)
+            ->values();
 
-                return [
-                    'itemId'          => $item->id,
-                    'office'          => $item->budgetProposal?->office?->name ?? '—',
-                    'item'            => $item->name,
-                    'quantity'        => (int) $item->quantity,
-                    'abcAmount'       => $abc,
-                    'targetQuarter'   => $item->target_quarter ?? 'Q1',
-                    'recommendedMode' => $recommendedMode,
-                    'rationale'       => ProcurementModeService::rationale($abc),
-                    'procurementMode' => $item->procurement_mode ?? $recommendedMode,
-                    'isOverridden'    => (bool) $item->is_overridden,
-                    'overrideReason'  => $item->override_reason ?? '',
-                    'saveUrl'         => route('procurement-office.annual-procurement-plan.save-mode', $item->id),
-                ];
-            })
+        $officeIds = $items->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
+
+        // Pre-PR stages come from the item's own PPMP (Budget Proposal) journey —
+        // this page only ever shows items whose proposal is already 'endorsed' or
+        // 'approved', so that distinction is real progress, not a guess.
+        $trackingOptions = collect([
+                ['key' => 'bp:endorsed', 'label' => 'PPMP Endorsed — Awaiting Chancellor Approval'],
+                ['key' => 'bp:approved', 'label' => 'PPMP Approved — Not Yet Requested'],
+            ])
+            ->concat(PurchaseRequest::allTrackingStageOptions())
+            ->values()
             ->all();
+
+        $mapped = $items->map(function ($item) use ($prItemMatches, $trackingOptions) {
+            $abc             = (float) $item->estimated_total_cost;
+            $recommendedMode = ProcurementModeService::recommend($abc);
+            $officeId        = $item->budgetProposal?->office_id;
+            $matchedPr       = $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest;
+
+            $trackingStatusAuto = $matchedPr
+                ? $matchedPr->effectiveTrackingStatus()
+                : ($item->budgetProposal?->status === 'approved'
+                    ? ['key' => 'bp:approved', 'label' => 'PPMP Approved — Not Yet Requested']
+                    : ['key' => 'bp:endorsed', 'label' => 'PPMP Endorsed — Awaiting Chancellor Approval']);
+
+            if ($item->tracking_status_override) {
+                $label = collect($trackingOptions)->firstWhere('key', $item->tracking_status_override)['label'] ?? $item->tracking_status_override;
+                $trackingStatus = ['key' => $item->tracking_status_override, 'label' => $label, 'override' => true];
+            } else {
+                $trackingStatus = $trackingStatusAuto + ['override' => false];
+            }
+
+            return [
+                'itemId'          => $item->id,
+                'office'          => $item->budgetProposal?->office?->name ?? '—',
+                'fiscalYear'      => $item->budgetProposal?->fiscal_year,
+                'item'            => $item->name,
+                'quantity'        => (int) $item->quantity,
+                'abcAmount'       => $abc,
+                'targetQuarter'   => $item->target_quarter ?? 'Q1',
+                'recommendedMode' => $recommendedMode,
+                'rationale'       => ProcurementModeService::rationale($abc),
+                'procurementMode' => $item->procurement_mode ?? $recommendedMode,
+                'isOverridden'    => (bool) $item->is_overridden,
+                'overrideReason'  => $item->override_reason ?? '',
+                'saveUrl'         => route('procurement-office.annual-procurement-plan.save-mode', $item->id),
+                'trackingStatus'     => $trackingStatus,
+                'trackingStatusAuto' => $trackingStatusAuto,
+                'trackingStatusUrl'  => route('procurement-office.annual-procurement-plan.update-tracking-status', $item->id),
+            ];
+        })->all();
+
+        $fiscalYears = collect($mapped)->pluck('fiscalYear')->filter()->unique()->sort()->values();
 
         return view('prism.procurement-office.annual-procurement-plan', $this->withCommon('annual-procurement-plan', [
             'pageTitle'        => 'Annual Procurement Plan',
-            'appItems'         => $items,
-            'offices'          => collect($items)->pluck('office')->unique()->values()->all(),
+            'appItems'         => $mapped,
+            'offices'          => collect($mapped)->pluck('office')->unique()->values()->all(),
+            'fiscalYears'      => $fiscalYears->all(),
             'quarters'         => ['Q1', 'Q2', 'Q3', 'Q4'],
             'procurementModes' => ProcurementModeService::MODES,
+            'trackingStageOptions' => $trackingOptions,
         ]));
     }
 
@@ -277,6 +313,37 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Manually pin an APP item's Tracking Status. Passing an empty value clears
+     * the pin and reverts to the auto-computed value (best-effort matched PR's
+     * tracking status, or the item's own PPMP endorsed/approved stage when no
+     * PR has been matched yet).
+     */
+    public function updateAppItemTrackingStatus(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $request->validate(['trackingStatus' => 'nullable|string|max:50']);
+
+        $value = $request->input('trackingStatus') ?: null;
+
+        if ($value !== null) {
+            $valid = collect([['key' => 'bp:endorsed'], ['key' => 'bp:approved']])
+                ->concat(PurchaseRequest::allTrackingStageOptions())
+                ->pluck('key')
+                ->all();
+            if (!in_array($value, $valid, true)) {
+                return response()->json(['error' => 'Invalid tracking status.'], 422);
+            }
+        }
+
+        $item->update([
+            'tracking_status_override'             => $value,
+            'tracking_status_overridden_by_user_id' => $value !== null ? auth()->id() : null,
+            'tracking_status_overridden_at'         => $value !== null ? now() : null,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
     // ── Canvassing tab (quotation uploads + stage tracking) ──────────────────
 
     public function canvassing(): View
@@ -301,7 +368,6 @@ class PrismProcurementOfficeController extends Controller
                     'uploadedAt'=> $doc->uploaded_at?->format('M d, Y') ?? '—',
                     'deleteUrl' => route('procurement-office.canvass-document.delete', $doc->id),
                 ])->all(),
-                'updateUrl' => route('procurement-office.purchase-request.canvassing', $pr->id),
                 'uploadUrl' => route('procurement-office.purchase-request.canvass-document', $pr->id),
             ])
             ->all();
@@ -312,6 +378,10 @@ class PrismProcurementOfficeController extends Controller
         ]));
     }
 
+    /**
+     * Canvassing has one step: upload a document. The upload itself completes
+     * canvassing immediately — no separate "start"/"complete" action needed.
+     */
     public function uploadCanvassDocument(Request $request, PurchaseRequest $pr): JsonResponse
     {
         if ($pr->signatory_stage !== 'fully_signed') {
@@ -343,17 +413,22 @@ class PrismProcurementOfficeController extends Controller
             'uploaded_at'         => now(),
         ]);
 
-        // First quotation implicitly starts canvassing
-        if ($pr->canvassing_stage === 'not_started') {
-            $pr->update(['canvassing_stage' => 'in_progress']);
-        }
+        $pr->update(['canvassing_stage' => 'completed']);
+
+        ProcurementStatusUpdate::create([
+            'purchase_request_id' => $pr->id,
+            'updated_by_user_id'  => auth()->id(),
+            'status'              => 'canvassing_completed',
+            'remarks'             => 'Canvassing document uploaded — ready for AOC.',
+        ]);
 
         return response()->json([
             'success'         => true,
             'documentId'      => $doc->id,
             'url'             => Storage::url($path),
-            'canvassingStage' => $pr->fresh()->canvassing_stage,
-            'quotationCount'  => $pr->canvassDocuments()->count(),
+            'canvassingStage' => 'completed',
+            'canvassingLabel' => $pr->fresh()->canvassing_label,
+            'readyForAoc'     => $pr->fresh()->isReadyForAoc(),
         ]);
     }
 
@@ -378,27 +453,48 @@ class PrismProcurementOfficeController extends Controller
 
     public function abstractOfCanvass(): View
     {
-        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'signatureLogs.signedBy', 'purchaseOrder'])
+        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'purchaseOrder'])
             ->latest()
             ->get()
-            ->map(fn ($aoc) => [
-                'id'             => $aoc->id,
-                'code'           => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
-                'prNumber'       => $aoc->purchaseRequest->number ?? 'PR-' . str_pad($aoc->purchaseRequest->id, 4, '0', STR_PAD_LEFT),
-                'office'         => $aoc->purchaseRequest->office?->name ?? '—',
-                'title'          => $aoc->purchaseRequest->title,
-                'signatoryStage'   => $aoc->signatory_stage,
-                'signatoryLabel'   => $aoc->signatory_label,
-                'nextStage'        => $aoc->nextSignatoryStage(),
-                'currentStageType' => $aoc->stageMetaFor($aoc->signatory_stage)['type'] ?? 'signature',
-                'nextStageLabel'   => $aoc->stageMetaFor($aoc->nextSignatoryStage())['label'] ?? null,
-                'hasPo'            => $aoc->purchaseOrder !== null,
-                'remarks'        => $aoc->remarks ?? '—',
-                'createdAt'      => $aoc->created_at->format('M d, Y'),
-                'advanceUrl'     => route('procurement-office.aoc.advance', $aoc->id),
-                'returnUrl'      => route('procurement-office.aoc.return', $aoc->id),
-                'issuePo'        => route('procurement-office.po.issue', $aoc->id),
-            ])
+            ->map(function ($aoc) {
+                $pr = $aoc->purchaseRequest;
+
+                return [
+                    'id'             => $aoc->id,
+                    'code'           => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+                    'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+                    'office'         => $pr->office?->name ?? '—',
+                    'title'          => $pr->title,
+                    'signatoryStage'   => $aoc->signatory_stage,
+                    'signatoryLabel'   => $aoc->signatory_label,
+                    'nextStage'        => $aoc->nextSignatoryStage(),
+                    'currentStageType' => $aoc->stageMetaFor($aoc->signatory_stage)['type'] ?? 'signature',
+                    'nextStageLabel'   => $aoc->stageMetaFor($aoc->nextSignatoryStage())['label'] ?? null,
+                    'hasPo'            => $aoc->purchaseOrder !== null,
+                    'poNumber'         => $aoc->purchaseOrder?->po_number,
+                    'remarks'        => $aoc->remarks ?? '—',
+                    'createdAt'      => $aoc->created_at->format('M d, Y'),
+                    'advanceUrl'     => route('procurement-office.aoc.advance', $aoc->id),
+                    'returnUrl'      => route('procurement-office.aoc.return', $aoc->id),
+                    'issuePoUrl'     => route('procurement-office.po.issue', $aoc->id),
+                    'uploadUrl'      => route('procurement-office.aoc.upload', $aoc->id),
+                    'pdfFile'        => $aoc->file_path,
+                    'prTotal'        => (float) ($pr->total_amount ?? 0),
+                    'prItems'        => $pr->items->map(fn ($i) => [
+                        'name'      => $i->name,
+                        'quantity'  => (float) $i->quantity,
+                        'unit'      => $i->unit,
+                        'unitCost'  => (float) $i->estimated_unit_cost,
+                        'totalCost' => (float) $i->estimated_total_cost,
+                    ])->all(),
+                    'quotations'     => $pr->documents->where('document_type', 'canvass_quotation')->map(fn ($d) => [
+                        'supplier'   => $d->title,
+                        'filename'   => $d->original_filename,
+                        'url'        => \Illuminate\Support\Facades\Storage::url($d->file_path),
+                        'uploadedAt' => $d->uploaded_at?->format('M d, Y') ?? '—',
+                    ])->values()->all(),
+                ];
+            })
             ->all();
 
         // PRs that completed canvassing but don't have an AOC yet
@@ -456,43 +552,68 @@ class PrismProcurementOfficeController extends Controller
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        return response()->json($signatory->returnToDraft($aoc, $request->input('remarks')));
+        return response()->json($signatory->returnOneStep($aoc, $request->input('remarks')));
     }
 
     // ── Phase 3: Purchase Order ───────────────────────────────────────────────
 
     public function purchaseOrders(): View
     {
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents'])
+        $chain = PurchaseOrder::statusChain();
+
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy'])
             ->latest()
             ->get()
-            ->map(fn ($po) => [
-                'receiptUrl'   => ($receipt = $po->documents->firstWhere('document_type', 'payment_receipt'))
-                    ? \Illuminate\Support\Facades\Storage::url($receipt->file_path)
-                    : null,
-                'id'           => $po->id,
-                'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                'aocCode'      => $po->abstractOfCanvass->code ?? '—',
-                'prNumber'     => $po->abstractOfCanvass->purchaseRequest->number ?? '—',
-                'office'       => $po->abstractOfCanvass->purchaseRequest->office?->name ?? '—',
-                'title'        => $po->abstractOfCanvass->purchaseRequest->title ?? '—',
-                'supplier'     => $po->supplier_name,
-                'totalAmount'  => (float) $po->total_amount,
-                'status'       => $po->status,
-                'statusLabel'  => $po->status_label,
-                'nextStatus'   => $po->nextStatus(),
-                'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',
-                'expectedDate' => $po->expected_delivery_date?->format('M d, Y') ?? '—',
-                'paidAt'       => $po->paid_at?->format('M d, Y') ?? null,
-                'updateUrl'    => route('procurement-office.po.update-status', $po->id),
-                'signatoryStage'   => $po->signatory_stage ?? 'draft',
-                'signatoryLabel'   => $po->signatory_label,
-                'nextStage'        => $po->nextSignatoryStage(),
-                'currentStageType' => $po->stageMetaFor($po->signatory_stage)['type'] ?? 'signature',
-                'nextStageLabel'   => $po->stageMetaFor($po->nextSignatoryStage())['label'] ?? null,
-                'advanceUrl'       => route('procurement-office.po.advance', $po->id),
-                'returnUrl'        => route('procurement-office.po.return', $po->id),
-            ])
+            ->map(function ($po) use ($chain) {
+                $pr      = $po->abstractOfCanvass?->purchaseRequest;
+                $current = array_search($po->status, $chain);
+                $current = $current === false ? 0 : $current;
+
+                return [
+                    'receiptUrl'   => ($receipt = $po->documents->firstWhere('document_type', 'payment_receipt'))
+                        ? \Illuminate\Support\Facades\Storage::url($receipt->file_path)
+                        : null,
+                    'id'           => $po->id,
+                    'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+                    'aocCode'      => $po->abstractOfCanvass->code ?? '—',
+                    'prNumber'     => $pr->number ?? '—',
+                    'office'       => $pr?->office?->name ?? '—',
+                    'title'        => $pr->title ?? '—',
+                    'supplier'     => $po->supplier_name,
+                    'supplierAddress' => $po->supplier_address ?? '—',
+                    'totalAmount'  => (float) $po->total_amount,
+                    'remarks'      => $po->remarks ?: '—',
+                    'status'       => $po->status,
+                    'statusLabel'  => $po->status_label,
+                    'nextStatus'   => $po->nextStatus(),
+                    'deliveryChain' => collect($chain)->map(function ($key, $idx) use ($current, $po) {
+                        return [
+                            'key'    => $key,
+                            'label'  => (clone $po)->fill(['status' => $key])->status_label,
+                            'status' => $idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending'),
+                        ];
+                    })->values()->all(),
+                    'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',
+                    'expectedDate' => $po->expected_delivery_date?->format('M d, Y') ?? '—',
+                    'paidAt'       => $po->paid_at?->format('M d, Y') ?? null,
+                    'updateUrl'    => route('procurement-office.po.update-status', $po->id),
+                    'signatoryStage'   => $po->signatory_stage ?? 'draft',
+                    'signatoryLabel'   => $po->signatory_label,
+                    'nextStage'        => $po->nextSignatoryStage(),
+                    'currentStageType' => $po->stageMetaFor($po->signatory_stage)['type'] ?? 'signature',
+                    'nextStageLabel'   => $po->stageMetaFor($po->nextSignatoryStage())['label'] ?? null,
+                    'stageMeta'        => $po->resolvedStageMeta(),
+                    'advanceUrl'       => route('procurement-office.po.advance', $po->id),
+                    'returnUrl'        => route('procurement-office.po.return', $po->id),
+                    'uploadUrl'        => route('procurement-office.po.upload', $po->id),
+                    'pdfFile'          => $po->file_path,
+                    'signatureLogs'    => $po->signatureLogs->map(fn ($l) => [
+                        'display' => $po->describeSignatureLog($l),
+                        'by'      => $l->signedBy?->name ?? '—',
+                        'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                    ])->all(),
+                ];
+            })
             ->all();
 
         // AOCs that are fully signed but don't have a PO yet
@@ -574,6 +695,7 @@ class PrismProcurementOfficeController extends Controller
             'status'  => $next,
             'remarks' => $request->input('remarks'),
         ]);
+        $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
 
         return response()->json([
             'success'     => true,
@@ -593,7 +715,7 @@ class PrismProcurementOfficeController extends Controller
     {
         $request->validate(['remarks' => 'required|string|max:1000']);
 
-        return response()->json($signatory->returnToDraft($po, $request->input('remarks')));
+        return response()->json($signatory->returnOneStep($po, $request->input('remarks')));
     }
 
     /** Re-run signature detection for a log whose photo is pending/failed. */
@@ -609,32 +731,6 @@ class PrismProcurementOfficeController extends Controller
         $result = $signatory->reprocessPhoto($doc, $log);
 
         return response()->json($result, $result['status'] ?? 200);
-    }
-
-    public function procurementStatusTracking(): View
-    {
-        $items = BudgetProposalItem::with('budgetProposal.office')
-            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
-            ->latest()
-            ->get()
-            ->map(fn ($item) => [
-                'id'             => $item->id,
-                'office'         => $item->budgetProposal?->office?->name ?? '—',
-                'item'           => $item->name,
-                'approvedAmount' => (float) $item->estimated_total_cost,
-                'targetQuarter'  => $item->target_quarter ?? '—',
-                'currentStatus'  => 'Pending',
-                'remarks'        => $item->remarks ?? '—',
-            ])
-            ->all();
-
-        return view('prism.procurement-office.procurement-status-tracking', $this->withCommon('procurement-status-tracking', [
-            'pageTitle'     => 'Procurement Status Tracking',
-            'trackingItems' => $items,
-            'offices'       => collect($items)->pluck('office')->unique()->values()->all(),
-            'quarters'      => collect($items)->pluck('targetQuarter')->filter(fn ($q) => $q !== '—')->unique()->sort()->values()->all(),
-            'statuses'      => ['Pending', 'In Progress', 'Completed', 'Delayed'],
-        ]));
     }
 
     public function procurementReports(): View
@@ -683,42 +779,78 @@ class PrismProcurementOfficeController extends Controller
             ])
             ->all();
 
+        $ppmpValidationRows = $this->buildPpmpValidationRows();
+
         return view('prism.procurement-office.procurement-reports', $this->withCommon('procurement-reports', [
             'pageTitle'          => 'Procurement Reports',
             'quarterlyRows'      => $quarterlyRows,
             'completedPurchases' => $completedPurchases,
             'delayedItems'       => $delayedItems,
+            'ppmpValidationRows' => $ppmpValidationRows,
         ]));
     }
 
-    public function getMarketPrices(Request $request, PurchaseRequest $pr): JsonResponse
+    /**
+     * Compare each endorsed/approved PPMP item against what was actually
+     * requested for it (via the best-effort office+name match), flagging
+     * quantity/amount discrepancies so Procurement can spot-check that
+     * purchases matched the plan — not just track process stage.
+     */
+    private function buildPpmpValidationRows(): array
     {
-        $item   = trim($request->input('item', $pr->title));
-        $budget = (float) $request->input('budget', 0);
+        $items = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->get();
 
-        $service = new MarketScopingService();
-        $results = $service->search($item);
+        $officeIds     = $items->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
 
-        if (empty($results)) {
-            return response()->json([
-                'results'         => [],
-                'cached'          => false,
-                'source'          => 'none',
-                'quota_exhausted' => $service->isQuotaExhausted(),
-            ]);
-        }
+        return $items->map(function ($item) use ($prItemMatches) {
+            $officeId  = $item->budgetProposal?->office_id;
+            $matched   = $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)));
+            $matchedPr = $matched?->purchaseRequest;
 
-        $results = $service->matchSpecs($results, [], $item);
-        if ($budget > 0) {
-            $results = $service->flagAdvantageous($results, $budget);
-        }
+            $plannedQty   = (float) $item->quantity;
+            $plannedTotal = (float) $item->estimated_total_cost;
 
-        return response()->json([
-            'results'         => $results,
-            'cached'          => !empty($results[0]['cached']),
-            'source'          => 'serpapi',
-            'quota_exhausted' => $service->isQuotaExhausted(),
-        ]);
+            if (!$matched) {
+                return [
+                    'office'          => $item->budgetProposal?->office?->name ?? '—',
+                    'item'            => $item->name,
+                    'plannedQty'      => $plannedQty,
+                    'plannedTotal'    => $plannedTotal,
+                    'matchedItem'     => null,
+                    'purchasedQty'    => null,
+                    'purchasedTotal'  => null,
+                    'trackingStatus'  => ['key' => 'not_requested', 'label' => 'Not Yet Requested'],
+                    'flag'            => 'pending',
+                ];
+            }
+
+            $purchasedQty   = (float) $matched->quantity;
+            $purchasedTotal = (float) $matched->estimated_total_cost;
+            $qtyMismatch    = abs($purchasedQty - $plannedQty) > 0.01;
+            $overBudget     = $purchasedTotal > $plannedTotal;
+
+            $flag = match (true) {
+                $qtyMismatch && $overBudget => 'qty_and_over_budget',
+                $qtyMismatch                => 'qty_mismatch',
+                $overBudget                 => 'over_budget',
+                default                     => 'ok',
+            };
+
+            return [
+                'office'         => $item->budgetProposal?->office?->name ?? '—',
+                'item'           => $item->name,
+                'plannedQty'     => $plannedQty,
+                'plannedTotal'   => $plannedTotal,
+                'matchedItem'    => $matched->name,
+                'purchasedQty'   => $purchasedQty,
+                'purchasedTotal' => $purchasedTotal,
+                'trackingStatus' => $matchedPr?->effectiveTrackingStatus() ?? ['key' => 'unknown', 'label' => '—'],
+                'flag'           => $flag,
+            ];
+        })->all();
     }
 
     public function uploadPurchaseRequest(Request $request, PurchaseRequest $pr): JsonResponse
@@ -746,6 +878,52 @@ class PrismProcurementOfficeController extends Controller
             'success'  => true,
             'filePath' => $path,
             'status'   => ucwords(str_replace('_', ' ', $newStatus)),
+        ]);
+    }
+
+    /** Upload/re-upload the scanned, physically-signed AOC document. */
+    public function uploadAbstractOfCanvass(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $year = now()->year;
+        $slug = Str::slug($aoc->code ?? 'aoc-' . $aoc->id);
+        $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
+        $path = $request->file('file')->storeAs("abstract-of-canvass/{$year}", $name, 'public');
+
+        $aoc->update([
+            'file_path'   => $path,
+            'uploaded_at' => now(),
+        ]);
+
+        return response()->json([
+            'success'  => true,
+            'filePath' => $path,
+        ]);
+    }
+
+    /** Upload/re-upload the scanned, physically-signed PO document. */
+    public function uploadPurchaseOrder(Request $request, PurchaseOrder $po): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $year = now()->year;
+        $slug = Str::slug($po->po_number ?? 'po-' . $po->id);
+        $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
+        $path = $request->file('file')->storeAs("purchase-orders/{$year}", $name, 'public');
+
+        $po->update([
+            'file_path'   => $path,
+            'uploaded_at' => now(),
+        ]);
+
+        return response()->json([
+            'success'  => true,
+            'filePath' => $path,
         ]);
     }
 
@@ -991,6 +1169,25 @@ class PrismProcurementOfficeController extends Controller
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /**
+     * Best-effort match from a BudgetProposalItem (PPMP) to the downstream PR
+     * item eventually raised for it. No stored link exists yet between the two
+     * (the BSU PDF import flow doesn't record annual_procurement_plan_item_id),
+     * so we match on office + item name and keep the most recently created PR
+     * per pair. Returns PurchaseRequestItem (not the PR itself), keyed by
+     * "office_id|lower(trim(item name))" — callers read ->purchaseRequest when
+     * they need the parent PR.
+     */
+    private function matchPrItemsByOfficeAndName(\Illuminate\Support\Collection $officeIds): \Illuminate\Support\Collection
+    {
+        return PurchaseRequestItem::with('purchaseRequest.abstractOfCanvass.purchaseOrder')
+            ->whereHas('purchaseRequest', fn ($q) => $q->whereIn('office_id', $officeIds))
+            ->get()
+            ->filter(fn ($pri) => $pri->purchaseRequest !== null)
+            ->groupBy(fn ($pri) => $pri->purchaseRequest->office_id . '|' . strtolower(trim($pri->name)))
+            ->map(fn ($group) => $group->sortByDesc(fn ($pri) => $pri->purchaseRequest->created_at)->first());
+    }
+
     private function prStatusLabel(string $status): string
     {
         return match ($status) {
@@ -1031,7 +1228,6 @@ class PrismProcurementOfficeController extends Controller
                 ['slug' => 'canvassing',                  'label' => 'Canvassing',                  'href' => route('procurement-office.canvassing'),                  'icon' => 'clipboard-list'],
                 ['slug' => 'abstract-of-canvass',         'label' => 'Abstract of Canvass',         'href' => route('procurement-office.abstract-of-canvass'),         'icon' => 'file-text'],
                 ['slug' => 'purchase-orders',             'label' => 'Purchase Orders',             'href' => route('procurement-office.purchase-orders'),             'icon' => 'shopping-cart'],
-                ['slug' => 'procurement-status-tracking', 'label' => 'Status Tracking',             'href' => route('procurement-office.procurement-status-tracking'), 'icon' => 'list-check'],
                 ['slug' => 'procurement-reports',         'label' => 'Reports',                     'href' => route('procurement-office.procurement-reports'),         'icon' => 'trending-up'],
             ],
         ], $data);

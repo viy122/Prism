@@ -43,12 +43,7 @@
 
     .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; white-space: nowrap; }
     .btn-upload { background: var(--crimson); color: #fff; }
-    .btn-complete { background: #166534; color: #fff; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-
-    .quota-note { font-size: 11px; font-weight: 700; }
-    .quota-note.short { color: #854f0b; }
-    .quota-note.ok { color: #166534; }
 
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 160px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 28px; text-align: center; }
     .empty-state i { font-size: 36px; color: var(--s300); }
@@ -72,7 +67,7 @@
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Canvassing</h1>
-            <p class="page-hdr-sub">Upload supplier quotations for fully signed PRs. At least 3 quotations are required before canvassing can be completed and an AOC created.</p>
+            <p class="page-hdr-sub">Upload a canvass document for each fully signed PR. Canvassing completes as soon as the document is uploaded, and the PR becomes eligible for AOC creation.</p>
         </div>
     </div>
 
@@ -123,14 +118,9 @@
                 </span>
             </div>
             @empty
-            <p style="font-size:12px;color:var(--s400);">No quotations uploaded yet.</p>
+            <p style="font-size:12px;color:var(--s400);">No document uploaded yet.</p>
             @endforelse
         </div>
-
-        @php $count = count($pr['quotations']); @endphp
-        <p class="quota-note {{ $count >= 3 ? 'ok' : 'short' }}" data-quota-note="{{ $pr['id'] }}">
-            {{ $count }}/3 quotations {{ $count >= 3 ? '— ready to complete canvassing' : '— minimum of 3 required' }}
-        </p>
 
         @if($pr['canvassingStage'] !== 'completed')
         <div class="upload-row">
@@ -140,10 +130,7 @@
                 <i class="ti ti-paperclip"></i> <span data-file-label="{{ $pr['id'] }}">Choose file</span>
             </label>
             <button class="btn btn-upload btn-upload-quote" data-pr-id="{{ $pr['id'] }}" data-url="{{ $pr['uploadUrl'] }}">
-                <i class="ti ti-upload"></i> Upload Quotation
-            </button>
-            <button class="btn btn-complete btn-complete-canvass" data-pr-id="{{ $pr['id'] }}" data-url="{{ $pr['updateUrl'] }}" {{ $count < 3 ? 'disabled' : '' }}>
-                <i class="ti ti-checks"></i> Complete Canvassing
+                <i class="ti ti-upload"></i> Upload Document
             </button>
         </div>
         @endif
@@ -183,7 +170,7 @@
             const file     = document.querySelector(`[data-file-input="${prId}"]`);
 
             if (!supplier.value.trim()) { showToast('Enter the supplier name first.', true); return; }
-            if (!file.files[0])         { showToast('Choose a quotation file first.', true); return; }
+            if (!file.files[0])         { showToast('Choose a file first.', true); return; }
 
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Uploading…';
@@ -200,24 +187,24 @@
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    showToast('Quotation uploaded (' + json.quotationCount + '/3).');
+                    showToast('Canvassing completed — PR is ready for AOC.');
                     setTimeout(() => window.location.reload(), 900);
                 } else {
                     showToast(json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Upload failed.'), true);
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="ti ti-upload"></i> Upload Quotation';
+                    btn.innerHTML = '<i class="ti ti-upload"></i> Upload Document';
                 }
             } catch {
                 showToast('Network error — please try again.', true);
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-upload"></i> Upload Quotation';
+                btn.innerHTML = '<i class="ti ti-upload"></i> Upload Document';
             }
         });
     });
 
     document.querySelectorAll('.btn-delete-quote').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('Remove this quotation?')) return;
+            if (!confirm('Remove this document?')) return;
             try {
                 const resp = await fetch(btn.dataset.url, {
                     method: 'DELETE',
@@ -225,34 +212,12 @@
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    showToast('Quotation removed.');
+                    showToast('Document removed.');
                     setTimeout(() => window.location.reload(), 700);
                 } else {
                     showToast(json.error || 'Failed to remove.', true);
                 }
             } catch { showToast('Network error.', true); }
-        });
-    });
-
-    document.querySelectorAll('.btn-complete-canvass').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (!confirm('Complete canvassing for this PR? Quotations will be locked and the PR becomes eligible for AOC creation.')) return;
-            btn.disabled = true;
-            try {
-                const resp = await fetch(btn.dataset.url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body: JSON.stringify({ action: 'complete' }),
-                });
-                const json = await resp.json();
-                if (resp.ok && json.success) {
-                    showToast('Canvassing completed — PR is ready for AOC.');
-                    setTimeout(() => window.location.reload(), 900);
-                } else {
-                    showToast(json.error || 'Failed to complete canvassing.', true);
-                    btn.disabled = false;
-                }
-            } catch { showToast('Network error.', true); btn.disabled = false; }
         });
     });
 

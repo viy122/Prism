@@ -104,7 +104,9 @@ trait HasSignatoryChain
         return match ($log->action) {
             'forwarded' => 'Forwarded to '
                 . ($this->stageMetaFor($stages[$log->signatory_number + 1] ?? null)['label'] ?? 'next stage'),
-            'returned'  => 'Returned to draft (was at ' . $label . ')',
+            'returned'  => 'Returned to '
+                . ($this->stageMetaFor($stages[max(0, $log->signatory_number - 1)] ?? null)['label'] ?? 'draft')
+                . ' (was at ' . $label . ')',
             default     => 'Signed – ' . $label,
         };
     }

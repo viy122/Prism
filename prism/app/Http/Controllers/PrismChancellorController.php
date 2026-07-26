@@ -27,11 +27,16 @@ class PrismChancellorController extends Controller
         return 'chancellor';
     }
 
+    /**
+     * Chancellor is the fixed final signatory on all three document types
+     * (PR, AOC, PO) — shows EVERY document, not just currently-actionable
+     * ones. `canAct` tells the UI which rows are actually his turn right now.
+     */
     public function forMySignature(): View
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'queueRows' => $this->signatureQueueRows(),
+            'documents' => $this->signatureHistoryRows(['pr', 'aoc', 'po']),
         ]));
     }
 
@@ -238,12 +243,12 @@ class PrismChancellorController extends Controller
     {
         abort_if($proposal->status !== 'endorsed', 403);
 
-        $remarks = trim($request->input('remarks', ''));
+        $remarks = trim((string) $request->input('remarks', ''));
         if (!$remarks) {
             return response()->json(['success' => false, 'message' => 'Remarks are required to return a proposal.'], 422);
         }
 
-        $proposal->update(['status' => 'returned', 'reviewed_at' => now()]);
+        $proposal->update(['status' => 'returned', 'reviewed_at' => now(), 'remarks' => $remarks]);
 
         BudgetProposalReview::create([
             'budget_proposal_id'  => $proposal->id,

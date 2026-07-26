@@ -206,6 +206,9 @@
         <a href="{{ route('office-head.dashboard') }}" title="Dashboard" @if(($activeOfficePage ?? '') === 'dashboard') class="active" @endif>
             <i class="ti ti-layout-dashboard"></i><span class="sb-label">Dashboard</span>
         </a>
+        <a href="{{ route('office-head.for-my-signature') }}" title="For My Signature" @if(($activeOfficePage ?? '') === 'for-my-signature') class="active" @endif>
+            <i class="ti ti-signature"></i><span class="sb-label">For My Signature</span>
+        </a>
         <a href="{{ route('office-head.budget-proposal') }}" title="PPMP" @if(($activeOfficePage ?? '') === 'budget-proposal') class="active" @endif>
             <i class="ti ti-file-text"></i><span class="sb-label">PPMP</span>
         </a>

@@ -98,6 +98,10 @@ class PrismFinanceOfficeController extends Controller
 
     public function saveItemRemark(Request $request, BudgetProposalItem $item): JsonResponse
     {
+        // Once endorsed, the proposal is with the Chancellor — not Budget Office's to
+        // touch again until it's either freshly submitted or the Chancellor returns it.
+        abort_if(!$this->isActionableByFinance($item->budgetProposal), 403);
+
         $validated = $request->validate([
             'ok'     => 'required|boolean',
             'remark' => 'nullable|string|max:1000',
@@ -188,7 +192,7 @@ class PrismFinanceOfficeController extends Controller
 
     public function endorse(Request $request, BudgetProposal $proposal): RedirectResponse
     {
-        abort_if($proposal->status !== 'submitted', 403);
+        abort_if(!$this->isActionableByFinance($proposal), 403);
 
         if ($proposal->items()->where('finance_ok', false)->exists()) {
             return redirect()->route('finance-office.proposal-review.show', $proposal->id)
@@ -212,17 +216,20 @@ class PrismFinanceOfficeController extends Controller
 
         NotificationService::proposalEndorsed($proposal);
 
-        return redirect()->route('finance-office.proposal-review.show', $proposal->id)
-            ->with('success', 'PPMP approved and forwarded to the Chancellor.');
+        return $this->nextReviewRedirect($proposal, 'PPMP approved and forwarded to the Chancellor.');
     }
 
     public function returnProposal(Request $request, BudgetProposal $proposal): RedirectResponse
     {
-        abort_if($proposal->status !== 'submitted', 403);
+        abort_if(!$this->isActionableByFinance($proposal), 403);
 
         $request->validate(['remarks' => 'nullable|string']);
 
-        $remarks = $request->input('remarks', '');
+        // An empty textarea submits as '', but Laravel's ConvertEmptyStringsToNull
+        // middleware turns that into null before it ever reaches here — input()'s
+        // default only kicks in when the key is missing, not when it's present-but-null.
+        $remarks    = (string) $request->input('remarks', '');
+        $statusFrom = $proposal->status;
 
         $proposal->update(['status' => 'returned', 'reviewed_at' => now(), 'remarks' => $remarks]);
 
@@ -230,7 +237,7 @@ class PrismFinanceOfficeController extends Controller
             'budget_proposal_id'  => $proposal->id,
             'reviewed_by_user_id' => auth()->id(),
             'action'              => 'return',
-            'status_from'         => 'submitted',
+            'status_from'         => $statusFrom,
             'status_to'           => 'returned',
             'remarks'             => $remarks,
             'reviewed_at'         => now(),
@@ -238,25 +245,81 @@ class PrismFinanceOfficeController extends Controller
 
         NotificationService::proposalReturnedByFinance($proposal, $remarks);
 
-        return redirect()->route('finance-office.proposal-review')
-            ->with('success', 'Proposal returned to the office with remarks.');
+        return $this->nextReviewRedirect($proposal, 'Proposal returned to the office with remarks.');
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /**
+     * After acting on a proposal, jump straight to the next one still awaiting
+     * endorsement instead of dropping back to a blank "select a proposal" state —
+     * continues the review queue automatically. If nothing else is pending,
+     * fall back to the proposal just acted on so its updated status (badge +
+     * "no further action available" message) is the thing actually shown,
+     * rather than a generic empty screen with no confirmation of what happened.
+     */
+    private function nextReviewRedirect(BudgetProposal $justActedOn, string $successMessage): RedirectResponse
+    {
+        // Budget Office reviews all offices, not just one — "next" means the next
+        // proposal awaiting endorsement campus-wide. Matches the same ordering
+        // proposalReview()'s own default-landing auto-select already uses.
+        $next = BudgetProposal::where('status', 'submitted')->latest('submitted_at')->first();
+
+        $targetId = $next?->id ?? $justActedOn->id;
+
+        return redirect()->route('finance-office.proposal-review.show', $targetId)
+            ->with('success', $successMessage);
+    }
+
+    /**
+     * 'returned' is reused for two different points in the workflow — Budget
+     * Office returning to the Office Head (status_from: submitted) AND the
+     * Chancellor returning to Budget Office (status_from: endorsed) — so the
+     * status alone can't tell which side is supposed to act next. Only the
+     * latter needs Endorse/Return available to Budget Office again; the
+     * former is waiting on the Office Head to revise and resubmit.
+     */
+    private function isActionableByFinance(BudgetProposal $proposal): bool
+    {
+        if ($proposal->status === 'submitted') {
+            return true;
+        }
+        if ($proposal->status !== 'returned') {
+            return false;
+        }
+
+        return $this->latestReturnReview($proposal)?->status_from === 'endorsed';
+    }
+
+    private function latestReturnReview(BudgetProposal $proposal): ?BudgetProposalReview
+    {
+        return $proposal->reviews()->where('action', 'return')->with('reviewedBy')->latest('reviewed_at')->first();
+    }
+
     private function formatProposal(BudgetProposal $p): array
     {
+        // The Chancellor's (or Budget Office's own) return reason lives in the review
+        // log, not on the proposal itself — BudgetProposal.remarks isn't reliably kept
+        // in sync with who returned it most recently, so read from the audit trail.
+        $lastReturn = $p->status === 'returned' ? $this->latestReturnReview($p) : null;
+
         return [
-            'id'     => $p->id,
-            'title'  => $p->title,
-            'status' => ucfirst($p->status),
+            'id'         => $p->id,
+            'title'      => $p->title,
+            'status'     => ucfirst($p->status),
+            'actionable' => $this->isActionableByFinance($p),
+            'returnRemarks' => $lastReturn ? [
+                'text' => $lastReturn->remarks,
+                'from' => $lastReturn->status_from === 'endorsed' ? 'Chancellor' : 'Budget Office',
+                'by'   => $lastReturn->reviewedBy?->name ?? '—',
+                'date' => ($lastReturn->reviewed_at ?? $lastReturn->created_at)->format('M d, Y g:i A'),
+            ] : null,
             'office' => [
                 'name'          => $p->office?->name ?? '—',
                 'head'          => $p->submittedBy?->name ?? '—',
                 'fiscalYear'    => (string) $p->fiscal_year,
                 'submittedDate' => $p->submitted_at?->format('M d, Y') ?? '—',
                 'totalAmount'   => (float) $p->total_estimated_cost,
-                'fundSource'    => 'General Fund',
             ],
             'items' => $p->items->map(fn ($item) => [
                 'id'                => $item->id,
