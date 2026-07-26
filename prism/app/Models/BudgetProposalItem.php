@@ -60,6 +60,9 @@ class BudgetProposalItem extends Model
         'finance_ok',
         'finance_remark',
         'specifications_json',
+        'tracking_status_override',
+        'tracking_status_overridden_by_user_id',
+        'tracking_status_overridden_at',
     ];
 
     protected function casts(): array
@@ -74,6 +77,7 @@ class BudgetProposalItem extends Model
             'specifications_json'   => 'array',
             'is_overridden'         => 'boolean',
             'finance_ok'            => 'boolean',
+            'tracking_status_overridden_at' => 'datetime',
         ];
     }
 

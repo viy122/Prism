@@ -52,9 +52,17 @@
     .ref-card:hover { border-color: var(--crimson-border); box-shadow: var(--sh); }
     .ref-card.ref-attached { background: #FFF8F8; border-color: var(--crimson-border); }
 
-    .ref-logo { width: 64px; height: 48px; border-radius: 8px; background: #F8F8F8; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+    .ref-logo { width: 64px; height: 48px; border-radius: 8px; background: #F8F8F8; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; position: relative; }
     .ref-logo i { font-size: 22px; color: var(--txt3); }
     .ref-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ref-logo.has-detail { cursor: pointer; }
+    .ref-logo.has-detail .ref-logo-hover {
+        position: absolute; inset: 0; background: rgba(20,20,20,.68); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity .15s; pointer-events: none;
+    }
+    .ref-logo.has-detail .ref-logo-hover i { color: #fff; font-size: 17px; }
+    .ref-logo.has-detail:hover .ref-logo-hover { opacity: 1; }
 
     .ref-body { flex: 1; min-width: 0; overflow: hidden; }
     .ref-name { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 2px; line-height: 1.35; word-break: break-word; overflow-wrap: break-word; }
@@ -118,6 +126,9 @@
     .td-supplier { font-weight: 700; color: var(--txt); }
     .td-price { font-weight: 800; color: var(--crimson); white-space: nowrap; }
     .td-source { color: var(--txt3); font-weight: 500; }
+    .td-remove-btn { background: none; border: none; cursor: pointer; color: var(--txt3); padding: 4px; line-height: 1; border-radius: 6px; transition: background .12s, color .12s; }
+    .td-remove-btn:hover { background: var(--red-bg, #fee2e2); color: var(--red, #991b1b); }
+    .td-remove-btn i { font-size: 13px; display: block; }
 
     .table-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; text-align: center; }
     .table-empty i { font-size: 32px; color: #D1D5DB; }
@@ -171,11 +182,8 @@
     .budget-input { height: 42px; width: 170px; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 12px 0 24px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
     .budget-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
     .budget-input::placeholder { color: var(--txt3); font-size: 12px; }
-    .dept-select { height: 42px; width: 160px; flex-shrink: 0; border-radius: var(--r-sm); border: 1.5px solid var(--border2); background: var(--bg); padding: 0 10px; font-size: 13px; font-weight: 500; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; cursor: pointer; }
-    .dept-select:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
 
-    /* ── Spec-match & advantageous badges ── */
-    .ref-tag.t-match { background: #ECFDF5; color: #059669; }
+    /* ── Advantageous badge ── */
     .ref-tag.t-adv   { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
     .advantageous-reason { font-size: 11px; font-weight: 500; color: #92400E; margin-top: 5px; line-height: 1.5; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 5px; padding: 5px 8px; }
 
@@ -196,18 +204,6 @@
     .filter-price:focus { border-color: var(--crimson); }
     .filter-clear { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); font-size: 11px; font-weight: 700; color: var(--txt2); cursor: pointer; font-family: 'Poppins', sans-serif; transition: all .15s; }
     .filter-clear:hover { border-color: var(--crimson); color: var(--crimson); }
-
-    /* ── Multi-select checklist dropdown (Store, Reviews) ── */
-    .filter-multisel { position: relative; }
-    .filter-multisel-btn { height: 32px; border-radius: 8px; border: 1px solid var(--border2); background: var(--white); padding: 0 10px; font-size: 12px; font-weight: 600; color: var(--txt); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .filter-multisel-btn:hover, .filter-multisel-btn.open { border-color: var(--crimson); }
-    .filter-multisel-btn i { font-size: 12px; color: var(--txt3); }
-    .filter-multisel-panel { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 200px; max-height: 240px; overflow-y: auto; background: var(--white); border: 1px solid var(--border2); border-radius: 10px; box-shadow: var(--sh); padding: 8px; display: none; }
-    .filter-multisel-panel.open { display: block; }
-    .filter-multisel-panel label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: normal; color: var(--txt); padding: 5px 6px; border-radius: 6px; cursor: pointer; }
-    .filter-multisel-panel label:hover { background: var(--bg2); }
-    .filter-multisel-panel input[type="checkbox"] { margin: 0; cursor: pointer; }
-    .filter-multisel-empty { font-size: 11px; color: var(--txt3); padding: 6px; font-style: italic; }
 
     /* ── Did you mean ── */
     .dym-box { margin: 12px 18px 0; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 600; color: #1d4ed8; }
@@ -234,7 +230,7 @@
                     <p>Search market prices and attach references to your proposal items.</p>
                 </div>
             </div>
-            <a href="{{ route('office-head.market-scoping.mps') }}" class="btn-mps-doc{{ $survey ? ' btn-mps-doc-done' : '' }}">
+            <a href="{{ route('office-head.market-scoping.mps', $proposalId ? ['proposal' => $proposalId] : []) }}" class="btn-mps-doc{{ $survey ? ' btn-mps-doc-done' : '' }}">
                 <i class="ti {{ $survey ? 'ti-circle-check' : 'ti-file-description' }}"></i>
                 {{ $survey ? 'View Submitted Market Study' : 'View Market Study' }}
             </a>
@@ -246,17 +242,6 @@
                        placeholder="Search a new item (e.g. Laptop Intel i7 16GB RAM)…">
                 <div id="suggestDropdown" class="suggest-dropdown"></div>
             </div>
-            <select id="marketDeptSelect" class="dept-select" title="Limit the search to stores serving this category">
-                <option value="">All categories</option>
-                <option value="office">Office supplies</option>
-                <option value="it">IT / Computers</option>
-                <option value="medical">Medical</option>
-                <option value="appliances">Appliances</option>
-                <option value="furniture">Furniture</option>
-                <option value="hardware">Hardware</option>
-                <option value="janitorial">Janitorial</option>
-                <option value="sports">Sports / PE</option>
-            </select>
             <div class="budget-wrap">
                 <span class="budget-prefix">₱</span>
                 <input id="marketBudgetInput" class="budget-input" type="number" min="0" step="0.01"
@@ -283,7 +268,7 @@
             {{-- Service notices (quota / AI matcher availability) --}}
             <div id="noticeArea"></div>
 
-            {{-- Filter / Sort bar — always visible; Store/Reviews options populate once results load --}}
+            {{-- Filter / Sort bar --}}
             <div class="filter-bar" id="filterBar">
                 <label>Sort</label>
                 <select id="sortSel" class="filter-sel">
@@ -294,38 +279,10 @@
                     <option value="store_az">Store: A → Z</option>
                 </select>
 
-                <label>Store</label>
-                <div class="filter-multisel" id="storeMultiselWrap">
-                    <button type="button" class="filter-multisel-btn" id="storeMultiselBtn">
-                        <span id="storeMultiselLabel">All stores</span><i class="ti ti-chevron-down"></i>
-                    </button>
-                    <div class="filter-multisel-panel" id="storeMultiselPanel">
-                        <div class="filter-multisel-empty">Run a search to see stores.</div>
-                    </div>
-                </div>
-
-                <label>Reviews</label>
-                <div class="filter-multisel" id="reviewsMultiselWrap">
-                    <button type="button" class="filter-multisel-btn" id="reviewsMultiselBtn">
-                        <span id="reviewsMultiselLabel">Any rating</span><i class="ti ti-chevron-down"></i>
-                    </button>
-                    <div class="filter-multisel-panel" id="reviewsMultiselPanel">
-                        <label><input type="checkbox" value="4"> 4 stars &amp; up</label>
-                        <label><input type="checkbox" value="3"> 3 stars &amp; up</label>
-                        <label><input type="checkbox" value="unrated"> No rating yet</label>
-                    </div>
-                </div>
-
                 <label>Price</label>
                 <input id="priceMin" class="filter-price" type="number" min="0" placeholder="Min ₱">
                 <span style="color:var(--txt3);font-size:11px;">–</span>
                 <input id="priceMax" class="filter-price" type="number" min="0" placeholder="Max ₱">
-                <label style="margin-left:4px;">
-                    <input type="checkbox" id="advOnly" style="vertical-align:middle;margin-right:4px;">Advantageous only
-                </label>
-                <label style="margin-left:4px;">
-                    <input type="checkbox" id="hasPriceOnly" style="vertical-align:middle;margin-right:4px;">With price only
-                </label>
                 <button type="button" class="filter-clear" id="filterClear">Clear</button>
             </div>
 
@@ -358,11 +315,12 @@
                                 <th>Supplier</th>
                                 <th>Price / unit</th>
                                 <th>Source</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody id="attachedTableBody">
                             <tr id="tableEmptyRow">
-                                <td colspan="3">
+                                <td colspan="4">
                                     <div class="table-empty">
                                         <i class="ti ti-clipboard-list"></i>
                                         <p>No references attached yet.<br>Click <strong>Attach</strong> on a card.</p>
@@ -378,7 +336,7 @@
                     <button class="btn-save-ref" id="saveRefBtn" type="button" disabled>
                         <i class="ti ti-link"></i>Attach to PPMP
                     </button>
-                    <a href="{{ route('office-head.market-scoping.mps') }}"
+                    <a href="{{ route('office-head.market-scoping.mps', $proposalId ? ['proposal' => $proposalId] : []) }}"
                        style="display:flex;align-items:center;justify-content:center;gap:7px;height:38px;width:100%;border-radius:var(--r-sm);background:transparent;color:var(--txt2);border:1.5px solid var(--border2);font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;text-decoration:none;transition:all .15s;"
                        onmouseover="this.style.borderColor='var(--crimson)';this.style.color='var(--crimson)';"
                        onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--txt2)';">
@@ -461,13 +419,44 @@
 <script type="application/json" id="msProposalItems">@json($proposalItems)</script>
 <script type="application/json" id="msSelectedRefs">@json($selectedRefs)</script>
 <script type="application/json" id="msSurveyLocked">@json(isset($survey) && $survey !== null)</script>
+<script type="application/json" id="msExistingItemRefs">@json($existingItemRefs ?? [])</script>
 
 <script>
 (function () {
 
+    const proposalId     = @json($proposalId ?? null);
+    const existingItemId = @json($existingItemId ?? null);
+    const budgetProposalUrl = '{{ route("office-head.budget-proposal") }}' + (proposalId ? ('?proposal=' + proposalId) : '');
+    const resolveSourceUrl  = '{{ route("office-head.market-scoping.resolve-source") }}';
+    const productDetailsUrl = '{{ route("office-head.market-scoping.product-details") }}';
+
+    // For Google Shopping results (page_token present), route the "Source" click through
+    // the backend so it resolves to the actual merchant page instead of a Google Shopping
+    // intermediary link. Results without a page_token (e.g. the local price aggregator)
+    // are already direct store links, so they're used as-is.
+    function sourceHrefFor(url, pageToken) {
+        if (!pageToken) return url;
+        const params = new URLSearchParams({ page_token: pageToken, fallback: url });
+        return resolveSourceUrl + '?' + params.toString();
+    }
+
     const attached   = {};   /* refId → ref data */
     const MAX_REFS   = 3;
     const mpsLocked  = JSON.parse(document.getElementById('msSurveyLocked').textContent);
+
+    // Arrived via an item's "Add reference" link — that item's already-saved
+    // references must start out attached, not blank, or finishing this flow would
+    // silently unselect them in favor of whatever gets picked next.
+    (function seedExistingRefs() {
+        if (!existingItemId) return;
+        let refs = [];
+        try { refs = JSON.parse(document.getElementById('msExistingItemRefs').textContent || '[]'); } catch { refs = []; }
+        refs.forEach(ref => {
+            attached[ref.id] = ref;
+            addTableRow(ref.id, ref);
+        });
+        if (refs.length) updateCount();
+    })();
 
     /* ── Lock UI when MPS has been submitted ── */
     if (mpsLocked) {
@@ -489,46 +478,59 @@
         });
     }
 
-    /* ── Attach / detach ── */
+    /* ── Attach / detach ──────────────────────────────────────────────────────
+       Shared by: live search result cards, pre-loaded DB reference cards, AND
+       refs pre-loaded from an item's already-saved selection (which have no
+       corresponding card at all — only the summary table row's own × button). */
+    window.detachRef = function (refId) {
+        delete attached[refId];
+        removeTableRow(refId);
+
+        const card = document.getElementById('card-' + refId);
+        if (card) {
+            card.classList.remove('ref-attached');
+            const btn = card.querySelector('.btn-attach-card');
+            if (btn) { btn.innerHTML = '<i class="ti ti-paperclip"></i>Attach'; btn.classList.remove('is-attached'); }
+        }
+        updateCount();
+    };
+
     window.attachRef = function (refId) {
         const card = document.getElementById('card-' + refId);
         if (!card) return;
 
         if (attached[refId]) {
-            /* detach */
-            delete attached[refId];
-            card.classList.remove('ref-attached');
-            const btn = card.querySelector('.btn-attach-card[data-ref-id="' + refId + '"]');
-            if (btn) { btn.innerHTML = '<i class="ti ti-paperclip"></i>Attach'; btn.classList.remove('is-attached'); }
-            removeTableRow(refId);
-        } else {
-            /* block if already at max */
-            if (Object.keys(attached).length >= MAX_REFS) {
-                const hint = document.getElementById('saveHint');
-                hint.textContent = 'Maximum of 3 references reached. Remove one first.';
-                hint.className = 'rp-save-hint hint-err';
-                setTimeout(() => updateCount(), 2000);
-                return;
-            }
-            /* attach */
-            const d = card.dataset;
-            attached[refId] = {
-                id:       refId,
-                name:     d.name,
-                price:    parseFloat(d.priceRaw),
-                priceStr: d.price,
-                supplier: d.supplier,
-                source:   d.source,
-                date:     d.date,
-                url:      d.url,
-                specs:    d.specs,
-                itemId:   d.itemId,
-            };
-            card.classList.add('ref-attached');
-            const btn = card.querySelector('.btn-attach-card[data-ref-id="' + refId + '"]');
-            if (btn) { btn.innerHTML = '<i class="ti ti-check"></i>Attached'; btn.classList.add('is-attached'); }
-            addTableRow(refId, attached[refId]);
+            window.detachRef(refId);
+            return;
         }
+
+        /* block if already at max */
+        if (Object.keys(attached).length >= MAX_REFS) {
+            const hint = document.getElementById('saveHint');
+            hint.textContent = 'Maximum of 3 references reached. Remove one first.';
+            hint.className = 'rp-save-hint hint-err';
+            setTimeout(() => updateCount(), 2000);
+            return;
+        }
+        /* attach */
+        const d = card.dataset;
+        attached[refId] = {
+            id:       refId,
+            name:     d.name,
+            price:    parseFloat(d.priceRaw),
+            priceStr: d.price,
+            supplier: d.supplier,
+            source:   d.source,
+            date:     d.date,
+            url:      d.url,
+            pageToken: d.pageToken,
+            specs:    d.specs,
+            itemId:   d.itemId,
+        };
+        card.classList.add('ref-attached');
+        const btn = card.querySelector('.btn-attach-card[data-ref-id="' + refId + '"]');
+        if (btn) { btn.innerHTML = '<i class="ti ti-check"></i>Attached'; btn.classList.add('is-attached'); }
+        addTableRow(refId, attached[refId]);
 
         updateCount();
     };
@@ -544,7 +546,8 @@
         tr.innerHTML =
             '<td class="td-supplier">' + esc(ref.supplier) + '</td>' +
             '<td class="td-price">₱' + esc(ref.priceStr) + '</td>' +
-            '<td class="td-source">' + esc(ref.source) + '</td>';
+            '<td class="td-source">' + esc(ref.source) + '</td>' +
+            '<td><button type="button" class="td-remove-btn" onclick="window.detachRef(\'' + esc(String(refId)) + '\')" title="Remove"><i class="ti ti-x"></i></button></td>';
         tbody.appendChild(tr);
     }
 
@@ -588,7 +591,7 @@
 
         /* No search done — refs already saved, just go to proposal */
         if (!query) {
-            window.location.href = '{{ route("office-head.budget-proposal") }}';
+            window.location.href = budgetProposalUrl;
             return;
         }
 
@@ -598,7 +601,7 @@
         fetch('{{ route("office-head.market-scoping.attach") }}', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-            body:    JSON.stringify({ query, refs: Object.values(attached) }),
+            body:    JSON.stringify({ query, refs: Object.values(attached), proposal_id: proposalId, item_id: existingItemId }),
         })
         .then(r => r.json())
         .then(data => {
@@ -615,7 +618,7 @@
                 showMsToast('References attached to "' + data.item_name + '".');
                 document.getElementById('saveHint').textContent = 'Redirecting to PPMP…';
                 document.getElementById('saveHint').className   = 'rp-save-hint hint-ok';
-                setTimeout(() => { window.location.href = '{{ route("office-head.budget-proposal") }}'; }, 1400);
+                setTimeout(() => { window.location.href = budgetProposalUrl; }, 1400);
             } else {
                 openAddItemModal(data);
             }
@@ -673,7 +676,7 @@
             const res  = await fetch('{{ route("office-head.market-scoping.add-item-with-refs") }}', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: cat, refs: pendingRefsData }),
+                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: cat, refs: pendingRefsData, proposal_id: proposalId }),
             });
             const json = await res.json();
             if (json.success) {
@@ -728,11 +731,10 @@
         renderNotices({});   /* clear notices from the previous search */
 
         try {
-            const department = document.getElementById('marketDeptSelect')?.value || undefined;
             const res  = await fetch(runUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body:    JSON.stringify({ item_id: 'manual', query, specs, budget, department }),
+                body:    JSON.stringify({ item_id: 'manual', query, specs, budget }),
             });
             const data = await res.json();
 
@@ -745,14 +747,12 @@
                 }
                 dynDiv.innerHTML = html;
                 lastResults = [];
-                populateStoreFilter();
                 return;
             }
 
             lastResults = data.results;
-            populateStoreFilter();
             applyFilters();
-            saveSearchState(query, budget, department);
+            saveSearchState(query, budget);
 
         } catch (e) {
             dynDiv.innerHTML = '<div class="state-box"><div class="state-icon si-error"><i class="ti ti-alert-triangle"></i></div><p class="state-title">Network error</p><p class="state-sub">Check your connection and try again.</p></div>';
@@ -788,9 +788,60 @@
     }
 
     window.msRefLogoError = function (img) {
-        img.style.display = 'none';
-        const parent = img.parentElement;
-        if (parent) parent.innerHTML = '<i class="ti ti-shopping-bag"></i>';
+        // Replace only the broken <img>, not the whole .ref-logo — a sibling
+        // .ref-logo-hover overlay (see showProductDetails) must survive this.
+        const icon = document.createElement('i');
+        icon.className = 'ti ti-shopping-bag';
+        img.replaceWith(icon);
+    };
+
+    window.showProductDetails = async function (pageToken, name) {
+        window.prismInfoModal({
+            title: name || 'Product Details',
+            bodyHtml: '<p style="font-size:13px;color:var(--txt3);text-align:center;padding:20px 0;"><i class="ti ti-loader-2" style="animation:spin .7s linear infinite;font-size:18px;display:block;margin:0 auto 8px;"></i>Loading details…</p>',
+        });
+
+        try {
+            const res  = await fetch(productDetailsUrl + '?' + new URLSearchParams({ page_token: pageToken }), {
+                headers: { 'Accept': 'application/json' },
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                document.getElementById('prismInfoBody').innerHTML =
+                    '<p style="font-size:13px;color:var(--txt3);text-align:center;padding:20px 0;">' +
+                    esc(data.message || 'Details are not available for this item.') + '</p>';
+                return;
+            }
+
+            const d = data.details;
+            const thumbHtml = d.thumbnail
+                ? '<img src="' + esc(d.thumbnail) + '" alt="" style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;background:#F8F8F8;border:1px solid var(--border2);margin-bottom:12px;">'
+                : '';
+            const brandHtml = d.brand
+                ? '<p style="font-size:12px;color:var(--txt3);font-weight:600;margin-bottom:4px;">' + esc(d.brand) + '</p>'
+                : '';
+            const priceHtml = d.price_range
+                ? '<p style="font-size:14px;font-weight:800;color:var(--crimson);margin-bottom:10px;">' + esc(d.price_range) + '</p>'
+                : '';
+            const featuresHtml = d.features && d.features.length
+                ? '<dl style="display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:12.5px;">' +
+                    d.features.map(f =>
+                        '<dt style="font-weight:700;color:var(--txt2);">' + esc(f.title) + '</dt>' +
+                        '<dd style="color:var(--txt);">' + esc(f.value) + '</dd>'
+                    ).join('') +
+                  '</dl>'
+                : '<p style="font-size:12.5px;color:var(--txt3);">No additional specs available for this item.</p>';
+            const storeCountHtml = d.store_count
+                ? '<p style="font-size:11px;color:var(--txt3);margin-top:12px;">Available from ' + d.store_count + ' seller' + (d.store_count > 1 ? 's' : '') + '.</p>'
+                : '';
+
+            document.getElementById('prismInfoBody').innerHTML =
+                thumbHtml + brandHtml + priceHtml + featuresHtml + storeCountHtml;
+        } catch {
+            document.getElementById('prismInfoBody').innerHTML =
+                '<p style="font-size:13px;color:var(--txt3);text-align:center;padding:20px 0;">Network error. Please try again.</p>';
+        }
     };
 
     function renderDynamic(results, container) {
@@ -815,6 +866,7 @@
             card.dataset.source   = source;
             card.dataset.date     = date;
             card.dataset.url      = url;
+            card.dataset.pageToken = item.page_token || '';
             card.dataset.specs    = item.snippet || '';
             card.dataset.itemId   = '';
             const imgUrl = item.image_url || item.source_icon || '';
@@ -822,7 +874,14 @@
                 ? '<img src="' + esc(imgUrl) + '" alt="" loading="lazy" onerror="window.msRefLogoError(this)">'
                 : '<i class="ti ti-shopping-bag"></i>';
 
-            const matchScore = item.match_score ? Math.round(item.match_score * 100) : null;
+            // Only Google Shopping results (page_token present) have a details endpoint
+            // to fetch from — separate from the "Source" button, which sends the user
+            // to the actual merchant site instead of showing info inside the app.
+            const hasDetail = !!item.page_token;
+            const logoOverlay = hasDetail
+                ? '<div class="ref-logo-hover"><i class="ti ti-info-circle"></i></div>'
+                : '';
+
             const isAdv      = item.is_advantageous === true;
             const advReason  = item.reason || '';
             const rating     = parseFloat(item.rating);
@@ -837,9 +896,6 @@
                   '</div>'
                 : '';
 
-            const matchBadge = matchScore !== null
-                ? '<span class="ref-tag t-match"><i class="ti ti-check" style="font-size:10px"></i>' + matchScore + '% match</span>'
-                : '';
             const advBadge = isAdv
                 ? '<span class="ref-tag t-adv"><i class="ti ti-star" style="font-size:10px"></i>Advantageous</span>'
                 : '';
@@ -848,11 +904,13 @@
                 : '';
 
             card.innerHTML =
-                '<div class="ref-logo">' + logoHtml + '</div>' +
+                '<div class="ref-logo' + (hasDetail ? ' has-detail' : '') + '"' +
+                    (hasDetail ? ' title="Click to see product details" onclick="window.showProductDetails(\'' + esc(item.page_token) + '\', \'' + esc(name).replace(/'/g, '&#39;') + '\')"' : '') +
+                    '>' + logoHtml + logoOverlay + '</div>' +
                 '<div class="ref-body">' +
                     '<p class="ref-name">' + esc(name) + '</p>' +
                     '<p class="ref-supplier">' + esc(source) + '</p>' +
-                    '<div class="ref-tags">' + sourceTag + cachedTag + matchBadge + advBadge + '</div>' +
+                    '<div class="ref-tags">' + sourceTag + cachedTag + advBadge + '</div>' +
                     ratingHtml +
                     advBlock +
                     '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
@@ -860,7 +918,7 @@
                 '<div class="ref-right">' +
                     '<p class="ref-price">' + esc(priceFmt) + '</p>' +
                     '<div class="ref-actions">' +
-                        '<a class="btn-view-src" href="' + esc(url) + '" target="_blank" rel="noopener"><i class="ti ti-external-link" style="font-size:12px"></i>Source</a>' +
+                        '<a class="btn-view-src" href="' + esc(sourceHrefFor(url, item.page_token)) + '" target="_blank" rel="noopener"><i class="ti ti-external-link" style="font-size:12px"></i>Source</a>' +
                         '<button class="btn-attach-card" type="button" data-ref-id="' + id + '" onclick="window.attachLive(\'' + id + '\')"><i class="ti ti-paperclip"></i>Attach</button>' +
                     '</div>' +
                 '</div>';
@@ -871,28 +929,25 @@
     window.attachLive = function(id) {
         const card = document.getElementById('card-' + id);
         if (!card) return;
-        const d = card.dataset;
 
         if (attached[id]) {
-            delete attached[id];
-            card.classList.remove('ref-attached');
-            card.querySelector('.btn-attach-card').innerHTML = '<i class="ti ti-paperclip"></i>Attach';
-            card.querySelector('.btn-attach-card').classList.remove('is-attached');
-            removeTableRow(id);
-        } else {
-            if (Object.keys(attached).length >= MAX_REFS) {
-                const hint = document.getElementById('saveHint');
-                hint.textContent = 'Maximum of 3 references reached. Remove one first.';
-                hint.className = 'rp-save-hint hint-err';
-                setTimeout(() => updateCount(), 2000);
-                return;
-            }
-            attached[id] = { id, name: d.name, price: parseFloat(d.priceRaw), priceStr: parseFloat(d.priceRaw).toLocaleString('en-PH', {minimumFractionDigits:2}), supplier: d.supplier, source: d.source, date: d.date, url: d.url, specs: d.specs, itemId: d.itemId };
-            card.classList.add('ref-attached');
-            card.querySelector('.btn-attach-card').innerHTML = '<i class="ti ti-check"></i>Attached';
-            card.querySelector('.btn-attach-card').classList.add('is-attached');
-            addTableRow(id, attached[id]);
+            window.detachRef(id);
+            return;
         }
+
+        if (Object.keys(attached).length >= MAX_REFS) {
+            const hint = document.getElementById('saveHint');
+            hint.textContent = 'Maximum of 3 references reached. Remove one first.';
+            hint.className = 'rp-save-hint hint-err';
+            setTimeout(() => updateCount(), 2000);
+            return;
+        }
+        const d = card.dataset;
+        attached[id] = { id, name: d.name, price: parseFloat(d.priceRaw), priceStr: parseFloat(d.priceRaw).toLocaleString('en-PH', {minimumFractionDigits:2}), supplier: d.supplier, source: d.source, date: d.date, url: d.url, pageToken: d.pageToken, specs: d.specs, itemId: d.itemId };
+        card.classList.add('ref-attached');
+        card.querySelector('.btn-attach-card').innerHTML = '<i class="ti ti-check"></i>Attached';
+        card.querySelector('.btn-attach-card').classList.add('is-attached');
+        addTableRow(id, attached[id]);
         updateCount();
     };
 
@@ -942,79 +997,15 @@
     /* ── Filters + sort (client-side on lastResults) ── */
     let lastResults = [];
 
-    /* ── Generic checkbox-dropdown wiring (Store, Reviews) ── */
-    function wireMultiselect(btnId, panelId, labelId, emptyLabel) {
-        const btn   = document.getElementById(btnId);
-        const panel = document.getElementById(panelId);
-        const label = document.getElementById(labelId);
-        if (!btn || !panel) return null;
-
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.querySelectorAll('.filter-multisel-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
-            document.querySelectorAll('.filter-multisel-btn.open').forEach(b => { if (b !== btn) b.classList.remove('open'); });
-            panel.classList.toggle('open');
-            btn.classList.toggle('open');
-        });
-
-        function refreshLabel() {
-            const checked = [...panel.querySelectorAll('input[type="checkbox"]:checked')];
-            label.textContent = checked.length === 0 ? emptyLabel
-                : checked.length === 1 ? checked[0].closest('label').textContent.trim()
-                : checked.length + ' selected';
-        }
-        panel.addEventListener('change', () => { refreshLabel(); applyFilters(); });
-
-        return { panel, refreshLabel };
-    }
-
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.filter-multisel')) {
-            document.querySelectorAll('.filter-multisel-panel.open').forEach(p => p.classList.remove('open'));
-            document.querySelectorAll('.filter-multisel-btn.open').forEach(b => b.classList.remove('open'));
-        }
-    });
-
-    const storeMultisel   = wireMultiselect('storeMultiselBtn', 'storeMultiselPanel', 'storeMultiselLabel', 'All stores');
-    const reviewsMultisel = wireMultiselect('reviewsMultiselBtn', 'reviewsMultiselPanel', 'reviewsMultiselLabel', 'Any rating');
-
-    function populateStoreFilter() {
-        if (!storeMultisel) return;
-        const panel   = storeMultisel.panel;
-        const checked = new Set([...panel.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value));
-        const stores  = [...new Set(lastResults.map(r => r.source || 'Unknown'))].sort((a, b) => a.localeCompare(b));
-
-        panel.innerHTML = stores.length === 0
-            ? '<div class="filter-multisel-empty">Run a search to see stores.</div>'
-            : stores.map(s => '<label><input type="checkbox" value="' + esc(s) + '"' + (checked.has(s) ? ' checked' : '') + '> ' + esc(s) + '</label>').join('');
-        storeMultisel.refreshLabel();
-    }
-
-    function selectedValues(panel) {
-        return [...panel.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
-    }
-
     function applyFilters() {
         const dynDiv = document.getElementById('dynamicResults');
         const sortBy   = document.getElementById('sortSel').value;
-        const stores   = storeMultisel ? selectedValues(storeMultisel.panel) : [];
-        const ratings  = reviewsMultisel ? selectedValues(reviewsMultisel.panel) : [];
         const min      = parseFloat(document.getElementById('priceMin').value) || 0;
         const max      = parseFloat(document.getElementById('priceMax').value) || Infinity;
-        const advOnly  = document.getElementById('advOnly').checked;
-        const hasPrice = document.getElementById('hasPriceOnly')?.checked || false;
 
         let list = lastResults.filter(r => {
             const p = parseFloat(r.price) || 0;
             if (p < min || p > max) return false;
-            if (advOnly && r.is_advantageous !== true) return false;
-            if (hasPrice && !(parseFloat(r.price) > 0)) return false;
-            if (stores.length && !stores.includes(r.source || 'Unknown')) return false;
-            if (ratings.length) {
-                const rating = parseFloat(r.rating) || 0;
-                const matches = ratings.some(rv => rv === 'unrated' ? !r.rating : rating >= parseFloat(rv));
-                if (!matches) return false;
-            }
             return true;
         });
 
@@ -1032,19 +1023,14 @@
         document.getElementById('refCount').textContent = list.length + ' of ' + lastResults.length + ' result' + (lastResults.length !== 1 ? 's' : '');
     }
 
-    ['sortSel', 'priceMin', 'priceMax', 'advOnly', 'hasPriceOnly'].forEach(id => {
+    ['sortSel', 'priceMin', 'priceMax'].forEach(id => {
         const el = document.getElementById(id);
         el && el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', applyFilters);
     });
     document.getElementById('filterClear')?.addEventListener('click', () => {
         document.getElementById('sortSel').value  = 'match';
-        if (storeMultisel)   { storeMultisel.panel.querySelectorAll('input:checked').forEach(cb => cb.checked = false); storeMultisel.refreshLabel(); }
-        if (reviewsMultisel) { reviewsMultisel.panel.querySelectorAll('input:checked').forEach(cb => cb.checked = false); reviewsMultisel.refreshLabel(); }
         document.getElementById('priceMin').value = '';
         document.getElementById('priceMax').value = '';
-        document.getElementById('advOnly').checked = false;
-        const hp = document.getElementById('hasPriceOnly');
-        if (hp) hp.checked = false;
         applyFilters();
     });
 
@@ -1116,7 +1102,14 @@
     /* ── Auto-search when arriving from the PPMP "Run scoping →" link ── */
     (function () {
         const params = new URLSearchParams(window.location.search);
-        const q = params.get('q');
+        const q      = params.get('q');
+        const budget = params.get('budget');
+
+        // Item's already-encoded Unit Cost carried over as the scoping budget —
+        // only present when the PPMP item was encoded before scoping was run.
+        const budgetInput = document.getElementById('marketBudgetInput');
+        if (budget && budgetInput) budgetInput.value = budget;
+
         if (q && queryInput) {
             queryInput.value = q;
             setTimeout(runSearch, 280);
@@ -1154,9 +1147,9 @@
        so results don't disappear just because the user stepped away. ── */
     const SEARCH_STATE_KEY = 'prismMarketScopingState';
 
-    function saveSearchState(query, budget, department) {
+    function saveSearchState(query, budget) {
         try {
-            sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, budget, department, results: lastResults }));
+            sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, budget, results: lastResults }));
         } catch { /* storage full/unavailable — not critical, just skip persisting */ }
     }
 
@@ -1168,14 +1161,11 @@
         if (queryInput) queryInput.value = saved.query || '';
         const budgetInput = document.getElementById('marketBudgetInput');
         if (budgetInput && saved.budget) budgetInput.value = saved.budget;
-        const deptSelect = document.getElementById('marketDeptSelect');
-        if (deptSelect && saved.department) deptSelect.value = saved.department;
 
         const sp = document.getElementById('searchPrompt');
         if (sp) sp.style.display = 'none';
 
         lastResults = saved.results;
-        populateStoreFilter();
         applyFilters();
         return true;
     }

@@ -5,7 +5,6 @@
     $isReadOnly            = $isReadOnly ?? false;
     $itemsLocked           = $itemsLocked ?? $isReadOnly;
     $proposalStatus        = $proposalStatus ?? 'draft';
-    $isDraft                = $proposalStatus === 'draft';
     $itemCount             = count($encodedItems);
     $scopingReferenceCount = collect($encodedItems)->sum(fn ($item) => count($item['scoping']));
     $missingScopingCount   = collect($encodedItems)->filter(fn ($item) => empty($item['scoping']))->count();
@@ -290,9 +289,16 @@
 
         /* Print: show only the PPMP document */
         @media print {
+            @page { size: landscape; margin: 10mm; }
             body * { visibility: hidden !important; }
             #ppmpPreviewDoc, #ppmpPreviewDoc * { visibility: visible !important; }
             #ppmpPreviewDoc { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+            /* The on-screen preview scrolls wide tables horizontally — printing must not
+               clip to that scrolled viewport, or columns past the fold never make it onto
+               the page. Let the table reflow to the full (landscape) print width instead. */
+            .table-scroll { overflow: visible !important; }
+            .ppmp-preview-table { width: 100% !important; table-layout: fixed; font-size: 10px; }
+            .ppmp-preview-table th, .ppmp-preview-table td { white-space: normal !important; word-break: break-word; padding: 6px 8px; }
         }
 </style>
 @endpush
@@ -300,12 +306,28 @@
 @section('content')
     <div class="page-shell">
 
-        @if($isReadOnly)
+        {{-- Suppressed when the "Create New PPMP" banner below is also showing —
+             that one already carries the same "submitted, read-only" message,
+             plus the actual next-step buttons, so showing both was redundant. --}}
+        @if($isReadOnly && !($canCreateNew ?? false))
+        {{--
+            Reaching this branch with status "returned" can only mean the Chancellor
+            returned it to Budget Office — a Budget-Office return would have left
+            $isReadOnly false and shown the editable view instead of this banner.
+        --}}
+        @php
+            $readOnlyBannerText = match($proposalStatus) {
+                'endorsed' => ['PPMP Endorsed — With the Chancellor', 'This PPMP has been endorsed by the Budget Office and forwarded to the Chancellor for approval. Editing is disabled.'],
+                'approved' => ['PPMP Approved', 'This PPMP has been approved by the Chancellor. Editing is disabled.'],
+                'returned' => ['PPMP Returned — With Budget Office', 'This PPMP was returned by the Chancellor and is being reconsidered by the Budget Office. Editing is disabled.'],
+                default    => ['PPMP Submitted — Under Review', 'This PPMP has been submitted and is awaiting Budget Office review. Editing is disabled.'],
+            };
+        @endphp
         <div class="submitted-banner">
             <i class="ti ti-send"></i>
             <div>
-                <p class="submitted-banner-title">PPMP Submitted — Under Review</p>
-                <p class="submitted-banner-sub">This PPMP has been submitted and is awaiting Budget Office review. Editing is disabled.</p>
+                <p class="submitted-banner-title">{{ $readOnlyBannerText[0] }}</p>
+                <p class="submitted-banner-sub">{{ $readOnlyBannerText[1] }}</p>
             </div>
         </div>
         @endif
@@ -373,21 +395,26 @@
                         @if($needsRevisionCount > 0)
                             <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
                         @endif
+                        {{-- Suppressed when the "Create New PPMP" banner further down is
+                             also showing it — one visible entry point at a time. That banner
+                             only appears once this PPMP is read-only AND no draft is in the
+                             way; everywhere else (including while still editing a draft),
+                             this is the only place to start a new one. --}}
+                        @if(!($isReadOnly && ($canCreateNew ?? false)))
+                        <form method="POST" action="{{ route('office-head.budget-proposal.create-new') }}" style="margin-left:10px;">
+                            @csrf
+                            <button type="submit" class="btn-outline" style="white-space:nowrap;" title="Add a supplemental PPMP for the current fiscal year">
+                                <i class="ti ti-plus"></i> Create New PPMP
+                            </button>
+                        </form>
+                        @endif
                     </div>
                     <div class="card-body">
                         <div class="field-group" style="margin-bottom:14px;">
                             <label class="field-label" for="ppmpTitle">PPMP Name</label>
-                            <div style="display:flex; gap:8px;">
-                                <input class="field-input {{ $isReadOnly ? 'readonly' : '' }}" id="ppmpTitle"
-                                    value="{{ $proposalForm['title'] }}" {{ $isReadOnly ? 'readonly' : '' }}
-                                    placeholder="e.g. College of Engineering PPMP FY2026">
-                                @unless($isReadOnly)
-                                <button type="button" class="btn-outline" id="btnSaveTitle" style="white-space:nowrap;">
-                                    <i class="ti ti-device-floppy"></i> Save Name
-                                </button>
-                                @endunless
-                            </div>
-                            <p id="titleSaveStatus" style="display:none; font-size:11px; font-weight:600; margin-top:4px;"></p>
+                            <input class="field-input {{ $isReadOnly ? 'readonly' : '' }}" id="ppmpTitle"
+                                value="{{ $proposalForm['title'] }}" {{ $isReadOnly ? 'readonly' : '' }}
+                                placeholder="e.g. College of Engineering PPMP FY2026">
                         </div>
                         <div class="form-grid-4">
                             <div class="field-group">
@@ -419,7 +446,7 @@
                                 <div style="display:flex; gap:8px;">
                                     <input id="proposedBudget" class="field-input" type="number" min="0" step="0.01"
                                         value="{{ $proposalForm['totalProposedBudget'] }}" placeholder="0.00">
-                                    <button type="button" class="btn-outline" id="btnSaveProposedBudget" style="white-space:nowrap;">
+                                    <button type="button" class="btn-outline" id="btnSaveProposedBudget" style="white-space:nowrap;" title="Saves both PPMP Name and Proposed Budget">
                                         <i class="ti ti-device-floppy"></i> Save
                                     </button>
                                 </div>
@@ -475,7 +502,7 @@
         </div>{{-- /top-grid --}}
 
         {{-- ═══ ADD ITEMS — full-width, stretched, only shown while the PPMP is still in Draft status and items aren't locked ═══ --}}
-        @if($isDraft && !$itemsLocked)
+        @if(!$itemsLocked)
         <div class="card" id="addItemsCard" style="margin-top:16px;">
             <div class="card-head">
                 <div class="card-head-icon"><i class="ti ti-plus"></i></div>
@@ -489,6 +516,11 @@
                 </button>
             </div>
             <div class="card-body">
+                <div id="editItemBanner" style="display:none;align-items:center;gap:8px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px;font-weight:700;color:#1D4ED8;">
+                    <i class="ti ti-pencil"></i>
+                    <span>Editing item — update the fields below, then save.</span>
+                    <button type="button" id="cancelItemEditBtn" style="margin-left:auto;background:none;border:none;color:#1D4ED8;font-weight:700;cursor:pointer;text-decoration:underline;font-family:'Poppins', sans-serif;font-size:12px;">Cancel edit</button>
+                </div>
                 <form id="proposalItemForm">
                     <input id="itemId" name="itemId" type="hidden">
                     <div class="item-row1">
@@ -609,7 +641,7 @@
                 </div>
 
                 <div class="total-row">
-                    <span class="total-label">Total Proposed Budget</span>
+                    <span class="total-label">Total Estimated Cost</span>
                     <span class="total-amount" id="proposalSummaryTotal">PHP {{ number_format($proposalTotal) }}</span>
                 </div>
             </div>
@@ -645,42 +677,76 @@
     const destroyBase = '{{ url("office-head/budget-proposal/item") }}/';
     const submitUrl   = '{{ route("office-head.budget-proposal.submit") }}';
     const scopingUrl  = '{{ route("office-head.market-scoping") }}';
+    const refDeleteBase = '{{ url("office-head/market-scoping/ref") }}/';
     const titleUrl    = @json($titleUpdateUrl);
     const proposedBudgetUrl = @json($proposedBudgetUpdateUrl);
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
     const itemsLocked = {{ $itemsLocked ? 'true' : 'false' }};
     const proposalId  = {{ $selectedProposalId ?? 'null' }};
 
-    // ── PPMP name (title) ───────────────────────────────────────────────────
-    document.getElementById('btnSaveTitle')?.addEventListener('click', async function () {
-        const input  = document.getElementById('ppmpTitle');
-        const status = document.getElementById('titleSaveStatus');
-        const title  = input.value.trim();
+    // Keep the currently-selected PPMP "attached" when navigating to Market Scoping,
+    // so returning here (or attaching a reference) doesn't silently jump to the latest PPMP.
+    // `budget` carries the item's already-encoded Unit Cost over as the scoping budget —
+    // only meaningful when the item already exists (PPMP encoded before scoping was run).
+    // `itemId` lets Market Scoping preload that item's already-saved references instead
+    // of starting from a blank slate that would replace them.
+    function scopingUrlFor(query, budget, itemId) {
+        const params = new URLSearchParams();
+        if (query) params.set('q', query);
+        if (proposalId) params.set('proposal', proposalId);
+        if (budget) params.set('budget', budget);
+        if (itemId) params.set('item', itemId);
+        const qs = params.toString();
+        return scopingUrl + (qs ? '?' + qs : '');
+    }
+
+    // ── PPMP name + Proposed Budget — one combined Save ─────────────────────
+    document.getElementById('btnSaveProposedBudget')?.addEventListener('click', async function () {
+        const titleInput  = document.getElementById('ppmpTitle');
+        const budgetInput = document.getElementById('proposedBudget');
+        const status      = document.getElementById('proposedBudgetSaveStatus');
+        const title       = titleInput.value.trim();
+        const budget      = parseFloat(budgetInput.value);
+
+        titleInput.style.borderColor  = '';
+        budgetInput.style.borderColor = '';
 
         if (!title) {
-            input.style.borderColor = '#dc2626';
-            input.focus();
+            titleInput.style.borderColor = '#dc2626';
+            titleInput.focus();
             return;
         }
-        if (!titleUrl) return;
+        if (isNaN(budget) || budget < 0) {
+            budgetInput.style.borderColor = '#dc2626';
+            budgetInput.focus();
+            return;
+        }
 
-        input.style.borderColor = '';
         this.disabled = true;
 
         try {
-            const res  = await fetch(titleUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-                body: JSON.stringify({ title }),
-            });
-            const json = await res.json();
+            const [titleRes, budgetRes] = await Promise.all([
+                titleUrl ? fetch(titleUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    body: JSON.stringify({ title }),
+                }).then(r => r.json().then(json => ({ ok: r.ok, json }))) : Promise.resolve({ ok: true, json: { success: true } }),
+                proposedBudgetUrl ? fetch(proposedBudgetUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    body: JSON.stringify({ proposed_budget: budget }),
+                }).then(r => r.json().then(json => ({ ok: r.ok, json }))) : Promise.resolve({ ok: true, json: { success: true } }),
+            ]);
+
             status.style.display = '';
-            if (res.ok && json.success) {
+            if (titleRes.ok && titleRes.json.success && budgetRes.ok && budgetRes.json.success) {
                 status.textContent = 'Saved.';
                 status.style.color = '#166534';
                 setTimeout(() => { status.style.display = 'none'; }, 2000);
             } else {
-                status.textContent = json.message || 'Could not save the name.';
+                status.textContent = (!titleRes.json.success && titleRes.json.message)
+                    || (!budgetRes.json.success && budgetRes.json.message)
+                    || 'Could not save.';
                 status.style.color = '#991b1b';
             }
         } catch {
@@ -692,45 +758,11 @@
         }
     });
 
-    // ── Proposed Budget ──────────────────────────────────────────────────────
-    document.getElementById('btnSaveProposedBudget')?.addEventListener('click', async function () {
-        const input  = document.getElementById('proposedBudget');
-        const status = document.getElementById('proposedBudgetSaveStatus');
-        const value  = parseFloat(input.value);
-
-        if (isNaN(value) || value < 0) {
-            input.style.borderColor = '#dc2626';
-            input.focus();
-            return;
-        }
-        if (!proposedBudgetUrl) return;
-
-        input.style.borderColor = '';
-        this.disabled = true;
-
-        try {
-            const res  = await fetch(proposedBudgetUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-                body: JSON.stringify({ proposed_budget: value }),
-            });
-            const json = await res.json();
-            status.style.display = '';
-            if (res.ok && json.success) {
-                status.textContent = 'Saved.';
-                status.style.color = '#166534';
-                setTimeout(() => { status.style.display = 'none'; }, 2000);
-            } else {
-                status.textContent = json.message || 'Could not save the budget.';
-                status.style.color = '#991b1b';
-            }
-        } catch {
-            status.style.display = '';
-            status.textContent = 'Network error.';
-            status.style.color = '#991b1b';
-        } finally {
-            this.disabled = false;
-        }
+    // Re-color the running totals as the office head types a new budget, before
+    // they even hit Save — no reason to wait for a round-trip to reflect it.
+    document.getElementById('proposedBudget')?.addEventListener('input', function () {
+        if (typeof updateSummary === 'function') updateSummary();
+        if (typeof renderPreview === 'function') renderPreview();
     });
 
     let items = JSON.parse(document.getElementById('initialProposalItems').textContent || '[]');
@@ -742,6 +774,25 @@
     }
     function fmt(n) {
         return Number(n).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    // ── Total vs. Proposed Budget coloring ──────────────────────────────────
+    // Green while comfortably under budget, amber once the running total gets
+    // close to (or lands exactly on) the proposed budget, red once it's over.
+    function currentProposedBudget() {
+        const el = document.getElementById('proposedBudget');
+        if (!el) return 0;
+        const raw = 'value' in el ? el.value : el.textContent;
+        return parseFloat(String(raw).replace(/[^0-9.]/g, '')) || 0;
+    }
+    function applyBudgetColor(el, total) {
+        if (!el) return;
+        const budget = currentProposedBudget();
+        if (!budget) { el.style.color = ''; return; }
+        const ratio = total / budget;
+        if (ratio > 1)        el.style.color = 'var(--red, #991B1B)';
+        else if (ratio >= 0.9) el.style.color = 'var(--amber, #92400E)';
+        else                   el.style.color = 'var(--green, #166534)';
     }
 
     // ── Render table ─────────────────────────────────────────────────────────
@@ -761,7 +812,9 @@
                 const tree   = isLast ? '└──' : '├──';
                 const label  = esc((ref.title || ref.supplierName) + ' – ₱' + fmt(ref.price) + ' – ' + (ref.source || 'Online'));
                 const href   = ref.sourceLink ? ` href="${esc(ref.sourceLink)}" target="_blank" rel="noopener"` : '';
-                return `<li><span class="ref-tree-icon">${tree}</span><a class="ref-tree-link"${href}>${label}</a></li>`;
+                const removeBtn = (itemsLocked || !ref.id) ? '' :
+                    ` <a style="color:#b91c1c;cursor:pointer;font-weight:700;" title="Remove reference" onclick="prismBP.deleteReference('${esc(ref.id)}')">&times;</a>`;
+                return `<li><span class="ref-tree-icon">${tree}</span><a class="ref-tree-link"${href}>${label}</a>${removeBtn}</li>`;
             }).join('');
 
             const files = item.attachments || [];
@@ -775,13 +828,16 @@
 
             let scopingCell;
             if (refs.length || files.length) {
+                const addRefLink = itemsLocked ? '' :
+                    `<span class="scoping-empty-hint"><a href="${esc(scopingUrlFor(item.description, item.estimatedUnitCost, item.id))}" style="color:var(--crimson);cursor:pointer;text-decoration:none;font-weight:700"><i class="ti ti-plus" style="font-size:11px"></i> Add reference</a></span>`;
                 const refsBlock = refs.length
                     ? `<button class="scoping-toggle" onclick="window.prismBP.toggleRefs(this)" type="button">
                         <i class="ti ti-list" style="font-size:14px"></i>
                         Market References (${refs.length})
                         <i class="ti ti-chevron-down scoping-chevron"></i>
                     </button>
-                    <ul class="scoping-refs-list" style="display:none">${refsHtml}</ul>`
+                    <ul class="scoping-refs-list" style="display:none">${refsHtml}</ul>
+                    ${addRefLink}`
                     : '';
                 const filesBlock = files.length
                     ? `<ul class="scoping-refs-list" style="margin-top:4px;">${filesHtml}</ul>`
@@ -790,45 +846,16 @@
             } else {
                 scopingCell = `<div class="scoping-empty">
                     <span class="scoping-empty-label">No references or source file yet</span>
-                    <span class="scoping-empty-hint"><a href="${esc(scopingUrl)}?q=${encodeURIComponent(item.description)}" style="color:var(--crimson);text-decoration:none;font-weight:700">Run scoping →</a></span>
+                    <span class="scoping-empty-hint"><a href="${esc(scopingUrlFor(item.description, item.estimatedUnitCost, item.id))}" style="color:var(--crimson);text-decoration:none;font-weight:700">Run scoping →</a></span>
                     ${attachBtn}
                    </div>`;
             }
 
-            if (editingId === item.id && !itemsLocked) {
-                return `<tr data-item-row="${esc(item.id)}" style="background:#FFF8F8;">
-                    <td colspan="2">
-                        <input class="field-input" id="edit-desc" value="${esc(item.description)}" placeholder="Item description" style="margin-bottom:6px;">
-                        <input class="field-input" id="edit-just" value="${esc(item.justification)}" placeholder="Purpose / justification">
-                        ${item.financeOk === false ? `<span class="badge badge-red" style="margin-top:6px;display:inline-block;"><i class="ti ti-alert-triangle"></i> Needs Revision</span>
-                        <div class="item-flag-remark">${esc(item.financeRemark)}</div>` : ''}
-                    </td>
-                    <td>
-                        <div style="display:flex;gap:6px;">
-                            <input class="field-input" id="edit-qty" type="number" min="0.01" step="any" value="${esc(item.quantity)}" style="width:70px;" title="Quantity">
-                            <input class="field-input" id="edit-unit" value="${esc(item.unit)}" style="width:70px;" title="Unit">
-                        </div>
-                    </td>
-                    <td><input class="field-input" id="edit-cost" type="number" min="0" step="0.01" value="${esc(item.estimatedUnitCost)}" style="width:110px;" title="Unit cost"></td>
-                    <td>
-                        <select class="field-input" id="edit-quarter" style="width:74px;">
-                            ${['Q1','Q2','Q3','Q4'].map(q => `<option value="${q}"${item.targetQuarter === q ? ' selected' : ''}>${q}</option>`).join('')}
-                        </select>
-                    </td>
-                    <td>${scopingCell}</td>
-                    <td><div class="tbl-actions" style="flex-direction:column;gap:5px;">
-                        <button class="tbl-btn" type="button" title="Save changes" style="background:var(--green-bg);color:var(--green);border-color:#bbf7d0;" onclick="prismBP.saveEdit('${esc(item.id)}')">
-                            <i class="ti ti-check"></i>
-                        </button>
-                        <button class="tbl-btn" type="button" title="Cancel" style="background:var(--red-bg, #fee2e2);color:var(--red, #991b1b);border-color:#fecaca;" onclick="prismBP.cancelEdit()">
-                            <i class="ti ti-x"></i>
-                        </button>
-                    </div></td>
-                </tr>`;
-            }
+            const isEditingRow = editingId === item.id && !itemsLocked;
 
-            return `<tr data-item-row="${esc(item.id)}"${item.financeOk === false ? ' style="background:#FEF9F9;border-left:3px solid #991B1B;"' : ''}>
+            return `<tr data-item-row="${esc(item.id)}"${isEditingRow ? ' style="background:#FFF8F8;border-left:3px solid var(--crimson);"' : (item.financeOk === false ? ' style="background:#FEF9F9;border-left:3px solid #991B1B;"' : '')}>
                 <td class="td-name">${esc(item.description)}<small>${esc(item.justification)}</small>
+                    ${isEditingRow ? `<br><span class="badge badge-blue" style="margin-top:4px;display:inline-block;"><i class="ti ti-pencil"></i> Editing above</span>` : ''}
                     ${item.financeOk === false ? `<br><span class="badge badge-red" style="margin-top:4px;display:inline-block;"><i class="ti ti-alert-triangle"></i> Needs Revision</span>
                     <div class="item-flag-remark">${esc(item.financeRemark)}</div>` : ''}
                 </td>
@@ -864,7 +891,7 @@
         document.getElementById('proposalSummaryMissing').textContent   = missing;
 
         const totalEl = document.getElementById('proposalSummaryTotal');
-        if (totalEl) totalEl.textContent = 'PHP ' + fmt(total);
+        if (totalEl) { totalEl.textContent = 'PHP ' + fmt(total); applyBudgetColor(totalEl, total); }
 
         const refs = items.reduce((s, i) => s + (i.scoping?.length || 0), 0);
         document.getElementById('proposalSummaryReferences').textContent = refs;
@@ -900,45 +927,73 @@
         }
     }
 
-    // ── Add item ──────────────────────────────────────────────────────────────
+    // ── Add / update item (same form; branches on hidden itemId) ───────────────
+    function resetItemFormToAddMode(f) {
+        f.itemId.value = '';
+        f.reset();
+        f.quantity.value = 1;
+        f.estimatedUnitCost.value = 0;
+        editingId = null;
+        document.getElementById('editItemBanner').style.display = 'none';
+        document.getElementById('saveItemButton').innerHTML = '<i class="ti ti-plus"></i>Add Item';
+    }
+
+    function cancelItemFormEdit() {
+        resetItemFormToAddMode(document.getElementById('proposalItemForm'));
+        renderTable();
+    }
+
+    document.getElementById('cancelItemEditBtn')?.addEventListener('click', cancelItemFormEdit);
+
     document.getElementById('proposalItemForm')?.addEventListener('submit', async function (e) {
         e.preventDefault();
-        const f   = e.target;
-        const btn = document.getElementById('saveItemButton');
+        const f      = e.target;
+        const btn    = document.getElementById('saveItemButton');
+        const itemId = f.itemId.value;
         btn.disabled = true;
-        btn.innerHTML = '<i class="ti ti-loader-2"></i> Adding…';
+        btn.innerHTML = '<i class="ti ti-loader-2"></i> ' + (itemId ? 'Updating…' : 'Adding…');
+
+        const payload = {
+            description:       f.description.value.trim(),
+            unit:              f.unit.value,
+            quantity:          parseFloat(f.quantity.value),
+            estimatedUnitCost: parseFloat(f.estimatedUnitCost.value),
+            justification:     f.justification.value.trim(),
+            targetQuarter:     f.targetQuarter.value,
+        };
+        if (!itemId) payload.proposal_id = proposalId;
 
         try {
-            const res = await fetch(storeUrl, {
-                method: 'POST',
+            const res = await fetch(itemId ? (destroyBase + itemId) : storeUrl, {
+                method: itemId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-                body: JSON.stringify({
-                    description:       f.description.value.trim(),
-                    unit:              f.unit.value,
-                    quantity:          parseFloat(f.quantity.value),
-                    estimatedUnitCost: parseFloat(f.estimatedUnitCost.value),
-                    justification:     f.justification.value.trim(),
-                    targetQuarter:     f.targetQuarter.value,
-                    proposal_id:       proposalId,
-                }),
+                body: JSON.stringify(payload),
             });
             const data = await res.json();
             if (data.success) {
-                items.push(data.item);
+                if (itemId) {
+                    const idx = items.findIndex(i => i.id === itemId);
+                    if (idx !== -1) items[idx] = { ...items[idx], ...data.item };
+                } else {
+                    items.push(data.item);
+                }
+                resetItemFormToAddMode(f);
                 renderTable();
                 renderPreview();
                 updateSummary();
-                f.reset();
-                f.quantity.value = 1;
-                f.estimatedUnitCost.value = 0;
             } else {
-                alert(data.message || 'Could not add item.');
+                alert(data.message || (itemId ? 'Could not update item.' : 'Could not add item.'));
             }
         } catch {
             alert('Network error. Please try again.');
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="ti ti-plus"></i>Add Item';
+            if (!itemId) {
+                btn.innerHTML = '<i class="ti ti-plus"></i>Add Item';
+            } else if (f.itemId.value) {
+                // Update failed — still in edit mode, restore the "Update Item" label.
+                btn.innerHTML = '<i class="ti ti-pencil"></i>Update Item';
+            }
         }
     });
 
@@ -1000,7 +1055,8 @@
             try {
                 const res  = await fetch(submitUrl, {
                     method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    body: JSON.stringify({ proposal_id: proposalId }),
                 });
                 const data = await res.json();
                 if (data.success && data.redirect) {
@@ -1020,55 +1076,30 @@
 
     // ── Run Market Scoping redirect ───────────────────────────────────────────
     document.getElementById('runMarketScopingButton')?.addEventListener('click', function () {
-        window.location.href = scopingUrl;
+        window.location.href = scopingUrlFor();
     });
 
-    // ── Edit item (inline) ────────────────────────────────────────────────────
+    // ── Edit item (populates the Add Items form above, rather than the row) ────
     function editItem(id) {
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+
+        const f = document.getElementById('proposalItemForm');
+        f.itemId.value               = item.id;
+        f.description.value          = item.description;
+        f.unit.value                 = item.unit;
+        f.quantity.value             = item.quantity;
+        f.estimatedUnitCost.value    = item.estimatedUnitCost;
+        f.justification.value        = item.justification || '';
+        f.targetQuarter.value        = item.targetQuarter;
+
         editingId = id;
+        document.getElementById('editItemBanner').style.display = 'flex';
+        document.getElementById('saveItemButton').innerHTML = '<i class="ti ti-pencil"></i>Update Item';
+
         renderTable();
-        document.getElementById('edit-desc')?.focus();
-    }
-
-    function cancelEdit() {
-        editingId = null;
-        renderTable();
-    }
-
-    async function saveEdit(id) {
-        const payload = {
-            description:       document.getElementById('edit-desc').value.trim(),
-            justification:     document.getElementById('edit-just').value.trim(),
-            quantity:          parseFloat(document.getElementById('edit-qty').value),
-            unit:              document.getElementById('edit-unit').value.trim() || 'unit',
-            estimatedUnitCost: parseFloat(document.getElementById('edit-cost').value),
-            targetQuarter:     document.getElementById('edit-quarter').value,
-        };
-        if (!payload.description || isNaN(payload.quantity) || isNaN(payload.estimatedUnitCost)) {
-            alert('Please fill in description, quantity, and unit cost.');
-            return;
-        }
-
-        try {
-            const res  = await fetch(destroyBase + id, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json();
-            if (data.success) {
-                const idx = items.findIndex(i => i.id === id);
-                if (idx !== -1) items[idx] = { ...items[idx], ...data.item };
-                editingId = null;
-                renderTable();
-                renderPreview();
-                updateSummary();
-            } else {
-                alert(data.message || 'Could not save changes.');
-            }
-        } catch {
-            alert('Network error. Please try again.');
-        }
+        document.getElementById('addItemsCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        f.description.focus();
     }
 
     // ── PPMP document preview ─────────────────────────────────────────────────
@@ -1105,7 +1136,7 @@
 
         const total = items.reduce((s, i) => s + (i.totalCost || 0), 0);
         const totalEl = document.getElementById('ppmpPreviewTotal');
-        if (totalEl) totalEl.textContent = 'PHP ' + fmt(total);
+        if (totalEl) { totalEl.textContent = 'PHP ' + fmt(total); applyBudgetColor(totalEl, total); }
     }
 
     // ── Preview ⇄ edit toggle + print/export ─────────────────────────────────
@@ -1221,8 +1252,29 @@
         } catch { alert('Network error. Please try again.'); }
     }
 
+    async function deleteReference(id) {
+        const ok = await window.prismConfirm({
+            title: 'Remove reference?',
+            message: 'Remove this market reference?',
+            confirmText: 'Remove',
+        });
+        if (!ok) return;
+        try {
+            const res  = await fetch(refDeleteBase + id, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                items.forEach(i => { i.scoping = (i.scoping || []).filter(r => r.id !== id); });
+                renderTable();
+                renderPreview();
+                updateSummary();
+            } else {
+                alert(data.error || 'Could not remove the reference.');
+            }
+        } catch { alert('Network error. Please try again.'); }
+    }
+
     // expose functions globally for inline onclick
-    window.prismBP = { deleteItem, editItem, cancelEdit, saveEdit, openAttach, deleteAttachment };
+    window.prismBP = { deleteItem, editItem, openAttach, deleteAttachment, deleteReference };
 
     prismBP.toggleRefs = function (btn) {
         const list = btn.nextElementSibling;

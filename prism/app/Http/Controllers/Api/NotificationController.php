@@ -31,6 +31,7 @@ class NotificationController extends Controller
                 'type'       => $n->type,
                 'title'      => $n->title,
                 'message'    => $n->message,
+                'action_url' => $n->action_url,
                 'read_at'    => $n->read_at?->toIso8601String(),
                 'created_at' => $n->created_at->toIso8601String(),
             ]);

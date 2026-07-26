@@ -70,9 +70,9 @@ class SignatoryQueueService
         return $rows;
     }
 
-    public function countForRole(string $roleCode): int
+    public function countForRole(string $roleCode, ?array $officeIds = null): int
     {
-        return count($this->forRole($roleCode));
+        return count($this->forRole($roleCode, $officeIds));
     }
 
     private function row($doc, string $docType, string $number, ?string $office, ?string $title): array

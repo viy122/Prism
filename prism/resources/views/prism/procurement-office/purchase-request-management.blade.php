@@ -65,33 +65,13 @@
     .btn-route-ret:hover:not(:disabled) { background: var(--s200); }
     .btn-route:disabled { opacity: .5; cursor: not-allowed; }
 
-    /* Canvassing step */
-    .canvassing-block { border: 1.5px solid var(--s200); border-radius: 12px; padding: 14px 16px; background: var(--s50); display: flex; flex-direction: column; gap: 10px; }
-    .canvassing-block.active { border-color: #fac775; background: #fffbf0; }
-    .canvassing-block.done   { border-color: #c0dd97; background: #f3fbea; }
-    .canvassing-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .canvassing-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s500); }
-    .canvassing-block.active .canvassing-title { color: #854f0b; }
-    .canvassing-block.done   .canvassing-title { color: #3b6d11; }
-    .canvassing-btns { display: flex; gap: 6px; }
-    .btn-canvas { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
-    .btn-canvas-start { background: #854f0b; color: #fff; }
-    .btn-canvas-done  { background: #3b6d11; color: #fff; }
-    .btn-canvas:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-canvas-market { background: #f0f4ff; color: #3b5bdb; border: 1px solid #bac8ff !important; }
-    .btn-canvas-market:hover { background: #dbe4ff; }
-    .market-controls { display: flex; gap: 8px; margin-bottom: 10px; }
-    .market-item-sel { flex: 1; padding: 6px 10px; border: 1px solid var(--s200); border-radius: 6px; font-size: 12px; font-family: 'Poppins', sans-serif; background: #fff; color: var(--s700); }
-    .market-results { display: flex; flex-direction: column; gap: 8px; }
-    .market-card { border: 1px solid var(--s200); border-radius: 8px; padding: 10px 12px; background: #fff; font-size: 12px; }
-    .market-card.advantageous { border-color: #40c057; background: #f4fbe6; }
-    .market-card .mc-name { font-weight: 600; margin-bottom: 3px; color: var(--s900); }
-    .market-card .mc-price { font-size: 15px; color: #2f9e44; font-weight: 700; }
-    .market-card .mc-reason { font-size: 11px; color: #5c940d; margin-top: 3px; }
-    .market-card .mc-source { font-size: 10px; color: var(--s400); margin-top: 4px; }
-    .market-quota-warn { font-size: 11px; color: #e67700; background: #fff3cd; padding: 6px 10px; border-radius: 6px; margin-top: 8px; border: 1px solid #ffd43b; }
-
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
+
+    .search-wrap { position: relative; }
+    .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+    .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+    .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    .search-input::placeholder { color: var(--s400); }
 
     /* Detail panel */
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
@@ -158,7 +138,16 @@
     .btn-import-bsu { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; background: #0f5288; color: #fff; transition: background .15s; white-space: nowrap; }
     .btn-import-bsu:hover { background: #0a3d68; }
     .btn-import-bsu i { font-size: 15px; }
-    .badge-bsu-import { background: #e8f4fd; color: #0f5288; border: 1px solid #b3d4ef; font-size: 10px; }
+
+    /* Tracking status hover tooltip (full text, since the select itself truncates) */
+    .tracking-tooltip-wrap { position: relative; display: inline-block; max-width: 220px; }
+    .tracking-tooltip-text {
+        display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
+        background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 6px;
+        font-size: 11px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(15,23,42,.25);
+        pointer-events: none;
+    }
+    .tracking-tooltip-wrap:hover .tracking-tooltip-text { display: block; }
 
     /* Import modal overlay */
     .import-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -235,9 +224,16 @@
                     <button type="button" class="btn-import-bsu" id="btnOpenImport">
                         <i class="ti ti-file-import"></i> Import from BSU PDF
                     </button>
-                    <span class="count-chip">{{ count($purchaseRequests) }} PR{{ count($purchaseRequests) !== 1 ? 's' : '' }}</span>
+                    <span class="count-chip" id="prVisibleCount">{{ count($purchaseRequests) }} PR{{ count($purchaseRequests) !== 1 ? 's' : '' }}</span>
                 </div>
             </div>
+
+            @if(count($purchaseRequests) > 0)
+                <div class="search-wrap" style="margin-bottom:14px;">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input class="search-input" type="search" id="prSearch" placeholder="Search by PR number, item, office, or remarks">
+                </div>
+            @endif
 
             @if(count($purchaseRequests) === 0)
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;border-radius:12px;border:1.5px dashed var(--s300);background:var(--s50);padding:32px;text-align:center;">
@@ -254,6 +250,7 @@
                             <th>Description</th>
                             <th>Date Submitted</th>
                             <th>Signatory Stage</th>
+                            <th>Tracking Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -265,16 +262,24 @@
                                     default        => 'badge-routing',
                                 };
                             @endphp
-                            <tr data-pr-row data-pr-id="{{ $pr['id'] }}" tabindex="0">
+                            <tr data-pr-row data-pr-id="{{ $pr['id'] }}" data-search="{{ strtolower($pr['prNumber'] . ' ' . $pr['item'] . ' ' . $pr['office'] . ' ' . $pr['remarks'] . ' ' . $pr['signatoryLabel']) }}" tabindex="0">
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">{{ $pr['office'] }}</td>
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
                                 <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $pr['item'] }}</td>
                                 <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['dateSubmitted'] }}</td>
                                 <td>
                                     <span class="badge {{ $stageBadge }}" data-sig-badge="{{ $pr['id'] }}">{{ $pr['signatoryLabel'] }}</span>
-                                    @if(!empty($pr['ocr']['imported_from_bsu']))
-                                        <span class="badge badge-bsu-import" style="margin-left:4px;">BSU Import</span>
-                                    @endif
+                                </td>
+                                <td onclick="event.stopPropagation()">
+                                    <div class="tracking-tooltip-wrap">
+                                        <select class="tracking-status-select" data-tracking-select="{{ $pr['id'] }}" data-tracking-url="{{ $pr['trackingStatusUrl'] }}" data-prev-value="{{ !empty($pr['trackingStatus']['override']) ? $pr['trackingStatus']['key'] : '' }}" style="font-size:12px;font-weight:600;padding:5px 8px;border-radius:8px;border:1px solid var(--s300);background:var(--s50);color:var(--s700);max-width:220px;">
+                                            <option value="" @selected(empty($pr['trackingStatus']['override']))>{{ $pr['trackingStatusAuto']['label'] }}</option>
+                                            @foreach ($trackingStageOptions as $opt)
+                                                <option value="{{ $opt['key'] }}" @selected(!empty($pr['trackingStatus']['override']) && $pr['trackingStatus']['key'] === $opt['key'])>{{ $opt['label'] }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="tracking-tooltip-text">{{ $pr['trackingStatus']['label'] }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -352,36 +357,6 @@
                         <div style="display:flex;gap:8px;">
                             <button class="btn-route btn-route-fwd" id="btnThirdAcct" type="button"><i class="ti ti-calculator"></i> Accounting</button>
                             <button class="btn-route btn-route-fwd" id="btnThirdVc" type="button"><i class="ti ti-user-check"></i> Vice Chancellor</button>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Canvassing step (shown only after PR is fully signed) --}}
-                <div id="canvassingBlock" class="canvassing-block" style="display:none;">
-                    <div class="canvassing-header">
-                        <span class="canvassing-title">
-                            <i class="ti ti-search" style="margin-right:4px;"></i>
-                            Canvassing
-                        </span>
-                        <span class="badge" id="canvassingBadge" style="font-size:10px;"></span>
-                    </div>
-                    <p id="canvassingDesc" style="font-size:12px;color:var(--s500);line-height:1.5;"></p>
-                    <p style="font-size:11px;margin:4px 0 0;">
-                        <a href="{{ route('procurement-office.canvassing') }}" style="font-weight:700;color:var(--crimson);text-decoration:none;">
-                            <i class="ti ti-clipboard-list"></i> Upload supplier quotations in the Canvassing tab (min. 3 required) →
-                        </a>
-                    </p>
-                    <div class="canvassing-btns" id="canvassingBtns"></div>
-                    <div id="marketPanel" style="display:none; margin-top:14px;">
-                        <div class="market-controls">
-                            <select id="marketItemSel" class="market-item-sel"></select>
-                            <button id="btnRunMarket" type="button" class="btn-canvas btn-canvas-start" style="min-width:110px;">
-                                <i class="ti ti-search"></i> Search
-                            </button>
-                        </div>
-                        <div id="marketResults" class="market-results"></div>
-                        <div id="marketQuotaWarn" class="market-quota-warn" style="display:none;">
-                            &#9888; SerpAPI search quota reached (250/month). Showing cached results only.
                         </div>
                     </div>
                 </div>
@@ -563,7 +538,6 @@
 
 <script type="application/json" id="prData">@json($purchaseRequests)</script>
 <script type="application/json" id="stagesData">@json($stageMeta)</script>
-<script type="application/json" id="aocUrlData">@json(route('procurement-office.abstract-of-canvass'))</script>
 <script type="application/json" id="importPdfUrlData">@json($importPdfUrl)</script>
 <script type="application/json" id="importConfirmUrlData">@json($importConfirmUrl)</script>
 
@@ -586,16 +560,11 @@
     const returnRemarks    = document.getElementById('returnRemarks');
     const returnIn         = document.getElementById('returnRemarksInput');
     const btnConfirmRet    = document.getElementById('btnConfirmReturn');
-    const canvassingBlock  = document.getElementById('canvassingBlock');
-    const canvassingBadge  = document.getElementById('canvassingBadge');
-    const canvassingDesc   = document.getElementById('canvassingDesc');
-    const canvassingBtns   = document.getElementById('canvassingBtns');
     const uploadPrInput    = document.getElementById('uploadPrInput');
     const uploadPrText     = document.getElementById('uploadPrText');
     const csrfToken        = document.querySelector('meta[name="csrf-token"]').content;
 
     const pageStageMeta    = JSON.parse(document.getElementById('stagesData').textContent);
-    const aocUrl           = JSON.parse(document.getElementById('aocUrlData').textContent);
     const thirdSignerPanel = document.getElementById('thirdSignerPanel');
 
     /* Stage-meta helpers — per-PR meta carries resolved 3rd/4th signer labels */
@@ -698,137 +667,6 @@
         thirdSignerPanel.style.display = 'none';
     }
 
-    function updateCanvassingUI(pr) {
-        const stage = pr.canvassingStage;
-        if (!stage) {
-            canvassingBlock.style.display = 'none';
-            return;
-        }
-        canvassingBlock.style.display = '';
-        canvassingBlock.classList.remove('active', 'done');
-
-        if (stage === 'not_started') {
-            canvassingBadge.textContent = 'Not Started';
-            canvassingBadge.className   = 'badge badge-draft';
-            canvassingDesc.textContent  = 'PR is fully signed. Initiate canvassing of suppliers for the listed items before creating the AOC.';
-            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-start" id="btnStartCanvassing" type="button"><i class="ti ti-search"></i> Start Canvassing</button>`;
-        } else if (stage === 'in_progress') {
-            canvassingBlock.classList.add('active');
-            canvassingBadge.textContent = 'In Progress';
-            canvassingBadge.className   = 'badge badge-routing';
-            canvassingDesc.textContent  = 'Canvassing is currently in progress. Mark complete when all supplier quotes have been collected.';
-            canvassingBtns.innerHTML    = `<button class="btn-canvas btn-canvas-done" id="btnCompleteCanvassing" type="button"><i class="ti ti-circle-check"></i> Mark Canvassing Complete</button><button class="btn-canvas btn-canvas-market" id="btnCheckMarket" type="button"><i class="ti ti-coins"></i> Check Market Prices</button>`;
-        } else if (stage === 'completed') {
-            canvassingBlock.classList.add('done');
-            canvassingBadge.textContent = 'Completed';
-            canvassingBadge.className   = 'badge badge-signed';
-            canvassingDesc.textContent  = 'Canvassing complete. You may now create the Abstract of Canvass (AOC).';
-            canvassingBtns.innerHTML    = `<a href="${aocUrl}" class="btn-canvas btn-canvas-done"><i class="ti ti-file-text"></i> Go to AOC</a>`;
-        }
-        attachCanvassingHandlers(pr);
-    }
-
-    function attachCanvassingHandlers(pr) {
-        const btnStart    = document.getElementById('btnStartCanvassing');
-        const btnComplete = document.getElementById('btnCompleteCanvassing');
-
-        if (btnStart) {
-            btnStart.addEventListener('click', async () => {
-                if (saving) return;
-                saving = true;
-                btnStart.disabled = true;
-                btnStart.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Starting…';
-                try {
-                    const resp = await fetch(pr.canvassingUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                        body: JSON.stringify({ action: 'start' }),
-                    });
-                    const json = await resp.json();
-                    if (resp.ok && json.success) {
-                        pr.canvassingStage = 'in_progress';
-                        updateCanvassingUI(pr);
-                        showToast('Canvassing started.');
-                    } else {
-                        showToast(json.error || 'Failed to start canvassing.', true);
-                    }
-                } catch { showToast('Network error.', true); }
-                finally { saving = false; }
-            });
-        }
-
-        if (btnComplete) {
-            btnComplete.addEventListener('click', async () => {
-                if (saving) return;
-                saving = true;
-                btnComplete.disabled = true;
-                btnComplete.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Completing…';
-                try {
-                    const resp = await fetch(pr.canvassingUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                        body: JSON.stringify({ action: 'complete' }),
-                    });
-                    const json = await resp.json();
-                    if (resp.ok && json.success) {
-                        pr.canvassingStage = 'completed';
-                        updateCanvassingUI(pr);
-                        showToast('Canvassing marked as complete. AOC can now be created.');
-                    } else {
-                        showToast(json.error || 'Failed to complete canvassing.', true);
-                    }
-                } catch { showToast('Network error.', true); }
-                finally { saving = false; }
-            });
-        }
-
-        const btnMarket = document.getElementById('btnCheckMarket');
-        if (btnMarket) {
-            btnMarket.addEventListener('click', () => {
-                const panel = document.getElementById('marketPanel');
-                const sel   = document.getElementById('marketItemSel');
-                panel.style.display = panel.style.display === 'none' ? '' : 'none';
-                if (panel.style.display !== 'none' && sel.options.length === 0) {
-                    (pr.prItems || []).forEach((it, i) => sel.add(new Option(it.name, i)));
-                }
-            });
-        }
-
-        const btnRunMarket = document.getElementById('btnRunMarket');
-        if (btnRunMarket) {
-            btnRunMarket.addEventListener('click', async () => {
-                const sel    = document.getElementById('marketItemSel');
-                const resDiv = document.getElementById('marketResults');
-                const warn   = document.getElementById('marketQuotaWarn');
-                const item   = pr.prItems?.[+sel.value];
-                if (!item) return;
-
-                resDiv.innerHTML   = '<p style="font-size:12px;color:var(--s400);">Searching…</p>';
-                warn.style.display = 'none';
-
-                try {
-                    const url  = `${pr.marketPricesUrl}?item=${encodeURIComponent(item.name)}&budget=${item.budget}`;
-                    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } });
-                    const json = await resp.json();
-
-                    warn.style.display = json.quota_exhausted ? '' : 'none';
-
-                    if (!json.results?.length) {
-                        resDiv.innerHTML = '<p style="font-size:12px;color:var(--s400);">No results found.</p>';
-                        return;
-                    }
-                    resDiv.innerHTML = json.results.map(r => `
-                        <div class="market-card ${r.is_advantageous ? 'advantageous' : ''}">
-                            <div class="mc-name">${r.name ?? r.title ?? ''}</div>
-                            <div class="mc-price">${r.price_formatted ?? ('&#8369;' + r.price)}</div>
-                            ${r.is_advantageous && r.reason ? `<div class="mc-reason">&#10003; ${r.reason}</div>` : ''}
-                            <div class="mc-source">${r.source ?? ''} &middot; ${r.date_retrieved ?? ''}</div>
-                        </div>`).join('');
-                } catch { resDiv.innerHTML = '<p style="font-size:12px;color:#a32d2d;">Search failed. Is the microservice running?</p>'; }
-            });
-        }
-    }
-
     function updateSigBadge(prId, label, stage) {
         const badge = document.querySelector(`[data-sig-badge="${prId}"]`);
         if (!badge) return;
@@ -857,13 +695,6 @@
         statusSel.value = pr.currentStatus ?? 'new';
         remarksIn.value = '';
 
-        const mp = document.getElementById('marketPanel');
-        const ms = document.getElementById('marketItemSel');
-        const mr = document.getElementById('marketResults');
-        if (mp) { mp.style.display = 'none'; }
-        if (ms) { ms.innerHTML = ''; }
-        if (mr) { mr.innerHTML = ''; }
-
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = pr.pdfFile
             ? `<iframe src="/storage/${pr.pdfFile}" title="PR Document"></iframe>`
@@ -889,7 +720,6 @@
 
         updateTimeline(pr);
         updateRoutingButtons(pr);
-        updateCanvassingUI(pr);
 
         emptyEl.style.display = 'none';
         contentEl.classList.add('visible');
@@ -905,6 +735,20 @@
         row.addEventListener('keydown', e => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
         });
+    });
+
+    /* ── Search (PR number, item, office, remarks, signatory stage) ── */
+    const prSearchInput = document.getElementById('prSearch');
+    const prCountChip    = document.getElementById('prVisibleCount');
+    prSearchInput?.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        let visible = 0;
+        rows.forEach(row => {
+            const match = !q || (row.dataset.search ?? '').includes(q);
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        if (prCountChip) prCountChip.textContent = visible + (visible === 1 ? ' PR' : ' PRs');
     });
 
     /* ── Reprocess a pending/failed signature photo ── */
@@ -932,6 +776,37 @@
         }
     });
 
+    /* ── Tracking Status (auto by default, manually overridable) ── */
+    document.addEventListener('change', async (e) => {
+        const sel = e.target.closest('[data-tracking-select]');
+        if (!sel) return;
+        const url  = sel.dataset.trackingUrl;
+        const prev = sel.dataset.prevValue ?? '';
+        sel.disabled = true;
+        try {
+            const resp = await fetch(url, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ trackingStatus: sel.value }),
+            });
+            const json = await resp.json().catch(() => null);
+            if (resp.ok && json?.success) {
+                sel.dataset.prevValue = sel.value;
+                const tip = sel.closest('.tracking-tooltip-wrap')?.querySelector('.tracking-tooltip-text');
+                if (tip) tip.textContent = sel.options[sel.selectedIndex].text;
+                showToast(sel.value ? 'Tracking status overridden.' : 'Tracking status reset.');
+            } else {
+                sel.value = prev;
+                showToast(json?.error || 'Failed to update tracking status.', true);
+            }
+        } catch {
+            sel.value = prev;
+            showToast('Network error.', true);
+        } finally {
+            sel.disabled = false;
+        }
+    });
+
     /* ── Route Forward ── */
     async function doAdvance(body) {
         if (!activePr || saving) return;
@@ -952,11 +827,9 @@
                 activePr.nextStage       = json.signatoryStage !== 'fully_signed' ? true : null;
                 if (json.stageMeta)   activePr.stageMeta   = json.stageMeta;
                 if (json.thirdSigner) activePr.thirdSigner = json.thirdSigner;
-                if (json.canvassingStage) activePr.canvassingStage = json.canvassingStage;
                 document.getElementById('fSigLabel').textContent = json.signatoryLabel;
                 updateTimeline(activePr);
                 updateRoutingButtons(activePr);
-                updateCanvassingUI(activePr);
                 updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
                 logs[activePr.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr() });
                 renderLog(activePr.id);
@@ -1008,19 +881,19 @@
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
-                activePr.signatoryStage = 'draft';
-                activePr.signatoryLabel = 'PR Created';
-                activePr.thirdSigner    = null;
-                activePr.stageMeta      = pageStageMeta;
-                document.getElementById('fSigLabel').textContent = 'PR Created';
+                activePr.signatoryStage = json.signatoryStage;
+                activePr.signatoryLabel = json.signatoryLabel;
+                activePr.thirdSigner    = json.thirdSigner;
+                if (json.stageMeta) activePr.stageMeta = json.stageMeta;
+                document.getElementById('fSigLabel').textContent = json.signatoryLabel;
                 updateTimeline(activePr);
                 updateRoutingButtons(activePr);
-                updateSigBadge(activePr.id, 'PR Created', 'draft');
+                updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
                 returnRemarks.style.display = 'none';
                 returnIn.value = '';
-                logs[activePr.id].push({ text: `<strong>Returned to draft</strong> &mdash; ${reason}`, time: nowStr() });
+                logs[activePr.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr() });
                 renderLog(activePr.id);
-                showToast('PR returned to draft.');
+                showToast('PR returned one step — now at ' + json.signatoryLabel + '.');
             } else {
                 showToast(json.error || 'Failed to return PR.', true);
             }

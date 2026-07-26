@@ -47,6 +47,37 @@
     .btn-process:hover:not(:disabled) { background: #6e410a; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
 
+    .icon-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; font-size: 16px; }
+    .icon-btn-check { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .icon-btn-check:hover:not(:disabled) { background: #bbf7d0; }
+    .icon-btn-x { background: var(--s100); color: var(--s400); border-color: var(--s200); cursor: default; }
+    .icon-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .payment-processed-cell { display: flex; align-items: center; gap: 8px; }
+    .payment-processed-note { font-size: 11px; color: var(--s400); }
+
+    /* Colors here use the globally-defined --crimson/--crimson-dark/--s200 (set
+       on :root in the base layout) rather than this page's --m/--s* aliases
+       (scoped to .content) — this modal sits outside .content as a sibling, so
+       a content-scoped variable would resolve to nothing there. */
+    .pp-modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .pp-modal-overlay.open { display: flex; }
+    .pp-modal-card { background: #fff; border-radius: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.18); width: 100%; max-width: 420px; padding: 24px 26px; font-family: 'Poppins', sans-serif; }
+    .pp-modal-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .pp-modal-sub { font-size: 12px; color: #64748b; margin-bottom: 18px; }
+    .pp-form-field { margin-bottom: 14px; }
+    .pp-form-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 6px; }
+    .pp-form-field input[type="file"] { width: 100%; font-size: 12.5px; color: #334155; }
+    .pp-form-field textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 11px; font-size: 12.5px; color: #334155; font-family: 'Poppins', sans-serif; resize: vertical; min-height: 64px; }
+    .pp-form-field textarea:focus { outline: none; border-color: var(--crimson); }
+    .pp-form-hint { font-size: 10.5px; color: #94a3b8; margin-top: 4px; }
+    .pp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .pp-btn { height: 38px; padding: 0 18px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1px solid transparent; transition: all .15s; }
+    .pp-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .pp-btn-cancel { background: #e2e8f0; color: #334155; border-color: #cbd5e1; }
+    .pp-btn-cancel:hover:not(:disabled) { background: #cbd5e1; }
+    .pp-btn-submit { background: var(--crimson); color: #fff; }
+    .pp-btn-submit:hover:not(:disabled) { background: var(--crimson-dark); }
+
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 160px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 28px; text-align: center; }
     .empty-state i { font-size: 36px; color: var(--s300); }
     .empty-state p { font-size: 13px; color: var(--s400); max-width: 240px; line-height: 1.6; }
@@ -123,7 +154,7 @@
                         <th>Amount</th>
                         <th>Issued</th>
                         <th>Status</th>
-                        <th>Action</th>
+                        <th>Payment Processed</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -137,13 +168,18 @@
                         <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $po['issuedAt'] }}</td>
                         <td><span class="badge badge-delivered">Complete Delivery</span></td>
                         <td>
-                            <button class="btn btn-process btn-start-processing"
-                                data-url="{{ $po['processUrl'] }}"
-                                data-po-id="{{ $po['id'] }}"
-                                data-po-number="{{ $po['poNumber'] }}">
-                                <i class="ti ti-player-play"></i>
-                                Start Processing
-                            </button>
+                            <div class="payment-processed-cell">
+                                <button type="button" class="icon-btn icon-btn-x" disabled title="Not yet processed">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                                <button type="button" class="icon-btn icon-btn-check btn-open-processing"
+                                    data-url="{{ $po['processUrl'] }}"
+                                    data-po-id="{{ $po['id'] }}"
+                                    data-po-number="{{ $po['poNumber'] }}"
+                                    title="Mark Payment Processed">
+                                    <i class="ti ti-check"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     @endforeach
@@ -243,6 +279,29 @@
 
 <div class="pr-toast" id="aoToast"></div>
 
+{{-- ── Mark Payment Processed modal ── --}}
+<div class="pp-modal-overlay" id="ppModalOverlay">
+    <div class="pp-modal-card">
+        <p class="pp-modal-title">Mark Payment Processed</p>
+        <p class="pp-modal-sub" id="ppModalSub">Attach proof of payment processing for this PO.</p>
+        <form id="ppModalForm">
+            <div class="pp-form-field">
+                <label>Attachment (PDF/JPG/PNG, required)</label>
+                <input type="file" id="ppAttachmentInput" accept=".pdf,.jpg,.jpeg,.png" required>
+                <p class="pp-form-hint">Max 10MB.</p>
+            </div>
+            <div class="pp-form-field">
+                <label>Remarks (optional)</label>
+                <textarea id="ppRemarksInput" placeholder="Add any notes for this payment processing…"></textarea>
+            </div>
+        </form>
+        <div class="pp-modal-actions">
+            <button type="button" class="pp-btn pp-btn-cancel" id="ppCancelBtn">Cancel</button>
+            <button type="button" class="pp-btn pp-btn-submit" id="ppSubmitBtn">Submit</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -258,42 +317,70 @@
         toastEl._t = setTimeout(() => { toastEl.className = 'pr-toast'; }, 3000);
     }
 
-    document.querySelectorAll('.btn-start-processing').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (!confirm(`Start payment processing for ${btn.dataset.poNumber}?`)) return;
+    const overlay        = document.getElementById('ppModalOverlay');
+    const modalSub        = document.getElementById('ppModalSub');
+    const attachmentInput = document.getElementById('ppAttachmentInput');
+    const remarksInput    = document.getElementById('ppRemarksInput');
+    const cancelBtn       = document.getElementById('ppCancelBtn');
+    const submitBtn       = document.getElementById('ppSubmitBtn');
+    let activeBtn = null;
 
-            btn.disabled = true;
-            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Starting…';
+    function openModal(btn) {
+        activeBtn = btn;
+        attachmentInput.value = '';
+        remarksInput.value    = '';
+        modalSub.textContent  = `Attach proof of payment processing for ${btn.dataset.poNumber}.`;
+        overlay.classList.add('open');
+    }
 
-            try {
-                const resp = await fetch(btn.dataset.url, {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body:    JSON.stringify({}),
-                });
-                const json = await resp.json();
-                if (resp.ok && json.success) {
-                    showToast(`${btn.dataset.poNumber} is now processing payment. The Cashier will upload the receipt.`);
-                    setTimeout(() => window.location.reload(), 1200);
-                } else {
-                    showToast(json.error || 'Failed to start processing.', true);
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="ti ti-player-play"></i> Start Processing';
-                }
-            } catch {
-                showToast('Network error. Please try again.', true);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-player-play"></i> Start Processing';
-            }
-        });
+    function closeModal() {
+        overlay.classList.remove('open');
+        activeBtn = null;
+    }
+
+    document.querySelectorAll('.btn-open-processing').forEach(btn => {
+        btn.addEventListener('click', () => openModal(btn));
     });
 
-    if (!document.getElementById('spinStyle')) {
-        const s = document.createElement('style');
-        s.id = 'spinStyle';
-        s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
-        document.head.appendChild(s);
-    }
+    cancelBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    submitBtn.addEventListener('click', async () => {
+        if (!activeBtn) return;
+        if (!attachmentInput.files.length) {
+            showToast('Please attach a file.', true);
+            return;
+        }
+
+        const btn = activeBtn;
+        const fd  = new FormData();
+        fd.append('attachment', attachmentInput.files[0]);
+        if (remarksInput.value.trim()) fd.append('remarks', remarksInput.value.trim());
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting…';
+
+        try {
+            const resp = await fetch(btn.dataset.url, {
+                method:  'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body:    fd,
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                closeModal();
+                showToast(`${btn.dataset.poNumber} is now processing payment. The Cashier will upload the receipt.`);
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                showToast(json.error || (json.errors ? Object.values(json.errors)[0][0] : 'Failed to start processing.'), true);
+            }
+        } catch {
+            showToast('Network error. Please try again.', true);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+        }
+    });
 })();
 </script>
 @endpush

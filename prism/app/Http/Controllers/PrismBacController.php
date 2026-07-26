@@ -55,11 +55,12 @@ class PrismBacController extends Controller
         ]));
     }
 
+    /** BAC only ever signs AOC (Member, Vice Chair, Chair) — shows EVERY AOC, not just currently-actionable ones. */
     public function forMySignature(): View
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'queueRows' => $this->signatureQueueRows(),
+            'documents' => $this->signatureHistoryRows(['aoc']),
         ]));
     }
 

@@ -46,6 +46,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
         Route::post('/market-scoping/run', 'runMarketScoping')->name('market-scoping.run');
         Route::get('/market-scoping/suggestions', 'marketScopingSuggestions')->name('market-scoping.suggestions');
+        Route::get('/market-scoping/resolve-source', 'resolveMarketSource')->name('market-scoping.resolve-source');
+        Route::get('/market-scoping/product-details', 'marketProductDetails')->name('market-scoping.product-details');
         Route::post('/market-scoping/attach-to-proposal', 'attachToProposal')->name('market-scoping.attach');
         Route::post('/market-scoping/add-item-with-refs', 'addItemWithRefs')->name('market-scoping.add-item-with-refs');
         Route::delete('/market-scoping/ref/{ref}', 'deleteRef')->name('market-scoping.ref.delete');
@@ -53,6 +55,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/market-scoping/mps/submit', 'submitMps')->name('market-scoping.mps.submit');
         Route::get('/my-proposals', 'myProposals')->name('my-proposals');
         Route::get('/purchase-requests', 'purchaseRequests')->name('purchase-requests');
+        Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
+        Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
+        Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
     });
 
     Route::prefix('finance-office')->name('finance-office.')->middleware('role:Budget Office')->controller(PrismFinanceOfficeController::class)->group(function () {
@@ -69,15 +74,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
         Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
+        Route::post('/annual-procurement-plan/item/{item}/tracking-status', 'updateAppItemTrackingStatus')->name('annual-procurement-plan.update-tracking-status');
         Route::get('/canvassing', 'canvassing')->name('canvassing');
         Route::post('/purchase-request/{pr}/canvass-document', 'uploadCanvassDocument')->name('purchase-request.canvass-document');
         Route::delete('/canvass-document/{document}', 'deleteCanvassDocument')->name('canvass-document.delete');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
+        Route::post('/purchase-request/{pr}/tracking-status', 'updateTrackingStatus')->name('purchase-request.update-tracking-status');
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
         Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
-        Route::post('/purchase-request/{pr}/canvassing', 'updateCanvassing')->name('purchase-request.canvassing');
-        Route::get('/purchase-request/{pr}/market-prices', 'getMarketPrices')->name('purchase-request.market-prices');
         Route::post('/purchase-request/import-pdf', 'importPrFromPdf')->name('purchase-request.import-pdf');
         Route::post('/purchase-request/import-pdf/confirm', 'importPrConfirm')->name('purchase-request.import-confirm');
         Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
@@ -85,12 +90,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-request/{pr}/create-aoc', 'createAoc')->name('aoc.create');
         Route::post('/aoc/{aoc}/advance', 'advanceAocStage')->name('aoc.advance');
         Route::post('/aoc/{aoc}/return-aoc', 'returnAoc')->name('aoc.return');
+        Route::post('/aoc/{aoc}/upload', 'uploadAbstractOfCanvass')->name('aoc.upload');
         Route::get('/purchase-orders', 'purchaseOrders')->name('purchase-orders');
         Route::post('/aoc/{aoc}/issue-po', 'issuePo')->name('po.issue');
         Route::post('/purchase-order/{po}/status', 'updatePoStatus')->name('po.update-status');
         Route::post('/purchase-order/{po}/advance', 'advancePoStage')->name('po.advance');
         Route::post('/purchase-order/{po}/return-po', 'returnPo')->name('po.return');
-        Route::get('/procurement-status-tracking', 'procurementStatusTracking')->name('procurement-status-tracking');
+        Route::post('/purchase-order/{po}/upload', 'uploadPurchaseOrder')->name('po.upload');
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
         Route::post('/signature-photo/{docType}/{logId}/reprocess', 'reprocessSignaturePhoto')->name('signature-photo.reprocess')->whereIn('docType', ['pr', 'aoc', 'po']);
     });

@@ -30,6 +30,7 @@ class User extends Authenticatable
         'employee_number',
         'office_id',
         'position_title',
+        'vc_type',
         'password',
         'account_status',
         'expo_push_token',

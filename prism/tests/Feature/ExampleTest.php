@@ -46,7 +46,6 @@ class ExampleTest extends TestCase
     {
         $this->get('/procurement-office')->assertStatus(200);
         $this->get('/procurement-office/purchase-request-management')->assertStatus(200);
-        $this->get('/procurement-office/procurement-status-tracking')->assertStatus(200);
         $this->get('/procurement-office/procurement-reports')->assertStatus(200);
     }
 

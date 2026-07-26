@@ -112,7 +112,10 @@
         text-align: right;
     }
 
-    .mps-no-refs { padding: 14px 18px; font-size: 12px; color: #94a3b8; font-style: italic; }
+    .mps-source-files { padding: 10px 18px 14px; border-top: 1px solid #e2e8f0; }
+    .mps-source-files-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: 6px; }
+    .mps-source-files ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .mps-source-files .mps-ref-source-link { font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
 
     /* Footer */
     .mps-doc-footer {
@@ -136,6 +139,8 @@
         .mps-document { border: none; border-radius: 0; box-shadow: none; }
         .mps-item-block { break-inside: avoid; }
     }
+
+    .mps-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 300; background: #166534; color: #fff; font-size: 13px; font-weight: 700; border-radius: 99px; padding: 10px 24px; box-shadow: 0 4px 20px rgba(0,0,0,.18); white-space: nowrap; display: none; align-items: center; gap: 8px; }
 </style>
 @endpush
 
@@ -144,7 +149,7 @@
 
     {{-- Action bar --}}
     <div class="mps-actions no-print">
-        <a href="{{ route('office-head.market-scoping') }}" class="mps-back">
+        <a href="{{ route('office-head.market-scoping', ['proposal' => $proposal->id]) }}" class="mps-back">
             <i class="ti ti-arrow-left"></i> Back to Market Scoping
         </a>
         <span class="mps-action-spacer"></span>
@@ -217,7 +222,7 @@
                 <div class="mps-item-head">
                     <div class="mps-item-num">{{ $idx + 1 }}</div>
                     <div class="mps-item-name">{{ $item->name }}</div>
-                    <div class="mps-item-qty">{{ $item->quantity }} {{ $item->unit }}</div>
+                    <div class="mps-item-qty">{{ rtrim(rtrim(number_format((float) $item->quantity, 2, '.', ''), '0'), '.') }} {{ $item->unit }}</div>
                 </div>
                 @if ($item->marketReferences->isNotEmpty())
                 <table class="mps-ref-table">
@@ -252,11 +257,21 @@
                 @endphp
                 <div class="mps-item-avg">
                     Average Market Price: <strong>₱{{ number_format($avg, 2) }}</strong>
-                    &nbsp;&middot;&nbsp;
-                    Estimated Unit Cost: <strong>₱{{ number_format((float) $item->estimated_unit_cost, 2) }}</strong>
                 </div>
-                @else
-                <div class="mps-no-refs">No references attached for this item.</div>
+                @endif
+                @if ($item->sourceFiles->isNotEmpty())
+                <div class="mps-source-files">
+                    <p class="mps-source-files-label">Attached source file(s)</p>
+                    <ul>
+                        @foreach ($item->sourceFiles as $doc)
+                        <li>
+                            <a href="{{ \Illuminate\Support\Facades\Storage::url($doc->file_path) }}" target="_blank" rel="noopener" class="mps-ref-source-link">
+                                <i class="ti ti-paperclip"></i> {{ $doc->original_filename ?? $doc->title }}
+                            </a>
+                        </li>
+                        @endforeach
+                    </ul>
+                </div>
                 @endif
             </div>
             @endforeach
@@ -282,6 +297,9 @@
     </div>
     @endif
 
+    {{-- ── Toast ── --}}
+    <div id="mpsToast" class="mps-toast no-print"></div>
+
 </div>
 @endsection
 
@@ -295,6 +313,15 @@
 
     const submitUrl  = JSON.parse(document.getElementById('mpsSubmitUrl').textContent);
     const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+    const proposalId = {{ $proposal->id }};
+
+    function showMpsToast(msg) {
+        const t = document.getElementById('mpsToast');
+        if (!t) return;
+        t.textContent = msg;
+        t.style.display = 'flex';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
 
     btnSubmit.addEventListener('click', async () => {
         if (btnSubmit.disabled) return;
@@ -304,12 +331,18 @@
         try {
             const resp = await fetch(submitUrl, {
                 method:  'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ proposal_id: proposalId }),
             });
             const json = await resp.json();
 
             if (resp.ok && json.success) {
-                location.reload();
+                // No reload — a brief toast is enough. Reloading would immediately drop
+                // in the permanent "submitted" banner and the read-only page state,
+                // which is jarring right after the click; that's fine to pick up
+                // naturally next time this page is opened.
+                btnSubmit.innerHTML = '<i class="ti ti-circle-check"></i> Submitted';
+                showMpsToast('Market Study submitted successfully — ' + (json.ref_number || ''));
             } else {
                 alert(json.error || 'Submission failed. Please try again.');
                 btnSubmit.disabled = false;

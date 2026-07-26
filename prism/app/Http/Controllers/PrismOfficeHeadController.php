@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
@@ -20,6 +21,37 @@ use Illuminate\View\View;
 
 class PrismOfficeHeadController extends Controller
 {
+    use HandlesSignatureQueue;
+
+    protected function queueRoleCode(): string
+    {
+        return 'office-head';
+    }
+
+    protected function queueRoutePrefix(): string
+    {
+        return 'office-head';
+    }
+
+    protected function queueOfficeIds(): ?array
+    {
+        return [$this->officeId()];
+    }
+
+    /**
+     * Office Head / Dean is "End User" — the 1st signatory on both PR and
+     * AOC (never PO). Scoped strictly to their own office via
+     * queueOfficeIds(), never another office's.
+     */
+    public function forMySignature(): View
+    {
+        return view('prism.shared.for-my-signature', $this->withCommon('office-head', 'for-my-signature', [
+            'pageTitle' => 'For My Signature',
+            'layout'    => 'prism.layouts.office-head',
+            'documents' => $this->signatureHistoryRows(['pr', 'aoc']),
+        ]));
+    }
+
     // ── Pages ─────────────────────────────────────────────────────────────────
 
     public function dashboard(): View
@@ -70,18 +102,27 @@ class PrismOfficeHeadController extends Controller
         $proposalOptions = BudgetProposal::where('office_id', $officeId)
             ->orderByDesc('fiscal_year')->orderByDesc('created_at')
             ->get(['id', 'fiscal_year', 'code', 'status'])
-            ->map(fn ($p) => [
-                'id'     => $p->id,
-                'label'  => 'FY ' . $p->fiscal_year . ' — ' . $p->code
-                    . ($p->status === 'returned' ? ' — Returned, needs revision' : ' — ' . ucfirst($p->status)),
-                'status' => $p->status,
-            ])->all();
+            ->map(function ($p) {
+                $label = 'FY ' . $p->fiscal_year . ' — ' . $p->code;
+                if ($p->status === 'returned') {
+                    // 'returned' covers two different senders — only a Budget Office
+                    // return actually needs the office head to revise; a Chancellor
+                    // return is sitting with Budget Office, not back here yet.
+                    $label .= $this->isEditableByOfficeHead($p)
+                        ? ' — Returned, needs revision'
+                        : ' — Returned to Budget Office';
+                } else {
+                    $label .= ' — ' . ucfirst($p->status);
+                }
+                return ['id' => $p->id, 'label' => $label, 'status' => $p->status];
+            })->all();
 
         // Proposal selector: ?proposal=ID shows that specific PPMP (read-only unless draft/returned).
         // ?fy=YYYY is kept as a fallback for old links — resolves to the latest proposal for that year.
         $requestedId = (int) $request->query('proposal', 0);
         $requestedFy = (int) $request->query('fy', 0);
         $proposal    = null;
+        $sessionKey  = "office_head.selected_proposal.{$officeId}";
 
         if ($requestedId) {
             $proposal = BudgetProposal::where('office_id', $officeId)->find($requestedId);
@@ -90,6 +131,15 @@ class PrismOfficeHeadController extends Controller
                 ->where('fiscal_year', $requestedFy)
                 ->latest()
                 ->first();
+        } else {
+            // No explicit selection on this request — fall back to whichever PPMP the
+            // office head last picked in the selector, so navigating elsewhere (sidebar,
+            // dashboard shortcuts, My PPMP, etc.) and back doesn't silently reset the
+            // page to whatever happens to be the latest proposal.
+            $rememberedId = $request->session()->get($sessionKey);
+            if ($rememberedId) {
+                $proposal = BudgetProposal::where('office_id', $officeId)->find($rememberedId);
+            }
         }
 
         if (!$proposal) {
@@ -99,7 +149,12 @@ class PrismOfficeHeadController extends Controller
                 ->first();
         }
 
-        $isReadOnly     = $proposal ? !in_array($proposal->status, ['draft', 'returned'], true) : false;
+        // A 'returned' proposal is only actually editable here if it was Budget
+        // Office who returned it — a Chancellor return leaves it with Budget Office
+        // to reconsider first, even though the stored status looks identical.
+        $isReadOnly     = $proposal
+            ? !($proposal->status === 'draft' || ($proposal->status === 'returned' && $this->isEditableByOfficeHead($proposal)))
+            : false;
         // Line items lock once a market study has been submitted for this proposal —
         // separate from $isReadOnly, which only tracks the proposal's own status.
         $itemsLocked    = $isReadOnly || (bool) $proposal?->marketPriceSurvey;
@@ -116,6 +171,10 @@ class PrismOfficeHeadController extends Controller
                 $isReadOnly     = true;
                 $proposalStatus = $proposal->status;
             }
+        }
+
+        if ($proposal) {
+            $request->session()->put($sessionKey, $proposal->id);
         }
 
         if ($proposal && $isReadOnly) {
@@ -140,7 +199,9 @@ class PrismOfficeHeadController extends Controller
             'officeName'          => $office?->name ?? 'Your Office',
             'title'               => $proposal?->title ?? '',
             'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
-            'date'                => $proposal?->created_at?->format('Y-m-d') ?? now()->format('Y-m-d'),
+            // Once a PPMP has actually been submitted, "Date Prepared" should reflect
+            // that — not when the draft was first started, which can be weeks earlier.
+            'date'                => ($proposal?->submitted_at ?? $proposal?->created_at)?->format('Y-m-d') ?? now()->format('Y-m-d'),
             'totalProposedBudget' => $proposal?->proposed_budget ?? $proposal?->total_estimated_cost ?? 0,
         ];
 
@@ -173,6 +234,7 @@ class PrismOfficeHeadController extends Controller
                     'scoping'           => $item->marketReferences
                         ->where('is_selected', true)
                         ->map(fn ($ref) => [
+                            'id'            => (string) $ref->id,
                             'title'         => $ref->title ?? $ref->supplier_name,
                             'supplierName'  => $ref->supplier_name,
                             'price'         => (float) $ref->price,
@@ -242,7 +304,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         $office = auth()->user()->office;
-        BudgetProposal::create([
+        $newProposal = BudgetProposal::create([
             'office_id'          => $officeId,
             'created_by_user_id' => auth()->id(),
             'code'               => $code,
@@ -251,7 +313,7 @@ class PrismOfficeHeadController extends Controller
             'status'             => 'draft',
         ]);
 
-        return redirect()->route('office-head.budget-proposal')
+        return redirect()->route('office-head.budget-proposal', ['proposal' => $newProposal->id])
             ->with('success', "FY {$nextYear} PPMP started.");
     }
 
@@ -282,7 +344,7 @@ class PrismOfficeHeadController extends Controller
         $office = auth()->user()->office;
         $title  = ($office?->name ?? 'Office') . ' PPMP FY' . $year . ($sequence > 1 ? " (Supplemental {$sequence})" : '');
 
-        BudgetProposal::create([
+        $newProposal = BudgetProposal::create([
             'office_id'          => $officeId,
             'created_by_user_id' => auth()->id(),
             'code'               => $code,
@@ -291,7 +353,10 @@ class PrismOfficeHeadController extends Controller
             'status'             => 'draft',
         ]);
 
-        return redirect()->route('office-head.budget-proposal')
+        // Without an explicit proposal id, the index falls back to whichever PPMP
+        // was last remembered in session (or "latest") — neither is guaranteed to
+        // be the one just created here.
+        return redirect()->route('office-head.budget-proposal', ['proposal' => $newProposal->id])
             ->with('success', "New PPMP ({$code}) created for FY {$year}.");
     }
 
@@ -323,9 +388,24 @@ class PrismOfficeHeadController extends Controller
         return response()->json(['success' => true, 'proposed_budget' => (float) $proposal->proposed_budget]);
     }
 
-    public function marketScoping(): View
+    public function marketScoping(Request $request): View
     {
         $officeId    = $this->officeId();
+        $requestedId = (int) $request->query('proposal', 0);
+
+        // Which proposal "owns" this scoping session — carried forward through
+        // attach/add-item calls and back-links so navigating away and back
+        // doesn't silently land on a different (e.g. newer) PPMP.
+        $activeProposal = $requestedId
+            ? BudgetProposal::where('office_id', $officeId)->where('id', $requestedId)
+                ->whereIn('status', ['draft', 'returned'])->first()
+            : null;
+        if (!$activeProposal) {
+            $activeProposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->latest()->first();
+        }
+
         $draftIds    = BudgetProposal::where('office_id', $officeId)
                            ->whereIn('status', ['draft', 'returned'])
                            ->pluck('id');
@@ -353,17 +433,46 @@ class PrismOfficeHeadController extends Controller
             ->map(fn ($ref) => $this->formatMarketReference($ref))
             ->all();
 
-        $survey = BudgetProposal::where('office_id', $officeId)
-            ->with('marketPriceSurvey')
-            ->latest()
-            ->first()
-            ?->marketPriceSurvey;
+        $survey = $activeProposal?->marketPriceSurvey;
+
+        // Arriving via an item's "Add reference" link: that item's already-selected
+        // references must be preserved as the starting selection, not dropped —
+        // otherwise attaching a new set silently unselects the ones already saved.
+        $existingItemId   = null;
+        $existingItemRefs = [];
+        $requestedItemId  = (int) $request->query('item', 0);
+        if ($requestedItemId) {
+            $existingItem = BudgetProposalItem::where('id', $requestedItemId)
+                ->whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+                ->with(['marketReferences' => fn ($q) => $q->where('is_selected', true)])
+                ->first();
+
+            if ($existingItem) {
+                $existingItemId   = $existingItem->id;
+                $existingItemRefs = $existingItem->marketReferences->map(fn ($ref) => [
+                    'id'        => (string) $ref->id,
+                    'name'      => $ref->title ?? $ref->supplier_name,
+                    'price'     => (float) $ref->price,
+                    'priceStr'  => number_format((float) $ref->price, 2),
+                    'supplier'  => $ref->supplier_name,
+                    'source'    => $ref->source_type ?? 'Online',
+                    'date'      => $ref->date_accessed?->format('M d, Y') ?? now()->format('M d, Y'),
+                    'url'       => $ref->source_url ?? '',
+                    'pageToken' => null,
+                    'specs'     => '',
+                    'itemId'    => (string) $existingItem->id,
+                ])->values()->all();
+            }
+        }
 
         return view('prism.office-head.market-scoping', $this->withCommon('office-head', 'market-scoping', [
-            'pageTitle'     => 'Market Scoping',
-            'proposalItems' => $proposalItems,
-            'selectedRefs'  => $selectedRefs,
-            'survey'        => $survey,
+            'pageTitle'        => 'Market Scoping',
+            'proposalItems'    => $proposalItems,
+            'selectedRefs'     => $selectedRefs,
+            'survey'           => $survey,
+            'proposalId'       => $activeProposal?->id,
+            'existingItemId'   => $existingItemId,
+            'existingItemRefs' => $existingItemRefs,
         ]));
     }
 
@@ -373,6 +482,10 @@ class PrismOfficeHeadController extends Controller
             ->where('office_id', $this->officeId())
             ->latest()
             ->get()
+            // Returned PPMPs need action, so they surface first regardless of date —
+            // stable sort keeps each group ordered by latest() above.
+            ->sortBy(fn ($p) => $p->status === 'returned' ? 0 : 1)
+            ->values()
             ->map(fn ($proposal) => [
                 'id'              => $proposal->code ?: "bp-{$proposal->id}",
                 'proposalId'      => $proposal->id,
@@ -403,7 +516,7 @@ class PrismOfficeHeadController extends Controller
 
     public function purchaseRequests(): View
     {
-        $purchaseItems = PurchaseRequest::with('items')
+        $purchaseItems = PurchaseRequest::with(['items', 'abstractOfCanvass.purchaseOrder'])
             ->where('office_id', $this->officeId())
             ->orderByRaw("FIELD(status, 'in_progress', 'pending', 'approved', 'completed', 'delayed')")
             ->orderBy('number')
@@ -417,6 +530,15 @@ class PrismOfficeHeadController extends Controller
                 'totalAmount' => (float) ($pr->total_amount ?? 0),
                 'status'      => $pr->status,
                 'statusLabel' => ucwords(str_replace('_', ' ', $pr->status)),
+                'trackingStatus' => (function () use ($pr) {
+                    $tracking = $pr->effectiveTrackingStatus();
+                    // End users don't need internal-office phrasing — once paid, their
+                    // request has simply reached its final, completed state.
+                    if (($tracking['key'] ?? null) === 'paid') {
+                        $tracking['label'] = 'Completed';
+                    }
+                    return $tracking;
+                })(),
                 'remarks'     => $pr->remarks ?? '',
                 'uploadedAt'  => $pr->uploaded_at?->format('M d, Y'),
                 'itemCount'   => $pr->items->count(),
@@ -675,10 +797,23 @@ class PrismOfficeHeadController extends Controller
 
     public function submitProposal(Request $request): JsonResponse
     {
-        $proposal = BudgetProposal::where('office_id', $this->officeId())
-            ->where('status', 'draft')
-            ->latest()
-            ->firstOrFail();
+        $officeId = $this->officeId();
+
+        // A returned proposal must be resubmittable too — it's a legitimate, editable
+        // state (draft and returned can coexist), not just a one-way dead end. Prefer
+        // whichever proposal the office head is actually looking at; only guess by
+        // "latest draft" as a fallback for old callers that don't send an id.
+        $requestedId = (int) $request->input('proposal_id', 0);
+        $proposal    = $requestedId
+            ? BudgetProposal::where('id', $requestedId)->where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])->first()
+            : null;
+        if (!$proposal) {
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->latest()
+                ->firstOrFail();
+        }
 
         if ($proposal->items()->count() === 0) {
             return response()->json([
@@ -700,6 +835,16 @@ class PrismOfficeHeadController extends Controller
             ], 422);
         }
 
+        $statusFrom = $proposal->status;
+
+        // A resubmission is a fresh review — clear any finance_ok/finance_remark left
+        // over from the last review cycle, or a stale "issued" flag on an item the
+        // office head already fixed silently blocks Endorse next time (it checks for
+        // any item still flagged false, regardless of how old that flag is).
+        if ($statusFrom === 'returned') {
+            $proposal->items()->update(['finance_ok' => null, 'finance_remark' => null]);
+        }
+
         $proposal->update([
             'status'                => 'submitted',
             'submitted_at'          => now(),
@@ -710,9 +855,9 @@ class PrismOfficeHeadController extends Controller
             'budget_proposal_id'  => $proposal->id,
             'reviewed_by_user_id' => auth()->id(),
             'action'              => 'submitted',
-            'status_from'         => 'draft',
+            'status_from'         => $statusFrom,
             'status_to'           => 'submitted',
-            'remarks'             => 'Proposal submitted for review.',
+            'remarks'             => $statusFrom === 'returned' ? 'Proposal revised and resubmitted for review.' : 'Proposal submitted for review.',
             'reviewed_at'         => now(),
         ]);
 
@@ -776,6 +921,47 @@ class PrismOfficeHeadController extends Controller
             'quota_exhausted'   => $service->isQuotaExhausted(),
             'matcher_available' => $service->matcherAvailable(),
         ]);
+    }
+
+    public function resolveMarketSource(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'page_token' => 'nullable|string|max:4000',
+            'fallback'   => 'nullable|string|max:2000',
+        ]);
+
+        $fallback = (string) $request->input('fallback', '');
+        if ($fallback === '' || !preg_match('#^https?://#i', $fallback)) {
+            $fallback = 'https://shopping.google.com/';
+        }
+
+        $pageToken = (string) $request->input('page_token', '');
+        if ($pageToken !== '') {
+            $link = (new MarketScopingService())->resolveDirectLink($pageToken);
+            if ($link) {
+                return redirect()->away($link);
+            }
+        }
+
+        return redirect()->away($fallback);
+    }
+
+    public function marketProductDetails(Request $request): JsonResponse
+    {
+        $request->validate([
+            'page_token' => 'required|string|max:4000',
+        ]);
+
+        $details = (new MarketScopingService())->fetchProductDetails($request->input('page_token'));
+
+        if (!$details) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product details are not available for this result right now.',
+            ], 404);
+        }
+
+        return response()->json(['success' => true, 'details' => $details]);
     }
 
     public function marketScopingSuggestions(Request $request): JsonResponse
@@ -920,21 +1106,39 @@ class PrismOfficeHeadController extends Controller
     public function attachToProposal(Request $request): JsonResponse
     {
         $request->validate([
-            'query' => 'required|string|max:300',
-            'refs'  => 'required|array|min:3|max:3',
+            'query'       => 'required|string|max:300',
+            'refs'        => 'required|array|min:3|max:3',
+            'proposal_id' => 'nullable|integer|exists:budget_proposals,id',
+            'item_id'     => 'nullable|integer|exists:budget_proposal_items,id',
         ]);
 
         $officeId = $this->officeId();
         $query    = trim($request->input('query'));
         $refs     = $request->input('refs');
 
-        $draftProposal = BudgetProposal::where('office_id', $officeId)
-            ->whereIn('status', ['draft', 'returned'])
-            ->latest()->first();
+        $draftProposal = null;
+        if ($request->filled('proposal_id')) {
+            $draftProposal = BudgetProposal::where('id', $request->input('proposal_id'))
+                ->where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->first();
+        }
+        if (!$draftProposal) {
+            $draftProposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->latest()->first();
+        }
 
-        $existingItem = $draftProposal
-            ? $this->findMatchingItem($draftProposal, $query)
-            : null;
+        // Arriving via a specific item's "Add reference" link means we already know
+        // exactly which item this is — use that directly instead of guessing from
+        // the query text, which is fragile once several items share similar names.
+        $existingItem = null;
+        if ($draftProposal && $request->filled('item_id')) {
+            $existingItem = $draftProposal->items()->where('id', $request->input('item_id'))->first();
+        }
+        if (!$existingItem && $draftProposal) {
+            $existingItem = $this->findMatchingItem($draftProposal, $query);
+        }
 
         if ($existingItem) {
             $this->saveRefsToItem($existingItem, $refs, $request);
@@ -967,15 +1171,25 @@ class PrismOfficeHeadController extends Controller
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'category'          => 'required|string|max:200',
             'refs'              => 'required|array|min:1|max:3',
+            'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
 
         $officeId = $this->officeId();
 
-        // Use the existing draft/returned proposal for any fiscal year
-        $proposal = BudgetProposal::where('office_id', $officeId)
-            ->whereIn('status', ['draft', 'returned'])
-            ->orderByDesc('fiscal_year')
-            ->first();
+        $proposal = null;
+        if (!empty($validated['proposal_id'])) {
+            $proposal = BudgetProposal::where('id', $validated['proposal_id'])
+                ->where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->first();
+        }
+        if (!$proposal) {
+            // Fall back to the existing draft/returned proposal for any fiscal year
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->orderByDesc('fiscal_year')
+                ->first();
+        }
 
         if (!$proposal) {
             $year     = now()->year + 1;
@@ -1019,7 +1233,7 @@ class PrismOfficeHeadController extends Controller
 
         return response()->json([
             'success'  => true,
-            'redirect' => route('office-head.budget-proposal'),
+            'redirect' => route('office-head.budget-proposal', ['proposal' => $proposal->id]),
         ]);
     }
 
@@ -1037,19 +1251,28 @@ class PrismOfficeHeadController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function previewMps(): View
+    public function previewMps(Request $request): View
     {
-        $officeId = $this->officeId();
-        $proposal = BudgetProposal::where('office_id', $officeId)
-            ->with([
-                'items.marketReferences' => fn ($q) => $q->where('is_selected', true)->orderBy('price'),
-                'marketPriceSurvey.submittedBy',
-            ])
-            ->latest()
-            ->firstOrFail();
+        $officeId    = $this->officeId();
+        $requestedId = (int) $request->query('proposal', 0);
 
+        $withRelations = fn () => BudgetProposal::where('office_id', $officeId)->with([
+            'items.marketReferences' => fn ($q) => $q->where('is_selected', true)->orderBy('price'),
+            'items.sourceFiles',
+            'marketPriceSurvey.submittedBy',
+        ]);
+
+        $proposal = $requestedId ? $withRelations()->where('id', $requestedId)->first() : null;
+        if (!$proposal) {
+            $proposal = $withRelations()->latest()->firstOrFail();
+        }
+
+        // An item can be supported by market-scoping references OR an uploaded source
+        // file — only filtering on references left file-supported items out of the
+        // Market Study entirely, even though they're a valid, already-supported way
+        // to justify an item's price.
         $items = $proposal->items
-            ->filter(fn ($i) => $i->marketReferences->isNotEmpty())
+            ->filter(fn ($i) => $i->marketReferences->isNotEmpty() || $i->sourceFiles->isNotEmpty())
             ->values();
 
         return view('prism.office-head.market-price-survey', $this->withCommon('office-head', 'market-scoping', [
@@ -1062,11 +1285,19 @@ class PrismOfficeHeadController extends Controller
 
     public function submitMps(Request $request): JsonResponse
     {
-        $officeId = $this->officeId();
-        $proposal = BudgetProposal::where('office_id', $officeId)
-            ->whereIn('status', ['draft', 'returned'])
-            ->latest()
-            ->firstOrFail();
+        $officeId    = $this->officeId();
+        $requestedId = (int) $request->input('proposal_id', 0);
+
+        $proposal = $requestedId
+            ? BudgetProposal::where('office_id', $officeId)->where('id', $requestedId)
+                ->whereIn('status', ['draft', 'returned'])->first()
+            : null;
+        if (!$proposal) {
+            $proposal = BudgetProposal::where('office_id', $officeId)
+                ->whereIn('status', ['draft', 'returned'])
+                ->latest()
+                ->firstOrFail();
+        }
 
         if ($proposal->marketPriceSurvey) {
             return response()->json(['error' => 'Market Study already submitted.'], 409);
@@ -1123,12 +1354,22 @@ class PrismOfficeHeadController extends Controller
                     ->where('budget_proposal_item_id', $item->id)
                     ->update(['is_selected' => true, 'status' => 'approved']);
             } else {
+                // Google Shopping refs only ever carry a Google intermediary link — resolve
+                // to the actual merchant page once, here, so it's baked into the saved
+                // reference and every later "View source" click (PPMP, Market Study
+                // document, etc.) goes straight there without needing to re-resolve.
+                $sourceUrl = $ref['url'] ?? '';
+                if (!empty($ref['pageToken'])) {
+                    $resolved  = (new MarketScopingService())->resolveDirectLink($ref['pageToken']);
+                    $sourceUrl = $resolved ?: $sourceUrl;
+                }
+
                 MarketScopingReference::create([
                     'budget_proposal_item_id' => $item->id,
                     'created_by_user_id'     => $request->user()?->id,
                     'supplier_name'          => $ref['supplier'] ?? 'Unknown',
                     'source_type'            => $ref['source'] ?? 'Google Shopping',
-                    'source_url'             => $ref['url'] ?? '',
+                    'source_url'             => $sourceUrl,
                     'title'                  => $ref['name'] ?? '',
                     'price'                  => (float) ($ref['price'] ?? 0),
                     'currency'               => 'PHP',
@@ -1144,6 +1385,22 @@ class PrismOfficeHeadController extends Controller
     private function officeId(): int
     {
         return auth()->user()?->office_id ?? 1;
+    }
+
+    /**
+     * 'returned' is shared by two different points in the workflow — Budget Office
+     * returning it here for revision (status_from: submitted) vs. the Chancellor
+     * returning it to Budget Office (status_from: endorsed), which the office head
+     * can't touch until Budget Office decides to bounce it back further. Mirrors
+     * PrismFinanceOfficeController::isActionableByFinance() for the other side.
+     */
+    private function isEditableByOfficeHead(BudgetProposal $proposal): bool
+    {
+        $lastReturn = $proposal->reviews()->where('action', 'return')->latest('reviewed_at')->first();
+
+        // No review record found is treated as editable (safe default for older/legacy
+        // data) — only a confirmed Chancellor-return locks the office head out.
+        return $lastReturn?->status_from !== 'endorsed';
     }
 
     private function formatMarketReference(MarketScopingReference $ref): array
@@ -1201,10 +1458,13 @@ class PrismOfficeHeadController extends Controller
             'activeOfficePage' => $activeOfficePage,
             'activeModulePage' => $activeOfficePage,
             'brandHref'        => route('office-head.dashboard'),
+            'roleLabel'        => 'Office Head / Dean',
+            'roleInitials'     => 'OH',
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Office Head / Dean pages',
             'moduleNavigation' => [
                 ['slug' => 'dashboard',         'label' => 'Dashboard',         'href' => route('office-head.dashboard'),         'icon' => 'layout-dashboard'],
+                ['slug' => 'for-my-signature',  'label' => 'For My Signature',  'href' => route('office-head.for-my-signature'),  'icon' => 'signature'],
                 ['slug' => 'market-scoping',    'label' => 'Market Scoping',    'href' => route('office-head.market-scoping'),    'icon' => 'search'],
                 ['slug' => 'budget-proposal',   'label' => 'PPMP',              'href' => route('office-head.budget-proposal'),   'icon' => 'file-plus'],
                 ['slug' => 'my-proposals',      'label' => 'My PPMPs',          'href' => route('office-head.my-proposals'),      'icon' => 'folder'],

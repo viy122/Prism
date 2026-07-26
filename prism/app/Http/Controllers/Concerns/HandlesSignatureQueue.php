@@ -30,49 +30,53 @@ trait HandlesSignatureQueue
         return null;
     }
 
+    /**
+     * Step 1 of 2: sign. Routing stages are still a one-click forward (they
+     * were never signature-based). Signature stages never advance here —
+     * a photo is optional, but either way this only processes/detects the
+     * photo (if any) and hands back "ready" so a distinct "Next" action
+     * (confirmSignDocument) is what actually sends it to the next signatory.
+     */
     public function signDocument(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
     {
         $doc = $this->resolveSignableDoc($docType, $id);
         $this->authorizeStageOwnership($doc);
 
-        // Routing stages (e.g. VC review on a PO) are a one-click forward
         if (($doc->stageMetaFor($doc->signatory_stage)['type'] ?? 'signature') === 'routing') {
             $result = $signatory->advance($doc, $request->input('remarks'));
             return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
         }
 
-        $rules = [
-            'photo'   => 'required|image|mimes:jpeg,jpg,png|max:10240',
-            'remarks' => 'nullable|string|max:1000',
-        ];
-        if ($doc instanceof PurchaseRequest && $doc->nextSignatoryStage() === 'at_third_sign') {
-            $rules['third_signer'] = 'required|in:accounting,vice_chancellor';
-        }
-        $request->validate($rules);
+        $request->validate(['photo' => 'nullable|image|mimes:jpeg,jpg,png|max:10240']);
 
-        $result = $signatory->signWithPhoto(
-            $doc,
-            $request->file('photo'),
-            $request->input('remarks'),
-            $request->input('third_signer'),
-        );
+        if (!$request->hasFile('photo')) {
+            return response()->json(['success' => true, 'needsConfirmation' => true, 'detection' => 'none', 'photoPath' => null]);
+        }
+
+        $result = $signatory->signWithPhoto($doc, $request->file('photo'));
 
         return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
     }
 
+    /**
+     * Step 2 of 2 ("Next"): the sole point that actually advances a
+     * signature-type stage. `photo_path` is optional — null means no photo
+     * was ever attached (signing without one is allowed).
+     */
     public function confirmSignDocument(Request $request, string $docType, int $id, SignatoryActionService $signatory): JsonResponse
     {
         $doc = $this->resolveSignableDoc($docType, $id);
         $this->authorizeStageOwnership($doc);
 
         $rules = [
-            'photo_path' => 'required|string|max:500',
-            'boxes'      => 'nullable|array|max:6',
-            'boxes.*.x'  => 'required|numeric|min:0|max:1',
-            'boxes.*.y'  => 'required|numeric|min:0|max:1',
-            'boxes.*.w'  => 'required|numeric|min:0|max:1',
-            'boxes.*.h'  => 'required|numeric|min:0|max:1',
-            'remarks'    => 'nullable|string|max:1000',
+            'photo_path'   => 'nullable|string|max:500',
+            'blurred_path' => 'nullable|string|max:500',
+            'boxes'        => 'nullable|array|max:6',
+            'boxes.*.x'    => 'required|numeric|min:0|max:1',
+            'boxes.*.y'    => 'required|numeric|min:0|max:1',
+            'boxes.*.w'    => 'required|numeric|min:0|max:1',
+            'boxes.*.h'    => 'required|numeric|min:0|max:1',
+            'remarks'      => 'nullable|string|max:1000',
         ];
         if ($doc instanceof PurchaseRequest && $doc->nextSignatoryStage() === 'at_third_sign') {
             $rules['third_signer'] = 'required|in:accounting,vice_chancellor';
@@ -85,6 +89,7 @@ trait HandlesSignatureQueue
             $request->input('boxes'),
             $request->input('remarks'),
             $request->input('third_signer'),
+            $request->input('blurred_path'),
         );
 
         return response()->json($result, isset($result['error']) ? ($result['status'] ?? 422) : 200);
@@ -100,6 +105,139 @@ trait HandlesSignatureQueue
             $row['confirmUrl'] = route($this->queueRoutePrefix() . '.sign.confirm', [$row['docType'], $row['id']]);
             return $row;
         }, $queue->forRole($this->queueRoleCode(), $this->queueOfficeIds()));
+    }
+
+    /**
+     * EVERY document this role could ever be a signatory for — created,
+     * in progress, or already fully signed — not just the ones currently
+     * awaiting action. Powers a "show everything, gate the action" list +
+     * detail-panel signatories page (mirrors Office Head's page). `canAct`
+     * tells the UI which one row is actually actionable right now.
+     *
+     * Scoped to `queueOfficeIds()` when a controller overrides it (e.g.
+     * Office Head only ever sees their own office's documents); roles with
+     * no office boundary (VC, Chancellor, Accounting, BAC) leave it null.
+     *
+     * @param  array<string>  $docTypes  subset of ['pr','aoc','po'] this role
+     *                                   is ever a signatory for
+     */
+    protected function signatureHistoryRows(array $docTypes): array
+    {
+        $rows      = collect();
+        $officeIds = $this->queueOfficeIds();
+
+        if (in_array('pr', $docTypes, true)) {
+            $rows = $rows->concat(
+                PurchaseRequest::with(['office', 'signatureLogs.signedBy'])
+                    ->when($officeIds, fn ($q, $ids) => $q->whereIn('office_id', $ids))
+                    ->latest()
+                    ->get()
+                    ->map(fn ($pr) => $this->historyRowFor(
+                        $pr, 'pr', $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), $pr->office?->name, $pr->title, $pr->remarks
+                    ))
+            );
+        }
+
+        if (in_array('aoc', $docTypes, true)) {
+            $rows = $rows->concat(
+                AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy'])
+                    ->when($officeIds, fn ($q, $ids) => $q->whereHas('purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
+                    ->latest()
+                    ->get()
+                    ->map(fn ($aoc) => $this->historyRowFor(
+                        $aoc, 'aoc', $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+                        $aoc->purchaseRequest?->office?->name, $aoc->purchaseRequest?->title, $aoc->remarks
+                    ))
+            );
+        }
+
+        if (in_array('po', $docTypes, true)) {
+            $rows = $rows->concat(
+                PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'signatureLogs.signedBy'])
+                    ->when($officeIds, fn ($q, $ids) => $q->whereHas('abstractOfCanvass.purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
+                    ->latest()
+                    ->get()
+                    ->map(function ($po) {
+                        $pr = $po->abstractOfCanvass?->purchaseRequest;
+                        return $this->historyRowFor(
+                            $po, 'po', $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+                            $pr?->office?->name, ($pr?->title ?? '—') . ' — ' . $po->supplier_name, $po->remarks
+                        );
+                    })
+            );
+        }
+
+        return $rows->sortByDesc('updatedAt')->values()->all();
+    }
+
+    private function historyRowFor(Model $doc, string $docType, string $number, ?string $office, ?string $title, ?string $remarks): array
+    {
+        $stages  = $doc::signatoryStages();
+        $current = $doc->stageIndex($doc->signatory_stage);
+
+        $chain = collect($doc->resolvedStageMeta())
+            ->filter(fn ($m) => !in_array($m['key'], ['draft', 'fully_signed'], true))
+            ->values()
+            ->map(function ($meta) use ($stages, $current) {
+                $idx = array_search($meta['key'], $stages);
+                return [
+                    'key'    => $meta['key'],
+                    'label'  => $meta['label'],
+                    'type'   => $meta['type'] ?? 'signature',
+                    'status' => $idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending'),
+                ];
+            })->values()->all();
+
+        $row = [
+            'docType'        => $docType,
+            'docLabel'       => strtoupper($docType),
+            'id'             => $doc->id,
+            'number'         => $number,
+            'office'         => $office ?? '—',
+            'title'          => $title ?? '—',
+            'remarks'        => $remarks ?: '—',
+            'signatoryStage' => $doc->signatory_stage,
+            'signatoryLabel' => $doc->signatory_label,
+            'stageType'      => $doc->stageMetaFor($doc->signatory_stage)['type'] ?? 'signature',
+            'nextStage'      => $doc->nextSignatoryStage(),
+            'canAct'         => $doc->signatory_stage !== 'fully_signed'
+                && $doc->stageOwnerRole($doc->signatory_stage) === $this->queueRoleCode(),
+            'chain'          => $chain,
+            'signatureLogs'  => $doc->signatureLogs->map(fn ($l) => [
+                'display' => $doc->describeSignatureLog($l),
+                'by'      => $l->signedBy?->name ?? '—',
+                'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+            ])->all(),
+            'signUrl'        => route($this->queueRoutePrefix() . '.sign', [$docType, $doc->id]),
+            'confirmUrl'     => route($this->queueRoutePrefix() . '.sign.confirm', [$docType, $doc->id]),
+            'updatedAt'      => $doc->updated_at,
+        ];
+
+        // Preview: PR embeds its uploaded scanned PDF; AOC has no file of its
+        // own, so its "preview" is the parent PR's items + the canvass
+        // quotations gathered for it — the actual substance of an Abstract
+        // of Canvass. PO has neither and isn't previewed.
+        if ($docType === 'pr') {
+            $row['pdfFile'] = $doc->file_path;
+        } elseif ($docType === 'aoc') {
+            $pr = $doc->purchaseRequest;
+            $row['prItems'] = $pr?->items->map(fn ($i) => [
+                'name'      => $i->name,
+                'quantity'  => (float) $i->quantity,
+                'unit'      => $i->unit,
+                'unitCost'  => (float) $i->estimated_unit_cost,
+                'totalCost' => (float) $i->estimated_total_cost,
+            ])->all() ?? [];
+            $row['prTotal'] = (float) ($pr?->total_amount ?? 0);
+            $row['quotations'] = $pr?->documents->where('document_type', 'canvass_quotation')->map(fn ($d) => [
+                'supplier'   => $d->title,
+                'filename'   => $d->original_filename,
+                'url'        => \Illuminate\Support\Facades\Storage::url($d->file_path),
+                'uploadedAt' => $d->uploaded_at?->format('M d, Y') ?? '—',
+            ])->values()->all() ?? [];
+        }
+
+        return $row;
     }
 
     protected function resolveSignableDoc(string $docType, int $id): Model

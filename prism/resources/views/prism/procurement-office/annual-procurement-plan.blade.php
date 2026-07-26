@@ -33,7 +33,7 @@
     }
     .btn-primary:hover { background: var(--crimson-dark); }
 
-    .filters-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .filters-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
     .field-select {
         height: 44px; width: 100%; border-radius: 10px;
@@ -74,7 +74,18 @@
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
     /* ── Procurement mode cell ── */
-    .mode-cell { min-width: 280px; }
+    .mode-cell { min-width: 200px; }
+    .tracking-cell { min-width: 260px; }
+
+    /* Tracking status hover tooltip (full text, since the select itself truncates) */
+    .tracking-tooltip-wrap { position: relative; display: block; width: 100%; }
+    .tracking-tooltip-text {
+        display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
+        background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 6px;
+        font-size: 11px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(15,23,42,.25);
+        pointer-events: none;
+    }
+    .tracking-tooltip-wrap:hover .tracking-tooltip-text { display: block; }
 
     .rec-badge {
         display: flex; align-items: center; gap: 7px;
@@ -155,6 +166,15 @@
     <div class="card">
         <div class="filters-grid">
             <div>
+                <label class="field-label" for="appYearFilter">Fiscal Year</label>
+                <select class="field-select" id="appYearFilter">
+                    <option value="all">All years</option>
+                    @foreach ($fiscalYears as $year)
+                        <option value="{{ $year }}">FY {{ $year }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
                 <label class="field-label" for="appOfficeFilter">Office</label>
                 <select class="field-select" id="appOfficeFilter">
                     <option value="all">All offices</option>
@@ -208,6 +228,7 @@
                         <th>ABC Amount</th>
                         <th>Quarter</th>
                         <th>Procurement Mode</th>
+                        <th>Tracking Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -215,7 +236,8 @@
                         <tr data-app-row
                             data-office="{{ $item['office'] }}"
                             data-quarter="{{ $item['targetQuarter'] }}"
-                            data-mode="{{ $item['procurementMode'] }}">
+                            data-mode="{{ $item['procurementMode'] }}"
+                            data-year="{{ $item['fiscalYear'] }}">
 
                             <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $item['office'] }}</td>
                             <td><p class="item-name">{{ $item['item'] }}</p></td>
@@ -239,7 +261,7 @@
                                     {{-- System recommendation (compact single-line) --}}
                                     <div class="rec-badge" title="{{ $item['rationale'] }}">
                                         <i class="ti ti-cpu"></i>
-                                        System Recommendation: <strong>{{ $item['recommendedMode'] }}</strong>
+                                        Recommended: <strong>{{ $item['recommendedMode'] }}</strong>
                                     </div>
 
                                     {{-- Override active warning --}}
@@ -287,6 +309,19 @@
                                 </div>
 
                             </td>
+
+                            {{-- ── Tracking Status cell ── --}}
+                            <td class="tracking-cell">
+                                <div class="tracking-tooltip-wrap">
+                                    <select class="field-select js-tracking-select" data-tracking-select="{{ $item['itemId'] }}" data-tracking-url="{{ $item['trackingStatusUrl'] }}" data-prev-value="{{ !empty($item['trackingStatus']['override']) ? $item['trackingStatus']['key'] : '' }}" style="height:36px;font-size:12px;font-weight:600;width:100%;">
+                                        <option value="" @selected(empty($item['trackingStatus']['override']))>{{ $item['trackingStatusAuto']['label'] }}</option>
+                                        @foreach ($trackingStageOptions as $opt)
+                                            <option value="{{ $opt['key'] }}" @selected(!empty($item['trackingStatus']['override']) && $item['trackingStatus']['key'] === $opt['key'])>{{ $opt['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <span class="tracking-tooltip-text">{{ $item['trackingStatus']['label'] }}</span>
+                                </div>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -303,6 +338,7 @@
     const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
     // ── Filters ───────────────────────────────────────────────────────────
+    const yearEl    = document.getElementById('appYearFilter');
     const officeEl  = document.getElementById('appOfficeFilter');
     const quarterEl = document.getElementById('appQuarterFilter');
     const modeEl    = document.getElementById('appModeFilter');
@@ -310,6 +346,7 @@
     const rows      = document.querySelectorAll('[data-app-row]');
 
     function applyFilters() {
+        const year    = yearEl.value;
         const office  = officeEl.value;
         const quarter = quarterEl.value;
         const mode    = modeEl.value;
@@ -317,6 +354,7 @@
 
         rows.forEach(row => {
             const match =
+                (year    === 'all' || row.dataset.year    === year)    &&
                 (office  === 'all' || row.dataset.office  === office)  &&
                 (quarter === 'all' || row.dataset.quarter === quarter) &&
                 (mode    === 'all' || row.dataset.mode    === mode);
@@ -327,6 +365,7 @@
         countEl.textContent = visible + ' shown';
     }
 
+    yearEl.addEventListener('change',    applyFilters);
     officeEl.addEventListener('change',  applyFilters);
     quarterEl.addEventListener('change', applyFilters);
     modeEl.addEventListener('change',    applyFilters);
@@ -456,6 +495,34 @@
     function escHtml(s) {
         return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    // ── Tracking status (auto by default, manually overridable) ────────────
+    document.addEventListener('change', async function (e) {
+        const sel = e.target.closest('[data-tracking-select]');
+        if (!sel) return;
+        const url  = sel.dataset.trackingUrl;
+        const prev = sel.dataset.prevValue ?? '';
+        sel.disabled = true;
+        try {
+            const res  = await fetch(url, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                body: JSON.stringify({ trackingStatus: sel.value }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && data?.success) {
+                sel.dataset.prevValue = sel.value;
+                const tip = sel.closest('.tracking-tooltip-wrap')?.querySelector('.tracking-tooltip-text');
+                if (tip) tip.textContent = sel.options[sel.selectedIndex].text;
+            } else {
+                sel.value = prev;
+            }
+        } catch {
+            sel.value = prev;
+        } finally {
+            sel.disabled = false;
+        }
+    });
 })();
 </script>
 @endpush

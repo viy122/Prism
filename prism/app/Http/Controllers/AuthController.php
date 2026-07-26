@@ -96,8 +96,13 @@ class AuthController extends Controller
             'procurement-office' => 'procurement',
             'chancellor'         => 'chancellor',
             'vice-chancellor'    => 'vice_chancellor',
+            'vcaa'               => 'vcaa_demo',
+            'vcaf'               => 'vcaf_demo',
             'accounting-office'  => 'accounting',
             'bac'                => 'bac',
+            'bac-member'         => 'bac_member_demo',
+            'bac-vc'             => 'bac_vc_demo',
+            'bac-chair'          => 'bac_chair_demo',
             'cashier'            => 'cashier',
             'system-admin'       => 'admin',
         ];

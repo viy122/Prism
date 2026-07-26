@@ -26,6 +26,29 @@
     </div>
 </div>
 
+{{--
+    Shared info popup — same visual language as the confirm modal above (same
+    overlay, card, radius, shadow, fonts) but for showing read-only content
+    with a single Close button instead of asking for a Confirm/Cancel decision.
+
+        window.prismInfoModal({ title: 'Product Details', bodyHtml: '<p>...</p>' });
+
+    Do not build page-specific info popups — reuse this one so the design
+    stays consistent everywhere.
+--}}
+<div id="prismInfoOverlay" class="prism-confirm-overlay" aria-hidden="true">
+    <div class="prism-confirm-card prism-info-card" role="dialog" aria-modal="true" aria-labelledby="prismInfoTitle">
+        <div class="prism-info-head">
+            <p class="prism-confirm-title" id="prismInfoTitle">Details</p>
+            <button type="button" class="prism-info-close" id="prismInfoCloseX" aria-label="Close">&times;</button>
+        </div>
+        <div class="prism-info-body" id="prismInfoBody"></div>
+        <div class="prism-confirm-actions">
+            <button type="button" class="prism-confirm-btn prism-confirm-cancel" id="prismInfoCloseBtn">Close</button>
+        </div>
+    </div>
+</div>
+
 <style>
     .prism-confirm-overlay {
         position: fixed; inset: 0; z-index: 2000;
@@ -53,6 +76,16 @@
     .prism-confirm-ok:hover { background: var(--crimson-dark, #5C1011); }
     .prism-confirm-ok.neutral { background: var(--txt, #1C1010); }
     .prism-confirm-ok.neutral:hover { background: #000; }
+
+    .prism-info-card { max-width: 440px; max-height: 82vh; display: flex; flex-direction: column; }
+    .prism-info-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .prism-info-head .prism-confirm-title { margin-bottom: 0; }
+    .prism-info-close {
+        background: none; border: none; cursor: pointer; line-height: 1;
+        font-size: 20px; color: var(--txt3, #A88B8C); padding: 0 2px; flex-shrink: 0;
+    }
+    .prism-info-close:hover { color: var(--txt, #1C1010); }
+    .prism-info-body { overflow-y: auto; margin-top: 10px; }
 </style>
 
 <script>
@@ -92,6 +125,35 @@
         okBtn.focus();
 
         return new Promise((resolve) => { resolvePromise = resolve; });
+    };
+
+    // ── Info popup (read-only content, single Close button) ────────────────
+    const infoOverlay  = document.getElementById('prismInfoOverlay');
+    const infoTitleEl  = document.getElementById('prismInfoTitle');
+    const infoBodyEl   = document.getElementById('prismInfoBody');
+    const infoCloseBtn = document.getElementById('prismInfoCloseBtn');
+    const infoCloseX   = document.getElementById('prismInfoCloseX');
+
+    function closeInfo() {
+        infoOverlay.classList.remove('open');
+        infoOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    infoCloseBtn.addEventListener('click', closeInfo);
+    infoCloseX.addEventListener('click', closeInfo);
+    infoOverlay.addEventListener('click', (e) => { if (e.target === infoOverlay) closeInfo(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && infoOverlay.classList.contains('open')) closeInfo();
+    });
+
+    window.prismInfoModal = function (options) {
+        options = options || {};
+        infoTitleEl.textContent = options.title || 'Details';
+        infoBodyEl.innerHTML    = options.bodyHtml || '';
+
+        infoOverlay.classList.add('open');
+        infoOverlay.setAttribute('aria-hidden', 'false');
+        infoCloseBtn.focus();
     };
 })();
 </script>
