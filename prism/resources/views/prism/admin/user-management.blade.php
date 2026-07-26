@@ -83,6 +83,10 @@
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <input type="text" id="userSearch" class="search-input" placeholder="Search name, username, office…">
+                <select id="roleFilter" class="search-input" style="min-width:auto;width:auto;">
+                    <option value="">All Roles</option>
+                    @foreach($roles as $r)<option value="{{ $r['name'] }}">{{ $r['name'] }}</option>@endforeach
+                </select>
                 <button class="btn btn-crimson" id="newUserBtn"><i class="ti ti-user-plus"></i> New User</button>
             </div>
         </div>
@@ -102,7 +106,7 @@
                 </thead>
                 <tbody>
                     @foreach($users as $u)
-                    <tr data-search="{{ strtolower($u['name'] . ' ' . $u['username'] . ' ' . $u['email'] . ' ' . $u['office'] . ' ' . $u['role']) }}">
+                    <tr data-search="{{ strtolower($u['name'] . ' ' . $u['username'] . ' ' . $u['email'] . ' ' . $u['office'] . ' ' . $u['role']) }}" data-role="{{ $u['role'] }}">
                         <td>
                             <span style="font-weight:700;">{{ $u['name'] }}</span><br>
                             <span style="font-size:11px;color:var(--s400);">{{ $u['email'] }}</span>
@@ -275,12 +279,20 @@
         });
     });
 
-    document.getElementById('userSearch').addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
+    const roleFilterEl = document.getElementById('roleFilter');
+
+    function applyUserFilters() {
+        const q    = document.getElementById('userSearch').value.trim().toLowerCase();
+        const role = roleFilterEl.value;
         document.querySelectorAll('#usersTable tbody tr').forEach(tr => {
-            tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none';
+            const matchesSearch = !q || tr.dataset.search.includes(q);
+            const matchesRole   = !role || tr.dataset.role === role;
+            tr.style.display = matchesSearch && matchesRole ? '' : 'none';
         });
-    });
+    }
+
+    document.getElementById('userSearch').addEventListener('input', applyUserFilters);
+    roleFilterEl.addEventListener('change', applyUserFilters);
 
     if (!document.getElementById('spinStyle')) {
         const s = document.createElement('style');

@@ -257,7 +257,7 @@
                         $trackingKey = $pr['trackingStatus']['key'] ?? null;
                         $trackingBadgeCls = match(true) {
                             $trackingKey === 'paid' => 'badge-completed',
-                            in_array($trackingKey, ['pr:draft', 'awaiting_aoc', 'awaiting_po'], true) => 'badge-pending',
+                            in_array($trackingKey, ['pr:draft', 'for_canvassing', 'awaiting_aoc', 'aoc:not_yet_created', 'awaiting_po', 'po:not_yet_created'], true) => 'badge-pending',
                             default => 'badge-progress',
                         };
                     @endphp

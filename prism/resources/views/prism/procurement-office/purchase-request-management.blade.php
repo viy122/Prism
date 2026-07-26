@@ -139,16 +139,6 @@
     .btn-import-bsu:hover { background: #0a3d68; }
     .btn-import-bsu i { font-size: 15px; }
 
-    /* Tracking status hover tooltip (full text, since the select itself truncates) */
-    .tracking-tooltip-wrap { position: relative; display: inline-block; max-width: 220px; }
-    .tracking-tooltip-text {
-        display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
-        background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 6px;
-        font-size: 11px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(15,23,42,.25);
-        pointer-events: none;
-    }
-    .tracking-tooltip-wrap:hover .tracking-tooltip-text { display: block; }
-
     /* Import modal overlay */
     .import-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
     .import-modal-overlay.hidden { display: none; }
@@ -250,7 +240,6 @@
                             <th>Description</th>
                             <th>Date Submitted</th>
                             <th>Signatory Stage</th>
-                            <th>Tracking Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -269,17 +258,6 @@
                                 <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['dateSubmitted'] }}</td>
                                 <td>
                                     <span class="badge {{ $stageBadge }}" data-sig-badge="{{ $pr['id'] }}">{{ $pr['signatoryLabel'] }}</span>
-                                </td>
-                                <td onclick="event.stopPropagation()">
-                                    <div class="tracking-tooltip-wrap">
-                                        <select class="tracking-status-select" data-tracking-select="{{ $pr['id'] }}" data-tracking-url="{{ $pr['trackingStatusUrl'] }}" data-prev-value="{{ !empty($pr['trackingStatus']['override']) ? $pr['trackingStatus']['key'] : '' }}" style="font-size:12px;font-weight:600;padding:5px 8px;border-radius:8px;border:1px solid var(--s300);background:var(--s50);color:var(--s700);max-width:220px;">
-                                            <option value="" @selected(empty($pr['trackingStatus']['override']))>{{ $pr['trackingStatusAuto']['label'] }}</option>
-                                            @foreach ($trackingStageOptions as $opt)
-                                                <option value="{{ $opt['key'] }}" @selected(!empty($pr['trackingStatus']['override']) && $pr['trackingStatus']['key'] === $opt['key'])>{{ $opt['label'] }}</option>
-                                            @endforeach
-                                        </select>
-                                        <span class="tracking-tooltip-text">{{ $pr['trackingStatus']['label'] }}</span>
-                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -317,7 +295,7 @@
                 </div>
                 <label class="upload-pr-label" id="uploadPrLabel">
                     <i class="ti ti-upload"></i>
-                    <span id="uploadPrText">Upload Signed PR PDF</span>
+                    <span id="uploadPrText">Upload PR PDF</span>
                     <input type="file" id="uploadPrInput" accept="application/pdf,.pdf">
                 </label>
 
@@ -634,12 +612,17 @@
     }
 
     function updateTimeline(pr) {
-        // Timeline shows every stage after 'draft'; routing steps get dashed dots
+        // Timeline shows every real stage — excludes 'draft' (not a signing step)
+        // and the terminal 'fully_signed' marker (not a real step either, just
+        // means "done"). Without excluding the latter, activeIdx would land on
+        // it once reached and that last dot would render 'active' (in-progress)
+        // forever instead of 'done' like the rest.
         const timeline = document.getElementById('sigTimeline');
-        const meta     = metaOf(pr).slice(1);
+        const meta     = metaOf(pr).filter(m => !['draft', 'fully_signed'].includes(m.key));
         const activeIdx = meta.findIndex(m => m.key === pr.signatoryStage);
+        const isFullySigned = pr.signatoryStage === 'fully_signed';
         timeline.innerHTML = meta.map((m, i) => {
-            const state = i < activeIdx ? ' done' : (i === activeIdx ? ' active' : '');
+            const state = (isFullySigned || i < activeIdx) ? ' done' : (i === activeIdx ? ' active' : '');
             const routing = m.type === 'routing' ? ' routing' : '';
             return `<div class="sig-step${routing}${state}"><div class="sig-dot"></div><span class="sig-label">${m.label}</span></div>`;
         }).join('');
@@ -699,7 +682,7 @@
         pdfEl.innerHTML = pr.pdfFile
             ? `<iframe src="/storage/${pr.pdfFile}" title="PR Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
-        uploadPrText.textContent = pr.pdfFile ? 'Re-upload PDF' : 'Upload Signed PR PDF';
+        uploadPrText.textContent = pr.pdfFile ? 'Re-upload PDF' : 'Upload PR PDF';
 
         if (!logs[pr.id]) {
             logs[pr.id] = (pr.activityLog || []).map(e => ({
@@ -773,37 +756,6 @@
         } catch {
             btn.textContent = 'Network error';
             btn.disabled = false;
-        }
-    });
-
-    /* ── Tracking Status (auto by default, manually overridable) ── */
-    document.addEventListener('change', async (e) => {
-        const sel = e.target.closest('[data-tracking-select]');
-        if (!sel) return;
-        const url  = sel.dataset.trackingUrl;
-        const prev = sel.dataset.prevValue ?? '';
-        sel.disabled = true;
-        try {
-            const resp = await fetch(url, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({ trackingStatus: sel.value }),
-            });
-            const json = await resp.json().catch(() => null);
-            if (resp.ok && json?.success) {
-                sel.dataset.prevValue = sel.value;
-                const tip = sel.closest('.tracking-tooltip-wrap')?.querySelector('.tracking-tooltip-text');
-                if (tip) tip.textContent = sel.options[sel.selectedIndex].text;
-                showToast(sel.value ? 'Tracking status overridden.' : 'Tracking status reset.');
-            } else {
-                sel.value = prev;
-                showToast(json?.error || 'Failed to update tracking status.', true);
-            }
-        } catch {
-            sel.value = prev;
-            showToast('Network error.', true);
-        } finally {
-            sel.disabled = false;
         }
     });
 
@@ -1217,6 +1169,18 @@
         btnConfirm.disabled = false;
         btnConfirm.innerHTML = '<i class="ti ti-check"></i> Confirm Import';
     });
+
+    // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
+    // web) otherwise wouldn't show up here without a manual reload. Skip while
+    // an upload/import is in flight or a remark/purpose field is being typed.
+    setInterval(() => {
+        if (saving || importing) return;
+        for (const id of ['returnRemarksInput', 'remarksInput', 'impPurpose']) {
+            const el = document.getElementById(id);
+            if (el && el.value.trim()) return;
+        }
+        window.location.reload();
+    }, 45000);
 })();
 </script>
 @endpush

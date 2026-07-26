@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\DocumentUpload;
 use App\Models\PurchaseOrder;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -139,6 +140,8 @@ class PrismAccountingOfficeController extends Controller
             'payment_processing_at' => now(),
         ]);
         $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
+
+        NotificationService::paymentProcessingStarted($po->fresh());
 
         return response()->json([
             'success'      => true,

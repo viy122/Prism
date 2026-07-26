@@ -50,6 +50,29 @@ class AbstractOfCanvass extends Model
         return $this->hasOne(PurchaseOrder::class);
     }
 
+    /**
+     * Overrides HasSignatoryChain's default: clicking "For AOC" only creates
+     * this row so it can be routed for signatures — no document exists yet,
+     * so "AOC Created" would be misleading until uploadAbstractOfCanvass()
+     * actually attaches one. Mirrors PurchaseRequest::getSignatoryLabelAttribute().
+     */
+    public function getSignatoryLabelAttribute(): string
+    {
+        if ($this->signatory_stage === 'draft' && !$this->file_path) {
+            return 'AOC to be Created';
+        }
+
+        $meta = $this->stageMetaFor($this->signatory_stage);
+        if (!$meta) {
+            return ucfirst(str_replace('_', ' ', $this->signatory_stage ?? 'draft'));
+        }
+        return match ($meta['key']) {
+            'draft'        => static::SIGNATORY_DOC_PREFIX . ' Created',
+            'fully_signed' => static::SIGNATORY_DOC_PREFIX . ' – Fully Signed',
+            default        => static::SIGNATORY_DOC_PREFIX . ' – At ' . $meta['label'],
+        };
+    }
+
     // ── Signatory chain ──────────────────────────────────────────────────────
 
     public const SIGNATORY_DOC_PREFIX = 'AOC';
@@ -60,7 +83,7 @@ class AbstractOfCanvass extends Model
         ['key' => 'at_bac_member',     'label' => 'BAC Member',                    'type' => 'signature', 'role' => 'bac'],
         ['key' => 'at_bac_vice_chair', 'label' => 'BAC Vice Chairperson',          'type' => 'signature', 'role' => 'bac'],
         ['key' => 'at_bac_chair',      'label' => 'BAC Chairperson',               'type' => 'signature', 'role' => 'bac'],
-        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign', 'type' => 'signature', 'role' => 'vcaf'],
+        ['key' => 'at_vc_countersign', 'label' => 'Vice Chancellor – Countersign (VCAF)', 'type' => 'signature', 'role' => 'vcaf'],
         ['key' => 'at_chancellor',     'label' => 'Chancellor',                    'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'fully_signed',      'label' => 'Fully Signed',                  'type' => 'signature'],
     ];

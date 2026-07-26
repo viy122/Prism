@@ -228,10 +228,9 @@
                 <table class="mps-ref-table">
                     <thead>
                         <tr>
-                            <th style="width:40%">Source / Supplier</th>
-                            <th style="width:20%">Unit Price</th>
-                            <th style="width:20%">Date Retrieved</th>
-                            <th style="width:20%">Link</th>
+                            <th style="width:50%">Source / Supplier</th>
+                            <th style="width:25%">Unit Price</th>
+                            <th style="width:25%">Date Retrieved</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -240,13 +239,6 @@
                             <td>{{ $ref->supplier_name ?? $ref->title ?? '—' }}</td>
                             <td class="mps-ref-price">₱{{ number_format((float) $ref->price, 2) }}</td>
                             <td>{{ $ref->date_accessed?->format('M d, Y') ?? now()->format('M d, Y') }}</td>
-                            <td>
-                                @if ($ref->source_url)
-                                    <a href="{{ $ref->source_url }}" target="_blank" rel="noopener" class="mps-ref-source-link">View source</a>
-                                @else
-                                    &mdash;
-                                @endif
-                            </td>
                         </tr>
                         @endforeach
                     </tbody>

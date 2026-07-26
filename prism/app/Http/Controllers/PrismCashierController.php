@@ -12,58 +12,41 @@ use Illuminate\View\View;
 class PrismCashierController extends Controller
 {
     /**
-     * Cashier isn't part of the signatory chain — POs pass through a separate
-     * delivery/payment `status` chain, and the only action here is uploading
-     * a receipt once a PO reaches `processing_payment`. Mirrors the other
-     * roles' "For My Signature" list + detail-panel UI: shows EVERY issued
-     * PO (not just those currently awaiting a receipt), with `canAct` gating
-     * the upload action to the ones actually at Cashier's step right now.
+     * Mirrors the Accounting Office dashboard's layout: a flat "needs action"
+     * table with a check-icon "Payment Made" column that opens an attach-receipt
+     * popup, plus a "Recently Paid" history table — instead of the previous
+     * search + click-to-select master/detail panel.
      */
     public function dashboard(): View
     {
-        $chain = PurchaseOrder::statusChain();
-
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy', 'documents'])
-            ->latest()
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy'])
+            ->whereIn('status', ['processing_payment', 'paid'])
+            ->latest('id')
             ->get()
-            ->map(function ($po) use ($chain) {
-                $pr      = $po->abstractOfCanvass?->purchaseRequest;
-                $current = array_search($po->status, $chain);
-                $current = $current === false ? 0 : $current;
-
-                $receipt = $po->documents->firstWhere('document_type', 'payment_receipt');
+            ->map(function ($po) {
+                $pr = $po->abstractOfCanvass?->purchaseRequest;
 
                 return [
-                    'id'          => $po->id,
-                    'poNumber'    => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                    'office'      => $pr?->office?->name ?? '—',
-                    'title'       => $pr?->title ?? '—',
-                    'supplier'    => $po->supplier_name,
-                    'totalAmount' => (float) $po->total_amount,
-                    'remarks'     => $po->remarks ?: '—',
-                    'status'      => $po->status,
-                    'statusLabel' => $po->status_label,
-                    'canAct'      => $po->status === 'processing_payment',
-                    'chain'       => collect($chain)->map(function ($key, $idx) use ($current, $po) {
-                        return [
-                            'key'    => $key,
-                            'label'  => (clone $po)->fill(['status' => $key])->status_label,
-                            'status' => $idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending'),
-                        ];
-                    })->values()->all(),
-                    'receiptUrl'  => $receipt ? Storage::url($receipt->file_path) : null,
-                    'paidAt'      => $po->paid_at?->format('M d, Y g:i A') ?? '—',
-                    'paidBy'      => $po->paidBy?->name ?? '—',
-                    'uploadUrl'   => route('cashier.po.upload-receipt', $po->id),
+                    'id'            => $po->id,
+                    'poNumber'      => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+                    'office'        => $pr?->office?->name ?? '—',
+                    'title'         => $pr?->title ?? '—',
+                    'supplier'      => $po->supplier_name,
+                    'totalAmount'   => (float) $po->total_amount,
+                    'status'        => $po->status,
+                    'processingAt'  => $po->payment_processing_at?->format('M d, Y') ?? '—',
+                    'paidAt'        => $po->paid_at?->format('M d, Y') ?? '—',
+                    'paidBy'        => $po->paidBy?->name ?? '—',
+                    'uploadUrl'     => route('cashier.po.upload-receipt', $po->id),
                 ];
-            })
-            ->all();
+            });
 
         return view('prism.cashier.dashboard', $this->withCommon('dashboard', [
-            'pageTitle' => 'Cashier Dashboard',
-            'purchaseOrders' => $pos,
+            'pageTitle'    => 'Cashier Dashboard',
+            'forPayment'   => $pos->where('status', 'processing_payment')->values()->all(),
+            'recentlyPaid' => $pos->where('status', 'paid')->values()->all(),
             'summary'   => [
-                'forPayment'  => collect($pos)->where('status', 'processing_payment')->count(),
+                'forPayment'  => $pos->where('status', 'processing_payment')->count(),
                 'totalPaid'   => PurchaseOrder::where('status', 'paid')->count(),
                 'totalAmount' => (float) PurchaseOrder::where('status', 'paid')->sum('total_amount'),
             ],

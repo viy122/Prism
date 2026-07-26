@@ -183,8 +183,7 @@
     .budget-input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); background: var(--white); }
     .budget-input::placeholder { color: var(--txt3); font-size: 12px; }
 
-    /* ── Advantageous badge ── */
-    .ref-tag.t-adv   { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+    /* ── Advantageous reason ── */
     .advantageous-reason { font-size: 11px; font-weight: 500; color: #92400E; margin-top: 5px; line-height: 1.5; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 5px; padding: 5px 8px; }
 
     /* ── Autocomplete dropdown ── */
@@ -336,12 +335,6 @@
                     <button class="btn-save-ref" id="saveRefBtn" type="button" disabled>
                         <i class="ti ti-link"></i>Attach to PPMP
                     </button>
-                    <a href="{{ route('office-head.market-scoping.mps', $proposalId ? ['proposal' => $proposalId] : []) }}"
-                       style="display:flex;align-items:center;justify-content:center;gap:7px;height:38px;width:100%;border-radius:var(--r-sm);background:transparent;color:var(--txt2);border:1.5px solid var(--border2);font-size:12px;font-weight:700;font-family:'Poppins',sans-serif;text-decoration:none;transition:all .15s;"
-                       onmouseover="this.style.borderColor='var(--crimson)';this.style.color='var(--crimson)';"
-                       onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--txt2)';">
-                        <i class="ti ti-file-download"></i>Save Market Study as File
-                    </a>
                 </div>
 
             </div>
@@ -581,7 +574,13 @@
         }
     }
 
-    let pendingRefsData = null;
+    let pendingRefsData      = null;
+    // Set below (from ?unit=&quantity=&quarter=&justification=) only when arriving
+    // via the PPMP "Run Market Scoping" shortcut with a not-yet-added item — lets
+    // "Attach to PPMP" create the item straight away instead of popping up
+    // "Add Item to Proposal" and asking the office head to retype what they
+    // already filled in on the PPMP tab.
+    let carriedNewItemFields = null;
 
     /* ── Attach to Proposal button ── */
     document.getElementById('saveRefBtn').addEventListener('click', function () {
@@ -619,6 +618,8 @@
                 document.getElementById('saveHint').textContent = 'Redirecting to PPMP…';
                 document.getElementById('saveHint').className   = 'rp-save-hint hint-ok';
                 setTimeout(() => { window.location.href = budgetProposalUrl; }, 1400);
+            } else if (carriedNewItemFields) {
+                autoAddItemWithCarriedFields(data);
             } else {
                 openAddItemModal(data);
             }
@@ -642,6 +643,57 @@
         document.getElementById('modalError').style.display = 'none';
         document.getElementById('addItemModal').style.display = 'flex';
         setTimeout(() => document.getElementById('modalQty').focus(), 80);
+    }
+
+    async function autoAddItemWithCarriedFields(data) {
+        const hint = document.getElementById('saveHint');
+        hint.textContent = 'Adding item to proposal…';
+        hint.className   = 'rp-save-hint hint-ok';
+
+        try {
+            const res  = await fetch('{{ route("office-head.market-scoping.add-item-with-refs") }}', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body:    JSON.stringify({
+                    description:       data.query || '',
+                    unit:              carriedNewItemFields.unit,
+                    quantity:          parseFloat(carriedNewItemFields.quantity),
+                    estimatedUnitCost: data.average_price ? parseFloat(data.average_price) : 0,
+                    targetQuarter:     carriedNewItemFields.quarter,
+                    // Not collected on the PPMP tab's Add Item form (nor asked
+                    // there), same default the "Add Item to Proposal" modal itself
+                    // starts on — office head can still edit it after redirect.
+                    category:          'Sched 9 - Supplies',
+                    refs:              data.refs_data,
+                    proposal_id:       proposalId,
+                }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                showMsToast('Item added to proposal!');
+                hint.textContent = 'Redirecting to PPMP…';
+                setTimeout(() => { window.location.href = json.redirect; }, 1000);
+            } else {
+                // Couldn't add automatically (e.g. no draft proposal to attach to)
+                // — fall back to the modal, pre-filled, rather than losing the
+                // 3 already-attached references.
+                openAddItemModal(data);
+                document.getElementById('modalItemName').value = data.query || '';
+                document.getElementById('modalUnit').value     = carriedNewItemFields.unit || 'unit';
+                document.getElementById('modalQty').value       = carriedNewItemFields.quantity || '';
+                document.getElementById('modalQuarter').value   = carriedNewItemFields.quarter || 'Q1';
+                document.getElementById('modalError').textContent = json.message || 'Could not add automatically — please confirm the details.';
+                document.getElementById('modalError').style.display = '';
+                hint.textContent = '3 references ready — click to attach to proposal.';
+                hint.className   = 'rp-save-hint hint-ok';
+            }
+        } catch {
+            openAddItemModal(data);
+            document.getElementById('modalError').textContent = 'Network error — please confirm the details.';
+            document.getElementById('modalError').style.display = '';
+            hint.textContent = '3 references ready — click to attach to proposal.';
+            hint.className   = 'rp-save-hint hint-ok';
+        }
     }
 
     document.getElementById('modalSkipBtn').addEventListener('click', function () {
@@ -896,9 +948,6 @@
                   '</div>'
                 : '';
 
-            const advBadge = isAdv
-                ? '<span class="ref-tag t-adv"><i class="ti ti-star" style="font-size:10px"></i>Advantageous</span>'
-                : '';
             const advBlock = isAdv && advReason
                 ? '<p class="advantageous-reason"><i class="ti ti-bulb" style="font-size:11px;margin-right:4px"></i>' + esc(advReason) + '</p>'
                 : '';
@@ -910,7 +959,7 @@
                 '<div class="ref-body">' +
                     '<p class="ref-name">' + esc(name) + '</p>' +
                     '<p class="ref-supplier">' + esc(source) + '</p>' +
-                    '<div class="ref-tags">' + sourceTag + cachedTag + advBadge + '</div>' +
+                    '<div class="ref-tags">' + sourceTag + cachedTag + '</div>' +
                     ratingHtml +
                     advBlock +
                     '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
@@ -1104,11 +1153,27 @@
         const params = new URLSearchParams(window.location.search);
         const q      = params.get('q');
         const budget = params.get('budget');
+        const itemId = params.get('item');
 
         // Item's already-encoded Unit Cost carried over as the scoping budget —
         // only present when the PPMP item was encoded before scoping was run.
         const budgetInput = document.getElementById('marketBudgetInput');
         if (budget && budgetInput) budgetInput.value = budget;
+
+        // Only set when there's no ?item= — an itemId means the item already
+        // exists in the proposal table, so the normal "attach to existing item"
+        // path applies and there's nothing here to carry into a new-item add.
+        const unitParam     = params.get('unit');
+        const quantityParam = params.get('quantity');
+        const quarterParam  = params.get('quarter');
+        if (!itemId && unitParam && quantityParam && quarterParam) {
+            carriedNewItemFields = {
+                unit: unitParam,
+                quantity: quantityParam,
+                quarter: quarterParam,
+                justification: params.get('justification') || '',
+            };
+        }
 
         if (q && queryInput) {
             queryInput.value = q;

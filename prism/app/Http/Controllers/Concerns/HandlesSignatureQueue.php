@@ -128,7 +128,7 @@ trait HandlesSignatureQueue
 
         if (in_array('pr', $docTypes, true)) {
             $rows = $rows->concat(
-                PurchaseRequest::with(['office', 'signatureLogs.signedBy'])
+                PurchaseRequest::with(['office', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
                     ->when($officeIds, fn ($q, $ids) => $q->whereIn('office_id', $ids))
                     ->latest()
                     ->get()
@@ -140,7 +140,7 @@ trait HandlesSignatureQueue
 
         if (in_array('aoc', $docTypes, true)) {
             $rows = $rows->concat(
-                AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy'])
+                AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
                     ->when($officeIds, fn ($q, $ids) => $q->whereHas('purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
                     ->latest()
                     ->get()
@@ -153,7 +153,7 @@ trait HandlesSignatureQueue
 
         if (in_array('po', $docTypes, true)) {
             $rows = $rows->concat(
-                PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'signatureLogs.signedBy'])
+                PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
                     ->when($officeIds, fn ($q, $ids) => $q->whereHas('abstractOfCanvass.purchaseRequest', fn ($q2) => $q2->whereIn('office_id', $ids)))
                     ->latest()
                     ->get()
@@ -204,9 +204,21 @@ trait HandlesSignatureQueue
                 && $doc->stageOwnerRole($doc->signatory_stage) === $this->queueRoleCode(),
             'chain'          => $chain,
             'signatureLogs'  => $doc->signatureLogs->map(fn ($l) => [
-                'display' => $doc->describeSignatureLog($l),
-                'by'      => $l->signedBy?->name ?? '—',
-                'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                'display'     => $doc->describeSignatureLog($l),
+                'by'          => $l->signedBy?->name ?? '—',
+                'at'          => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                // Only meaningful for a 'returned' entry (the reason it was sent
+                // back) — surfaced separately from 'display' so the reason is
+                // visible to whoever the document lands with next, not just
+                // logged silently.
+                'remarks'     => $l->action === 'returned' ? $l->remarks : null,
+                'attachments' => $l->attachments->map(fn ($a) => [
+                    'filename' => $a->original_filename,
+                    'isImage'  => str_starts_with($a->mime_type ?? '', 'image/'),
+                    'url'      => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                        'signature-attachment.show', now()->addDay(), ['id' => $a->id]
+                    ),
+                ])->all(),
             ])->all(),
             'signUrl'        => route($this->queueRoutePrefix() . '.sign', [$docType, $doc->id]),
             'confirmUrl'     => route($this->queueRoutePrefix() . '.sign.confirm', [$docType, $doc->id]),

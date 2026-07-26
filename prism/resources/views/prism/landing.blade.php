@@ -280,7 +280,7 @@
     /* ── MODULES ── */
     .modules {
       position: relative;
-    
+
     padding: 70px 56px;
 
       background-image: url('{{ asset("images/features.png") }}');
@@ -309,7 +309,7 @@
       display: block;
     }
 
-    
+
     .modules-head { text-align: center; margin-bottom: 5px; position: relative; z-index: 1; }
     .modules-head h2 { font-size: 36px; font-weight: 800; color: var(--text); line-height: 1.2; margin-bottom: 10px; }
     .modules-head h2 .accent { color: var(--red); }
@@ -349,7 +349,7 @@
       opacity: 1; transform: translateY(0);
       transition: opacity .5s ease, transform .5s ease, background .25s, box-shadow .3s, border-color .3s;
     }
-    .mod-card:hover { 
+    .mod-card:hover {
       background: var(--rose);
       transform: translateY(-3px);
       box-shadow: 0 4px 12px rgba(139,0,0,0.08);
@@ -745,8 +745,8 @@
         <div class="mod-num-underline"></div>
       </div>
       <div class="mod-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-      <h4>Purchase Request Tracking</h4>
-      <p>Monitor PR submission, status movement, and procurement remarks in real-time dashboards.</p>
+      <h4>Document Tracking</h4>
+      <p>Monitor document submission, status movement, and procurement remarks in real-time dashboards.</p>
     </div>
   </div>
 </section>
@@ -776,7 +776,7 @@
     <div class="wf-step"><div class="wf-num">3</div><div class="wf-label">Approval Workflow</div></div>
     <div class="wf-step"><div class="wf-num">4</div><div class="wf-label">APP Consolidation</div></div>
     <div class="wf-step"><div class="wf-num">5</div><div class="wf-label">Purchase Request</div></div>
-    <div class="wf-step"><div class="wf-num">6</div><div class="wf-label">Abstract of Canvas</div></div>
+    <div class="wf-step"><div class="wf-num">6</div><div class="wf-label">Abstract of Canvass</div></div>
     <div class="wf-step"><div class="wf-num">7</div><div class="wf-label">Purchase Order</div></div>
     <div class="wf-step"><div class="wf-num">8</div><div class="wf-label">Tracking and Monitoring</div></div>
     <div class="wf-step"><div class="wf-num">9</div><div class="wf-label">Dashboard and Analytics</div></div>
@@ -802,7 +802,7 @@
   <div class="footer-top">
     <div class="footer-brand">
       <div class="name">PRISM</div>
-      <p class="footer-brand-desc"><span class="nowrap-line">Batangas State University TNEU ARASOF-Nasugbu Campus</span><br>College of Information and Computing Sciences</p>
+      <p class="footer-brand-desc"><span class="nowrap-line">Batangas State University TNEU ARASOF-Nasugbu Campus</span><br>College of Informatics and Computing Sciences</p>
     </div>
     <div class="footer-col">
       <h5>System</h5>
@@ -868,3 +868,4 @@
 </script>
 </body>
 </html>
+

@@ -221,7 +221,16 @@ class PrismFinanceOfficeController extends Controller
 
     public function returnProposal(Request $request, BudgetProposal $proposal): RedirectResponse
     {
-        abort_if(!$this->isActionableByFinance($proposal), 403);
+        // A slow double-click/double-submit can fire this request twice; the first
+        // already moves the proposal to 'returned', so the second no longer passes
+        // isActionableByFinance(). Rather than surfacing a raw 403 for an action that
+        // in fact already succeeded, treat it as a no-op and confirm the end state.
+        if (!$this->isActionableByFinance($proposal)) {
+            return redirect()->route('finance-office.proposal-review.show', $proposal->id)
+                ->with('success', $proposal->status === 'returned'
+                    ? 'This proposal has already been returned to the office.'
+                    : 'This proposal is no longer available for this action.');
+        }
 
         $request->validate(['remarks' => 'nullable|string']);
 

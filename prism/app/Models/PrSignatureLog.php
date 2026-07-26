@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class PrSignatureLog extends Model
 {
@@ -39,5 +40,10 @@ class PrSignatureLog extends Model
     public function signedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'signed_by_user_id');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(SignatureAttachment::class, 'attachable');
     }
 }

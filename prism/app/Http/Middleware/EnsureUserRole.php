@@ -22,18 +22,23 @@ class EnsureUserRole
 
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        $userRole = Auth::user()?->roles()->first()?->name;
+        // A user can hold more than one role at once (e.g. a Vice Chancellor
+        // who is also Dean of their home college) — check every role they
+        // hold rather than just roles()->first(), whose order isn't
+        // guaranteed and shouldn't decide which of a dual-hat user's areas
+        // they can reach.
+        $userRoleNames = Auth::user()?->roles()->pluck('name')->all() ?? [];
 
-        if ($userRole === 'System Administrator') {
+        if (in_array('System Administrator', $userRoleNames, true)) {
             return $next($request);
         }
 
-        if ($userRole !== $role) {
-            $redirectRoute = $this->roleRoutes[$userRole] ?? 'prism.home';
-            return redirect()->route($redirectRoute)
-                ->with('error', 'Access denied. You do not have permission to view that area.');
+        if (in_array($role, $userRoleNames, true)) {
+            return $next($request);
         }
 
-        return $next($request);
+        $redirectRoute = $this->roleRoutes[$userRoleNames[0] ?? null] ?? 'prism.home';
+        return redirect()->route($redirectRoute)
+            ->with('error', 'Access denied. You do not have permission to view that area.');
     }
 }

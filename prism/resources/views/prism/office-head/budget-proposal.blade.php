@@ -66,6 +66,7 @@
         .badge-green { background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
         .badge-blue  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
         .badge-red   { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+        .badge-amber { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
 
         /* ── Form fields ── */
         .field-group { display: flex; flex-direction: column; gap: 5px; }
@@ -152,6 +153,7 @@
         .td-name { font-weight: 700; color: var(--txt); max-width: 240px; vertical-align: top !important; }
         .td-name small { display: block; font-size: 11px; font-weight: 500; color: var(--txt3); margin-top: 2px; line-height: 1.5; }
         .item-flag-remark { margin-top: 6px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 6px 9px; font-size: 11.5px; color: #991B1B; line-height: 1.45; white-space: pre-wrap; }
+        .item-flag-remark.is-prev { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
         .td-bold    { font-weight: 700; color: var(--txt); white-space: nowrap; }
         .td-crimson { font-weight: 700; color: var(--crimson); }
 
@@ -275,10 +277,6 @@
         .ppmp-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); text-align: left; white-space: nowrap; }
         .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: var(--txt2); }
-        .ppmp-src-pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
-        .ppmp-src-refs { background: #e0ecff; color: #1d4ed8; }
-        .ppmp-src-file { background: #dcfce7; color: #166534; }
-        .ppmp-src-none { background: #fee2e2; color: #b91c1c; }
 
         /* ── Attach source file modal ── */
         .attach-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -370,12 +368,21 @@
         </div>
         @endif
         @if(session('error'))
-        <div class="submitted-banner" style="background:#fef2f2;border-color:#fecaca;">
+        <div class="submitted-banner" id="ppmpErrorBanner" style="background:#fef2f2;border-color:#fecaca;">
             <i class="ti ti-alert-circle" style="color:#dc2626;"></i>
             <div>
                 <p class="submitted-banner-title" style="color:#991b1b;">{{ session('error') }}</p>
             </div>
         </div>
+        <script>
+            setTimeout(function () {
+                var el = document.getElementById('ppmpErrorBanner');
+                if (!el) return;
+                el.style.transition = 'opacity .4s ease';
+                el.style.opacity = '0';
+                setTimeout(function () { el.remove(); }, 400);
+            }, 4000);
+        </script>
         @endif
 
         {{-- ═══ TOP GRID — PPMP Info (left) aligned with Readiness Check (right) ═══ --}}
@@ -690,12 +697,23 @@
     // only meaningful when the item already exists (PPMP encoded before scoping was run).
     // `itemId` lets Market Scoping preload that item's already-saved references instead
     // of starting from a blank slate that would replace them.
-    function scopingUrlFor(query, budget, itemId) {
+    function scopingUrlFor(query, budget, itemId, extra) {
         const params = new URLSearchParams();
         if (query) params.set('q', query);
         if (proposalId) params.set('proposal', proposalId);
         if (budget) params.set('budget', budget);
         if (itemId) params.set('item', itemId);
+        // Only meaningful when there's no itemId yet (the item hasn't been added
+        // to the proposal table at all) — lets Market Scoping create the item with
+        // these already-typed details the moment 3 refs are attached, instead of
+        // popping up "Add Item to Proposal" and asking the office head to retype
+        // what they just filled in on this page.
+        if (!itemId && extra) {
+            if (extra.unit)         params.set('unit', extra.unit);
+            if (extra.quantity)     params.set('quantity', extra.quantity);
+            if (extra.justification) params.set('justification', extra.justification);
+            if (extra.quarter)      params.set('quarter', extra.quarter);
+        }
         const qs = params.toString();
         return scopingUrl + (qs ? '?' + qs : '');
     }
@@ -823,9 +841,6 @@
                 (itemsLocked ? '' : ` <a style="color:#b91c1c;cursor:pointer;font-weight:700;" title="Remove file" onclick="prismBP.deleteAttachment('${esc(f.deleteUrl)}')">&times;</a>`) +
                 `</li>`).join('');
 
-            const attachBtn = itemsLocked ? '' :
-                `<span class="scoping-empty-hint"><a style="color:#166534;cursor:pointer;text-decoration:none;font-weight:700" onclick="prismBP.openAttach('${esc(item.id)}')"><i class="ti ti-paperclip" style="font-size:11px"></i> Attach source file</a></span>`;
-
             let scopingCell;
             if (refs.length || files.length) {
                 const addRefLink = itemsLocked ? '' :
@@ -842,22 +857,25 @@
                 const filesBlock = files.length
                     ? `<ul class="scoping-refs-list" style="margin-top:4px;">${filesHtml}</ul>`
                     : '';
-                scopingCell = `<div class="scoping-block">${refsBlock}${filesBlock}${attachBtn}</div>`;
+                scopingCell = `<div class="scoping-block">${refsBlock}${filesBlock}</div>`;
             } else {
                 scopingCell = `<div class="scoping-empty">
                     <span class="scoping-empty-label">No references or source file yet</span>
                     <span class="scoping-empty-hint"><a href="${esc(scopingUrlFor(item.description, item.estimatedUnitCost, item.id))}" style="color:var(--crimson);text-decoration:none;font-weight:700">Run scoping →</a></span>
-                    ${attachBtn}
                    </div>`;
             }
 
             const isEditingRow = editingId === item.id && !itemsLocked;
+
+            const isPrevFlagged = item.financeOk !== false && item.financeOk !== true && !!item.financeRemark;
 
             return `<tr data-item-row="${esc(item.id)}"${isEditingRow ? ' style="background:#FFF8F8;border-left:3px solid var(--crimson);"' : (item.financeOk === false ? ' style="background:#FEF9F9;border-left:3px solid #991B1B;"' : '')}>
                 <td class="td-name">${esc(item.description)}<small>${esc(item.justification)}</small>
                     ${isEditingRow ? `<br><span class="badge badge-blue" style="margin-top:4px;display:inline-block;"><i class="ti ti-pencil"></i> Editing above</span>` : ''}
                     ${item.financeOk === false ? `<br><span class="badge badge-red" style="margin-top:4px;display:inline-block;"><i class="ti ti-alert-triangle"></i> Needs Revision</span>
                     <div class="item-flag-remark">${esc(item.financeRemark)}</div>` : ''}
+                    ${isPrevFlagged ? `<br><span class="badge badge-amber" style="margin-top:4px;display:inline-block;"><i class="ti ti-history"></i> Previously Flagged</span>
+                    <div class="item-flag-remark is-prev">${esc(item.financeRemark)}</div>` : ''}
                 </td>
                 <td>${esc(item.quantity)} ${esc(item.unit)}</td>
                 <td class="td-bold">PHP ${fmt(item.estimatedUnitCost)}</td>
@@ -1075,8 +1093,19 @@
     }
 
     // ── Run Market Scoping redirect ───────────────────────────────────────────
+    // Carries over whatever's currently typed in the Add Items form above, same
+    // as clicking "Run scoping" on an already-encoded row further down.
     document.getElementById('runMarketScopingButton')?.addEventListener('click', function () {
-        window.location.href = scopingUrlFor();
+        const query  = document.getElementById('itemDescription')?.value.trim() || '';
+        const budget = document.getElementById('itemUnitCost')?.value || '';
+        const itemId = document.getElementById('itemId')?.value || '';
+        const extra  = {
+            unit:          document.getElementById('itemUnit')?.value || '',
+            quantity:      document.getElementById('itemQuantity')?.value || '',
+            justification: document.getElementById('itemJustification')?.value.trim() || '',
+            quarter:       document.getElementById('itemQuarter')?.value || '',
+        };
+        window.location.href = scopingUrlFor(query, budget, itemId, extra);
     });
 
     // ── Edit item (populates the Add Items form above, rather than the row) ────
@@ -1112,14 +1141,14 @@
                 No items encoded yet. ${itemsLocked ? '' : 'Click "Edit Items" to start.'}</td></tr>`;
         } else {
             tbody.innerHTML = items.map((item, i) => {
-                let srcPill;
-                if (item.scoping && item.scoping.length) {
-                    srcPill = `<span class="ppmp-src-pill ppmp-src-refs"><i class="ti ti-list"></i>${item.scoping.length} market references</span>`;
-                } else if (item.attachments && item.attachments.length) {
-                    srcPill = `<span class="ppmp-src-pill ppmp-src-file"><i class="ti ti-paperclip"></i>file attached</span>`;
-                } else {
-                    srcPill = `<span class="ppmp-src-pill ppmp-src-none"><i class="ti ti-alert-triangle"></i>missing</span>`;
-                }
+                // This table is the print/export document — a clickable pill or
+                // a "missing" warning badge means nothing on paper (nothing to
+                // click, nothing to fix). Show the actual source instead: the
+                // market references' supplier names, up to 3; otherwise leave
+                // the cell blank rather than a banner that can't be acted on.
+                const srcCell = (item.scoping && item.scoping.length)
+                    ? esc(item.scoping.slice(0, 3).map(ref => ref.title || ref.supplierName || '').filter(Boolean).join(', '))
+                    : '';
                 return `<tr>
                     <td>${i + 1}</td>
                     <td><strong>${esc(item.description)}</strong>${item.justification ? `<br><span style="font-size:11px;color:var(--txt3);">${esc(item.justification)}</span>` : ''}</td>
@@ -1129,7 +1158,7 @@
                     <td>PHP ${fmt(item.estimatedUnitCost)}</td>
                     <td><strong>PHP ${fmt(item.totalCost)}</strong></td>
                     <td>${esc(item.targetQuarter)}</td>
-                    <td>${srcPill}</td>
+                    <td>${srcCell}</td>
                 </tr>`;
             }).join('');
         }

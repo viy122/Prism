@@ -112,9 +112,14 @@
     .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; max-width: 84px; }
     .sig-step.done .sig-label, .sig-step.active .sig-label { color: var(--s700); }
 
-    /* Delivery & payment timeline (separate chain, purple accent to distinguish from signatures) */
-    .po-status-timeline .sig-step.done::after { background: #5b21b6; }
-    .po-status-timeline .sig-step.done .sig-dot { background: #5b21b6; border-color: #5b21b6; }
+    /* Delivery & payment timeline (separate chain) — same red/green as the
+       signatory timeline above (PR and AOC's tracking uses only those two),
+       so no color override here; just the wrap-related line fix below. */
+    /* 6 steps wrap onto a second row after "At Accounting – Processing Payment"
+       (5th step) at this panel's width, dropping "Paid" to its own line below —
+       the connector line assumes a same-row next step, so it dangles rightward
+       into nothing at the wrap point. Cut just that one line. */
+    .po-status-timeline .sig-step:nth-child(5)::after { display: none; }
 
     .btn-route { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
     .btn-route-fwd { background: #3b6d11; color: #fff; }
@@ -182,7 +187,7 @@
                     <p style="font-weight:600;color:var(--s700);margin-top:2px;">Budget: ₱{{ number_format($aoc['amount'], 2) }}</p>
                 </div>
                 <button class="btn btn-primary btn-issue-po" data-aoc-id="{{ $aoc['id'] }}" data-aoc-code="{{ $aoc['code'] }}" data-url="{{ $aoc['issueUrl'] }}" data-amount="{{ $aoc['amount'] }}">
-                    <i class="ti ti-file-invoice"></i> Issue PO
+                    <i class="ti ti-file-invoice"></i> For PO
                 </button>
             </div>
             @endforeach
@@ -365,7 +370,7 @@
         </div>
         <div style="display:flex;gap:8px;margin-top:18px;">
             <button class="btn btn-ghost" id="btnCancelPo" style="flex:1;height:40px;">Cancel</button>
-            <button class="btn btn-primary" id="btnConfirmPo" style="flex:1;height:40px;font-size:13px;"><i class="ti ti-file-invoice"></i> Issue PO</button>
+            <button class="btn btn-primary" id="btnConfirmPo" style="flex:1;height:40px;font-size:13px;"><i class="ti ti-file-invoice"></i> For PO</button>
         </div>
     </div>
 </div>
@@ -742,7 +747,7 @@
                 showToast(json.error || 'Failed to issue PO.', true);
             }
         } catch { showToast('Network error.', true); }
-        finally { btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="ti ti-file-invoice"></i> Issue PO'; }
+        finally { btnConfirm.disabled = false; btnConfirm.innerHTML = '<i class="ti ti-file-invoice"></i> For PO'; }
     });
 
     if (!document.getElementById('spinStyle')) {
@@ -751,6 +756,16 @@
         s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
         document.head.appendChild(s);
     }
+
+    // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
+    // web) otherwise wouldn't show up here without a manual reload. Skip while
+    // an upload/issue is in flight or a return remark is being typed.
+    setInterval(() => {
+        if (saving) return;
+        const remarks = document.getElementById('returnRemarksInput');
+        if (remarks && remarks.value.trim()) return;
+        window.location.reload();
+    }, 45000);
 })();
 </script>
 @endpush

@@ -472,6 +472,12 @@ class PrismProcurementOfficeController extends Controller
                     'nextStageLabel'   => $aoc->stageMetaFor($aoc->nextSignatoryStage())['label'] ?? null,
                     'hasPo'            => $aoc->purchaseOrder !== null,
                     'poNumber'         => $aoc->purchaseOrder?->po_number,
+                    'signatureLogs'  => $aoc->signatureLogs->map(fn ($l) => [
+                        'display' => $aoc->describeSignatureLog($l),
+                        'by'      => $l->signedBy?->name ?? '—',
+                        'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                        'remarks' => $l->remarks ?? '',
+                    ])->all(),
                     'remarks'        => $aoc->remarks ?? '—',
                     'createdAt'      => $aoc->created_at->format('M d, Y'),
                     'advanceUrl'     => route('procurement-office.aoc.advance', $aoc->id),
@@ -586,11 +592,15 @@ class PrismProcurementOfficeController extends Controller
                     'status'       => $po->status,
                     'statusLabel'  => $po->status_label,
                     'nextStatus'   => $po->nextStatus(),
-                    'deliveryChain' => collect($chain)->map(function ($key, $idx) use ($current, $po) {
+                    'deliveryChain' => collect($chain)->map(function ($key, $idx) use ($current, $po, $chain) {
+                        // 'paid' is the terminal state — once reached, there's nothing left
+                        // "in progress", so every step (including 'paid' itself) reads as
+                        // done rather than leaving the last dot stuck on the "active" style.
+                        $isComplete = $current === count($chain) - 1;
                         return [
                             'key'    => $key,
                             'label'  => (clone $po)->fill(['status' => $key])->status_label,
-                            'status' => $idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending'),
+                            'status' => $isComplete ? 'done' : ($idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending')),
                         ];
                     })->values()->all(),
                     'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',

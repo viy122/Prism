@@ -76,16 +76,7 @@
     /* ── Procurement mode cell ── */
     .mode-cell { min-width: 200px; }
     .tracking-cell { min-width: 260px; }
-
-    /* Tracking status hover tooltip (full text, since the select itself truncates) */
-    .tracking-tooltip-wrap { position: relative; display: block; width: 100%; }
-    .tracking-tooltip-text {
-        display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
-        background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 6px;
-        font-size: 11px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(15,23,42,.25);
-        pointer-events: none;
-    }
-    .tracking-tooltip-wrap:hover .tracking-tooltip-text { display: block; }
+    .tracking-badge { white-space: normal; height: auto; line-height: 1.4; padding: 5px 10px; text-align: left; }
 
     .rec-badge {
         display: flex; align-items: center; gap: 7px;
@@ -212,10 +203,6 @@
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="count-chip" id="appVisibleCount">{{ count($appItems) }} shown</span>
-                <button class="btn-primary" type="button" id="printAppButton">
-                    <i class="ti ti-printer"></i>
-                    Export or Print APP
-                </button>
             </div>
         </div>
         <div class="table-wrap">
@@ -310,17 +297,9 @@
 
                             </td>
 
-                            {{-- ── Tracking Status cell ── --}}
+                            {{-- ── Tracking Status cell — read-only, inherited from the PPMP/PR/AOC/PO/payment chain ── --}}
                             <td class="tracking-cell">
-                                <div class="tracking-tooltip-wrap">
-                                    <select class="field-select js-tracking-select" data-tracking-select="{{ $item['itemId'] }}" data-tracking-url="{{ $item['trackingStatusUrl'] }}" data-prev-value="{{ !empty($item['trackingStatus']['override']) ? $item['trackingStatus']['key'] : '' }}" style="height:36px;font-size:12px;font-weight:600;width:100%;">
-                                        <option value="" @selected(empty($item['trackingStatus']['override']))>{{ $item['trackingStatusAuto']['label'] }}</option>
-                                        @foreach ($trackingStageOptions as $opt)
-                                            <option value="{{ $opt['key'] }}" @selected(!empty($item['trackingStatus']['override']) && $item['trackingStatus']['key'] === $opt['key'])>{{ $opt['label'] }}</option>
-                                        @endforeach
-                                    </select>
-                                    <span class="tracking-tooltip-text">{{ $item['trackingStatus']['label'] }}</span>
-                                </div>
+                                <span class="badge tracking-badge">{{ $item['trackingStatus']['label'] }}</span>
                             </td>
                         </tr>
                     @endforeach
@@ -496,33 +475,6 @@
         return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── Tracking status (auto by default, manually overridable) ────────────
-    document.addEventListener('change', async function (e) {
-        const sel = e.target.closest('[data-tracking-select]');
-        if (!sel) return;
-        const url  = sel.dataset.trackingUrl;
-        const prev = sel.dataset.prevValue ?? '';
-        sel.disabled = true;
-        try {
-            const res  = await fetch(url, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
-                body: JSON.stringify({ trackingStatus: sel.value }),
-            });
-            const data = await res.json().catch(() => null);
-            if (res.ok && data?.success) {
-                sel.dataset.prevValue = sel.value;
-                const tip = sel.closest('.tracking-tooltip-wrap')?.querySelector('.tracking-tooltip-text');
-                if (tip) tip.textContent = sel.options[sel.selectedIndex].text;
-            } else {
-                sel.value = prev;
-            }
-        } catch {
-            sel.value = prev;
-        } finally {
-            sel.disabled = false;
-        }
-    });
 })();
 </script>
 @endpush

@@ -33,16 +33,23 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
 
+        // 'serve' registers the GET /storage/{path} route Laravel uses to serve this
+        // disk's files directly (visibility: public means no signature required).
+        // Both this disk's `url` and the `local` disk's default route point at
+        // /storage/{path} — only one of the two can own that route, and every PR/AOC/
+        // PO/canvass/receipt upload lives on THIS disk, so this one must be the owner
+        // (local's 'serve' is off above; nothing in the app uses the local disk).
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
+            'serve' => true,
             'throw' => false,
             'report' => false,
         ],

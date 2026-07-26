@@ -126,9 +126,9 @@ class PurchaseRequest extends Model
     public const SIGNATORY_STAGES = [
         ['key' => 'draft',              'label' => 'Created',                      'type' => 'routing'],
         ['key' => 'at_end_user',        'label' => 'End User',                     'type' => 'signature', 'role' => 'office-head'],
-        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor',              'type' => 'signature', 'role' => 'vcaa'],
-        ['key' => 'at_third_sign',      'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
-        ['key' => 'at_fourth_sign',     'label' => 'Accounting / Vice Chancellor', 'type' => 'signature'],
+        ['key' => 'at_vice_chancellor', 'label' => 'Vice Chancellor (VCAA)',              'type' => 'signature', 'role' => 'vcaa'],
+        ['key' => 'at_third_sign',      'label' => 'Accounting / Vice Chancellor (VCAF)', 'type' => 'signature'],
+        ['key' => 'at_fourth_sign',     'label' => 'Accounting / Vice Chancellor (VCAF)', 'type' => 'signature'],
         ['key' => 'at_chancellor',      'label' => 'Chancellor',                   'type' => 'signature', 'role' => 'chancellor'],
         ['key' => 'fully_signed',       'label' => 'Fully Signed',                 'type' => 'signature'],
     ];
@@ -138,8 +138,8 @@ class PurchaseRequest extends Model
         if (!$this->third_signer || !in_array($meta['key'], ['at_third_sign', 'at_fourth_sign'], true)) {
             return $meta;
         }
-        $third         = $this->third_signer === 'accounting' ? 'Accounting' : 'Vice Chancellor';
-        $fourth        = $this->third_signer === 'accounting' ? 'Vice Chancellor' : 'Accounting';
+        $third         = $this->third_signer === 'accounting' ? 'Accounting' : 'Vice Chancellor (VCAF)';
+        $fourth        = $this->third_signer === 'accounting' ? 'Vice Chancellor (VCAF)' : 'Accounting';
         $meta['label'] = $meta['key'] === 'at_third_sign' ? $third : $fourth;
         return $meta;
     }
@@ -223,16 +223,27 @@ class PurchaseRequest extends Model
         }
 
         if ($this->signatory_stage === 'draft' && !$this->file_path) {
-            return ['key' => 'pr:not_yet_created', 'label' => $this->signatory_label];
+            return ['key' => 'pr:not_yet_created', 'label' => 'PR to be Created'];
         }
 
         if ($this->signatory_stage !== 'fully_signed') {
             return ['key' => 'pr:' . $this->signatory_stage, 'label' => $this->signatory_label];
         }
 
+        // Fully signed doesn't mean canvassing happened yet — that's a distinct
+        // step of its own (Canvassing tab upload), tracked separately via
+        // canvassing_stage rather than folded into the AOC branch below.
+        if ($this->canvassing_stage !== 'completed') {
+            return ['key' => 'for_canvassing', 'label' => 'For Canvassing'];
+        }
+
         $aoc = $this->abstractOfCanvass;
         if (!$aoc) {
-            return ['key' => 'awaiting_aoc', 'label' => 'Awaiting Abstract of Canvass'];
+            return ['key' => 'awaiting_aoc', 'label' => 'Canvassing Done, Waiting for AOC'];
+        }
+
+        if ($aoc->signatory_stage === 'draft' && !$aoc->file_path) {
+            return ['key' => 'aoc:not_yet_created', 'label' => 'AOC to be Created'];
         }
 
         if ($aoc->signatory_stage !== 'fully_signed') {
@@ -242,6 +253,10 @@ class PurchaseRequest extends Model
         $po = $aoc->purchaseOrder;
         if (!$po) {
             return ['key' => 'awaiting_po', 'label' => 'Awaiting Purchase Order'];
+        }
+
+        if ($po->signatory_stage === 'draft' && !$po->file_path) {
+            return ['key' => 'po:not_yet_created', 'label' => 'PO to be Created'];
         }
 
         if ($po->signatory_stage !== 'fully_signed') {
@@ -298,7 +313,9 @@ class PurchaseRequest extends Model
             $options[] = ['key' => 'pr:' . $stage['key'], 'label' => static::formatStageLabel(static::SIGNATORY_DOC_PREFIX, $stage)];
         }
 
-        $options[] = ['key' => 'awaiting_aoc', 'label' => 'Awaiting Abstract of Canvass'];
+        $options[] = ['key' => 'for_canvassing', 'label' => 'For Canvassing'];
+        $options[] = ['key' => 'awaiting_aoc', 'label' => 'Canvassing Done, Waiting for AOC'];
+        $options[] = ['key' => 'aoc:not_yet_created', 'label' => 'AOC to be Created'];
 
         foreach (AbstractOfCanvass::SIGNATORY_STAGES as $stage) {
             if ($stage['key'] === 'fully_signed') {
@@ -308,6 +325,7 @@ class PurchaseRequest extends Model
         }
 
         $options[] = ['key' => 'awaiting_po', 'label' => 'Awaiting Purchase Order'];
+        $options[] = ['key' => 'po:not_yet_created', 'label' => 'PO to be Created'];
 
         foreach (PurchaseOrder::SIGNATORY_STAGES as $stage) {
             if ($stage['key'] === 'fully_signed') {

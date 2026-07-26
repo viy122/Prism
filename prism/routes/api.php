@@ -24,5 +24,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/push-token', [NotificationController::class, 'registerPushToken']);
     Route::get('/sign/{docType}/{id}/document', [SignatoryController::class, 'document'])->whereIn('docType', ['pr', 'aoc', 'po']);
     Route::post('/sign/{docType}/{id}', [SignatoryController::class, 'sign'])->whereIn('docType', ['pr', 'aoc', 'po']);
-    Route::post('/sign/{docType}/{id}/confirm', [SignatoryController::class, 'confirm'])->whereIn('docType', ['pr', 'aoc', 'po']);
 });

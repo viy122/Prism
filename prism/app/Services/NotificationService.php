@@ -204,7 +204,7 @@ class NotificationService
             'proposal_returned',
             'Proposal Returned by Chancellor',
             "{$office}'s FY {$year} PPMP was returned by the Chancellor for revision." . ($remarks ? " Remarks: \"{$remarks}\"" : ''),
-            route('finance-office.proposal-review', [], false),
+            route('finance-office.proposal-review.show', ['proposal' => $proposal->id], false),
         );
 
         if ($proposal->submitted_by_user_id) {
@@ -231,6 +231,10 @@ class NotificationService
         $number = $doc->number ?? $doc->code ?? $doc->po_number ?? ($prefix . '-' . str_pad($doc->id, 4, '0', STR_PAD_LEFT));
         $stage  = $doc->stageMetaFor($doc->signatory_stage)['label'] ?? '';
 
+        // Lets the mobile app deep-link a tapped notification straight to
+        // this document's Signatures screen.
+        $data = ['docType' => strtolower($prefix), 'id' => $doc->id];
+
         // Office Head isn't a university-wide role like the others below — only
         // the specific office that raised the document should be notified, so
         // this resolves the owning PR's office and sends to just that office's head.
@@ -254,7 +258,11 @@ class NotificationService
                     'awaiting_signature',
                     "{$prefix} Awaiting Your Signature",
                     "{$number} is now at \"{$stage}\" and needs your action.",
-                    route('office-head.for-my-signature', [], false),
+                    // Query params (not just the bare queue URL) so the web
+                    // page can auto-open this exact document on arrival,
+                    // matching what $data already lets the mobile app do.
+                    route('office-head.for-my-signature', $data, false),
+                    $data,
                 );
             }
 
@@ -283,7 +291,10 @@ class NotificationService
             'awaiting_signature',
             "{$prefix} Awaiting Your Signature",
             "{$number} is now at \"{$stage}\" and needs your action.",
-            route($queueRoutes[$roleCode], [], false),
+            // Query params so the web page can auto-open this exact document
+            // on arrival, instead of landing on the generic queue list.
+            route($queueRoutes[$roleCode], $data, false),
+            $data,
         );
     }
 
@@ -303,6 +314,26 @@ class NotificationService
             'New Purchase Request Uploaded',
             "{$pr->number} from {$office} has been uploaded and is ready for processing.",
             route('procurement-office.purchase-request-management', [], false),
+        );
+    }
+
+    // ── Purchase Order / Payment events ───────────────────────────────────────
+
+    /**
+     * Triggered when: Accounting Office marks a delivered PO's payment as
+     * processed (OK).
+     * Notifies: Cashier — the PO is now awaiting them to release payment.
+     */
+    public static function paymentProcessingStarted(PurchaseOrder $po): void
+    {
+        $office = $po->abstractOfCanvass?->purchaseRequest?->office?->name ?? 'An office';
+
+        self::sendToRole(
+            'Cashier',
+            'payment_processing_started',
+            'PO Awaiting Payment Release',
+            "{$po->po_number} ({$office}) has been processed by Accounting and is now awaiting payment release.",
+            route('cashier.dashboard', [], false),
         );
     }
 

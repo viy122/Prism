@@ -107,6 +107,11 @@
     .sig-step.routing.done .sig-dot { border-style: solid; }
     .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; max-width: 84px; }
     .sig-step.done .sig-label, .sig-step.active .sig-label { color: var(--s700); }
+    /* 6 signatory steps wrap onto a second row after "VC" (5th step) at this
+       panel's width, dropping "Chancellor" to its own line below — the
+       connector line assumes a same-row next step, so it dangles rightward
+       into nothing at the wrap point. Cut just that one line. */
+    #sigTimeline .sig-step:nth-child(5)::after { display: none; }
 
     .btn-route { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; }
     .btn-route-fwd { background: #3b6d11; color: #fff; }
@@ -180,7 +185,7 @@
                     <p>{{ Str::limit($pr['title'], 60) }}</p>
                 </div>
                 <button class="btn-route btn-route-fwd btn-create-aoc" data-url="{{ $pr['createUrl'] }}" data-pr-id="{{ $pr['id'] }}">
-                    <i class="ti ti-file-plus"></i> Create AOC
+                    <i class="ti ti-file-plus"></i> For AOC
                 </button>
             </div>
             @endforeach
@@ -471,7 +476,7 @@
                     </div>
                 </div>
                 <button class="btn-route btn-route-fwd" id="btnIssuePo" type="button">
-                    <i class="ti ti-file-invoice"></i> Issue Purchase Order
+                    <i class="ti ti-file-invoice"></i> For PO
                 </button>
             </div>`;
 
@@ -505,12 +510,12 @@
                 } else {
                     showToast(json.error || 'Failed to issue PO.', true);
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="ti ti-file-invoice"></i> Issue Purchase Order';
+                    btn.innerHTML = '<i class="ti ti-file-invoice"></i> For PO';
                 }
             } catch {
                 showToast('Network error.', true);
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-file-invoice"></i> Issue Purchase Order';
+                btn.innerHTML = '<i class="ti ti-file-invoice"></i> For PO';
             }
         });
     }
@@ -532,11 +537,16 @@
     }
 
     function updateTimeline(aoc) {
+        // Excludes 'draft' (not a signing step) and the terminal 'fully_signed'
+        // marker (not a real step either) — without dropping the latter,
+        // activeIdx lands on it once reached and that last dot renders 'active'
+        // (in-progress) forever instead of 'done' like the rest.
         const timeline = document.getElementById('sigTimeline');
-        const meta      = metaOf(aoc).slice(1); // drop 'draft'
+        const meta     = metaOf(aoc).filter(m => !['draft', 'fully_signed'].includes(m.key));
         const activeIdx = meta.findIndex(m => m.key === aoc.signatoryStage);
+        const isFullySigned = aoc.signatoryStage === 'fully_signed';
         timeline.innerHTML = meta.map((m, i) => {
-            const state   = i < activeIdx ? ' done' : (i === activeIdx ? ' active' : '');
+            const state   = (isFullySigned || i < activeIdx) ? ' done' : (i === activeIdx ? ' active' : '');
             const routing = m.type === 'routing' ? ' routing' : '';
             return `<div class="sig-step${routing}${state}"><div class="sig-dot"></div><span class="sig-label">${m.label}</span></div>`;
         }).join('');
@@ -728,9 +738,9 @@
                 } else {
                     showToast(json.error || 'Failed to create AOC.', true);
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="ti ti-file-plus"></i> Create AOC';
+                    btn.innerHTML = '<i class="ti ti-file-plus"></i> For AOC';
                 }
-            } catch { showToast('Network error.', true); btn.disabled = false; btn.innerHTML = '<i class="ti ti-file-plus"></i> Create AOC'; }
+            } catch { showToast('Network error.', true); btn.disabled = false; btn.innerHTML = '<i class="ti ti-file-plus"></i> For AOC'; }
         });
     });
 
@@ -774,6 +784,16 @@
         s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
         document.head.appendChild(s);
     }
+
+    // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
+    // web) otherwise wouldn't show up here without a manual reload. Skip while
+    // an upload is in flight or a return remark is being typed.
+    setInterval(() => {
+        if (saving) return;
+        const remarks = document.getElementById('returnRemarksInput');
+        if (remarks && remarks.value.trim()) return;
+        window.location.reload();
+    }, 45000);
 })();
 </script>
 @endpush

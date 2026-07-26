@@ -118,6 +118,11 @@
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 5px; }
     .activity-item p { font-size: 12.5px; color: var(--s600); line-height: 1.6; }
     .activity-item time { font-size: 11px; color: var(--s400); display: block; margin-top: 2px; }
+    .activity-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .activity-remarks { font-size: 11.5px; font-weight: 600; color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 6px 9px; margin-top: 6px; line-height: 1.5; white-space: pre-wrap; }
+    .activity-attachment { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--m); background: var(--s50); border: 1px solid var(--s100); border-radius: 6px; padding: 3px 8px; text-decoration: none; max-width: 160px; }
+    .activity-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-attachment:hover { background: var(--s100); }
 
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s, transform .28s; transform: translateY(8px); }
     .pr-toast.visible { opacity: 1; transform: translateY(0); }
@@ -333,8 +338,27 @@
                 <div>
                     <p>${e.display}${e.by !== '—' ? ' — ' + e.by : ''}</p>
                     <time>${e.at}</time>
+                    ${remarksHtml(e.remarks)}
+                    ${attachmentsHtml(e.attachments)}
                 </div>
             </div>`).join('');
+    }
+
+    // Why a document was sent back — shown to whoever it now lands with.
+    function remarksHtml(remarks) {
+        if (!remarks) return '';
+        return '<p class="activity-remarks"><i class="ti ti-message-2" style="font-size:11px;margin-right:4px"></i>' + escapeHtml(remarks) + '</p>';
+    }
+
+    // Files attached via the mobile app's Take a Photo / Upload flow —
+    // opens the signed signature-attachment link in a new tab.
+    function attachmentsHtml(attachments) {
+        if (!attachments || !attachments.length) return '';
+        return '<div class="activity-attachments">' + attachments.map(a => `
+            <a href="${a.url}" target="_blank" rel="noopener" class="activity-attachment" title="${escapeHtml(a.filename)}">
+                <i class="ti ${a.isImage ? 'ti-photo' : 'ti-file-text'}"></i>
+                <span>${escapeHtml(a.filename)}</span>
+            </a>`).join('') + '</div>';
     }
 
     function escapeHtml(s) {
@@ -437,6 +461,17 @@
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
         });
     });
+
+    // Arrived via a "document awaiting your signature" notification — open that
+    // exact document instead of leaving the generic queue with nothing selected.
+    (function openFromNotification() {
+        const params  = new URLSearchParams(window.location.search);
+        const docType = params.get('docType');
+        const id      = params.get('id');
+        if (!docType || !id) return;
+        const doc = allDocs.find(d => d.docType === docType && String(d.id) === id);
+        if (doc) openDoc(doc);
+    })();
 
     previewToggle.addEventListener('click', () => {
         previewToggle.classList.toggle('open');
@@ -561,6 +596,18 @@
         s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
         document.head.appendChild(s);
     }
+
+    // ── Auto-refresh ── this page's queue/status/attachments are baked in at
+    // load time, so another signatory acting on a document elsewhere wouldn't
+    // show up here without a manual reload. Skip the reload while a sign/route
+    // action is in flight or a remark is being composed, so it can't wipe
+    // in-progress work.
+    setInterval(() => {
+        if (saving) return;
+        const remarks = document.getElementById('remarksInput');
+        if (remarks && remarks.value.trim()) return;
+        window.location.reload();
+    }, 45000);
 })();
 </script>
 @endpush

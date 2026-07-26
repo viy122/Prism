@@ -31,6 +31,7 @@ class User extends Authenticatable
         'office_id',
         'position_title',
         'vc_type',
+        'bac_position',
         'password',
         'account_status',
         'expo_push_token',

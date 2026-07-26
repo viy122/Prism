@@ -68,6 +68,29 @@ class PurchaseOrder extends Model
         return $this->hasMany(PoSignatureLog::class);
     }
 
+    /**
+     * Overrides HasSignatoryChain's default: clicking "For PO" only creates
+     * this row so it can be routed for signatures — no document exists yet,
+     * so "PO Created" would be misleading until uploadPurchaseOrder() actually
+     * attaches one. Mirrors PurchaseRequest::getSignatoryLabelAttribute().
+     */
+    public function getSignatoryLabelAttribute(): string
+    {
+        if ($this->signatory_stage === 'draft' && !$this->file_path) {
+            return 'PO to be Created';
+        }
+
+        $meta = $this->stageMetaFor($this->signatory_stage);
+        if (!$meta) {
+            return ucfirst(str_replace('_', ' ', $this->signatory_stage ?? 'draft'));
+        }
+        return match ($meta['key']) {
+            'draft'        => static::SIGNATORY_DOC_PREFIX . ' Created',
+            'fully_signed' => static::SIGNATORY_DOC_PREFIX . ' – Fully Signed',
+            default        => static::SIGNATORY_DOC_PREFIX . ' – At ' . $meta['label'],
+        };
+    }
+
     // ── Signatory chain ──────────────────────────────────────────────────────
 
     public const SIGNATORY_DOC_PREFIX = 'PO';

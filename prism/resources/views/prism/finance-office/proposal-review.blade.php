@@ -338,12 +338,21 @@
                                         <span style="font-size:11px;font-weight:600;color:var(--s400);">Not yet reviewed</span>
                                         @endif
                                     @endif
+                                    @if($item['financeOk'] === null && !empty($item['financeRemark']))
+                                    <div class="remark-display" style="background:#FFFBEB;border-color:#FDE68A;">
+                                        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400E;margin-bottom:3px;">
+                                            <i class="ti ti-history"></i> Previous remark — revised, pending re-review
+                                        </p>
+                                        <p class="remark-text">{{ $item['financeRemark'] }}</p>
+                                    </div>
+                                    @else
                                     <div class="remark-display" style="{{ $item['financeOk'] === false ? '' : 'display:none;' }}">
                                         <p class="remark-text">{{ $item['financeRemark'] }}</p>
                                         @if($selectedProposal['actionable'])
                                         <button type="button" class="btn-edit-remark"><i class="ti ti-pencil"></i> Edit</button>
                                         @endif
                                     </div>
+                                    @endif
                                     @if($selectedProposal['actionable'])
                                     <div class="verdict-remark" style="display:none;">
                                         <textarea class="field-textarea remark-input" rows="3"
@@ -435,13 +444,24 @@ window.toggleScope = function (btn) {
     btn.classList.toggle('open', !isOpen);
 };
 
+// Guards against a double-click firing two POSTs for the same action (which
+// made the second request 403 even though the first had already gone through).
+// Deliberately NOT using btn.disabled here — disabling a submit button inside
+// its own click handler can suppress the native form submission entirely in
+// some browsers (Safari in particular), which silently breaks the action.
+let financeFormSubmitting = false;
+
 function submitFinanceForm(btn) {
+    if (financeFormSubmitting) return false;
+    financeFormSubmitting = true;
     document.getElementById('financeRemarksHidden').value = document.getElementById('financeOverallRemarks').value;
     document.getElementById('financeReviewForm').action = btn.dataset.url;
     return true;
 }
 
 function submitFinanceReturn(btn) {
+    if (financeFormSubmitting) return false;
+    financeFormSubmitting = true;
     const remarks = document.getElementById('financeOverallRemarks').value.trim();
     document.getElementById('financeRemarksHidden').value = remarks;
     document.getElementById('financeReviewForm').action = btn.dataset.url;
@@ -523,7 +543,7 @@ function submitFinanceReturn(btn) {
             updateEndorseGate();
         });
 
-        btnEdit.addEventListener('click', () => {
+        btnEdit?.addEventListener('click', () => {
             display.style.display = 'none';
             remarkEl.style.display = '';
             input.focus();

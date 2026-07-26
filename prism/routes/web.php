@@ -12,6 +12,7 @@ use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
 use App\Http\Controllers\PrismProcurementOfficeController;
 use App\Http\Controllers\PrismViceChancellorController;
+use App\Http\Controllers\SignatureAttachmentController;
 use App\Http\Controllers\SignaturePhotoController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,12 @@ Route::view('/', 'prism.landing')->name('prism.home');
 Route::get('/print/pr/{id}', [PrintController::class, 'purchaseRequest'])
     ->middleware('signed')
     ->name('print.pr');
+
+// Signed URL only — files attached via the mobile attach-and-route flow,
+// linked from both the web signature-history views and the mobile app.
+Route::get('/signature-attachment/{id}', [SignatureAttachmentController::class, 'show'])
+    ->middleware('signed')
+    ->name('signature-attachment.show');
 
 // Authentication routes
 Route::get('/login', fn() => view('prism.auth.login'))->name('login');

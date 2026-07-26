@@ -837,12 +837,17 @@ class PrismOfficeHeadController extends Controller
 
         $statusFrom = $proposal->status;
 
-        // A resubmission is a fresh review — clear any finance_ok/finance_remark left
-        // over from the last review cycle, or a stale "issued" flag on an item the
-        // office head already fixed silently blocks Endorse next time (it checks for
-        // any item still flagged false, regardless of how old that flag is).
+        // A resubmission only needs Budget to re-review whatever was actually
+        // flagged — clear finance_ok just on those items, since a stale "issued"
+        // flag on an item the office head already fixed silently blocks Endorse
+        // next time (it checks for any item still flagged false, regardless of
+        // how old that flag is). Items Budget already approved (finance_ok true)
+        // are left alone — nothing changed for them, so they shouldn't need
+        // re-approving just because a *different* item on the same PPMP was
+        // revised. The remark text itself is kept so Budget can still see what
+        // was flagged before, as context while re-reviewing the revised item.
         if ($statusFrom === 'returned') {
-            $proposal->items()->update(['finance_ok' => null, 'finance_remark' => null]);
+            $proposal->items()->where('finance_ok', false)->update(['finance_ok' => null]);
         }
 
         $proposal->update([

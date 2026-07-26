@@ -9,6 +9,7 @@ use App\Models\ProcurementStatusUpdate;
 use App\Models\PrSignatureLog;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
+use App\Models\SignatureAttachment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -38,8 +39,9 @@ class SignatoryActionService
      * or ['success' => false, 'error' => ..., 'status' => 422] on failure.
      *
      * @param array $photoColumns extra signature-log columns from the photo pipeline
+     * @param UploadedFile[] $files attachments from the mobile attach-and-route flow
      */
-    public function advance(Model $doc, ?string $remarks = null, ?string $thirdSigner = null, array $photoColumns = []): array
+    public function advance(Model $doc, ?string $remarks = null, ?string $thirdSigner = null, array $photoColumns = [], array $files = []): array
     {
         $next = $doc->nextSignatoryStage();
         if (!$next) {
@@ -71,13 +73,17 @@ class SignatoryActionService
         $doc->update($updateData);
         $this->clearTrackingOverride($doc);
 
-        $this->createLog($doc, array_merge([
+        $log = $this->createLog($doc, array_merge([
             'signatory_number'  => $signatoryNumber,
             'signed_by_user_id' => auth()->id(),
             'action'            => $action,
             'remarks'           => $remarks,
             'signed_at'         => now(),
         ], $photoColumns));
+
+        if ($files) {
+            $this->storeAttachments($doc, $log, $files);
+        }
 
         if ($doc instanceof PurchaseRequest) {
             ProcurementStatusUpdate::create([
@@ -276,6 +282,29 @@ class SignatoryActionService
     }
 
     /**
+     * The mobile "attach & route" flow: one or more files (photos and/or
+     * PDFs) are attached as proof and the stage advances in the same call —
+     * no AI detection, no separate confirm step. Distinct from
+     * signWithPhoto()/confirmSign(), which drive the web app's single-photo
+     * AI-detection pipeline and must keep working unchanged for that UI.
+     *
+     * @param UploadedFile[] $files
+     */
+    public function signWithAttachments(Model $doc, array $files, ?string $remarks = null, ?string $thirdSigner = null): array
+    {
+        $stageMeta = $doc->stageMetaFor($doc->signatory_stage);
+        if (($stageMeta['type'] ?? 'signature') !== 'signature') {
+            return ['success' => false, 'error' => 'The current stage is a routing step — no attachment needed.', 'status' => 422];
+        }
+
+        if (!$files) {
+            return ['success' => false, 'error' => 'Please attach at least one photo or file.', 'status' => 422];
+        }
+
+        return $this->advance($doc, $remarks, $thirdSigner, [], $files);
+    }
+
+    /**
      * Re-run detection for a log whose photo could not be processed
      * (detection_status pending/failed). Used by procurement's Reprocess.
      */
@@ -323,10 +352,35 @@ class SignatoryActionService
         $pr?->clearTrackingOverride();
     }
 
-    private function createLog(Model $doc, array $attributes): void
+    private function createLog(Model $doc, array $attributes): Model
     {
         [$logClass, $fk] = self::DOC_MAP[get_class($doc)];
-        $logClass::create([$fk => $doc->id] + $attributes);
+        return $logClass::create([$fk => $doc->id] + $attributes);
+    }
+
+    /**
+     * Store each attached file on the private `signatures` disk and record it
+     * against the signature-log row that was just created. No AI detection
+     * runs here — this is the manual multi-file attach path used by the
+     * mobile "attach & route" flow, distinct from signWithPhoto()'s pipeline.
+     *
+     * @param UploadedFile[] $files
+     */
+    private function storeAttachments(Model $doc, Model $log, array $files): void
+    {
+        foreach ($files as $index => $file) {
+            $name = $doc->signatory_stage . '-' . now()->format('YmdHis') . '-' . $index . '.'
+                . strtolower($file->getClientOriginalExtension() ?: 'dat');
+            $path = Storage::disk('signatures')->putFileAs($this->docPrefix($doc) . '/' . $doc->id, $file, $name);
+
+            $log->attachments()->create([
+                'original_filename' => $file->getClientOriginalName(),
+                'file_path'         => $path,
+                'mime_type'         => $file->getClientMimeType(),
+                'file_size'         => $file->getSize(),
+                'uploaded_at'       => now(),
+            ]);
+        }
     }
 
     private function docPrefix(Model $doc): string
