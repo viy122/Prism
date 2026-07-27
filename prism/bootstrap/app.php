@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserRole::class,
+            'no-cache' => \App\Http\Middleware\PreventBackHistory::class,
         ]);
 
         // The dev tunnel (Cloudflare quick tunnel) the mobile app talks to forwards
@@ -44,6 +45,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 return redirect()->route('login')->withErrors([
                     'login' => 'Your session has expired. Please log in again.',
                 ]);
+            }
+
+            // Rate-limited form submissions (login, forgot/reset password) otherwise
+            // surface as a raw "429 Too Many Requests" framework page. Send the user
+            // back to the form with a friendly message instead — API/AJAX callers
+            // still get the normal 429 JSON response so their handling is unaffected.
+            if ($e->getStatusCode() === 429 && !$request->expectsJson()) {
+                $retryAfter = $e->getHeaders()['Retry-After'] ?? null;
+                $wait = $retryAfter ? ' Please try again in '.ceil($retryAfter / 60).' minute(s).' : ' Please try again shortly.';
+
+                return back()->withErrors([
+                    'email' => 'Too many attempts.'.$wait,
+                ])->onlyInput('email');
             }
         });
     })->create();

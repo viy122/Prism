@@ -194,11 +194,13 @@ class PrismChancellorController extends Controller
     }
 
     /**
-     * Give Procurement an immediate row in Purchase Request Management for each
-     * approved PPMP item, grouped by target quarter (matching the PR-{OFFICE}-{FY}-{Q}
-     * numbering already used across the system). If a PR for that office/year/quarter
-     * already exists (e.g. from an earlier proposal cycle), items are appended to it
-     * instead of creating a duplicate — 'number' is unique, so this must never collide.
+     * Give Procurement an immediate new row in Purchase Request Management for each
+     * approved PPMP, grouped by target quarter (matching the PR-{OFFICE}-{FY}-{Q}
+     * numbering already used across the system). The proposal id is folded into the
+     * number so every approved proposal always gets its own fresh PR row — it must
+     * never be merged into an older cycle's PR, which could already be sitting at a
+     * later stage (e.g. already paid), and would otherwise wrongly show that old
+     * status instead of the fresh "PR to be Created" a newly approved PPMP should have.
      */
     private function createPurchaseRequestsFromProposal(BudgetProposal $proposal): void
     {
@@ -211,7 +213,7 @@ class PrismChancellorController extends Controller
 
         foreach ($itemsByQuarter as $quarter => $items) {
             $pr = PurchaseRequest::firstOrCreate(
-                ['number' => "PR-{$office->code}-{$proposal->fiscal_year}-{$quarter}"],
+                ['number' => "PR-{$office->code}-{$proposal->fiscal_year}-{$quarter}-{$proposal->id}"],
                 [
                     'office_id'          => $office->id,
                     'created_by_user_id' => auth()->id(),

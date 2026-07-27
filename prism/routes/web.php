@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\PrismAccountingOfficeController;
@@ -31,11 +32,17 @@ Route::get('/signature-attachment/{id}', [SignatureAttachmentController::class, 
 
 // Authentication routes
 Route::get('/login', fn() => view('prism.auth.login'))->name('login');
-Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1')->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/demo-login/{role}', [AuthController::class, 'demoLogin'])->name('demo.login');
 
-Route::middleware('auth')->group(function () {
+// Forgot / reset password (OTP via email)
+Route::get('/forgot-password', [ForgotPasswordController::class, 'showRequestForm'])->name('password.request');
+Route::post('/forgot-password', [ForgotPasswordController::class, 'sendCode'])->middleware('throttle:3,10')->name('password.email');
+Route::get('/reset-password', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset.form');
+Route::post('/reset-password', [ForgotPasswordController::class, 'reset'])->middleware('throttle:5,10')->name('password.reset');
+
+Route::middleware(['auth', 'no-cache'])->group(function () {
 
     Route::prefix('office-head')->name('office-head.')->middleware('role:Office Head / Dean')->controller(PrismOfficeHeadController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');

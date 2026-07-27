@@ -665,11 +665,11 @@
                                     <circle cx="12" cy="7" r="4" />
                                 </svg>
                             </div>
-                            <input class="field-input @error('email') error @enderror" type="text" id="emailInput" name="email"
-                                autocomplete="username" placeholder="Username"
+                            <input class="field-input @error('email') error @enderror" type="email" id="emailInput" name="email"
+                                autocomplete="email" placeholder="Email Address"
                                 value="{{ old('email') }}">
                         </div>
-                        <p class="field-error" id="emailError">Please enter your username or email.</p>
+                        <p class="field-error" id="emailError">Please enter your email address.</p>
                     </div>
 
                     <div class="field">
@@ -696,7 +696,7 @@
                         <label class="remember-label">
                             <input type="checkbox" name="remember"> Remember Me
                         </label>
-                        <a class="forgot-link" href="#">Forgot Password?</a>
+                        <a class="forgot-link" href="{{ route('password.request') }}">Forgot Password?</a>
                     </div>
 
                     <button class="btn-login" type="submit" id="loginBtn">

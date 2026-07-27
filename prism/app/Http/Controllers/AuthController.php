@@ -15,14 +15,11 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|string',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        // Try to authenticate with email first, then with username
-        $user = User::where('email', $credentials['email'])
-            ->orWhere('username', $credentials['email'])
-            ->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         if (!$user) {
             return back()->withErrors([

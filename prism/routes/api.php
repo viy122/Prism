@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\TrackingController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
+Route::post('/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:5,10');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);

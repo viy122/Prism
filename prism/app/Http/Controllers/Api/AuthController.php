@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\PasswordResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(private PasswordResetService $passwordResetService) {}
+
     private const ROLE_MAP = [
         'system-admin'       => 'System Administrator',
         'office-head'        => 'Office Head / Dean',
@@ -63,6 +66,34 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(null, 204);
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $this->passwordResetService->sendCode($data['email']);
+
+        return response()->json(['message' => 'If that email is registered, a 6-digit code has been sent to it.']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'code' => 'required|string|size:6',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $ok = $this->passwordResetService->verifyAndReset($data['email'], $data['code'], $data['password']);
+
+        if (! $ok) {
+            return response()->json(['message' => 'That code is invalid or has expired.'], 422);
+        }
+
+        return response()->json(['message' => 'Password reset successfully.']);
     }
 
     private function formatUser(User $user): array
