@@ -90,6 +90,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
         Route::post('/annual-procurement-plan/item/{item}/tracking-status', 'updateAppItemTrackingStatus')->name('annual-procurement-plan.update-tracking-status');
         Route::get('/canvassing', 'canvassing')->name('canvassing');
+        Route::post('/canvassing/extract-supplier', 'extractCanvassSupplier')->name('canvassing.extract-supplier');
         Route::post('/purchase-request/{pr}/canvass-document', 'uploadCanvassDocument')->name('purchase-request.canvass-document');
         Route::delete('/canvass-document/{document}', 'deleteCanvassDocument')->name('canvass-document.delete');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');

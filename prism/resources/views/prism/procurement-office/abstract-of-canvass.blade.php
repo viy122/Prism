@@ -460,7 +460,7 @@
                 <div class="issue-po-row">
                     <div class="full">
                         <label>Supplier Name *</label>
-                        <input type="text" class="issue-po-input" id="poSupplierName" placeholder="Enter supplier name…">
+                        <input type="text" class="issue-po-input" id="poSupplierName" placeholder="Enter supplier name…" value="${escapeHtml(aoc.supplierName || '')}">
                     </div>
                     <div class="full">
                         <label>Supplier Address</label>

@@ -146,8 +146,9 @@
 @push('scripts')
 <script>
 (function () {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-    const toastEl   = document.getElementById('cvToast');
+    const csrfToken         = document.querySelector('meta[name="csrf-token"]').content;
+    const toastEl           = document.getElementById('cvToast');
+    const extractSupplierUrl = @json($extractSupplierUrl);
 
     function showToast(msg, isError = false) {
         toastEl.textContent = msg;
@@ -157,9 +158,38 @@
     }
 
     document.querySelectorAll('[data-file-input]').forEach(input => {
-        input.addEventListener('change', () => {
-            const label = document.querySelector(`[data-file-label="${input.dataset.fileInput}"]`);
-            if (label && input.files[0]) label.textContent = input.files[0].name;
+        input.addEventListener('change', async () => {
+            const prId  = input.dataset.fileInput;
+            const label = document.querySelector(`[data-file-label="${prId}"]`);
+            const file  = input.files[0];
+            if (!file) return;
+            if (label) label.textContent = file.name;
+
+            if (file.type !== 'application/pdf') return;
+
+            const supplierInput = document.querySelector(`[data-supplier-input="${prId}"]`);
+            if (!supplierInput || supplierInput.value.trim()) return; // don't clobber a manual entry
+
+            const originalLabelText = label ? label.textContent : '';
+            if (label) label.textContent = 'Reading document…';
+
+            try {
+                const fd = new FormData();
+                fd.append('document', file);
+                const resp = await fetch(extractSupplierUrl, {
+                    method:  'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    body:    fd,
+                });
+                const json = await resp.json();
+                if (resp.ok && json.supplierName && !supplierInput.value.trim()) {
+                    supplierInput.value = json.supplierName;
+                }
+            } catch {
+                // best-effort only — leave the field for manual entry
+            } finally {
+                if (label) label.textContent = originalLabelText;
+            }
         });
     });
 

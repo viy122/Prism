@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MarketScopingController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PrScanController;
 use App\Http\Controllers\Api\SignatoryController;
@@ -26,4 +27,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/push-token', [NotificationController::class, 'registerPushToken']);
     Route::get('/sign/{docType}/{id}/document', [SignatoryController::class, 'document'])->whereIn('docType', ['pr', 'aoc', 'po']);
     Route::post('/sign/{docType}/{id}', [SignatoryController::class, 'sign'])->whereIn('docType', ['pr', 'aoc', 'po']);
+
+    Route::post('/market-scoping/run', [MarketScopingController::class, 'run']);
 });

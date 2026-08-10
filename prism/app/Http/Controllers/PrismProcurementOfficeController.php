@@ -373,9 +373,62 @@ class PrismProcurementOfficeController extends Controller
             ->all();
 
         return view('prism.procurement-office.canvassing', $this->withCommon('canvassing', [
-            'pageTitle' => 'Canvassing',
-            'prs'       => $prs,
+            'pageTitle'          => 'Canvassing',
+            'prs'                => $prs,
+            'extractSupplierUrl' => route('procurement-office.canvassing.extract-supplier'),
         ]));
+    }
+
+    /**
+     * Reads the standardized BatStateU-FO-PRO-01 Quotation/Canvass Form the
+     * supplier signs — "Company Name" always sits on the line right after the
+     * supplier's own name in the signature block — and returns a best-guess
+     * supplier name so Procurement doesn't have to retype it. Best-effort only:
+     * scanned/image uploads or an unrecognized layout just return null, and the
+     * field stays manually editable either way.
+     */
+    public function extractCanvassSupplier(Request $request): JsonResponse
+    {
+        $request->validate(['document' => 'required|file|mimes:pdf,jpeg,jpg,png|max:10240']);
+
+        $file = $request->file('document');
+        if ($file->getClientMimeType() !== 'application/pdf' && $file->getClientOriginalExtension() !== 'pdf') {
+            return response()->json(['supplierName' => null]);
+        }
+
+        $text = '';
+        try {
+            $parser = new PdfParser();
+            $pdf    = $parser->parseContent($file->get());
+            $text   = $pdf->getText();
+        } catch (\Exception $e) {
+            $text = '';
+        }
+
+        return response()->json(['supplierName' => $this->parseSupplierNameFromQuotation($text)]);
+    }
+
+    private function parseSupplierNameFromQuotation(string $text): ?string
+    {
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $text)),
+            fn ($line) => $line !== ''
+        ));
+
+        foreach ($lines as $i => $line) {
+            if (stripos($line, 'Company Name') === false || $i === 0) {
+                continue;
+            }
+
+            $candidate = $lines[$i - 1];
+            $looksLikeLabel = preg_match('/^(Printed Name|Signature|Company (Name|Address)|Contact No|Canvasser|Procurement Officer)/i', $candidate);
+
+            if ($candidate !== '' && !$looksLikeLabel) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -499,6 +552,10 @@ class PrismProcurementOfficeController extends Controller
                         'url'        => \Illuminate\Support\Facades\Storage::url($d->file_path),
                         'uploadedAt' => $d->uploaded_at?->format('M d, Y') ?? '—',
                     ])->values()->all(),
+                    // Canvassing only ever keeps one quotation per PR (locked once
+                    // uploaded — see uploadCanvassDocument()), so it's already the
+                    // known supplier by the time Procurement issues the PO.
+                    'supplierName'   => $pr->documents->firstWhere('document_type', 'canvass_quotation')?->title,
                 ];
             })
             ->all();
