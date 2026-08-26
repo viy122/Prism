@@ -1032,6 +1032,7 @@
                     const m = pill.textContent.match(/\d+/);
                     if (m) pill.textContent = (parseInt(m[0]) - 1) + ' references found';
                 }
+                window.prismToast('Reference removed.');
             } else {
                 delBtn.disabled = false;
                 delBtn.innerHTML = '<i class="ti ti-x"></i>';

@@ -34,8 +34,19 @@ class PrismAccountingOfficeController extends Controller
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'documents' => $this->signatureHistoryRows(['pr', 'po']),
+            'documents' => $this->signatureHistoryRows($this->signatureDocTypes()),
+            'refreshUrl' => route($this->queueRoutePrefix() . '.for-my-signature.refresh'),
         ]));
+    }
+
+    public function forMySignatureRefresh(): JsonResponse
+    {
+        return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    private function signatureDocTypes(): array
+    {
+        return ['pr', 'po'];
     }
 
     public function dashboard(): View
@@ -44,7 +55,7 @@ class PrismAccountingOfficeController extends Controller
             'id'           => $po->id,
             'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
             'aocCode'      => $po->abstractOfCanvass->code ?? '—',
-            'office'       => $po->abstractOfCanvass->purchaseRequest->office?->name ?? '—',
+            'office'       => $po->abstractOfCanvass->purchaseRequest->office?->code ?? '—',
             'title'        => $po->abstractOfCanvass->purchaseRequest->title ?? '—',
             'supplier'     => $po->supplier_name,
             'totalAmount'  => (float) $po->total_amount,
@@ -79,7 +90,7 @@ class PrismAccountingOfficeController extends Controller
             ->get()
             ->map(fn ($po) => [
                 'poNumber'    => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                'office'      => $po->abstractOfCanvass->purchaseRequest->office?->name ?? '—',
+                'office'      => $po->abstractOfCanvass->purchaseRequest->office?->code ?? '—',
                 'title'       => $po->abstractOfCanvass->purchaseRequest->title ?? '—',
                 'supplier'    => $po->supplier_name,
                 'totalAmount' => (float) $po->total_amount,

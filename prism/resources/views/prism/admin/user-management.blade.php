@@ -260,7 +260,9 @@
         btn.addEventListener('click', async () => {
             const verb = btn.dataset.action;
             if (!confirm('Are you sure you want to ' + verb + ' this user?')) return;
+            const originalHtml = btn.innerHTML;
             btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> ' + (verb === 'deactivate' ? 'Deactivating…' : 'Reactivating…');
             try {
                 const resp = await fetch(btn.dataset.url, {
                     method: 'POST',
@@ -272,10 +274,11 @@
                     showToast('User ' + verb + 'd.');
                     setTimeout(() => window.location.reload(), 800);
                 } else {
+                    btn.innerHTML = originalHtml;
                     showToast(json.error || 'Action failed.', true);
                     btn.disabled = false;
                 }
-            } catch { showToast('Network error.', true); btn.disabled = false; }
+            } catch { btn.innerHTML = originalHtml; showToast('Network error.', true); btn.disabled = false; }
         });
     });
 

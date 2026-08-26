@@ -100,7 +100,7 @@
     .upload-pr-label i { font-size: 14px; }
     .upload-pr-label input { display: none; }
 
-    .sig-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
+    .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
     .sig-step { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 64px; position: relative; }
     .sig-step:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--s200); z-index: 0; }
     .sig-step.done::after { background: #3b6d11; }
@@ -138,12 +138,23 @@
     .po-done-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: #166534; background: #dcfce7; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; }
     .po-pending-note { font-size: 11px; color: var(--s500); }
 
-    .activity-log { display: flex; flex-direction: column; gap: 1px; }
+    .log-toggle { cursor: pointer; user-select: none; background: var(--s50); border: 1px solid var(--s200); border-radius: 10px; padding: 11px 14px; transition: background .15s, border-color .15s; }
+    .log-toggle:hover { background: var(--s100); border-color: var(--s300); }
+    .log-toggle-label { display: flex; align-items: center; gap: 9px; }
+    .log-toggle-label i.ti-history { font-size: 16px; color: var(--m); }
+    .log-toggle i.chev { font-size: 16px; transition: transform .18s; color: var(--s500); }
+    .log-toggle.open i.chev { transform: rotate(180deg); }
+    .activity-log { display: none; flex-direction: column; gap: 1px; margin-top: 10px; }
+    .activity-log.open { display: flex; }
     .activity-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--s100); }
     .activity-item:last-child { border-bottom: none; }
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 5px; }
     .activity-item p { font-size: 12.5px; color: var(--s600); line-height: 1.6; }
     .activity-item time { font-size: 11px; color: var(--s400); display: block; margin-top: 2px; }
+    .activity-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .activity-attachment { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--m); background: var(--s50); border: 1px solid var(--s100); border-radius: 6px; padding: 3px 8px; text-decoration: none; max-width: 160px; }
+    .activity-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-attachment:hover { background: var(--s100); }
 
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s, transform .28s; transform: translateY(8px); }
     .pr-toast.visible { opacity: 1; transform: translateY(0); }
@@ -293,6 +304,8 @@
                     <div class="detail-field"><label>Supplier</label><span id="fSupplier">—</span></div>
                     <div class="detail-field"><label>Expected Delivery</label><span id="fExpectedDate">—</span></div>
                     <div class="detail-field full"><label>Supplier Address</label><span id="fSupplierAddress">—</span></div>
+                    <div class="detail-field"><label>ALOBS No.</label><span id="fAlobsNo">—</span></div>
+                    <div class="detail-field"><label>Fund Source</label><span id="fFundSource">—</span></div>
                     <div class="detail-field full"><label>Remarks on File</label><span id="fRemarks" style="white-space:pre-line;">—</span></div>
                 </div>
 
@@ -327,11 +340,15 @@
 
                 {{-- Activity log --}}
                 <div>
-                    <div class="card-head" style="margin-bottom:10px;">
-                        <div>
-                            <p class="card-eyebrow">History</p>
-                            <h3 class="card-title" style="font-size:14px;">Activity Log</h3>
+                    <div class="card-head log-toggle" id="logToggle">
+                        <div class="log-toggle-label">
+                            <i class="ti ti-history"></i>
+                            <div>
+                                <p class="card-eyebrow" style="margin-bottom:1px;">History</p>
+                                <h3 class="card-title" style="font-size:14px;">View Activity Log</h3>
+                            </div>
                         </div>
+                        <i class="ti ti-chevron-down chev"></i>
                     </div>
                     <div class="activity-log" id="activityLog"></div>
                 </div>
@@ -378,16 +395,20 @@
 @endsection
 
 <script type="application/json" id="poData">@json($purchaseOrders)</script>
+<script type="application/json" id="refreshUrlData">@json(route('procurement-office.purchase-orders.refresh'))</script>
 
 @push('scripts')
 <script>
 (function () {
-    const allPos       = JSON.parse(document.getElementById('poData').textContent);
-    const rows         = document.querySelectorAll('[data-po-row]');
+    let allPos          = JSON.parse(document.getElementById('poData').textContent);
+    const refreshUrl    = JSON.parse(document.getElementById('refreshUrlData').textContent);
+    const tbody          = document.querySelector('.table-wrap table tbody');
+    function getRows() { return tbody ? tbody.querySelectorAll('[data-po-row]') : []; }
     const emptyEl       = document.getElementById('detailEmpty');
     const contentEl     = document.getElementById('detailContent');
     const titleEl       = document.getElementById('detailPoNumber');
     const logEl          = document.getElementById('activityLog');
+    const logToggle       = document.getElementById('logToggle');
     const toastEl        = document.getElementById('poToast');
     const btnAdvance     = document.getElementById('btnAdvance');
     const btnReturn      = document.getElementById('btnReturn');
@@ -424,8 +445,19 @@
         ).join('');
     }
 
+    // Oldest first — callers that want newest-first (the log display) reverse
+    // this. Falls back to array order for any entry missing a raw timestamp.
+    function sortEntriesAsc(entries) {
+        return entries.slice().sort((a, b) => {
+            const ta = a.atRaw ? new Date(a.atRaw).getTime() : NaN;
+            const tb = b.atRaw ? new Date(b.atRaw).getTime() : NaN;
+            if (isNaN(ta) || isNaN(tb)) return 0;
+            return ta - tb;
+        });
+    }
+
     function renderLog(poId) {
-        const entries = logs[poId] || [];
+        const entries = sortEntriesAsc(logs[poId] || []);
         if (!entries.length) {
             logEl.innerHTML = '<p style="font-size:12px;color:var(--s400);padding:8px 0;">No activity recorded yet.</p>';
             return;
@@ -436,9 +468,37 @@
                 <div>
                     <p>${e.text}</p>
                     <time>${e.time}</time>
+                    ${attachmentsHtml(e.attachments)}
                 </div>
             </div>`).join('');
     }
+
+    // Files a signatory attached via the mobile app's Take a Photo / Upload
+    // flow — opens the signed signature-attachment link in a new tab.
+    function attachmentsHtml(attachments) {
+        if (!attachments || !attachments.length) return '';
+        return '<div class="activity-attachments">' + attachments.map(a => `
+            <a href="${a.url}" class="activity-attachment" data-preview-name="${escapeHtml(a.filename)}" data-preview-image="${a.isImage ? '1' : '0'}" title="${escapeHtml(a.filename)}">
+                <i class="ti ${a.isImage ? 'ti-photo' : 'ti-file-text'}"></i>
+                <span>${escapeHtml(a.filename)}</span>
+            </a>`).join('') + '</div>';
+    }
+
+    // Preview an attachment inside PRISM instead of navigating away to it.
+    logEl.addEventListener('click', e => {
+        const link = e.target.closest('.activity-attachment');
+        if (!link) return;
+        e.preventDefault();
+        const url  = link.getAttribute('href');
+        const name = link.dataset.previewName;
+        const body = link.dataset.previewImage === '1'
+            ? `<img src="${url}" alt="${escapeHtml(name)}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe>`;
+        window.prismInfoModal({
+            title: name,
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    });
 
     function updateRoutingButtons(po) {
         const isDraft  = po.signatoryStage === 'draft';
@@ -524,6 +584,8 @@
         document.getElementById('fSupplier').textContent       = po.supplier;
         document.getElementById('fExpectedDate').textContent   = po.expectedDate;
         document.getElementById('fSupplierAddress').textContent = po.supplierAddress;
+        document.getElementById('fAlobsNo').textContent         = po.alobsNo || '—';
+        document.getElementById('fFundSource').textContent      = po.fundSource || '—';
         document.getElementById('fRemarks').textContent        = po.remarks;
 
         const pdfEl = document.getElementById('pdfPreview');
@@ -553,14 +615,18 @@
 
     function openPo(po) {
         activePo = po;
-        rows.forEach(r => r.classList.remove('selected'));
-        document.querySelector(`[data-po-id="${po.id}"]`)?.classList.add('selected');
+        getRows().forEach(r => r.classList.remove('selected'));
+        tbody?.querySelector(`[data-po-id="${po.id}"]`)?.classList.add('selected');
         titleEl.textContent = po.poNumber;
+        logToggle.classList.remove('open');
+        logEl.classList.remove('open');
 
         if (!logs[po.id]) {
             logs[po.id] = (po.signatureLogs || []).map(l => ({
                 text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : ''),
                 time: l.at,
+                atRaw: l.atRaw,
+                attachments: l.attachments || [],
             }));
         }
 
@@ -569,25 +635,36 @@
         contentEl.classList.add('visible');
     }
 
-    rows.forEach(row => {
-        row.addEventListener('click', () => {
-            const po = allPos.find(p => String(p.id) === row.dataset.poId);
-            if (po) openPo(po);
-        });
-        row.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
-        });
+    // Delegated so rows appended later (by the background refresh) work
+    // without needing to re-bind listeners after every poll.
+    tbody?.addEventListener('click', e => {
+        const row = e.target.closest('[data-po-row]');
+        if (!row) return;
+        const po = allPos.find(p => String(p.id) === row.dataset.poId);
+        if (po) openPo(po);
+    });
+    tbody?.addEventListener('keydown', e => {
+        const row = e.target.closest('[data-po-row]');
+        if (!row) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
 
-    poSearch?.addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
+    function applyPoSearchFilter() {
+        if (!poSearch) return;
+        const q = poSearch.value.trim().toLowerCase();
         let visible = 0;
-        rows.forEach(row => {
+        getRows().forEach(row => {
             const match = !q || (row.dataset.search ?? '').includes(q);
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (poCount) poCount.textContent = visible + (visible === 1 ? ' PO' : ' POs');
+    }
+    poSearch?.addEventListener('input', applyPoSearchFilter);
+
+    logToggle.addEventListener('click', () => {
+        logToggle.classList.toggle('open');
+        logEl.classList.toggle('open');
     });
 
     function updateSigBadge(poId, label, stage) {
@@ -616,7 +693,7 @@
                 activePo.signatoryLabel = json.signatoryLabel;
                 if (json.stageMeta) activePo.stageMeta = json.stageMeta;
                 updateSigBadge(activePo.id, json.signatoryLabel, json.signatoryStage);
-                logs[activePo.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr() });
+                logs[activePo.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderDetail(activePo);
                 showToast(json.currentStageType === 'routing' ? 'PO forwarded.' : 'PO signed and routed forward.');
             } else {
@@ -655,7 +732,7 @@
                 updateSigBadge(activePo.id, json.signatoryLabel, json.signatoryStage);
                 returnRemarks.style.display = 'none';
                 returnIn.value = '';
-                logs[activePo.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr() });
+                logs[activePo.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderDetail(activePo);
                 showToast('PO returned one step — now at ' + json.signatoryLabel + '.');
             } else {
@@ -682,11 +759,15 @@
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
-                activePo.pdfFile = json.filePath;
+                activePo.pdfFile    = json.filePath;
+                activePo.alobsNo    = json.alobsNo || activePo.alobsNo;
+                activePo.fundSource = json.fundSource || activePo.fundSource;
                 document.getElementById('pdfPreview').innerHTML =
                     `<iframe src="/storage/${json.filePath}" title="PO Document"></iframe>`;
+                document.getElementById('fAlobsNo').textContent    = activePo.alobsNo || '—';
+                document.getElementById('fFundSource').textContent = activePo.fundSource || '—';
                 uploadPoText.textContent = 'Re-upload PDF';
-                showToast('PO PDF uploaded successfully.');
+                showToast('PO PDF uploaded successfully.' + (json.alobsNo || json.fundSource ? ' ALOBS/Fund Source detected from the document.' : ''));
             } else {
                 uploadPoText.textContent = origText;
                 showToast(json.message || 'Upload failed.', true);
@@ -758,14 +839,81 @@
     }
 
     // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
-    // web) otherwise wouldn't show up here without a manual reload. Skip while
-    // an upload/issue is in flight or a return remark is being typed.
-    setInterval(() => {
+    // web) otherwise wouldn't show up here without a manual reload. Poll for
+    // fresh data and patch the list/detail panel in place instead of a full
+    // page reload. Skipped entirely (data fetched but discarded) while an
+    // upload/issue is in flight, the return-remarks panel is open, or the
+    // Issue-PO modal is open — so it can't wipe in-progress work. The
+    // "eligible AOCs" section at the top isn't refreshed by this poll (a
+    // newly-eligible AOC will appear on the next manual page load) to keep
+    // this background patch limited to the parts of the page most likely to
+    // change while it's open — the PO tracker below.
+    function rowHtml(po) {
+        const sigBadge = po.signatoryStage === 'fully_signed' ? 'badge-signed'
+            : (po.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
+        const search = (po.poNumber + ' ' + po.aocCode + ' ' + po.office + ' ' + po.supplier).toLowerCase();
+        return `<tr data-po-row data-po-id="${po.id}" data-search="${escapeHtml(search)}" tabindex="0">
+            <td style="font-weight:700;font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(po.poNumber)}</td>
+            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(po.aocCode)}</td>
+            <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(po.office)}</td>
+            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(po.supplier)}</td>
+            <td style="font-weight:600;white-space:nowrap;">₱${Number(po.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <td><span class="badge ${sigBadge}" data-po-sig-badge="${po.id}">${escapeHtml(po.signatoryLabel)}</span></td>
+        </tr>`;
+    }
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function handleRefresh(json) {
         if (saving) return;
-        const remarks = document.getElementById('returnRemarksInput');
-        if (remarks && remarks.value.trim()) return;
-        window.location.reload();
-    }, 45000);
+        if (returnIn.value.trim() || returnRemarks.style.display !== 'none') return;
+        if (uploadPoInput.disabled) return;
+        if (modal.style.display !== 'none') return;
+
+        const fresh = json.purchaseOrders || [];
+        allPos = fresh;
+
+        if (tbody) {
+            const freshById = new Map(fresh.map(p => [String(p.id), p]));
+            const existingIds = new Set();
+
+            getRows().forEach(row => {
+                const id = row.dataset.poId;
+                existingIds.add(id);
+                const po = freshById.get(id);
+                if (!po) return; // don't remove rows missing from the fresh data
+                updateSigBadge(po.id, po.signatoryLabel, po.signatoryStage);
+            });
+
+            fresh.forEach(po => {
+                if (!existingIds.has(String(po.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(po));
+            });
+
+            if (activePo) tbody.querySelector(`[data-po-id="${activePo.id}"]`)?.classList.add('selected');
+
+            applyPoSearchFilter();
+        }
+
+        if (activePo) {
+            const freshActive = fresh.find(p => p.id === activePo.id);
+            if (freshActive) {
+                activePo = freshActive;
+                logs[activePo.id] = (activePo.signatureLogs || []).map(l => ({
+                    text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : ''),
+                    time: l.at,
+                    atRaw: l.atRaw,
+                    attachments: l.attachments || [],
+                }));
+                renderDetail(activePo);
+            }
+        }
+    }
+
+    if (refreshUrl) {
+        window.prismAutoRefresh(refreshUrl, handleRefresh);
+    }
 })();
 </script>
 @endpush

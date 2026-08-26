@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\AbstractOfCanvass;
 use App\Models\AocSignatureLog;
 use App\Services\SignatoryQueueService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class PrismBacController extends Controller
@@ -33,7 +34,7 @@ class PrismBacController extends Controller
             ->filter(fn ($log) => $log->abstractOfCanvass !== null)
             ->map(fn ($log) => [
                 'code'    => $log->abstractOfCanvass->code ?? 'AOC-' . str_pad($log->abstractOfCanvass->id, 4, '0', STR_PAD_LEFT),
-                'office'  => $log->abstractOfCanvass->purchaseRequest?->office?->name ?? '—',
+                'office'  => $log->abstractOfCanvass->purchaseRequest?->office?->code ?? '—',
                 'display' => $log->abstractOfCanvass->describeSignatureLog($log),
                 'by'      => $log->signedBy?->name ?? '—',
                 'at'      => $log->signed_at?->format('M d, Y g:i A') ?? '—',
@@ -60,8 +61,19 @@ class PrismBacController extends Controller
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'documents' => $this->signatureHistoryRows(['aoc']),
+            'documents' => $this->signatureHistoryRows($this->signatureDocTypes()),
+            'refreshUrl' => route($this->queueRoutePrefix() . '.for-my-signature.refresh'),
         ]));
+    }
+
+    public function forMySignatureRefresh(): JsonResponse
+    {
+        return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    private function signatureDocTypes(): array
+    {
+        return ['aoc'];
     }
 
     private function withCommon(string $activePage, array $data): array

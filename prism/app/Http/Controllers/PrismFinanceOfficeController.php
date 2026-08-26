@@ -34,7 +34,7 @@ class PrismFinanceOfficeController extends Controller
             ->with('budgetProposals')
             ->get()
             ->map(fn ($office) => [
-                'office'   => $office->name,
+                'office'   => $office->code,
                 'pending'  => $office->budgetProposals->where('status', 'submitted')->count(),
                 'endorsed' => $office->budgetProposals->where('status', 'endorsed')->count(),
                 'returned' => $office->budgetProposals->where('status', 'returned')->count(),
@@ -50,7 +50,7 @@ class PrismFinanceOfficeController extends Controller
             ->get()
             ->map(fn ($p) => [
                 'proposalId'    => $p->id,
-                'office'        => $p->office?->name ?? '—',
+                'office'        => $p->office?->code ?? '—',
                 'submittedDate' => $p->submitted_at?->format('M d, Y') ?? $p->created_at->format('M d, Y'),
                 'totalAmount'   => (float) $p->total_estimated_cost,
             ])
@@ -156,7 +156,7 @@ class PrismFinanceOfficeController extends Controller
                     $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'Watch' : 'At Risk');
 
                     return [
-                        'office'   => $office->name,
+                        'office'   => $office->code,
                         'quarter'  => $quarter,
                         'budget'   => round($budget),
                         'utilized' => round($utilized),

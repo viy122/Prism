@@ -40,6 +40,8 @@ class BudgetProposalItem extends Model
         'name',
         'description',
         'category',
+        'source_of_fund',
+        'item_classification',
         'schedule_type',
         'ppmp_category',
         'iar_flag',

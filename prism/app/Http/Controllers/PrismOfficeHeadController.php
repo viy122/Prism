@@ -48,31 +48,55 @@ class PrismOfficeHeadController extends Controller
         return view('prism.shared.for-my-signature', $this->withCommon('office-head', 'for-my-signature', [
             'pageTitle' => 'For My Signature',
             'layout'    => 'prism.layouts.office-head',
-            'documents' => $this->signatureHistoryRows(['pr', 'aoc']),
+            'documents' => $this->signatureHistoryRows($this->signatureDocTypes()),
+            'refreshUrl' => route($this->queueRoutePrefix() . '.for-my-signature.refresh'),
         ]));
+    }
+
+    public function forMySignatureRefresh(): JsonResponse
+    {
+        return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    private function signatureDocTypes(): array
+    {
+        return ['pr', 'aoc'];
     }
 
     // ── Pages ─────────────────────────────────────────────────────────────────
 
     public function dashboard(): View
     {
-        $officeId    = $this->officeId();
-        $proposalIds = BudgetProposal::where('office_id', $officeId)->pluck('id');
-        $items       = BudgetProposalItem::whereIn('budget_proposal_id', $proposalIds)->get();
+        $officeId = $this->officeId();
+
+        // budget_proposal_items.status is a vestigial column — nothing in the
+        // app ever writes to it after creation, so every item sits at its
+        // 'draft' default forever regardless of what actually happened to its
+        // proposal. The real per-item lifecycle state lives on the parent
+        // BudgetProposal's own status (draft/submitted/endorsed/returned/approved),
+        // so item counts below are bucketed by that instead.
+        $proposals = BudgetProposal::where('office_id', $officeId)
+            ->withCount('items')
+            ->withSum('items', 'estimated_total_cost')
+            ->get();
+        $itemCountByProposalStatus = $proposals->groupBy('status')
+            ->map(fn ($group) => $group->sum('items_count'));
 
         $summary = [
-            'totalProposedItems'     => $items->count(),
-            'totalProposedBudget'    => $items->sum('estimated_total_cost'),
-            'approvedItems'          => $items->where('status', 'approved')->count(),
-            'pendingItems'           => $items->whereIn('status', ['draft', 'pending'])->count(),
-            'purchasedThisQuarter'   => PurchaseRequest::where('office_id', $officeId)
-                                            ->where('status', 'approved')->count(),
-            'unpurchasedThisQuarter' => PurchaseRequest::where('office_id', $officeId)
-                                            ->whereNotIn('status', ['approved', 'completed'])->count(),
+            'totalProposedItems'     => $proposals->sum('items_count'),
+            'totalProposedBudget'    => $proposals->sum('items_sum_estimated_total_cost'),
+            'approvedItems'          => $itemCountByProposalStatus->get('approved', 0),
+            'pendingItems'           => $itemCountByProposalStatus->get('submitted', 0) + $itemCountByProposalStatus->get('endorsed', 0),
+            'returnedItems'          => $itemCountByProposalStatus->get('returned', 0),
+            'draftItems'             => $itemCountByProposalStatus->get('draft', 0),
+            'monthlyBudgetUsage'     => $this->monthlyBudgetUsage($officeId),
+            'funnelStages'           => $this->prFunnelStages($officeId),
+            'categoryBreakdown'      => $this->itemCategoryBreakdown($officeId),
+            'budgetByQuarter'        => $this->itemBudgetByQuarter($officeId),
         ];
 
         $recentUpdates = BudgetProposalReview::with('budgetProposal')
-            ->whereIn('budget_proposal_id', $proposalIds)
+            ->whereIn('budget_proposal_id', $proposals->pluck('id'))
             ->latest()
             ->take(5)
             ->get()
@@ -119,8 +143,9 @@ class PrismOfficeHeadController extends Controller
 
         // Proposal selector: ?proposal=ID shows that specific PPMP (read-only unless draft/returned).
         // ?fy=YYYY is kept as a fallback for old links — resolves to the latest proposal for that year.
-        $requestedId = (int) $request->query('proposal', 0);
-        $requestedFy = (int) $request->query('fy', 0);
+        $requestedId        = (int) $request->query('proposal', 0);
+        $requestedFy        = (int) $request->query('fy', 0);
+        $explicitlySelected = (bool) ($requestedId || $requestedFy);
         $proposal    = null;
         $sessionKey  = "office_head.selected_proposal.{$officeId}";
 
@@ -155,12 +180,7 @@ class PrismOfficeHeadController extends Controller
         $isReadOnly     = $proposal
             ? !($proposal->status === 'draft' || ($proposal->status === 'returned' && $this->isEditableByOfficeHead($proposal)))
             : false;
-        // Line items lock once a market study has been submitted for this proposal —
-        // separate from $isReadOnly, which only tracks the proposal's own status.
-        $itemsLocked    = $isReadOnly || (bool) $proposal?->marketPriceSurvey;
         $proposalStatus = $proposal?->status ?? 'draft';
-        $canStartNew    = false;
-        $nextFiscalYear = null;
 
         if (!$proposal) {
             $proposal = BudgetProposal::where('office_id', $officeId)
@@ -173,24 +193,27 @@ class PrismOfficeHeadController extends Controller
             }
         }
 
+        // Landing on the tab with nothing currently editable auto-starts a fresh
+        // blank PPMP for the office — no manual "Create New" / "Start FY" step.
+        // Skipped only when the office head explicitly browsed to a specific
+        // (necessarily read-only, since editable ones are already caught above)
+        // past proposal via the selector — that deliberate choice is respected
+        // as-is, not overridden by a new draft.
+        if (!$explicitlySelected && (!$proposal || $isReadOnly)) {
+            $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
+            $proposal = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
+                ?? $this->createDraftProposal($officeId, $nextYear);
+            $isReadOnly     = false;
+            $proposalStatus = $proposal->status;
+        }
+
+        // Line items lock once a market study has been submitted for this proposal —
+        // separate from $isReadOnly, which only tracks the proposal's own status.
+        $itemsLocked = $isReadOnly || (bool) $proposal?->marketPriceSurvey;
+
         if ($proposal) {
             $request->session()->put($sessionKey, $proposal->id);
         }
-
-        if ($proposal && $isReadOnly) {
-            $nextFiscalYear = $proposal->fiscal_year + 1;
-            $canStartNew    = !DB::table('budget_proposals')
-                ->where('office_id', $officeId)
-                ->where('fiscal_year', $nextFiscalYear)
-                ->exists();
-        }
-
-        // "Create New PPMP" (a supplemental proposal within the same fiscal year) is only
-        // blocked by an open draft — a 'returned' proposal can sit alongside a new one and
-        // stays reachable/editable via the proposal selector above.
-        $canCreateNew = !BudgetProposal::where('office_id', $officeId)
-            ->where('status', 'draft')
-            ->exists();
 
         // Proposed Budget is a manually-set target/ceiling, separate from the auto-derived
         // item-sum total (total_estimated_cost) — falls back to that sum until the office
@@ -222,6 +245,8 @@ class PrismOfficeHeadController extends Controller
                     'financeRemark'     => $item->finance_remark ?? '',
                     'targetQuarter'     => $item->target_quarter ?? 'Q1',
                     'category'          => $item->category ?? $item->ppmpCategoryLabel() ?? 'General',
+                    'sourceOfFund'      => $item->source_of_fund,
+                    'itemClassification' => $item->item_classification ?? 'Regular',
                     'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
                     'attachments'       => $item->sourceFiles->map(fn ($doc) => [
                         'id'        => $doc->id,
@@ -260,9 +285,6 @@ class PrismOfficeHeadController extends Controller
             'isReadOnly'            => $isReadOnly,
             'itemsLocked'           => $itemsLocked,
             'proposalStatus'        => $proposalStatus,
-            'canStartNew'           => $canStartNew,
-            'nextFiscalYear'        => $nextFiscalYear,
-            'canCreateNew'          => $canCreateNew,
             'proposalOptions'       => $proposalOptions,
             'selectedProposalId'    => $proposal?->id,
             'titleUpdateUrl'        => $titleUpdateUrl,
@@ -274,90 +296,29 @@ class PrismOfficeHeadController extends Controller
         ]));
     }
 
-    public function startNewCycle(Request $request): RedirectResponse
+    /**
+     * A blank draft PPMP for the given office/fiscal year — no office/title
+     * template baked in, so the office head starts from an empty form rather
+     * than a presumptuous prefilled one. Used to auto-start a PPMP whenever the
+     * office head lands on the tab with nothing currently editable.
+     */
+    private function createDraftProposal(int $officeId, int $fiscalYear): BudgetProposal
     {
-        $officeId = $this->officeId();
-
-        // Find the highest fiscal year for this office (raw query bypasses all model scopes)
-        $latestYear = DB::table('budget_proposals')
-            ->where('office_id', $officeId)
-            ->max('fiscal_year');
-
-        if (!$latestYear) {
-            return redirect()->route('office-head.budget-proposal')
-                ->with('error', 'No existing proposal found. Create your first budget proposal first.');
-        }
-
-        $nextYear = (int) $latestYear + 1;
-
-        // Guard: should not already exist
-        if (DB::table('budget_proposals')->where('office_id', $officeId)->where('fiscal_year', $nextYear)->exists()) {
-            return redirect()->route('office-head.budget-proposal')
-                ->with('error', "A proposal for FY {$nextYear} already exists.");
-        }
-
-        $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $nextYear;
-        $code = $baseCode;
-        $n = 2;
+        $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $fiscalYear;
+        $code     = $baseCode;
+        $n        = 2;
         while (DB::table('budget_proposals')->where('code', $code)->exists()) {
             $code = $baseCode . '-' . $n++;
         }
 
-        $office = auth()->user()->office;
-        $newProposal = BudgetProposal::create([
+        return BudgetProposal::create([
             'office_id'          => $officeId,
             'created_by_user_id' => auth()->id(),
             'code'               => $code,
-            'title'              => ($office?->name ?? 'Office') . ' PPMP FY' . $nextYear,
-            'fiscal_year'        => $nextYear,
+            'title'              => '',
+            'fiscal_year'        => $fiscalYear,
             'status'             => 'draft',
         ]);
-
-        return redirect()->route('office-head.budget-proposal', ['proposal' => $newProposal->id])
-            ->with('success', "FY {$nextYear} PPMP started.");
-    }
-
-    /**
-     * Start a supplemental PPMP within the same fiscal year as the office's most
-     * recent proposal — offices can have several PPMPs per year (e.g. a main PPMP
-     * plus a mid-year supplemental one), unlike startNewCycle() which advances the year.
-     */
-    public function createNewPpmp(): RedirectResponse
-    {
-        $officeId = $this->officeId();
-
-        if (BudgetProposal::where('office_id', $officeId)->where('status', 'draft')->exists()) {
-            return redirect()->route('office-head.budget-proposal')
-                ->with('error', 'You already have an open PPMP draft. Submit or finish it before creating another.');
-        }
-
-        $latestYear = DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year');
-        $year       = $latestYear ? (int) $latestYear : now()->year + 1;
-        $sequence   = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $year)->count() + 1;
-
-        $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
-        $code     = $sequence > 1 ? $baseCode . '-' . $sequence : $baseCode;
-        while (DB::table('budget_proposals')->where('code', $code)->exists()) {
-            $code = $baseCode . '-' . ++$sequence;
-        }
-
-        $office = auth()->user()->office;
-        $title  = ($office?->name ?? 'Office') . ' PPMP FY' . $year . ($sequence > 1 ? " (Supplemental {$sequence})" : '');
-
-        $newProposal = BudgetProposal::create([
-            'office_id'          => $officeId,
-            'created_by_user_id' => auth()->id(),
-            'code'               => $code,
-            'title'              => $title,
-            'fiscal_year'        => $year,
-            'status'             => 'draft',
-        ]);
-
-        // Without an explicit proposal id, the index falls back to whichever PPMP
-        // was last remembered in session (or "latest") — neither is guaranteed to
-        // be the one just created here.
-        return redirect()->route('office-head.budget-proposal', ['proposal' => $newProposal->id])
-            ->with('success', "New PPMP ({$code}) created for FY {$year}.");
     }
 
     public function updateTitle(Request $request, BudgetProposal $proposal): JsonResponse
@@ -486,22 +447,37 @@ class PrismOfficeHeadController extends Controller
             // stable sort keeps each group ordered by latest() above.
             ->sortBy(fn ($p) => $p->status === 'returned' ? 0 : 1)
             ->values()
-            ->map(fn ($proposal) => [
-                'id'              => $proposal->code ?: "bp-{$proposal->id}",
-                'proposalId'      => $proposal->id,
-                'title'           => $proposal->title,
-                'fiscalYear'      => (string) $proposal->fiscal_year,
-                'dateSubmitted'   => ($proposal->submitted_at ?? $proposal->created_at)->format('M d, Y'),
-                'totalAmount'     => (float) $proposal->total_estimated_cost,
-                'status'          => ucwords(str_replace('_', ' ', $proposal->status)),
-                'returnedRemarks' => $proposal->status === 'returned' ? $proposal->remarks : null,
-                'timeline'        => $proposal->reviews
-                    ->map(fn ($r) => [
-                        'step'      => ucwords(str_replace('_', ' ', $r->action)),
-                        'timestamp' => ($r->reviewed_at ?? $r->created_at)->format('M d, Y g:i A'),
-                        'remarks'   => $r->remarks ?? '—',
-                    ])->all(),
-            ])
+            ->map(function ($proposal) {
+                // Each "submitted" review is one full submission of this PPMP —
+                // the 1st is Version 1, every resubmission after a return is the
+                // next version. Numbered in actual chronological order (not
+                // display order) since that's what "v1/v2/v3" needs to mean.
+                $submittedInOrder = $proposal->reviews
+                    ->where('action', 'submitted')
+                    ->sortBy(fn ($r) => $r->reviewed_at ?? $r->created_at)
+                    ->values();
+                $versionByReviewId = $submittedInOrder
+                    ->mapWithKeys(fn ($r, $i) => [$r->id => $i + 1]);
+
+                return [
+                    'id'              => $proposal->code ?: "bp-{$proposal->id}",
+                    'proposalId'      => $proposal->id,
+                    'title'           => $proposal->title,
+                    'fiscalYear'      => (string) $proposal->fiscal_year,
+                    'dateSubmitted'   => ($proposal->submitted_at ?? $proposal->created_at)->format('M d, Y'),
+                    'totalAmount'     => (float) $proposal->total_estimated_cost,
+                    'status'          => ucwords(str_replace('_', ' ', $proposal->status)),
+                    'returnedRemarks' => $proposal->status === 'returned' ? $proposal->remarks : null,
+                    'timeline'        => $proposal->reviews
+                        ->map(fn ($r) => [
+                            'step'          => ucwords(str_replace('_', ' ', $r->action)),
+                            'timestamp'     => ($r->reviewed_at ?? $r->created_at)->format('M d, Y g:i A'),
+                            'remarks'       => $r->remarks ?? '—',
+                            'version'       => $versionByReviewId->get($r->id),
+                            'itemsSnapshot' => $r->review_data_json,
+                        ])->all(),
+                ];
+            })
             ->all();
 
         return view('prism.office-head.my-proposals', $this->withCommon('office-head', 'my-proposals', [
@@ -563,6 +539,92 @@ class PrismOfficeHeadController extends Controller
         return preg_match('/-(Q[1-4])(?:-|$)/', $number, $m) ? $m[1] : '';
     }
 
+    /** Sum of this office's PR totals per calendar month, current year, for the dashboard's bar chart. */
+    private function monthlyBudgetUsage(int $officeId): array
+    {
+        $totalsByMonth = PurchaseRequest::where('office_id', $officeId)
+            ->whereYear('created_at', now()->year)
+            ->selectRaw('MONTH(created_at) as month, SUM(total_amount) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
+
+        return collect(range(1, 12))
+            ->map(fn ($m) => (float) ($totalsByMonth[$m] ?? 0))
+            ->all();
+    }
+
+    /**
+     * Where this office's PRs actually sit across the full PR→AOC→PO→Payment
+     * pipeline, bucketed from PurchaseRequest::currentTrackingStage()'s unified
+     * journey key rather than re-deriving the stage logic here. Halted PRs
+     * (cancelled/denied) aren't "at" a pipeline stage, so they're tallied
+     * separately instead of silently padding one of the 5 buckets.
+     */
+    private function prFunnelStages(int $officeId): array
+    {
+        $buckets = [
+            'PR Signing'         => 0,
+            'Canvassing / AOC'   => 0,
+            'PO Signing'         => 0,
+            'Delivery / Payment' => 0,
+            'Paid'               => 0,
+        ];
+        $halted = 0;
+
+        PurchaseRequest::with('abstractOfCanvass.purchaseOrder')
+            ->where('office_id', $officeId)
+            ->get()
+            ->each(function ($pr) use (&$buckets, &$halted) {
+                $key = $pr->currentTrackingStage()['key'];
+
+                if (str_starts_with($key, 'halted:')) {
+                    $halted++;
+                } elseif (str_starts_with($key, 'pr:')) {
+                    $buckets['PR Signing']++;
+                } elseif ($key === 'for_canvassing' || $key === 'awaiting_aoc' || str_starts_with($key, 'aoc:')) {
+                    $buckets['Canvassing / AOC']++;
+                } elseif ($key === 'awaiting_po' || str_starts_with($key, 'po:')) {
+                    $buckets['PO Signing']++;
+                } elseif (str_starts_with($key, 'po_status:')) {
+                    $buckets['Delivery / Payment']++;
+                } elseif ($key === 'paid') {
+                    $buckets['Paid']++;
+                }
+            });
+
+        return ['buckets' => $buckets, 'halted' => $halted];
+    }
+
+    /**
+     * Spend by Schedule 9 category. BudgetProposalItem::ppmp_category (the
+     * A–I letter code) is never actually written anywhere in the app, so
+     * relying on it alone would show 100% "Uncategorized" — this mirrors the
+     * fallback chain already used elsewhere in this controller (lines ~241,
+     * 437, 712) that prefers the free-text `category` field first.
+     */
+    private function itemCategoryBreakdown(int $officeId): array
+    {
+        return BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+            ->get(['category', 'ppmp_category', 'estimated_total_cost'])
+            ->groupBy(fn ($item) => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'))
+            ->map(fn ($group) => (float) $group->sum('estimated_total_cost'))
+            ->sortDesc()
+            ->all();
+    }
+
+    /** Planned spend per quarter at the PPMP stage — distinct from monthlyBudgetUsage(), which is actual PR spend by calendar month. */
+    private function itemBudgetByQuarter(int $officeId): array
+    {
+        $sums = BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+            ->selectRaw('target_quarter, SUM(estimated_total_cost) as total')
+            ->groupBy('target_quarter')
+            ->pluck('total', 'target_quarter');
+
+        return collect(['Q1', 'Q2', 'Q3', 'Q4'])
+            ->map(fn ($q) => (float) ($sums[$q] ?? 0))
+            ->all();
+    }
+
     // ── Budget Proposal CRUD ─────────────────────────────────────────────────
 
     public function storeItem(Request $request): JsonResponse
@@ -574,6 +636,8 @@ class PrismOfficeHeadController extends Controller
             'estimatedUnitCost' => 'required|numeric|min:0',
             'justification'     => 'nullable|string|max:1000',
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
+            'sourceOfFund'      => 'nullable|string|max:100',
+            'itemClassification' => 'nullable|string|max:50',
             'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
 
@@ -605,22 +669,8 @@ class PrismOfficeHeadController extends Controller
         }
 
         if (!$proposal) {
-            $year     = now()->year + 1;
-            $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
-            $code     = $baseCode;
-            $n        = 2;
-            while (DB::table('budget_proposals')->where('code', $code)->exists()) {
-                $code = $baseCode . '-' . $n++;
-            }
-            $proposal = BudgetProposal::create([
-                'office_id'            => $officeId,
-                'created_by_user_id'   => auth()->id(),
-                'code'                 => $code,
-                'title'                => 'FY ' . $year . ' PPMP',
-                'fiscal_year'          => $year,
-                'total_estimated_cost' => 0,
-                'status'               => 'draft',
-            ]);
+            $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
+            $proposal = $this->createDraftProposal($officeId, $nextYear);
         }
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
@@ -635,6 +685,8 @@ class PrismOfficeHeadController extends Controller
             'estimated_total_cost' => $total,
             'target_quarter'       => $validated['targetQuarter'],
             'remarks'              => $validated['justification'] ?? null,
+            'source_of_fund'       => $validated['sourceOfFund'] ?? null,
+            'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'status'               => 'draft',
         ]);
 
@@ -654,6 +706,8 @@ class PrismOfficeHeadController extends Controller
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
                 'category'          => $item->category ?? 'General',
+                'sourceOfFund'      => $item->source_of_fund,
+                'itemClassification' => $item->item_classification,
                 'scoping'           => [],
                 'attachments'       => [],
                 'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
@@ -678,6 +732,8 @@ class PrismOfficeHeadController extends Controller
             'estimatedUnitCost' => 'required|numeric|min:0',
             'justification'     => 'nullable|string|max:1000',
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
+            'sourceOfFund'      => 'nullable|string|max:100',
+            'itemClassification' => 'nullable|string|max:50',
         ]);
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
@@ -691,6 +747,8 @@ class PrismOfficeHeadController extends Controller
             'estimated_total_cost' => $total,
             'target_quarter'       => $validated['targetQuarter'],
             'remarks'              => $validated['justification'] ?? null,
+            'source_of_fund'       => $validated['sourceOfFund'] ?? null,
+            'item_classification'  => $validated['itemClassification'] ?? 'Regular',
         ]);
 
         $proposal->update([
@@ -708,6 +766,8 @@ class PrismOfficeHeadController extends Controller
                 'totalCost'         => (float) $item->estimated_total_cost,
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
+                'sourceOfFund'      => $item->source_of_fund,
+                'itemClassification' => $item->item_classification,
             ],
         ]);
     }
@@ -856,6 +916,15 @@ class PrismOfficeHeadController extends Controller
             'submitted_by_user_id'  => auth()->id(),
         ]);
 
+        // Item edits after a return are destructive (updateItem()/destroyItem()
+        // write/delete in place) — this is the one point that actually matters
+        // to preserve: a snapshot of exactly what was submitted for review this
+        // time, so returning here later shows what v1/v2/v3 each looked like.
+        $itemsSnapshot = $proposal->items()->get([
+            'id', 'name', 'description', 'quantity', 'unit',
+            'estimated_unit_cost', 'estimated_total_cost', 'target_quarter',
+        ])->toArray();
+
         BudgetProposalReview::create([
             'budget_proposal_id'  => $proposal->id,
             'reviewed_by_user_id' => auth()->id(),
@@ -863,6 +932,7 @@ class PrismOfficeHeadController extends Controller
             'status_from'         => $statusFrom,
             'status_to'           => 'submitted',
             'remarks'             => $statusFrom === 'returned' ? 'Proposal revised and resubmitted for review.' : 'Proposal submitted for review.',
+            'review_data_json'    => $itemsSnapshot,
             'reviewed_at'         => now(),
         ]);
 

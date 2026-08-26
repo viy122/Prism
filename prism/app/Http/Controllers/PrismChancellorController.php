@@ -36,8 +36,19 @@ class PrismChancellorController extends Controller
     {
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'documents' => $this->signatureHistoryRows(['pr', 'aoc', 'po']),
+            'documents' => $this->signatureHistoryRows($this->signatureDocTypes()),
+            'refreshUrl' => route($this->queueRoutePrefix() . '.for-my-signature.refresh'),
         ]));
+    }
+
+    public function forMySignatureRefresh(): JsonResponse
+    {
+        return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    private function signatureDocTypes(): array
+    {
+        return ['pr', 'aoc', 'po'];
     }
 
     public function dashboard(): View
@@ -86,7 +97,7 @@ class PrismChancellorController extends Controller
                 : (in_array('In Progress', $quarterRow) ? 'At Risk' : 'On Track');
 
             return [
-                'office' => $office->name,
+                'office' => $office->code,
                 'q1'     => $quarterRow['Q1'],
                 'q2'     => $quarterRow['Q2'],
                 'q3'     => $quarterRow['Q3'],
@@ -102,7 +113,7 @@ class PrismChancellorController extends Controller
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->name, 'currentUtilization' => $pct, 'forecast' => $forecast, 'risk' => $risk, 'budget' => $budget];
+            return ['office' => $office->code, 'currentUtilization' => $pct, 'forecast' => $forecast, 'risk' => $risk, 'budget' => $budget];
         })->filter(fn ($r) => $r['budget'] > 0)->values();
 
         $forecasts            = $officeMetrics->all();
@@ -126,7 +137,7 @@ class PrismChancellorController extends Controller
 
         $overdueAlerts = $overdueItems->map(fn ($item) => [
             'item'        => $item->name,
-            'office'      => $item->budgetProposal?->office?->name ?? '—',
+            'office'      => $item->budgetProposal?->office?->code ?? '—',
             'prNumber'    => '—',
             'daysOverdue' => (int) now()->diffInDays($quarterEnd($item->target_quarter)),
             'status'      => 'Overdue',
@@ -283,7 +294,7 @@ class PrismChancellorController extends Controller
             $procured       = $office->purchaseRequests->where('status', 'completed')->count();
             $completionRate = $targeted > 0 ? round(($procured / $targeted) * 100) : 0;
 
-            return ['office' => $office->name, 'targeted' => $targeted, 'procured' => $procured, 'completionRate' => $completionRate];
+            return ['office' => $office->code, 'targeted' => $targeted, 'procured' => $procured, 'completionRate' => $completionRate];
         })->filter(fn ($r) => $r['targeted'] > 0)->values()->all();
 
         $utilizationSummary = $offices->map(function ($office) use ($currentQNumber) {
@@ -293,14 +304,14 @@ class PrismChancellorController extends Controller
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->name, 'budget' => $budget, 'utilized' => $utilized, 'forecast' => $forecast, 'risk' => $risk];
+            return ['office' => $office->code, 'budget' => $budget, 'utilized' => $utilized, 'forecast' => $forecast, 'risk' => $risk];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
         $delayedByOffice = PurchaseRequest::with('office')
             ->where('status', 'delayed')
             ->latest()
             ->get()
-            ->groupBy(fn ($pr) => $pr->office?->name ?? '—')
+            ->groupBy(fn ($pr) => $pr->office?->code ?? '—')
             ->map(fn ($prs) => $prs->map(fn ($pr) => [
                 'item'     => $pr->title,
                 'prNumber' => $pr->number ?? '—',
@@ -324,7 +335,7 @@ class PrismChancellorController extends Controller
 
         return [
             'id'            => $p->id,
-            'office'        => $p->office?->name ?? '—',
+            'office'        => $p->office?->code ?? '—',
             'title'         => $p->title,
             'totalAmount'   => (float) $p->total_estimated_cost,
             'dateEndorsed'  => $p->reviewed_at?->format('M d, Y') ?? '—',

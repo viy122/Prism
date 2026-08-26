@@ -29,7 +29,7 @@ class PrismCashierController extends Controller
                 return [
                     'id'            => $po->id,
                     'poNumber'      => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                    'office'        => $pr?->office?->name ?? '—',
+                    'office'        => $pr?->office?->code ?? '—',
                     'title'         => $pr?->title ?? '—',
                     'supplier'      => $po->supplier_name,
                     'totalAmount'   => (float) $po->total_amount,

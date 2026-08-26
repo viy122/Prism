@@ -29,6 +29,8 @@ class PurchaseOrder extends Model
         'remarks',
         'file_path',
         'uploaded_at',
+        'alobs_no',
+        'fund_source',
     ];
 
     protected function casts(): array

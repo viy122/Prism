@@ -96,7 +96,7 @@
     .preview-quote-row a { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
     .preview-empty-note { font-size: 12px; color: var(--s400); }
 
-    .sig-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
+    .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
     .sig-step { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 64px; position: relative; }
     .sig-step:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--s200); z-index: 0; }
     .sig-step.done::after { background: #3b6d11; }
@@ -136,12 +136,23 @@
     .po-done-note a { margin-left: auto; font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
 
     /* Activity log */
-    .activity-log { display: flex; flex-direction: column; gap: 1px; }
+    .log-toggle { cursor: pointer; user-select: none; background: var(--s50); border: 1px solid var(--s200); border-radius: 10px; padding: 11px 14px; transition: background .15s, border-color .15s; }
+    .log-toggle:hover { background: var(--s100); border-color: var(--s300); }
+    .log-toggle-label { display: flex; align-items: center; gap: 9px; }
+    .log-toggle-label i.ti-history { font-size: 16px; color: var(--m); }
+    .log-toggle i.chev { font-size: 16px; transition: transform .18s; color: var(--s500); }
+    .log-toggle.open i.chev { transform: rotate(180deg); }
+    .activity-log { display: none; flex-direction: column; gap: 1px; margin-top: 10px; }
+    .activity-log.open { display: flex; }
     .activity-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--s100); }
     .activity-item:last-child { border-bottom: none; }
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 5px; }
     .activity-item p { font-size: 12.5px; color: var(--s600); line-height: 1.6; }
     .activity-item time { font-size: 11px; color: var(--s400); display: block; margin-top: 2px; }
+    .activity-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .activity-attachment { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--m); background: var(--s50); border: 1px solid var(--s100); border-radius: 6px; padding: 3px 8px; text-decoration: none; max-width: 160px; }
+    .activity-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-attachment:hover { background: var(--s100); }
 
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s, transform .28s; transform: translateY(8px); }
     .pr-toast.visible { opacity: 1; transform: translateY(0); }
@@ -334,11 +345,15 @@
 
                 {{-- Activity log --}}
                 <div>
-                    <div class="card-head" style="margin-bottom:10px;">
-                        <div>
-                            <p class="card-eyebrow">History</p>
-                            <h3 class="card-title" style="font-size:14px;">Activity Log</h3>
+                    <div class="card-head log-toggle" id="logToggle">
+                        <div class="log-toggle-label">
+                            <i class="ti ti-history"></i>
+                            <div>
+                                <p class="card-eyebrow" style="margin-bottom:1px;">History</p>
+                                <h3 class="card-title" style="font-size:14px;">View Activity Log</h3>
+                            </div>
                         </div>
+                        <i class="ti ti-chevron-down chev"></i>
                     </div>
                     <div class="activity-log" id="activityLog"></div>
                 </div>
@@ -357,18 +372,22 @@
 <script type="application/json" id="aocData">@json($aocs)</script>
 <script type="application/json" id="stagesData">@json($stageMeta)</script>
 <script type="application/json" id="purchaseOrdersUrlData">@json(route('procurement-office.purchase-orders'))</script>
+<script type="application/json" id="refreshUrlData">@json(route('procurement-office.abstract-of-canvass.refresh'))</script>
 
 @push('scripts')
 <script>
 (function () {
-    const allAocs      = JSON.parse(document.getElementById('aocData').textContent);
+    let allAocs         = JSON.parse(document.getElementById('aocData').textContent);
     const pageStageMeta= JSON.parse(document.getElementById('stagesData').textContent);
     const poListUrl    = JSON.parse(document.getElementById('purchaseOrdersUrlData').textContent);
-    const rows          = document.querySelectorAll('[data-aoc-row]');
+    const refreshUrl    = JSON.parse(document.getElementById('refreshUrlData').textContent);
+    const tbody          = document.querySelector('.table-wrap table tbody');
+    function getRows() { return tbody ? tbody.querySelectorAll('[data-aoc-row]') : []; }
     const emptyEl        = document.getElementById('detailEmpty');
     const contentEl      = document.getElementById('detailContent');
     const titleEl        = document.getElementById('detailAocCode');
     const logEl           = document.getElementById('activityLog');
+    const logToggle       = document.getElementById('logToggle');
     const toastEl         = document.getElementById('aocToast');
     const btnAdvance      = document.getElementById('btnAdvance');
     const btnReturn       = document.getElementById('btnReturn');
@@ -520,8 +539,19 @@
         });
     }
 
+    // Oldest first — callers that want newest-first (the log display) reverse
+    // this. Falls back to array order for any entry missing a raw timestamp.
+    function sortEntriesAsc(entries) {
+        return entries.slice().sort((a, b) => {
+            const ta = a.atRaw ? new Date(a.atRaw).getTime() : NaN;
+            const tb = b.atRaw ? new Date(b.atRaw).getTime() : NaN;
+            if (isNaN(ta) || isNaN(tb)) return 0;
+            return ta - tb;
+        });
+    }
+
     function renderLog(aocId) {
-        const entries = logs[aocId] || [];
+        const entries = sortEntriesAsc(logs[aocId] || []);
         if (!entries.length) {
             logEl.innerHTML = '<p style="font-size:12px;color:var(--s400);padding:8px 0;">No activity recorded yet.</p>';
             return;
@@ -532,9 +562,37 @@
                 <div>
                     <p>${e.text}</p>
                     <time>${e.time}</time>
+                    ${attachmentsHtml(e.attachments)}
                 </div>
             </div>`).join('');
     }
+
+    // Files a signatory attached via the mobile app's Take a Photo / Upload
+    // flow — opens the signed signature-attachment link in a new tab.
+    function attachmentsHtml(attachments) {
+        if (!attachments || !attachments.length) return '';
+        return '<div class="activity-attachments">' + attachments.map(a => `
+            <a href="${a.url}" class="activity-attachment" data-preview-name="${escapeHtml(a.filename)}" data-preview-image="${a.isImage ? '1' : '0'}" title="${escapeHtml(a.filename)}">
+                <i class="ti ${a.isImage ? 'ti-photo' : 'ti-file-text'}"></i>
+                <span>${escapeHtml(a.filename)}</span>
+            </a>`).join('') + '</div>';
+    }
+
+    // Preview an attachment inside PRISM instead of navigating away to it.
+    logEl.addEventListener('click', e => {
+        const link = e.target.closest('.activity-attachment');
+        if (!link) return;
+        e.preventDefault();
+        const url  = link.getAttribute('href');
+        const name = link.dataset.previewName;
+        const body = link.dataset.previewImage === '1'
+            ? `<img src="${url}" alt="${escapeHtml(name)}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe>`;
+        window.prismInfoModal({
+            title: name,
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    });
 
     function updateTimeline(aoc) {
         // Excludes 'draft' (not a signing step) and the terminal 'fully_signed'
@@ -582,8 +640,10 @@
 
     function openAoc(aoc) {
         activeAoc = aoc;
-        rows.forEach(r => r.classList.remove('selected'));
-        document.querySelector(`[data-aoc-id="${aoc.id}"]`)?.classList.add('selected');
+        getRows().forEach(r => r.classList.remove('selected'));
+        tbody?.querySelector(`[data-aoc-id="${aoc.id}"]`)?.classList.add('selected');
+        logToggle.classList.remove('open');
+        logEl.classList.remove('open');
 
         titleEl.textContent = aoc.code;
         document.getElementById('fCode').textContent     = aoc.code;
@@ -605,6 +665,8 @@
             logs[aoc.id] = (aoc.signatureLogs || []).map(l => ({
                 text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : ''),
                 time: l.at,
+                atRaw: l.atRaw,
+                attachments: l.attachments || [],
             }));
         }
 
@@ -617,14 +679,18 @@
         renderLog(aoc.id);
     }
 
-    rows.forEach(row => {
-        row.addEventListener('click', () => {
-            const aoc = allAocs.find(a => String(a.id) === row.dataset.aocId);
-            if (aoc) openAoc(aoc);
-        });
-        row.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
-        });
+    // Delegated so rows appended later (by the background refresh) work
+    // without needing to re-bind listeners after every poll.
+    tbody?.addEventListener('click', e => {
+        const row = e.target.closest('[data-aoc-row]');
+        if (!row) return;
+        const aoc = allAocs.find(a => String(a.id) === row.dataset.aocId);
+        if (aoc) openAoc(aoc);
+    });
+    tbody?.addEventListener('keydown', e => {
+        const row = e.target.closest('[data-aoc-row]');
+        if (!row) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
 
     previewToggle.addEventListener('click', () => {
@@ -632,16 +698,23 @@
         previewBody.classList.toggle('open');
     });
 
-    aocSearch?.addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
+    logToggle.addEventListener('click', () => {
+        logToggle.classList.toggle('open');
+        logEl.classList.toggle('open');
+    });
+
+    function applyAocSearchFilter() {
+        if (!aocSearch) return;
+        const q = aocSearch.value.trim().toLowerCase();
         let visible = 0;
-        rows.forEach(row => {
+        getRows().forEach(row => {
             const match = !q || (row.dataset.search ?? '').includes(q);
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (aocCount) aocCount.textContent = visible + (visible === 1 ? ' AOC' : ' AOCs');
-    });
+    }
+    aocSearch?.addEventListener('input', applyAocSearchFilter);
 
     /* ── Route Forward ── */
     async function doAdvance() {
@@ -664,7 +737,7 @@
                 updateRoutingButtons(activeAoc);
                 updateStageBadge(activeAoc.id, json.signatoryLabel, json.signatoryStage);
                 renderIssuePo(activeAoc);
-                logs[activeAoc.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr() });
+                logs[activeAoc.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderLog(activeAoc.id);
                 showToast(json.currentStageType === 'routing' ? 'AOC forwarded.' : 'AOC signed and routed forward.');
             } else {
@@ -710,7 +783,7 @@
                 renderIssuePo(activeAoc);
                 returnRemarks.style.display = 'none';
                 returnIn.value = '';
-                logs[activeAoc.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr() });
+                logs[activeAoc.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderLog(activeAoc.id);
                 showToast('AOC returned one step — now at ' + json.signatoryLabel + '.');
             } else {
@@ -762,10 +835,12 @@
             const json = await resp.json();
             if (resp.ok && json.success) {
                 activeAoc.pdfFile = json.filePath;
+                if (json.supplierName) activeAoc.supplierName = json.supplierName;
                 document.getElementById('pdfPreview').innerHTML =
                     `<iframe src="/storage/${json.filePath}" title="AOC Document"></iframe>`;
                 uploadAocText.textContent = 'Re-upload PDF';
-                showToast('AOC PDF uploaded successfully.');
+                showToast('AOC PDF uploaded successfully.' + (json.supplierName ? ' Responsive dealer detected: ' + json.supplierName + '.' : ''));
+                renderIssuePo(activeAoc);
             } else {
                 uploadAocText.textContent = origText;
                 showToast(json.message || 'Upload failed.', true);
@@ -786,14 +861,88 @@
     }
 
     // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
-    // web) otherwise wouldn't show up here without a manual reload. Skip while
-    // an upload is in flight or a return remark is being typed.
-    setInterval(() => {
+    // web) otherwise wouldn't show up here without a manual reload. Poll for
+    // fresh data and patch the list/detail panel in place instead of a full
+    // page reload. Skipped entirely (data fetched but discarded) while an
+    // upload is in flight, the return-remarks panel is open, or the inline
+    // Issue-PO form is showing (its supplier/amount fields could hold
+    // unsaved input) — so it can't wipe in-progress work.
+    function rowHtml(aoc) {
+        const stageBadge = aoc.signatoryStage === 'fully_signed' ? 'badge-signed'
+            : (aoc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
+        const search = (aoc.code + ' ' + aoc.prNumber + ' ' + aoc.office + ' ' + aoc.title).toLowerCase();
+        const poCell = aoc.hasPo
+            ? `<span class="badge badge-signed">${escapeHtml(aoc.poNumber || '')}</span>`
+            : `<span style="font-size:11px;color:var(--s400);">—</span>`;
+        return `<tr data-aoc-row data-aoc-id="${aoc.id}" data-search="${escapeHtml(search)}" tabindex="0">
+            <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(aoc.office)}</td>
+            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(aoc.code)}</td>
+            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(aoc.prNumber)}</td>
+            <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(aoc.title)}</td>
+            <td><span class="badge ${stageBadge}" data-aoc-stage-badge="${aoc.id}">${escapeHtml(aoc.signatoryLabel)}</span></td>
+            <td>${poCell}</td>
+        </tr>`;
+    }
+
+    function handleRefresh(json) {
         if (saving) return;
-        const remarks = document.getElementById('returnRemarksInput');
-        if (remarks && remarks.value.trim()) return;
-        window.location.reload();
-    }, 45000);
+        if (returnIn.value.trim() || returnRemarks.style.display !== 'none') return;
+        if (uploadAocInput.disabled) return;
+        if (document.getElementById('btnIssuePo')) return; // inline Issue-PO form is showing
+
+        const fresh = json.aocs || [];
+        allAocs = fresh;
+
+        if (tbody) {
+            const freshById = new Map(fresh.map(a => [String(a.id), a]));
+            const existingIds = new Set();
+
+            getRows().forEach(row => {
+                const id = row.dataset.aocId;
+                existingIds.add(id);
+                const aoc = freshById.get(id);
+                if (!aoc) return; // don't remove rows missing from the fresh data
+                updateStageBadge(aoc.id, aoc.signatoryLabel, aoc.signatoryStage);
+                const poCell = row.querySelector('td:last-child');
+                if (poCell) {
+                    poCell.innerHTML = aoc.hasPo
+                        ? `<span class="badge badge-signed">${escapeHtml(aoc.poNumber || '')}</span>`
+                        : `<span style="font-size:11px;color:var(--s400);">—</span>`;
+                }
+            });
+
+            fresh.forEach(aoc => {
+                if (!existingIds.has(String(aoc.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(aoc));
+            });
+
+            if (activeAoc) tbody.querySelector(`[data-aoc-id="${activeAoc.id}"]`)?.classList.add('selected');
+
+            applyAocSearchFilter();
+        }
+
+        if (activeAoc) {
+            const freshActive = fresh.find(a => a.id === activeAoc.id);
+            if (freshActive) {
+                activeAoc = freshActive;
+                updateTimeline(activeAoc);
+                btnAdvance.disabled  = activeAoc.signatoryStage === 'fully_signed';
+                btnAdvance.innerHTML = advanceBtnHtml(activeAoc);
+                btnReturn.disabled   = activeAoc.signatoryStage === 'draft' || activeAoc.signatoryStage === 'fully_signed';
+                renderIssuePo(activeAoc);
+                logs[activeAoc.id] = (activeAoc.signatureLogs || []).map(l => ({
+                    text: `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : ''),
+                    time: l.at,
+                    atRaw: l.atRaw,
+                    attachments: l.attachments || [],
+                }));
+                renderLog(activeAoc.id);
+            }
+        }
+    }
+
+    if (refreshUrl) {
+        window.prismAutoRefresh(refreshUrl, handleRefresh);
+    }
 })();
 </script>
 @endpush

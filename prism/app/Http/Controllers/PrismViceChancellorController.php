@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class PrismViceChancellorController extends Controller
@@ -49,15 +50,24 @@ class PrismViceChancellorController extends Controller
      */
     public function forMySignature(): View
     {
-        // VCAA is only ever a PR signatory. VCAF is a PR signatory too (the
-        // flexible 3rd/4th slot, alongside Accounting), plus AOC's countersign
-        // and PO's review — so her list needs all three document types.
-        $docTypes = $this->queueRoleCode() === 'vcaf' ? ['pr', 'aoc', 'po'] : ['pr'];
-
         return view('prism.shared.for-my-signature', $this->withCommon('for-my-signature', [
             'pageTitle' => 'For My Signature',
-            'documents' => $this->signatureHistoryRows($docTypes),
+            'documents' => $this->signatureHistoryRows($this->signatureDocTypes()),
+            'refreshUrl' => route($this->queueRoutePrefix() . '.for-my-signature.refresh'),
         ]));
+    }
+
+    public function forMySignatureRefresh(): JsonResponse
+    {
+        return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    // VCAA is only ever a PR signatory. VCAF is a PR signatory too (the
+    // flexible 3rd/4th slot, alongside Accounting), plus AOC's countersign
+    // and PO's review — so her list needs all three document types.
+    private function signatureDocTypes(): array
+    {
+        return $this->queueRoleCode() === 'vcaf' ? ['pr', 'aoc', 'po'] : ['pr'];
     }
 
     public function dashboard(): View
@@ -92,7 +102,7 @@ class PrismViceChancellorController extends Controller
                 ->count();
             $risk = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->name, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
+            return ['office' => $office->code, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
         $vcName = auth()->user()->name ?? 'Vice Chancellor';
@@ -103,7 +113,7 @@ class PrismViceChancellorController extends Controller
             $oldest     = $office->purchaseRequests->where('status', 'pending')->sortBy('created_at')->first();
 
             return [
-                'office'         => $office->name,
+                'office'         => $office->code,
                 'pendingPrs'     => $pending,
                 'inProgress'     => $inProgress,
                 'oldestPending'  => $oldest?->created_at?->format('M d, Y') ?? '—',
@@ -177,7 +187,7 @@ class PrismViceChancellorController extends Controller
 
                 return [
                     'id'                 => $pr->id,
-                    'office'             => $pr->office?->name ?? '—',
+                    'office'             => $pr->office?->code ?? '—',
                     'item'               => $pr->title,
                     'targetQuarter'      => $pr->fiscal_year ? 'FY ' . $pr->fiscal_year : '—',
                     'currentStatus'      => $currentStatus,
@@ -215,7 +225,7 @@ class PrismViceChancellorController extends Controller
             $utilized      = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
             $utilization   = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
 
-            return ['office' => $office->name, 'totalAppItems' => $totalAppItems, 'procured' => $procured, 'pending' => $pending, 'utilization' => $utilization, 'budget' => $budget];
+            return ['office' => $office->code, 'totalAppItems' => $totalAppItems, 'procured' => $procured, 'pending' => $pending, 'utilization' => $utilization, 'budget' => $budget];
         })->filter(fn ($r) => $r['budget'] > 0)->sortByDesc('utilization')->values();
 
         $performanceRows = $rows->map(fn ($r, $i) => array_merge($r, [

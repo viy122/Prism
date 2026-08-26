@@ -56,8 +56,22 @@
         .field-input:focus { border-color: #681012; background: #fff; box-shadow: 0 0 0 3.5px rgba(104,16,18,0.1); }
         .status-msg { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; font-size: 12.5px; font-weight: 600; border-radius: 8px; padding: 10px 12px; margin-bottom: 18px; }
         .server-error { background: #fdf1f1; border: 1px solid #f2c4c4; color: #a32d2d; font-size: 12px; font-weight: 600; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
-        .btn-primary { width: 100%; height: 48px; border-radius: 12px; background: #681012; color: #fff; border: none; cursor: pointer; font-size: 14px; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .btn-primary { width: 100%; height: 48px; border-radius: 12px; background: #681012; color: #fff; border: none; cursor: pointer; font-size: 14px; font-weight: 700; font-family: 'Poppins', sans-serif; position: relative; display: flex; align-items: center; justify-content: center; }
         .btn-primary:hover { opacity: .92; }
+        .btn-primary.loading { pointer-events: none; }
+        .btn-primary.loading .btn-text { opacity: 0; }
+        .btn-primary .spinner {
+            position: absolute;
+            width: 20px; height: 20px;
+            border: 2.5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            opacity: 0;
+            transition: opacity .2s;
+        }
+        .btn-primary.loading .spinner { opacity: 1; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .back-link { display: block; text-align: center; margin-top: 18px; font-size: 12.5px; font-weight: 600; color: #681012; text-decoration: none; }
         .back-link:hover { text-decoration: underline; }
     </style>
@@ -81,18 +95,27 @@
                 <div class="server-error">{{ $errors->first() }}</div>
             @endif
 
-            <form method="POST" action="{{ route('password.email') }}">
+            <form method="POST" action="{{ route('password.email') }}" id="forgotPasswordForm">
                 @csrf
                 <div class="field">
                     <label for="email">Email Address</label>
                     <input class="field-input" type="email" id="email" name="email" placeholder="you@example.com" value="{{ old('email') }}" required autofocus>
                 </div>
-                <button class="btn-primary" type="submit">Send Reset Code</button>
+                <button class="btn-primary" type="submit" id="submitBtn">
+                    <div class="spinner"></div>
+                    <span class="btn-text">Send Reset Code</span>
+                </button>
             </form>
 
             <a class="back-link" href="{{ route('login') }}">&larr; Back to Sign In</a>
         </div>
     </div>
+
+    <script>
+        document.getElementById('forgotPasswordForm').addEventListener('submit', function () {
+            document.getElementById('submitBtn').classList.add('loading');
+        });
+    </script>
 </body>
 
 </html>

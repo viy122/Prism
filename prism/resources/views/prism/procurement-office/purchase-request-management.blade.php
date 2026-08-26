@@ -46,7 +46,7 @@
     .badge-draft        { background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
 
     /* Signatory timeline */
-    .sig-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 4px; }
+    .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; }
     .sig-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
     .sig-step:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--s200); z-index: 0; }
     .sig-step.done::after { background: #3b6d11; }
@@ -118,12 +118,23 @@
     .btn-save i { font-size: 16px; }
 
     /* Activity log */
-    .activity-log { display: flex; flex-direction: column; gap: 1px; }
+    .log-toggle { cursor: pointer; user-select: none; background: var(--s50); border: 1px solid var(--s200); border-radius: 10px; padding: 11px 14px; transition: background .15s, border-color .15s; }
+    .log-toggle:hover { background: var(--s100); border-color: var(--s300); }
+    .log-toggle-label { display: flex; align-items: center; gap: 9px; }
+    .log-toggle-label i.ti-history { font-size: 16px; color: var(--m); }
+    .log-toggle i.chev { font-size: 16px; transition: transform .18s; color: var(--s500); }
+    .log-toggle.open i.chev { transform: rotate(180deg); }
+    .activity-log { display: none; flex-direction: column; gap: 1px; margin-top: 10px; }
+    .activity-log.open { display: flex; }
     .activity-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--s100); }
     .activity-item:last-child { border-bottom: none; }
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 5px; }
     .activity-item p { font-size: 12.5px; color: var(--s600); line-height: 1.6; }
     .activity-item time { font-size: 11px; color: var(--s400); display: block; margin-top: 2px; }
+    .activity-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .activity-attachment { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--m); background: var(--s50); border: 1px solid var(--s100); border-radius: 6px; padding: 3px 8px; text-decoration: none; max-width: 160px; }
+    .activity-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-attachment:hover { background: var(--s100); }
 
     /* Toast */
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s, transform .28s; transform: translateY(8px); }
@@ -382,11 +393,15 @@
 
                 {{-- Activity log --}}
                 <div>
-                    <div class="card-head" style="margin-bottom:10px;">
-                        <div>
-                            <p class="card-eyebrow">History</p>
-                            <h3 class="card-title" style="font-size:14px;">Activity Log</h3>
+                    <div class="card-head log-toggle" id="logToggle">
+                        <div class="log-toggle-label">
+                            <i class="ti ti-history"></i>
+                            <div>
+                                <p class="card-eyebrow" style="margin-bottom:1px;">History</p>
+                                <h3 class="card-title" style="font-size:14px;">View Activity Log</h3>
+                            </div>
                         </div>
+                        <i class="ti ti-chevron-down chev"></i>
                     </div>
                     <div class="activity-log" id="activityLog"></div>
                 </div>
@@ -518,12 +533,18 @@
 <script type="application/json" id="stagesData">@json($stageMeta)</script>
 <script type="application/json" id="importPdfUrlData">@json($importPdfUrl)</script>
 <script type="application/json" id="importConfirmUrlData">@json($importConfirmUrl)</script>
+<script type="application/json" id="refreshUrlData">@json(route('procurement-office.purchase-request-management.refresh'))</script>
 
 @push('scripts')
 <script>
 (function () {
-    const allPrs       = JSON.parse(document.getElementById('prData').textContent);
-    const rows         = document.querySelectorAll('[data-pr-row]');
+    let allPrs          = JSON.parse(document.getElementById('prData').textContent);
+    const refreshUrl    = JSON.parse(document.getElementById('refreshUrlData').textContent);
+    const tbody          = document.querySelector('.table-wrap table tbody');
+    function getRows() { return tbody ? tbody.querySelectorAll('[data-pr-row]') : []; }
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
     const emptyEl      = document.getElementById('detailEmpty');
     const contentEl    = document.getElementById('detailContent');
     const titleEl      = document.getElementById('detailPrNumber');
@@ -532,6 +553,7 @@
     const remarksIn    = document.getElementById('remarksInput');
     const btnSave      = document.getElementById('btnSave');
     const logEl        = document.getElementById('activityLog');
+    const logToggle    = document.getElementById('logToggle');
     const toastEl      = document.getElementById('prToast');
     const btnAdvance       = document.getElementById('btnAdvance');
     const btnReturn        = document.getElementById('btnReturn');
@@ -557,6 +579,11 @@
     const logs = {};
     let activePr = null;
     let saving = false;
+    // True once the user touches the status dropdown themselves, so a
+    // background refresh doesn't silently revert an unsaved selection.
+    // Cleared whenever the value is set programmatically (open / save / refresh).
+    let statusDirty = false;
+    statusSel.addEventListener('change', () => { statusDirty = true; });
 
     /* ── Helpers ── */
     function displayStatus(val) {
@@ -595,8 +622,22 @@
         toastEl._t = setTimeout(() => { toastEl.className = 'pr-toast'; }, 2800);
     }
 
+    // Oldest first — callers that want newest-first (the log display) reverse
+    // this. Falls back to array order for any entry missing a raw timestamp.
+    // Needed here specifically because this page merges two separate sources
+    // (status-update activityLog + signatureLogs) that aren't already in a
+    // shared chronological order once simply concatenated.
+    function sortEntriesAsc(entries) {
+        return entries.slice().sort((a, b) => {
+            const ta = a.atRaw ? new Date(a.atRaw).getTime() : NaN;
+            const tb = b.atRaw ? new Date(b.atRaw).getTime() : NaN;
+            if (isNaN(ta) || isNaN(tb)) return 0;
+            return ta - tb;
+        });
+    }
+
     function renderLog(prId) {
-        const entries = logs[prId] || [];
+        const entries = sortEntriesAsc(logs[prId] || []);
         if (!entries.length) {
             logEl.innerHTML = '<p style="font-size:12px;color:var(--s400);padding:8px 0;">No activity recorded yet.</p>';
             return;
@@ -607,9 +648,37 @@
                 <div>
                     <p>${e.text}</p>
                     <time>${e.time}</time>
+                    ${attachmentsHtml(e.attachments)}
                 </div>
             </div>`).join('');
     }
+
+    // Files a signatory attached via the mobile app's Take a Photo / Upload
+    // flow — opens the signed signature-attachment link in a new tab.
+    function attachmentsHtml(attachments) {
+        if (!attachments || !attachments.length) return '';
+        return '<div class="activity-attachments">' + attachments.map(a => `
+            <a href="${a.url}" class="activity-attachment" data-preview-name="${escapeHtml(a.filename)}" data-preview-image="${a.isImage ? '1' : '0'}" title="${escapeHtml(a.filename)}">
+                <i class="ti ${a.isImage ? 'ti-photo' : 'ti-file-text'}"></i>
+                <span>${escapeHtml(a.filename)}</span>
+            </a>`).join('') + '</div>';
+    }
+
+    // Preview an attachment inside PRISM instead of navigating away to it.
+    logEl.addEventListener('click', e => {
+        const link = e.target.closest('.activity-attachment');
+        if (!link) return;
+        e.preventDefault();
+        const url  = link.getAttribute('href');
+        const name = link.dataset.previewName;
+        const body = link.dataset.previewImage === '1'
+            ? `<img src="${url}" alt="${escapeHtml(name)}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe>`;
+        window.prismInfoModal({
+            title: name,
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    });
 
     function updateTimeline(pr) {
         // Timeline shows every real stage — excludes 'draft' (not a signing step)
@@ -661,8 +730,10 @@
     function openPr(pr) {
         activePr = pr;
 
-        rows.forEach(r => r.classList.remove('selected'));
-        document.querySelector(`[data-pr-id="${pr.id}"]`).classList.add('selected');
+        getRows().forEach(r => r.classList.remove('selected'));
+        tbody?.querySelector(`[data-pr-id="${pr.id}"]`)?.classList.add('selected');
+        logToggle.classList.remove('open');
+        logEl.classList.remove('open');
 
         titleEl.textContent      = pr.prNumber;
         officeChip.textContent   = pr.office;
@@ -676,6 +747,7 @@
         document.getElementById('fRemarks').textContent  = pr.remarks !== '—' ? pr.remarks : '—';
 
         statusSel.value = pr.currentStatus ?? 'new';
+        statusDirty = false;
         remarksIn.value = '';
 
         const pdfEl = document.getElementById('pdfPreview');
@@ -688,6 +760,7 @@
             logs[pr.id] = (pr.activityLog || []).map(e => ({
                 text: `Status: <strong>${e.status}</strong>` + (e.remarks && e.remarks !== '—' ? ` &mdash; ${e.remarks}` : ''),
                 time: e.timestamp,
+                atRaw: e.timestampRaw,
             }));
             (pr.signatureLogs || []).forEach(l => {
                 let text = `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : '');
@@ -697,7 +770,7 @@
                     text += `<br><span style="font-size:11px;color:#854f0b;">photo withheld — processing</span>`
                         + (l.reprocessUrl ? ` <button type="button" class="sig-reprocess-btn" data-url="${l.reprocessUrl}" style="font-size:10px;font-weight:700;border:1px solid #fac775;background:#fdf7ec;color:#854f0b;border-radius:6px;padding:2px 8px;cursor:pointer;">Reprocess</button>` : '');
                 }
-                logs[pr.id].push({ text, time: l.at });
+                logs[pr.id].push({ text, time: l.at, atRaw: l.atRaw, attachments: l.attachments || [] });
             });
         }
 
@@ -710,28 +783,39 @@
     }
 
     /* ── Row click ── */
-    rows.forEach(row => {
-        row.addEventListener('click', () => {
-            const pr = allPrs.find(p => String(p.id) === row.dataset.prId);
-            if (pr) openPr(pr);
-        });
-        row.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
-        });
+    // Delegated so rows appended later (by the background refresh) work
+    // without needing to re-bind listeners after every poll.
+    tbody?.addEventListener('click', e => {
+        const row = e.target.closest('[data-pr-row]');
+        if (!row) return;
+        const pr = allPrs.find(p => String(p.id) === row.dataset.prId);
+        if (pr) openPr(pr);
+    });
+    tbody?.addEventListener('keydown', e => {
+        const row = e.target.closest('[data-pr-row]');
+        if (!row) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
 
     /* ── Search (PR number, item, office, remarks, signatory stage) ── */
     const prSearchInput = document.getElementById('prSearch');
     const prCountChip    = document.getElementById('prVisibleCount');
-    prSearchInput?.addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
+    function applyPrSearchFilter() {
+        if (!prSearchInput) return;
+        const q = prSearchInput.value.trim().toLowerCase();
         let visible = 0;
-        rows.forEach(row => {
+        getRows().forEach(row => {
             const match = !q || (row.dataset.search ?? '').includes(q);
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (prCountChip) prCountChip.textContent = visible + (visible === 1 ? ' PR' : ' PRs');
+    }
+    prSearchInput?.addEventListener('input', applyPrSearchFilter);
+
+    logToggle.addEventListener('click', () => {
+        logToggle.classList.toggle('open');
+        logEl.classList.toggle('open');
     });
 
     /* ── Reprocess a pending/failed signature photo ── */
@@ -783,7 +867,7 @@
                 updateTimeline(activePr);
                 updateRoutingButtons(activePr);
                 updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
-                logs[activePr.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr() });
+                logs[activePr.id].push({ text: `Routed forward → <strong>${json.signatoryLabel}</strong>`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderLog(activePr.id);
                 showToast('PR routed forward.');
             } else {
@@ -843,7 +927,7 @@
                 updateSigBadge(activePr.id, json.signatoryLabel, json.signatoryStage);
                 returnRemarks.style.display = 'none';
                 returnIn.value = '';
-                logs[activePr.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr() });
+                logs[activePr.id].push({ text: `<strong>Returned to ${json.signatoryLabel}</strong> &mdash; ${reason}`, time: nowStr(), atRaw: new Date().toISOString() });
                 renderLog(activePr.id);
                 showToast('PR returned one step — now at ' + json.signatoryLabel + '.');
             } else {
@@ -878,8 +962,9 @@
                 if (remarks) document.getElementById('fRemarks').textContent = remarks;
                 let logText = `Processing status → <strong>${statusDisp}</strong>`;
                 if (remarks) logText += ` &mdash; ${remarks}`;
-                logs[pr.id].push({ text: logText, time: nowStr() });
+                logs[pr.id].push({ text: logText, time: nowStr(), atRaw: new Date().toISOString() });
                 remarksIn.value = '';
+                statusDirty = false;
                 renderLog(pr.id);
                 showToast('Saved successfully.');
             } else {
@@ -929,6 +1014,93 @@
         s.id = 'spinStyle';
         s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
         document.head.appendChild(s);
+    }
+
+    // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
+    // web) otherwise wouldn't show up here without a manual reload. Poll for
+    // fresh data and patch the list/detail panel in place instead of a full
+    // page reload. Skipped entirely (data fetched but discarded) while an
+    // upload/import is in flight, a remark/status field is being edited, the
+    // return panel is open, or the third-signer choice hasn't been submitted
+    // yet — so it can't wipe in-progress work. Checks the import modal via
+    // its DOM state rather than the BSU-import IIFE's own `importing` flag,
+    // since that variable lives in a separate closure below.
+    function rowHtml(pr) {
+        const stageBadge = pr.signatoryStage === 'fully_signed' ? 'badge-signed'
+            : (pr.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
+        const search = (pr.prNumber + ' ' + pr.item + ' ' + pr.office + ' ' + pr.remarks + ' ' + pr.signatoryLabel).toLowerCase();
+        return `<tr data-pr-row data-pr-id="${pr.id}" data-search="${escapeHtml(search)}" tabindex="0">
+            <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(pr.office)}</td>
+            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.prNumber)}</td>
+            <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(pr.item)}</td>
+            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.dateSubmitted)}</td>
+            <td><span class="badge ${stageBadge}" data-sig-badge="${pr.id}">${escapeHtml(pr.signatoryLabel)}</span></td>
+        </tr>`;
+    }
+
+    function handleRefresh(json) {
+        if (saving || statusDirty) return;
+        if (remarksIn.value.trim()) return;
+        if (returnIn.value.trim() || returnRemarks.style.display !== 'none') return;
+        if (thirdSignerPanel.style.display !== 'none') return;
+        const importOverlay = document.getElementById('importModalOverlay');
+        if (importOverlay && !importOverlay.classList.contains('hidden')) return;
+
+        const fresh = json.purchaseRequests || [];
+        allPrs = fresh;
+
+        if (tbody) {
+            const freshById = new Map(fresh.map(p => [String(p.id), p]));
+            const existingIds = new Set();
+
+            getRows().forEach(row => {
+                const id = row.dataset.prId;
+                existingIds.add(id);
+                const pr = freshById.get(id);
+                if (!pr) return; // don't remove rows missing from the fresh data
+                updateSigBadge(pr.id, pr.signatoryLabel, pr.signatoryStage);
+            });
+
+            fresh.forEach(pr => {
+                if (!existingIds.has(String(pr.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(pr));
+            });
+
+            if (activePr) tbody.querySelector(`[data-pr-id="${activePr.id}"]`)?.classList.add('selected');
+
+            applyPrSearchFilter();
+        }
+
+        if (activePr) {
+            const freshActive = fresh.find(p => p.id === activePr.id);
+            if (freshActive) {
+                activePr = freshActive;
+                document.getElementById('fSigLabel').textContent = activePr.signatoryLabel;
+                statusSel.value = activePr.currentStatus ?? 'new';
+                statusDirty = false;
+                updateTimeline(activePr);
+                updateRoutingButtons(activePr);
+                logs[activePr.id] = (activePr.activityLog || []).map(e => ({
+                    text: `Status: <strong>${e.status}</strong>` + (e.remarks && e.remarks !== '—' ? ` &mdash; ${e.remarks}` : ''),
+                    time: e.timestamp,
+                    atRaw: e.timestampRaw,
+                }));
+                (activePr.signatureLogs || []).forEach(l => {
+                    let text = `<strong>${l.display}</strong>` + (l.by && l.by !== '—' ? ` by ${l.by}` : '') + (l.remarks ? ` &mdash; ${l.remarks}` : '');
+                    if (l.photoUrl) {
+                        text += `<br><a href="${l.photoUrl}" target="_blank" rel="noopener"><img src="${l.photoUrl}" alt="Signed document (signature blurred)" style="margin-top:6px;max-width:120px;border-radius:8px;border:1px solid #e2e8f0;"></a> <span style="font-size:10px;color:#64748b;">signature blurred for privacy</span>`;
+                    } else if (l.photoStatus === 'pending' || l.photoStatus === 'failed') {
+                        text += `<br><span style="font-size:11px;color:#854f0b;">photo withheld — processing</span>`
+                            + (l.reprocessUrl ? ` <button type="button" class="sig-reprocess-btn" data-url="${l.reprocessUrl}" style="font-size:10px;font-weight:700;border:1px solid #fac775;background:#fdf7ec;color:#854f0b;border-radius:6px;padding:2px 8px;cursor:pointer;">Reprocess</button>` : '');
+                    }
+                    logs[activePr.id].push({ text, time: l.at, atRaw: l.atRaw, attachments: l.attachments || [] });
+                });
+                renderLog(activePr.id);
+            }
+        }
+    }
+
+    if (refreshUrl) {
+        window.prismAutoRefresh(refreshUrl, handleRefresh);
     }
 })();
 
@@ -1169,18 +1341,10 @@
         btnConfirm.disabled = false;
         btnConfirm.innerHTML = '<i class="ti ti-check"></i> Confirm Import';
     });
-
-    // ── Auto-refresh ── another signatory's action (mobile or elsewhere on
-    // web) otherwise wouldn't show up here without a manual reload. Skip while
-    // an upload/import is in flight or a remark/purpose field is being typed.
-    setInterval(() => {
-        if (saving || importing) return;
-        for (const id of ['returnRemarksInput', 'remarksInput', 'impPurpose']) {
-            const el = document.getElementById(id);
-            if (el && el.value.trim()) return;
-        }
-        window.location.reload();
-    }, 45000);
+    // Auto-refresh for this page now lives in the first IIFE above, where
+    // `allPrs`/`activePr`/`saving` are actually in scope — it polls the
+    // import modal's own DOM state (`#importModalOverlay`) instead of this
+    // IIFE's `importing` flag, which isn't visible from there.
 })();
 </script>
 @endpush

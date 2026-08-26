@@ -272,6 +272,15 @@ class MarketScopingService
                         return null;
                     }
 
+                    // Google Shopping's gl=ph/hl=en params only bias which results
+                    // and interface language are returned — they don't guarantee an
+                    // overseas seller's own listing title is in English. Drop any
+                    // title carrying non-Latin script rather than show a Procurement
+                    // user an untranslated Chinese/Korean/Arabic/etc. product name.
+                    if ($this->looksNonLatin($name)) {
+                        return null;
+                    }
+
                     return [
                         'name'            => $name,
                         'price'           => (float) $price,
@@ -297,5 +306,14 @@ class MarketScopingService
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /** True if $text contains CJK, Hangul, Cyrillic, Thai, or Arabic script. */
+    private function looksNonLatin(string $text): bool
+    {
+        return (bool) preg_match(
+            '/[\x{4E00}-\x{9FFF}\x{3040}-\x{30FF}\x{AC00}-\x{D7A3}\x{0400}-\x{04FF}\x{0E00}-\x{0E7F}\x{0600}-\x{06FF}]/u',
+            $text
+        );
     }
 }

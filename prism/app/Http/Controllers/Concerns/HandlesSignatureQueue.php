@@ -133,7 +133,7 @@ trait HandlesSignatureQueue
                     ->latest()
                     ->get()
                     ->map(fn ($pr) => $this->historyRowFor(
-                        $pr, 'pr', $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), $pr->office?->name, $pr->title, $pr->remarks
+                        $pr, 'pr', $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), $pr->office?->code, $pr->title, $pr->remarks
                     ))
             );
         }
@@ -146,7 +146,7 @@ trait HandlesSignatureQueue
                     ->get()
                     ->map(fn ($aoc) => $this->historyRowFor(
                         $aoc, 'aoc', $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
-                        $aoc->purchaseRequest?->office?->name, $aoc->purchaseRequest?->title, $aoc->remarks
+                        $aoc->purchaseRequest?->office?->code, $aoc->purchaseRequest?->title, $aoc->remarks
                     ))
             );
         }
@@ -161,13 +161,19 @@ trait HandlesSignatureQueue
                         $pr = $po->abstractOfCanvass?->purchaseRequest;
                         return $this->historyRowFor(
                             $po, 'po', $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                            $pr?->office?->name, ($pr?->title ?? '—') . ' — ' . $po->supplier_name, $po->remarks
+                            $pr?->office?->code, ($pr?->title ?? '—') . ' — ' . $po->supplier_name, $po->remarks
                         );
                     })
             );
         }
 
         return $rows->sortByDesc('updatedAt')->values()->all();
+    }
+
+    /** JSON version of signatureHistoryRows(), for the page's background poll. */
+    protected function signatureHistoryJson(array $docTypes): JsonResponse
+    {
+        return response()->json(['documents' => $this->signatureHistoryRows($docTypes)]);
     }
 
     private function historyRowFor(Model $doc, string $docType, string $number, ?string $office, ?string $title, ?string $remarks): array
@@ -207,6 +213,7 @@ trait HandlesSignatureQueue
                 'display'     => $doc->describeSignatureLog($l),
                 'by'          => $l->signedBy?->name ?? '—',
                 'at'          => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                'atRaw'       => $l->signed_at?->toIso8601String(),
                 // Only meaningful for a 'returned' entry (the reason it was sent
                 // back) — surfaced separately from 'display' so the reason is
                 // visible to whoever the document lands with next, not just
@@ -225,13 +232,14 @@ trait HandlesSignatureQueue
             'updatedAt'      => $doc->updated_at,
         ];
 
-        // Preview: PR embeds its uploaded scanned PDF; AOC has no file of its
-        // own, so its "preview" is the parent PR's items + the canvass
-        // quotations gathered for it — the actual substance of an Abstract
-        // of Canvass. PO has neither and isn't previewed.
+        // Preview: PR and AOC both embed their own uploaded scanned PDF.
+        // AOC additionally carries the parent PR's items + the canvass
+        // quotations gathered for it — the actual substance behind the
+        // Abstract of Canvass. PO has no file of its own and isn't previewed.
         if ($docType === 'pr') {
             $row['pdfFile'] = $doc->file_path;
         } elseif ($docType === 'aoc') {
+            $row['pdfFile'] = $doc->file_path;
             $pr = $doc->purchaseRequest;
             $row['prItems'] = $pr?->items->map(fn ($i) => [
                 'name'      => $i->name,

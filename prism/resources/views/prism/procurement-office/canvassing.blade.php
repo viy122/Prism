@@ -235,6 +235,9 @@
     document.querySelectorAll('.btn-delete-quote').forEach(btn => {
         btn.addEventListener('click', async () => {
             if (!confirm('Remove this document?')) return;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i>';
             try {
                 const resp = await fetch(btn.dataset.url, {
                     method: 'DELETE',
@@ -245,9 +248,15 @@
                     showToast('Document removed.');
                     setTimeout(() => window.location.reload(), 700);
                 } else {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
                     showToast(json.error || 'Failed to remove.', true);
                 }
-            } catch { showToast('Network error.', true); }
+            } catch {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                showToast('Network error.', true);
+            }
         });
     });
 

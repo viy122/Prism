@@ -285,6 +285,7 @@
 </script>
 
 <x-prism.confirm-modal />
+<div class="pr-toast" id="globalToast"></div>
 
 @stack('scripts')
 

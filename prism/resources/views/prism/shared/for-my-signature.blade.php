@@ -52,6 +52,12 @@
     .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     .search-input::placeholder { color: var(--s400); }
 
+    .search-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    @media (max-width: 560px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
+
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
     .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 220px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); text-align: center; padding: 32px; }
     .detail-empty i { font-size: 36px; color: var(--s300); }
@@ -89,7 +95,7 @@
     .preview-quote-row a { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
     .preview-empty-note { font-size: 12px; color: var(--s400); }
 
-    .sig-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
+    .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
     .sig-step { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 64px; position: relative; }
     .sig-step:not(:last-child)::after { content: ''; position: absolute; top: 10px; left: 50%; width: 100%; height: 2px; background: var(--s200); z-index: 0; }
     .sig-step.done::after { background: #3b6d11; }
@@ -112,7 +118,14 @@
     .remarks-textarea:focus { border-color: var(--m); }
     .remarks-textarea::placeholder { color: var(--s300); }
 
-    .activity-log { display: flex; flex-direction: column; gap: 1px; }
+    .log-toggle { cursor: pointer; user-select: none; background: var(--s50); border: 1px solid var(--s200); border-radius: 10px; padding: 11px 14px; transition: background .15s, border-color .15s; }
+    .log-toggle:hover { background: var(--s100); border-color: var(--s300); }
+    .log-toggle-label { display: flex; align-items: center; gap: 9px; }
+    .log-toggle-label i.ti-history { font-size: 16px; color: var(--m); }
+    .log-toggle i.chev { font-size: 16px; transition: transform .18s; color: var(--s500); }
+    .log-toggle.open i.chev { transform: rotate(180deg); }
+    .activity-log { display: none; flex-direction: column; gap: 1px; margin-top: 10px; }
+    .activity-log.open { display: flex; }
     .activity-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--s100); }
     .activity-item:last-child { border-bottom: none; }
     .activity-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; margin-top: 5px; }
@@ -159,9 +172,21 @@
             </div>
 
             @if(count($documents) > 0)
-                <div class="search-wrap" style="margin-bottom:14px;">
-                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input class="search-input" type="search" id="docSearch" placeholder="Search by number, office, or title">
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input class="search-input" type="search" id="docSearch" placeholder="Search by number, office, or title">
+                    </div>
+                    <select class="filter-select" id="docTypeFilter" title="Filter by document type">
+                        <option value="">All Types</option>
+                        <option value="pr">PR</option>
+                        <option value="aoc">AOC</option>
+                        <option value="po">PO</option>
+                    </select>
+                    <select class="filter-select" id="docSortOrder" title="Sort by last updated">
+                        <option value="desc">Newest → Oldest</option>
+                        <option value="asc">Oldest → Newest</option>
+                    </select>
                 </div>
             @endif
 
@@ -192,7 +217,7 @@
                                     default                                  => 'badge-routing',
                                 };
                             @endphp
-                            <tr data-doc-row data-doc-key="{{ $doc['docType'] }}-{{ $doc['id'] }}" data-search="{{ strtolower($doc['number'] . ' ' . $doc['office'] . ' ' . $doc['title']) }}" tabindex="0">
+                            <tr data-doc-row data-doc-key="{{ $doc['docType'] }}-{{ $doc['id'] }}" data-doc-type="{{ $doc['docType'] }}" data-updated-at="{{ $doc['updatedAt']->toIso8601String() }}" data-search="{{ strtolower($doc['number'] . ' ' . $doc['office'] . ' ' . $doc['title']) }}" tabindex="0">
                                 <td><span class="doc-badge doc-{{ $doc['docType'] }}">{{ $doc['docLabel'] }}</span></td>
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $doc['number'] }}</td>
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['office'] }}</td>
@@ -264,11 +289,15 @@
 
                 {{-- Activity log --}}
                 <div>
-                    <div class="card-head" style="margin-bottom:10px;">
-                        <div>
-                            <p class="card-eyebrow">History</p>
-                            <h3 class="card-title" style="font-size:14px;">Activity Log</h3>
+                    <div class="card-head log-toggle" id="logToggle">
+                        <div class="log-toggle-label">
+                            <i class="ti ti-history"></i>
+                            <div>
+                                <p class="card-eyebrow" style="margin-bottom:1px;">History</p>
+                                <h3 class="card-title" style="font-size:14px;">View Activity Log</h3>
+                            </div>
                         </div>
+                        <i class="ti ti-chevron-down chev"></i>
                     </div>
                     <div class="activity-log" id="activityLog"></div>
                 </div>
@@ -286,17 +315,21 @@
 @endsection
 
 <script type="application/json" id="docData">@json($documents)</script>
+<script type="application/json" id="refreshUrlData">@json($refreshUrl ?? null)</script>
 
 @push('scripts')
 <script>
 (function () {
-    const allDocs     = JSON.parse(document.getElementById('docData').textContent);
-    const rows        = document.querySelectorAll('[data-doc-row]');
+    let allDocs        = JSON.parse(document.getElementById('docData').textContent);
+    const refreshUrl    = JSON.parse(document.getElementById('refreshUrlData').textContent);
+    const tbody          = document.querySelector('.table-wrap table tbody');
+    function getRows() { return tbody ? tbody.querySelectorAll('[data-doc-row]') : []; }
     const emptyEl      = document.getElementById('detailEmpty');
     const contentEl    = document.getElementById('detailContent');
     const titleEl       = document.getElementById('detailDocNumber');
     const remarksIn     = document.getElementById('remarksInput');
     const logEl          = document.getElementById('activityLog');
+    const logToggle       = document.getElementById('logToggle');
     const toastEl        = document.getElementById('prToast');
     const btnMark         = document.getElementById('btnMarkSigned');
     const btnMarkIcon     = document.getElementById('btnMarkSignedIcon');
@@ -306,6 +339,8 @@
     const csrfToken       = document.querySelector('meta[name="csrf-token"]').content;
     const docSearch       = document.getElementById('docSearch');
     const docCount        = document.getElementById('docVisibleCount');
+    const docTypeFilter   = document.getElementById('docTypeFilter');
+    const docSortOrder    = document.getElementById('docSortOrder');
     const previewSection  = document.getElementById('previewSection');
     const previewToggle   = document.getElementById('previewToggle');
     const previewBody     = document.getElementById('previewBody');
@@ -326,8 +361,19 @@
         ).join('');
     }
 
+    // Oldest first — callers that want newest-first (the log display) reverse
+    // this. Falls back to array order for any entry missing a raw timestamp.
+    function sortEntriesAsc(entries) {
+        return entries.slice().sort((a, b) => {
+            const ta = a.atRaw ? new Date(a.atRaw).getTime() : NaN;
+            const tb = b.atRaw ? new Date(b.atRaw).getTime() : NaN;
+            if (isNaN(ta) || isNaN(tb)) return 0;
+            return ta - tb;
+        });
+    }
+
     function renderLog(doc) {
-        const entries = doc.signatureLogs || [];
+        const entries = sortEntriesAsc(doc.signatureLogs || []);
         if (!entries.length) {
             logEl.innerHTML = '<p style="font-size:12px;color:var(--s400);padding:8px 0;">No activity recorded yet.</p>';
             return;
@@ -355,11 +401,27 @@
     function attachmentsHtml(attachments) {
         if (!attachments || !attachments.length) return '';
         return '<div class="activity-attachments">' + attachments.map(a => `
-            <a href="${a.url}" target="_blank" rel="noopener" class="activity-attachment" title="${escapeHtml(a.filename)}">
+            <a href="${a.url}" class="activity-attachment" data-preview-name="${escapeHtml(a.filename)}" data-preview-image="${a.isImage ? '1' : '0'}" title="${escapeHtml(a.filename)}">
                 <i class="ti ${a.isImage ? 'ti-photo' : 'ti-file-text'}"></i>
                 <span>${escapeHtml(a.filename)}</span>
             </a>`).join('') + '</div>';
     }
+
+    // Preview an attachment inside PRISM instead of navigating away to it.
+    logEl.addEventListener('click', e => {
+        const link = e.target.closest('.activity-attachment');
+        if (!link) return;
+        e.preventDefault();
+        const url  = link.getAttribute('href');
+        const name = link.dataset.previewName;
+        const body = link.dataset.previewImage === '1'
+            ? `<img src="${url}" alt="${escapeHtml(name)}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe>`;
+        window.prismInfoModal({
+            title: name,
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    });
 
     function escapeHtml(s) {
         return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -402,7 +464,13 @@
                     </div>`).join('') + `</div>`;
             }
 
+            const pdfHtml = doc.pdfFile
+                ? `<div class="pdf-preview" style="margin-bottom:12px;"><iframe src="/storage/${doc.pdfFile}" title="AOC Document"></iframe></div>`
+                : `<div class="pdf-preview" style="margin-bottom:12px;"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this AOC</span></div></div>`;
+
             previewBody.innerHTML = `
+                <div style="font-size:10.5px;font-weight:700;color:var(--s600);margin-bottom:6px;">AOC Document</div>
+                ${pdfHtml}
                 <div style="font-size:10.5px;font-weight:700;color:var(--s600);margin-bottom:6px;">Items (from parent PR)</div>
                 ${itemsHtml}
                 <div style="font-size:10.5px;font-weight:700;color:var(--s600);margin:12px 0 6px;">Canvass Quotations</div>
@@ -442,24 +510,30 @@
 
     function openDoc(doc) {
         activeDoc = doc;
-        rows.forEach(r => r.classList.remove('selected'));
-        document.querySelector(`[data-doc-key="${doc.docType}-${doc.id}"]`)?.classList.add('selected');
+        getRows().forEach(r => r.classList.remove('selected'));
+        tbody?.querySelector(`[data-doc-key="${doc.docType}-${doc.id}"]`)?.classList.add('selected');
         titleEl.textContent = doc.docLabel + ' ' + doc.number;
         remarksIn.value = '';
+        logToggle.classList.remove('open');
+        logEl.classList.remove('open');
         renderDetail(doc);
         emptyEl.style.display = 'none';
         contentEl.classList.add('visible');
     }
 
-    rows.forEach(row => {
-        row.addEventListener('click', () => {
-            const [docType, id] = row.dataset.docKey.split('-');
-            const doc = allDocs.find(d => d.docType === docType && String(d.id) === id);
-            if (doc) openDoc(doc);
-        });
-        row.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
-        });
+    // Delegated so rows appended later (by the background refresh) work
+    // without needing to re-bind listeners after every poll.
+    tbody?.addEventListener('click', e => {
+        const row = e.target.closest('[data-doc-row]');
+        if (!row) return;
+        const [docType, id] = row.dataset.docKey.split('-');
+        const doc = allDocs.find(d => d.docType === docType && String(d.id) === id);
+        if (doc) openDoc(doc);
+    });
+    tbody?.addEventListener('keydown', e => {
+        const row = e.target.closest('[data-doc-row]');
+        if (!row) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
 
     // Arrived via a "document awaiting your signature" notification — open that
@@ -478,16 +552,41 @@
         previewBody.classList.toggle('open');
     });
 
-    docSearch?.addEventListener('input', function () {
-        const q = this.value.trim().toLowerCase();
+    logToggle.addEventListener('click', () => {
+        logToggle.classList.toggle('open');
+        logEl.classList.toggle('open');
+    });
+
+    function applyDocSearchFilter() {
+        if (!docSearch) return;
+        const q    = docSearch.value.trim().toLowerCase();
+        const type = docTypeFilter ? docTypeFilter.value : '';
         let visible = 0;
-        rows.forEach(row => {
-            const match = !q || (row.dataset.search ?? '').includes(q);
+        getRows().forEach(row => {
+            const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
+            const matchesType   = !type || row.dataset.docType === type;
+            const match = matchesSearch && matchesType;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (docCount) docCount.textContent = visible + (visible === 1 ? ' document' : ' documents');
-    });
+    }
+    docSearch?.addEventListener('input', applyDocSearchFilter);
+    docTypeFilter?.addEventListener('change', applyDocSearchFilter);
+
+    // Re-orders the DOM rows by last-updated — newest-first by default
+    // (matches the initial server-side order), toggled to oldest-first here.
+    function applySortOrder() {
+        if (!tbody) return;
+        const order = docSortOrder ? docSortOrder.value : 'desc';
+        const rows = getRows().slice().sort((a, b) => {
+            const ta = new Date(a.dataset.updatedAt).getTime();
+            const tb = new Date(b.dataset.updatedAt).getTime();
+            return order === 'asc' ? ta - tb : tb - ta;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+    }
+    docSortOrder?.addEventListener('change', applySortOrder);
 
     /* ── Mark Signed / Forward (no photo — matches the Procurement page's simple flow) ── */
     async function markSigned() {
@@ -565,7 +664,7 @@
         activeDoc.signatoryLabel = json.signatoryLabel;
         activeDoc.canAct = false; // this role's part is done until it comes back around
         activeDoc.signatureLogs = activeDoc.signatureLogs || [];
-        activeDoc.signatureLogs.push({ display: 'Signed – ' + activeDoc.signatoryLabel, by: '', at: 'just now' });
+        activeDoc.signatureLogs.push({ display: 'Signed – ' + activeDoc.signatoryLabel, by: '', at: 'just now', atRaw: new Date().toISOString() });
         if (Array.isArray(json.stageMeta)) {
             // Re-derive chain done/active/pending from the fresh stage list.
             const stages = json.stageMeta.map(m => m.key);
@@ -599,15 +698,76 @@
 
     // ── Auto-refresh ── this page's queue/status/attachments are baked in at
     // load time, so another signatory acting on a document elsewhere wouldn't
-    // show up here without a manual reload. Skip the reload while a sign/route
-    // action is in flight or a remark is being composed, so it can't wipe
-    // in-progress work.
-    setInterval(() => {
+    // show up here without a manual reload. Poll for fresh data and patch the
+    // list/detail panel in place instead of a full page reload. Skipped
+    // entirely (data fetched but discarded) while a sign/route action is in
+    // flight, a remark is being composed, or a third-signer choice hasn't
+    // been submitted yet — so it can't wipe in-progress work.
+    function rowHtml(doc) {
+        const stageBadge = doc.canAct ? 'badge-action'
+            : (doc.signatoryStage === 'fully_signed' ? 'badge-signed'
+            : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing'));
+        const search = (doc.number + ' ' + doc.office + ' ' + doc.title).toLowerCase();
+        return `<tr data-doc-row data-doc-key="${doc.docType}-${doc.id}" data-doc-type="${doc.docType}" data-updated-at="${doc.updatedAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
+            <td><span class="doc-badge doc-${doc.docType}">${doc.docLabel}</span></td>
+            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(doc.number)}</td>
+            <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.office)}</td>
+            <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.title)}</td>
+            <td><span class="badge ${stageBadge}" data-sig-badge="${doc.docType}-${doc.id}">${doc.canAct ? 'Needs You' : doc.signatoryLabel}</span></td>
+        </tr>`;
+    }
+
+    function handleRefresh(json) {
         if (saving) return;
-        const remarks = document.getElementById('remarksInput');
-        if (remarks && remarks.value.trim()) return;
-        window.location.reload();
-    }, 45000);
+        if (remarksIn && remarksIn.value.trim()) return;
+        if (document.querySelector('input[name="third_signer"]:checked')) return;
+
+        const fresh = json.documents || [];
+        allDocs = fresh;
+
+        if (tbody) {
+            const freshByKey = new Map(fresh.map(d => [d.docType + '-' + d.id, d]));
+            const existingKeys = new Set();
+
+            getRows().forEach(row => {
+                const key = row.dataset.docKey;
+                existingKeys.add(key);
+                const doc = freshByKey.get(key);
+                if (!doc) return; // don't remove rows missing from the fresh data
+                const badge = row.querySelector(`[data-sig-badge="${key}"]`);
+                if (badge) {
+                    const stageBadge = doc.canAct ? 'badge-action'
+                        : (doc.signatoryStage === 'fully_signed' ? 'badge-signed'
+                        : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing'));
+                    badge.className = 'badge ' + stageBadge;
+                    badge.textContent = doc.canAct ? 'Needs You' : doc.signatoryLabel;
+                }
+                if (doc.updatedAt) row.dataset.updatedAt = doc.updatedAt;
+            });
+
+            fresh.forEach(doc => {
+                const key = doc.docType + '-' + doc.id;
+                if (!existingKeys.has(key)) tbody.insertAdjacentHTML('beforeend', rowHtml(doc));
+            });
+
+            if (activeDoc) tbody.querySelector(`[data-doc-key="${activeDoc.docType}-${activeDoc.id}"]`)?.classList.add('selected');
+
+            applyDocSearchFilter();
+            applySortOrder();
+        }
+
+        if (activeDoc) {
+            const freshActive = fresh.find(d => d.docType === activeDoc.docType && d.id === activeDoc.id);
+            if (freshActive) {
+                activeDoc = freshActive;
+                renderDetail(activeDoc);
+            }
+        }
+    }
+
+    if (refreshUrl) {
+        window.prismAutoRefresh(refreshUrl, handleRefresh);
+    }
 })();
 </script>
 @endpush

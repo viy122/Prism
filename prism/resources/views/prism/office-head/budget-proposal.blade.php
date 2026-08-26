@@ -85,9 +85,25 @@
             background: var(--crimson-mid); font-weight: 700; color: var(--crimson);
             border-color: var(--crimson-border); cursor: default;
         }
+        .field-hint { font-size: 10.5px; color: var(--txt3); margin-top: 4px; }
+
+        /* ── PPMP Name ghost-text suggestion (type-ahead, Tab to accept) ──
+           Two stacked, identically-styled inputs: the ghost (behind, greyed,
+           read-only, holds the full suggested string) shows through the real
+           input's transparent background wherever the real input has no text
+           of its own yet — i.e. only the un-typed tail of the suggestion. */
+        .title-suggest-wrap { position: relative; }
+        #ppmpTitleGhost {
+            position: absolute; inset: 0; z-index: 0;
+            background: transparent; border-color: transparent; box-shadow: none;
+            color: var(--txt3); pointer-events: none;
+        }
+        .title-suggest-wrap #ppmpTitle,
+        .title-suggest-wrap #ppmpTitle:focus { position: relative; z-index: 1; background: transparent; }
         .form-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
         .item-row1   { display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; }
+        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; margin-bottom: 14px; }
+        .item-row3   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
         /* ── Buttons ── */
         .btn-primary {
@@ -232,6 +248,7 @@
             .form-grid-4 { grid-template-columns: 1fr; }
             .item-row1 { grid-template-columns: 1fr; }
             .item-row2 { grid-template-columns: 1fr; }
+            .item-row3 { grid-template-columns: 1fr; }
         }
 
         /* ── Submitted banner ── */
@@ -244,29 +261,13 @@
         .submit-msg { font-size: 12px; font-weight: 600; border-radius: var(--r-sm); padding: 9px 13px; margin-bottom: 8px; display: none; }
         .submit-msg.err  { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
         .submit-msg.warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+        .submit-msg.ok   { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; }
 
         /* ── Submitted state in right panel ── */
         .submitted-state { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 22px 22px; text-align: center; margin-top: auto; }
         .submitted-state i { font-size: 32px; color: #2563EB; }
         .submitted-state-title { font-size: 13px; font-weight: 800; color: var(--txt); }
         .submitted-state-sub   { font-size: 11.5px; color: var(--txt3); line-height: 1.5; }
-
-        /* ── New cycle banner ── */
-        .bp-new-cycle-banner {
-            display: flex; align-items: center; justify-content: space-between; gap: 14px;
-            background: #f0fdfa; border: 1.5px solid #99f6e4; border-radius: var(--r-sm);
-            padding: 14px 18px; margin-bottom: 4px; flex-wrap: wrap;
-        }
-        .bp-new-cycle-banner > div { font-size: 13px; color: #134e4a; }
-        .bp-new-cycle-banner strong { color: #0f766e; }
-        .btn-start-new-cycle {
-            display: inline-flex; align-items: center; gap: 7px;
-            height: 36px; padding: 0 16px; border-radius: 8px;
-            background: #0d9488; color: #fff; font-size: 12px; font-weight: 700;
-            border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
-            white-space: nowrap; transition: background .15s;
-        }
-        .btn-start-new-cycle:hover { background: #0f766e; }
 
         /* ── PPMP document preview ── */
         .ppmp-preview-wrap { padding: 6px 22px 18px; }
@@ -304,15 +305,12 @@
 @section('content')
     <div class="page-shell">
 
-        {{-- Suppressed when the "Create New PPMP" banner below is also showing —
-             that one already carries the same "submitted, read-only" message,
-             plus the actual next-step buttons, so showing both was redundant. --}}
-        @if($isReadOnly && !($canCreateNew ?? false))
         {{--
-            Reaching this branch with status "returned" can only mean the Chancellor
-            returned it to Budget Office — a Budget-Office return would have left
-            $isReadOnly false and shown the editable view instead of this banner.
+            Only reachable when the office head explicitly browsed to a past
+            proposal via the selector — the default landing state always auto-starts
+            a fresh editable draft, so there's nothing to show here otherwise.
         --}}
+        @if($isReadOnly)
         @php
             $readOnlyBannerText = match($proposalStatus) {
                 'endorsed' => ['PPMP Endorsed — With the Chancellor', 'This PPMP has been endorsed by the Budget Office and forwarded to the Chancellor for approval. Editing is disabled.'],
@@ -326,35 +324,6 @@
             <div>
                 <p class="submitted-banner-title">{{ $readOnlyBannerText[0] }}</p>
                 <p class="submitted-banner-sub">{{ $readOnlyBannerText[1] }}</p>
-            </div>
-        </div>
-        @endif
-
-        @if($isReadOnly && ($canCreateNew ?? false))
-        <div class="bp-new-cycle-banner">
-            <div>
-                <strong>FY{{ $proposalForm['fiscalYear'] }} PPMP is {{ ucfirst($proposalStatus) }}.</strong>
-                @if($canStartNew ?? false)
-                    Ready to begin FY{{ $nextFiscalYear }} budget planning, or add a supplemental PPMP for FY{{ $proposalForm['fiscalYear'] }}?
-                @else
-                    Need another PPMP for FY{{ $proposalForm['fiscalYear'] }} (e.g. a supplemental request)?
-                @endif
-            </div>
-            <div style="display:flex;gap:8px;">
-                <form method="POST" action="{{ route('office-head.budget-proposal.create-new') }}">
-                    @csrf
-                    <button type="submit" class="btn-start-new-cycle">
-                        <i class="ti ti-plus"></i> Create New PPMP
-                    </button>
-                </form>
-                @if($canStartNew ?? false)
-                <form method="POST" action="{{ route('office-head.budget-proposal.start-new-cycle') }}">
-                    @csrf
-                    <button type="submit" class="btn-start-new-cycle">
-                        <i class="ti ti-plus"></i> Start FY{{ $nextFiscalYear }} PPMP
-                    </button>
-                </form>
-                @endif
             </div>
         </div>
         @endif
@@ -402,26 +371,20 @@
                         @if($needsRevisionCount > 0)
                             <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
                         @endif
-                        {{-- Suppressed when the "Create New PPMP" banner further down is
-                             also showing it — one visible entry point at a time. That banner
-                             only appears once this PPMP is read-only AND no draft is in the
-                             way; everywhere else (including while still editing a draft),
-                             this is the only place to start a new one. --}}
-                        @if(!($isReadOnly && ($canCreateNew ?? false)))
-                        <form method="POST" action="{{ route('office-head.budget-proposal.create-new') }}" style="margin-left:10px;">
-                            @csrf
-                            <button type="submit" class="btn-outline" style="white-space:nowrap;" title="Add a supplemental PPMP for the current fiscal year">
-                                <i class="ti ti-plus"></i> Create New PPMP
-                            </button>
-                        </form>
-                        @endif
                     </div>
                     <div class="card-body">
                         <div class="field-group" style="margin-bottom:14px;">
                             <label class="field-label" for="ppmpTitle">PPMP Name</label>
-                            <input class="field-input {{ $isReadOnly ? 'readonly' : '' }}" id="ppmpTitle"
-                                value="{{ $proposalForm['title'] }}" {{ $isReadOnly ? 'readonly' : '' }}
-                                placeholder="e.g. College of Engineering PPMP FY2026">
+                            @if($isReadOnly)
+                            <input class="field-input readonly" id="ppmpTitle" value="{{ $proposalForm['title'] }}" readonly>
+                            @else
+                            <div class="title-suggest-wrap">
+                                <input class="field-input" id="ppmpTitleGhost" tabindex="-1" readonly aria-hidden="true">
+                                <input class="field-input" id="ppmpTitle"
+                                    value="{{ $proposalForm['title'] }}" autocomplete="off">
+                            </div>
+                            <p class="field-hint">Suggested as you type — press Tab to use it, or keep typing your own.</p>
+                            @endif
                         </div>
                         <div class="form-grid-4">
                             <div class="field-group">
@@ -547,7 +510,7 @@
                             <input id="itemQuantity" name="quantity" class="field-input" type="number" min="1" value="1" required>
                         </div>
                         <div class="field-group">
-                            <label class="field-label" for="itemUnitCost">Unit Cost</label>
+                            <label class="field-label" for="itemUnitCost">Budget</label>
                             <input id="itemUnitCost" name="estimatedUnitCost" class="field-input" type="number" min="0" value="0" required>
                         </div>
                     </div>
@@ -569,6 +532,29 @@
                             </button>
                         </div>
                     </div>
+                    <div class="item-row3">
+                        <div class="field-group">
+                            <label class="field-label" for="itemSourceOfFund">Source of Fund</label>
+                            <select id="itemSourceOfFund" name="sourceOfFund" class="field-select">
+                                <option value="">— Select —</option>
+                                <option value="General Fund">General Fund</option>
+                                <option value="Special Trust Fund">Special Trust Fund</option>
+                                <option value="Income">Income</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <input id="itemSourceOfFundOther" class="field-input" placeholder="Specify source of fund…" style="display:none;margin-top:8px;">
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemClassification">Classification</label>
+                            <select id="itemClassification" name="itemClassification" class="field-select">
+                                <option value="Regular">Regular</option>
+                                <option value="Supplemental">Supplemental</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <input id="itemClassificationOther" class="field-input" placeholder="Specify classification…" style="display:none;margin-top:8px;">
+                        </div>
+                    </div>
+                    <p id="itemFormMsg" class="submit-msg"></p>
                 </form>
             </div>
         </div>
@@ -612,7 +598,7 @@
                                     <th>Category</th>
                                     <th>Qty</th>
                                     <th>Unit</th>
-                                    <th>Unit Cost</th>
+                                    <th>Budget</th>
                                     <th>Estimated Budget</th>
                                     <th>Schedule</th>
                                     <th>Source</th>
@@ -636,9 +622,11 @@
                             <tr>
                                 <th>Item</th>
                                 <th>Qty / Unit</th>
-                                <th>Unit Cost</th>
+                                <th>Budget</th>
                                 <th>Total</th>
                                 <th>Quarter</th>
+                                <th>Source of Fund</th>
+                                <th>Classification</th>
                                 <th>Market Scoping / Source</th>
                                 @if(!$itemsLocked)<th>Actions</th>@endif
                             </tr>
@@ -690,6 +678,7 @@
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
     const itemsLocked = {{ $itemsLocked ? 'true' : 'false' }};
     const proposalId  = {{ $selectedProposalId ?? 'null' }};
+    const suggestedTitle = @json($proposalForm['officeName'] . ' PPMP FY' . $proposalForm['fiscalYear']);
 
     // Keep the currently-selected PPMP "attached" when navigating to Market Scoping,
     // so returning here (or attaching a reference) doesn't silently jump to the latest PPMP.
@@ -717,6 +706,34 @@
         const qs = params.toString();
         return scopingUrl + (qs ? '?' + qs : '');
     }
+
+    // ── PPMP Name — type-ahead suggestion, Tab to accept ────────────────────
+    // Fully optional: typing anything that isn't a prefix of the suggestion
+    // just drops it, so the name stays entirely free-form/customizable.
+    (function () {
+        const titleInput = document.getElementById('ppmpTitle');
+        const ghost       = document.getElementById('ppmpTitleGhost');
+        if (!titleInput || !ghost || !suggestedTitle) return;
+
+        function refreshGhost() {
+            const typed = titleInput.value;
+            const isPrefix = typed.length < suggestedTitle.length
+                && suggestedTitle.toLowerCase().startsWith(typed.toLowerCase());
+            ghost.value = (typed === '' || isPrefix) ? suggestedTitle : '';
+        }
+
+        titleInput.addEventListener('input', refreshGhost);
+        titleInput.addEventListener('keydown', function (e) {
+            if (e.key !== 'Tab' || !ghost.value || ghost.value === titleInput.value) return;
+            e.preventDefault();
+            titleInput.value = ghost.value;
+            ghost.value = '';
+            const len = titleInput.value.length;
+            titleInput.setSelectionRange(len, len);
+        });
+
+        refreshGhost();
+    })();
 
     // ── PPMP name + Proposed Budget — one combined Save ─────────────────────
     document.getElementById('btnSaveProposedBudget')?.addEventListener('click', async function () {
@@ -818,7 +835,7 @@
         const tbody = document.getElementById('encodedItemsTable');
         if (!tbody) return;
         if (!items.length) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--txt3);font-weight:600;">
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--txt3);font-weight:600;">
                 No items added yet. Use the form above to add procurement items.</td></tr>`;
             return;
         }
@@ -881,6 +898,8 @@
                 <td class="td-bold">PHP ${fmt(item.estimatedUnitCost)}</td>
                 <td class="td-bold">PHP ${fmt(item.totalCost)}</td>
                 <td>${esc(item.targetQuarter)}</td>
+                <td>${esc(item.sourceOfFund || '—')}</td>
+                <td>${esc(item.itemClassification || 'Regular')}</td>
                 <td>${scopingCell}</td>
                 ${itemsLocked ? '' : `<td><div class="tbl-actions">
                     <button class="tbl-btn" title="Edit item" type="button" onclick="prismBP.editItem('${esc(item.id)}')">
@@ -945,12 +964,58 @@
         }
     }
 
+    // ── Inline feedback for the item form + its row actions (add/update/delete,
+    //    attach/delete source file, delete reference) — mirrors submitMsg's
+    //    showMsg() pattern above rather than the native alert() this used to use.
+    function showItemMsg(text, type) {
+        const msgEl = document.getElementById('itemFormMsg');
+        if (!msgEl) return;
+        msgEl.textContent   = text;
+        msgEl.className     = 'submit-msg ' + type;
+        msgEl.style.display = '';
+        if (type === 'ok') {
+            clearTimeout(showItemMsg._hideTimer);
+            showItemMsg._hideTimer = setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
+        }
+    }
+
+    // ── "Other" source of fund / classification — reveal a free-text field ─────
+    const sourceOfFundSelect = document.getElementById('itemSourceOfFund');
+    const sourceOfFundOther  = document.getElementById('itemSourceOfFundOther');
+    sourceOfFundSelect?.addEventListener('change', function () {
+        sourceOfFundOther.style.display = this.value === 'Other' ? '' : 'none';
+        if (this.value !== 'Other') sourceOfFundOther.value = '';
+    });
+    // The value actually saved: the free-text field when "Other" is picked,
+    // otherwise the select's own value.
+    function resolvedSourceOfFund() {
+        return sourceOfFundSelect.value === 'Other'
+            ? sourceOfFundOther.value.trim()
+            : sourceOfFundSelect.value;
+    }
+
+    const classificationSelect = document.getElementById('itemClassification');
+    const classificationOther  = document.getElementById('itemClassificationOther');
+    classificationSelect?.addEventListener('change', function () {
+        classificationOther.style.display = this.value === 'Other' ? '' : 'none';
+        if (this.value !== 'Other') classificationOther.value = '';
+    });
+    function resolvedClassification() {
+        return classificationSelect.value === 'Other'
+            ? classificationOther.value.trim()
+            : classificationSelect.value;
+    }
+
     // ── Add / update item (same form; branches on hidden itemId) ───────────────
     function resetItemFormToAddMode(f) {
         f.itemId.value = '';
         f.reset();
         f.quantity.value = 1;
         f.estimatedUnitCost.value = 0;
+        sourceOfFundOther.style.display = 'none';
+        sourceOfFundOther.value = '';
+        classificationOther.style.display = 'none';
+        classificationOther.value = '';
         editingId = null;
         document.getElementById('editItemBanner').style.display = 'none';
         document.getElementById('saveItemButton').innerHTML = '<i class="ti ti-plus"></i>Add Item';
@@ -978,6 +1043,8 @@
             estimatedUnitCost: parseFloat(f.estimatedUnitCost.value),
             justification:     f.justification.value.trim(),
             targetQuarter:     f.targetQuarter.value,
+            sourceOfFund:       resolvedSourceOfFund() || null,
+            itemClassification: resolvedClassification() || null,
         };
         if (!itemId) payload.proposal_id = proposalId;
 
@@ -999,11 +1066,12 @@
                 renderTable();
                 renderPreview();
                 updateSummary();
+                showItemMsg(itemId ? 'Item updated.' : 'Item added.', 'ok');
             } else {
-                alert(data.message || (itemId ? 'Could not update item.' : 'Could not add item.'));
+                showItemMsg(data.message || (itemId ? 'Could not update item.' : 'Could not add item.'), 'err');
             }
         } catch {
-            alert('Network error. Please try again.');
+            showItemMsg('Network error. Please try again.', 'err');
         } finally {
             btn.disabled = false;
             if (!itemId) {
@@ -1034,9 +1102,12 @@
                 renderTable();
                 renderPreview();
                 updateSummary();
+                showItemMsg('Item removed.', 'ok');
+            } else {
+                showItemMsg(data.message || 'Could not remove item.', 'err');
             }
         } catch {
-            alert('Network error. Please try again.');
+            showItemMsg('Network error. Please try again.', 'err');
         }
     }
 
@@ -1078,6 +1149,10 @@
                 });
                 const data = await res.json();
                 if (data.success && data.redirect) {
+                    await window.prismSuccess({
+                        title: 'PPMP Submitted',
+                        message: 'Your PPMP has been submitted for Budget Office review.',
+                    });
                     window.location.href = data.redirect;
                 } else {
                     showMsg(data.message || 'Could not submit proposal.', 'err');
@@ -1121,6 +1196,29 @@
         f.estimatedUnitCost.value    = item.estimatedUnitCost;
         f.justification.value        = item.justification || '';
         f.targetQuarter.value        = item.targetQuarter;
+        const knownFunds = ['', 'General Fund', 'Special Trust Fund', 'Income'];
+        const fund = item.sourceOfFund || '';
+        if (fund && !knownFunds.includes(fund)) {
+            f.sourceOfFund.value = 'Other';
+            sourceOfFundOther.value = fund;
+            sourceOfFundOther.style.display = '';
+        } else {
+            f.sourceOfFund.value = fund;
+            sourceOfFundOther.value = '';
+            sourceOfFundOther.style.display = 'none';
+        }
+
+        const knownClassifications = ['Regular', 'Supplemental'];
+        const classification = item.itemClassification || 'Regular';
+        if (!knownClassifications.includes(classification)) {
+            f.itemClassification.value = 'Other';
+            classificationOther.value = classification;
+            classificationOther.style.display = '';
+        } else {
+            f.itemClassification.value = classification;
+            classificationOther.value = '';
+            classificationOther.style.display = 'none';
+        }
 
         editingId = id;
         document.getElementById('editItemBanner').style.display = 'flex';
@@ -1144,10 +1242,12 @@
                 // This table is the print/export document — a clickable pill or
                 // a "missing" warning badge means nothing on paper (nothing to
                 // click, nothing to fix). Show the actual source instead: the
-                // market references' supplier names, up to 3; otherwise leave
-                // the cell blank rather than a banner that can't be acted on.
+                // market references' supplier names only (not the full reference
+                // title, which runs too long for this column), up to 3;
+                // otherwise leave the cell blank rather than a banner that
+                // can't be acted on.
                 const srcCell = (item.scoping && item.scoping.length)
-                    ? esc(item.scoping.slice(0, 3).map(ref => ref.title || ref.supplierName || '').filter(Boolean).join(', '))
+                    ? esc(item.scoping.slice(0, 3).map(ref => ref.supplierName || '').filter(Boolean).join(', '))
                     : '';
                 return `<tr>
                     <td>${i + 1}</td>
@@ -1242,6 +1342,7 @@
                 renderPreview();
                 updateSummary();
                 closeAttach();
+                showItemMsg('File attached.', 'ok');
             } else {
                 attachStatus.style.display = 'block';
                 attachStatus.style.background = '#fee2e2';
@@ -1275,10 +1376,11 @@
                 renderTable();
                 renderPreview();
                 updateSummary();
+                showItemMsg('File removed.', 'ok');
             } else {
-                alert(data.error || 'Could not remove the file.');
+                showItemMsg(data.error || 'Could not remove the file.', 'err');
             }
-        } catch { alert('Network error. Please try again.'); }
+        } catch { showItemMsg('Network error. Please try again.', 'err'); }
     }
 
     async function deleteReference(id) {
@@ -1296,10 +1398,11 @@
                 renderTable();
                 renderPreview();
                 updateSummary();
+                showItemMsg('Reference removed.', 'ok');
             } else {
-                alert(data.error || 'Could not remove the reference.');
+                showItemMsg(data.error || 'Could not remove the reference.', 'err');
             }
-        } catch { alert('Network error. Please try again.'); }
+        } catch { showItemMsg('Network error. Please try again.', 'err'); }
     }
 
     // expose functions globally for inline onclick

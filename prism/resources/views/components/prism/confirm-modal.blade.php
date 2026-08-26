@@ -49,6 +49,31 @@
     </div>
 </div>
 
+{{--
+    Shared success modal — for one-way transitions the user should consciously
+    acknowledge before the page moves on (e.g. a form submit immediately
+    followed by a redirect). Does NOT auto-dismiss; that's the point of using
+    this instead of a toast for these specific cases.
+
+        await window.prismSuccess({ title: 'Submitted', message: 'Your PPMP was submitted.' });
+        window.location.href = redirectUrl;
+
+    Returns a Promise that resolves once the user clicks OK/backdrop/Escape.
+    For everything reversible/low-consequence (toggles, single-row deletes,
+    inline saves), keep using the existing toast pattern instead — don't
+    convert working toasts to this modal.
+--}}
+<div id="prismSuccessOverlay" class="prism-confirm-overlay" aria-hidden="true">
+    <div class="prism-confirm-card prism-success-card" role="alertdialog" aria-modal="true" aria-labelledby="prismSuccessTitle" aria-describedby="prismSuccessMessage">
+        <div class="prism-success-icon"><i class="ti ti-circle-check"></i></div>
+        <p class="prism-confirm-title" id="prismSuccessTitle">Success</p>
+        <p class="prism-confirm-message" id="prismSuccessMessage"></p>
+        <div class="prism-confirm-actions">
+            <button type="button" class="prism-confirm-btn prism-confirm-ok neutral" id="prismSuccessOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
 <style>
     .prism-confirm-overlay {
         position: fixed; inset: 0; z-index: 2000;
@@ -86,6 +111,11 @@
     }
     .prism-info-close:hover { color: var(--txt, #1C1010); }
     .prism-info-body { overflow-y: auto; margin-top: 10px; }
+
+    .prism-success-icon { text-align: center; font-size: 34px; color: #166534; margin-bottom: 8px; }
+    .prism-success-card .prism-confirm-title,
+    .prism-success-card .prism-confirm-message { text-align: center; }
+    .prism-success-card .prism-confirm-actions { justify-content: center; }
 </style>
 
 <script>
@@ -154,6 +184,37 @@
         infoOverlay.classList.add('open');
         infoOverlay.setAttribute('aria-hidden', 'false');
         infoCloseBtn.focus();
+    };
+
+    // ── Success modal (one-way transitions the user must acknowledge) ──────
+    const successOverlay  = document.getElementById('prismSuccessOverlay');
+    const successTitleEl  = document.getElementById('prismSuccessTitle');
+    const successMsgEl    = document.getElementById('prismSuccessMessage');
+    const successOkBtn    = document.getElementById('prismSuccessOkBtn');
+    let resolveSuccessPromise = null;
+
+    function closeSuccess() {
+        successOverlay.classList.remove('open');
+        successOverlay.setAttribute('aria-hidden', 'true');
+        if (resolveSuccessPromise) { resolveSuccessPromise(); resolveSuccessPromise = null; }
+    }
+
+    successOkBtn.addEventListener('click', closeSuccess);
+    successOverlay.addEventListener('click', (e) => { if (e.target === successOverlay) closeSuccess(); });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && successOverlay.classList.contains('open')) closeSuccess();
+    });
+
+    window.prismSuccess = function (options) {
+        options = options || {};
+        successTitleEl.textContent = options.title || 'Success';
+        successMsgEl.textContent   = options.message || '';
+
+        successOverlay.classList.add('open');
+        successOverlay.setAttribute('aria-hidden', 'false');
+        successOkBtn.focus();
+
+        return new Promise((resolve) => { resolveSuccessPromise = resolve; });
     };
 })();
 </script>

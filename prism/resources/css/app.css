@@ -316,3 +316,20 @@
         break-inside: avoid;
     }
 }
+
+/*
+ * Shared global toast — window.prismToast(msg, isError), see resources/js/app.js.
+ * Matches the .pr-toast convention copy-pasted per-page across most blade
+ * files; only pages with no page-local toast of their own should use this
+ * one (see app.js comment) — don't migrate already-working pages to it.
+ */
+#globalToast.pr-toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700;
+    color: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+    opacity: 0; pointer-events: none;
+    transition: opacity .28s, transform .28s; transform: translateY(8px);
+}
+#globalToast.pr-toast.visible { opacity: 1; transform: translateY(0); }
+#globalToast.pr-toast.success { background: #166534; }
+#globalToast.pr-toast.error { background: #a32d2d; }

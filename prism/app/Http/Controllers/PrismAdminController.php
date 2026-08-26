@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -59,7 +60,7 @@ class PrismAdminController extends Controller
                 'username'      => $user->username,
                 'email'         => $user->email,
                 'positionTitle' => $user->position_title ?? '—',
-                'office'        => $user->office?->name ?? '—',
+                'office'        => $user->office?->code ?? '—',
                 'officeId'      => $user->office_id,
                 'role'          => $user->roles->first()?->name ?? '—',
                 'roleId'        => $user->roles->first()?->id,
@@ -163,6 +164,132 @@ class PrismAdminController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Lets an admin manually add a shop link as a Market Scoping price
+     * source — the price-api service normally only picks up new vendors
+     * through its own automatic discovery (SerpApi-driven, still requiring
+     * a human to approve each candidate); this is the direct path where the
+     * admin's own submission already is that approval.
+     */
+    public function marketSources(): View
+    {
+        $sources = [];
+        $vendors = [];
+        $serviceDown = false;
+
+        try {
+            $sourcesResp = Http::timeout(8)->get($this->priceApiUrl('/admin/sources'));
+            $vendorsResp = Http::timeout(8)->get($this->priceApiUrl('/admin/vendors/pending'));
+
+            if ($sourcesResp->successful()) {
+                $sources = $sourcesResp->json('sources', []);
+            }
+            if ($vendorsResp->successful()) {
+                $vendors = $vendorsResp->json('vendors', []);
+            }
+            if (!$sourcesResp->successful() && !$vendorsResp->successful()) {
+                $serviceDown = true;
+            }
+        } catch (\Throwable) {
+            $serviceDown = true;
+        }
+
+        return view('prism.admin.market-sources', $this->withCommon('market-sources', [
+            'pageTitle'   => 'Market Scoping Sources',
+            'sources'     => $sources,
+            'vendors'     => $vendors,
+            'serviceDown' => $serviceDown,
+        ]));
+    }
+
+    public function addMarketSource(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'url'        => 'required|url|max:2048',
+            'seller'     => 'nullable|string|max:255',
+            'department' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $response = Http::timeout(15)->post($this->priceApiUrl('/admin/vendors/add'), array_filter([
+                'url'        => $validated['url'],
+                'seller'     => $validated['seller'] ?? null,
+                'department' => $validated['department'] ?? null,
+            ]));
+        } catch (\Throwable) {
+            return response()->json(['error' => 'The price scoping service is unreachable right now.'], 503);
+        }
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'The price scoping service returned an error.'], 502);
+        }
+
+        $body = $response->json();
+        if (empty($body['detected'])) {
+            return response()->json(['error' => $body['message'] ?? 'Could not recognize that link as a supported shop platform.'], 422);
+        }
+
+        return response()->json(['success' => true, 'vendor' => $body['vendor']]);
+    }
+
+    public function removeMarketSource(int $vendorId): JsonResponse
+    {
+        try {
+            $response = Http::timeout(10)->post($this->priceApiUrl("/admin/vendors/{$vendorId}/remove"));
+        } catch (\Throwable) {
+            return response()->json(['error' => 'The price scoping service is unreachable right now.'], 503);
+        }
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Could not remove that source.'], 422);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mutes a chronically-failing source (built-in or manually-added alike)
+     * without touching its scraper code — it just stops being queried until
+     * re-enabled here.
+     */
+    public function disableMarketSource(Request $request, string $sourceName): JsonResponse
+    {
+        try {
+            $response = Http::timeout(10)->post(
+                $this->priceApiUrl("/admin/sources/{$sourceName}/disable"),
+                ['reason' => $request->input('reason')]
+            );
+        } catch (\Throwable) {
+            return response()->json(['error' => 'The price scoping service is unreachable right now.'], 503);
+        }
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Could not disable that source.'], 422);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function enableMarketSource(string $sourceName): JsonResponse
+    {
+        try {
+            $response = Http::timeout(10)->post($this->priceApiUrl("/admin/sources/{$sourceName}/enable"));
+        } catch (\Throwable) {
+            return response()->json(['error' => 'The price scoping service is unreachable right now.'], 503);
+        }
+
+        if (!$response->successful()) {
+            return response()->json(['error' => 'Could not enable that source.'], 422);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    private function priceApiUrl(string $path): string
+    {
+        return rtrim(config('services.price_api.url'), '/') . $path;
+    }
+
     private function withCommon(string $activePage, array $data): array
     {
         return array_merge([
@@ -176,6 +303,7 @@ class PrismAdminController extends Controller
             'moduleNavigation' => [
                 ['slug' => 'dashboard',       'label' => 'Dashboard',       'href' => route('admin.dashboard'),       'icon' => 'layout-dashboard'],
                 ['slug' => 'user-management', 'label' => 'User Management', 'href' => route('admin.user-management'), 'icon' => 'users'],
+                ['slug' => 'market-sources',  'label' => 'Market Sources',  'href' => route('admin.market-sources'),  'icon' => 'link'],
             ],
         ], $data);
     }

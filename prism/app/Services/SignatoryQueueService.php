@@ -31,7 +31,7 @@ class SignatoryQueueService
             ->get()
             ->filter(fn ($pr) => $pr->stageOwnerRole($pr->signatory_stage) === $roleCode)
             ->each(function ($pr) use (&$rows) {
-                $rows[] = $this->row($pr, 'pr', $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), $pr->office?->name, $pr->title);
+                $rows[] = $this->row($pr, 'pr', $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), $pr->office?->code, $pr->title);
             });
 
         AbstractOfCanvass::with('purchaseRequest.office')
@@ -45,7 +45,7 @@ class SignatoryQueueService
                     $aoc,
                     'aoc',
                     $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
-                    $aoc->purchaseRequest?->office?->name,
+                    $aoc->purchaseRequest?->office?->code,
                     $aoc->purchaseRequest?->title
                 );
             });
@@ -62,7 +62,7 @@ class SignatoryQueueService
                     $po,
                     'po',
                     $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
-                    $pr?->office?->name,
+                    $pr?->office?->code,
                     ($pr?->title ?? '—') . ' — ' . $po->supplier_name
                 );
             });

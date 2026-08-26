@@ -111,7 +111,7 @@
         .pd-badge-finance   { background: #f0fdf4; color: #166534; }
 
         /* Main 2-col */
-        .pd-main-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; margin-bottom: 15px; }
+        .pd-main-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
 
         /* Progress */
         .pd-prog-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
@@ -139,6 +139,9 @@
         /* Bottom 3-col */
         .pd-bottom-grid { display: grid; grid-template-columns: 1.1fr 1fr 0.85fr; gap: 15px; }
 
+        /* Extra charts row */
+        .pd-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; margin-bottom: 15px; }
+
         /* PR links */
         .pd-pr-links { display: flex; flex-direction: column; gap: 9px; }
         .pd-pr-link {
@@ -165,21 +168,18 @@
             .pd-stat-grid { grid-template-columns: repeat(2,1fr); }
             .pd-main-grid { grid-template-columns: 1fr; }
             .pd-bottom-grid { grid-template-columns: 1fr 1fr; }
+            .pd-charts-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 600px) {
             .pd-stat-grid { grid-template-columns: 1fr; }
             .pd-bottom-grid { grid-template-columns: 1fr; }
+            .pd-charts-grid { grid-template-columns: 1fr; }
         }
 </style>
 @endpush
 
 @section('content')
         <div class="dash">
-
-            @php
-                $quarterTotal = $summary['purchasedThisQuarter'] + $summary['unpurchasedThisQuarter'];
-                $purchasedPercent = $quarterTotal > 0 ? round(($summary['purchasedThisQuarter'] / $quarterTotal) * 100) : 0;
-            @endphp
 
             {{-- Page header card --}}
             <div class="pd-header">
@@ -206,13 +206,13 @@
                     <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
                     <div class="pd-stat-label">Total Proposed Items</div>
                     <div class="pd-stat-value">{{ number_format($summary['totalProposedItems']) }}</div>
-                    <div class="pd-stat-hint">Across active fiscal year proposals</div>
+                    <div class="pd-stat-hint">Across all your office's PPMPs, any status</div>
                 </article>
                 <article class="pd-stat">
                     <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
                     <div class="pd-stat-label">Total Proposed Budget</div>
                     <div class="pd-stat-value sm">PHP {{ number_format($summary['totalProposedBudget']) }}</div>
-                    <div class="pd-stat-hint">Submitted and draft items combined</div>
+                    <div class="pd-stat-hint">Across all your office's PPMPs, any status</div>
                 </article>
                 <article class="pd-stat">
                     <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
@@ -228,44 +228,58 @@
                 </article>
             </div>
 
-            {{-- Main 2-col --}}
-            <div class="pd-main-grid">
+            {{-- Extra charts row --}}
+            <div class="pd-charts-grid">
 
-                {{-- Procurement progress --}}
+                {{-- PR pipeline funnel --}}
                 <article class="pd-card">
-                    <div class="pd-card-head">
-                        <div>
-                            <p class="pd-card-eyebrow">This Quarter</p>
-                            <h2 class="pd-card-title">Procurement Progress</h2>
-                        </div>
-                        <span class="pd-badge pd-badge-info">{{ $purchasedPercent }}% purchased</span>
-                    </div>
-                    <div class="pd-prog-nums">
-                        <div class="pd-prog-box">
-                            <strong>{{ $summary['purchasedThisQuarter'] }}</strong>
-                            <span>Purchased</span>
-                        </div>
-                        <div class="pd-prog-box">
-                            <strong>{{ $summary['unpurchasedThisQuarter'] }}</strong>
-                            <span>Unpurchased</span>
-                        </div>
-                    </div>
-                    <div class="pd-prog-bar-wrap" role="progressbar" aria-valuenow="{{ $purchasedPercent }}" aria-valuemin="0" aria-valuemax="100">
-                        <div class="pd-prog-bar" style="width:{{ $purchasedPercent }}%"></div>
-                    </div>
-                    <p class="pd-prog-note">{{ $summary['unpurchasedThisQuarter'] }} item{{ $summary['unpurchasedThisQuarter'] === 1 ? '' : 's' }} still need procurement movement this quarter.</p>
+                    <p class="pd-card-eyebrow">Pipeline</p>
+                    <h2 class="pd-card-title">PR → AOC → PO → Payment</h2>
                     <div class="pd-legend">
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Purchased</span>
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#e2e8f0"></span>Unpurchased</span>
+                        <span class="pd-legend-item">Where your office's PRs are right now</span>
+                        @if($summary['funnelStages']['halted'] > 0)
+                            <span class="pd-legend-item">({{ $summary['funnelStages']['halted'] }} cancelled/denied, not shown)</span>
+                        @endif
                     </div>
-                    <div class="pd-chart-wrap" style="height:160px;">
-                        <canvas id="donutChart" role="img"
-                            aria-label="Donut: {{ $summary['purchasedThisQuarter'] }} purchased vs {{ $summary['unpurchasedThisQuarter'] }} unpurchased"
-                            data-purchased="{{ $summary['purchasedThisQuarter'] }}"
-                            data-unpurchased="{{ $summary['unpurchasedThisQuarter'] }}">
+                    <div class="pd-chart-wrap" style="height:196px;">
+                        <canvas id="funnelChart" role="img" aria-label="PR pipeline funnel chart"
+                            data-stages="{{ json_encode($summary['funnelStages']['buckets']) }}">
                         </canvas>
                     </div>
                 </article>
+
+                {{-- PPMP category breakdown --}}
+                <article class="pd-card">
+                    <p class="pd-card-eyebrow">Proposal Breakdown</p>
+                    <h2 class="pd-card-title">Spend by Category</h2>
+                    <div class="pd-legend">
+                        <span class="pd-legend-item">Across all your office's PPMPs, any status</span>
+                    </div>
+                    <div class="pd-chart-wrap" style="height:196px;">
+                        <canvas id="categoryChart" role="img" aria-label="Spend by category doughnut chart"
+                            data-categories="{{ json_encode($summary['categoryBreakdown']) }}">
+                        </canvas>
+                    </div>
+                </article>
+
+                {{-- Budget by quarter --}}
+                <article class="pd-card">
+                    <p class="pd-card-eyebrow">PPMP Planning</p>
+                    <h2 class="pd-card-title">Budget by Quarter</h2>
+                    <div class="pd-legend">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Planned budget (PHP)</span>
+                    </div>
+                    <div class="pd-chart-wrap" style="height:196px;">
+                        <canvas id="quarterChart" role="img" aria-label="Planned budget by quarter bar chart"
+                            data-quarters="{{ json_encode($summary['budgetByQuarter']) }}">
+                        </canvas>
+                    </div>
+                </article>
+
+            </div>
+
+            {{-- Main 2-col --}}
+            <div class="pd-main-grid">
 
                 {{-- Recent updates --}}
                 <article class="pd-card">
@@ -381,29 +395,6 @@
     const pp = "'Poppins', sans-serif";
     Chart.defaults.font.family = pp;
 
-    /* DONUT */
-    const dEl = document.getElementById('donutChart');
-    if (dEl) {
-        new Chart(dEl, {
-            type: 'doughnut',
-            data: {
-                labels: ['Purchased','Unpurchased'],
-                datasets: [{
-                    data: [parseInt(dEl.dataset.purchased||0), parseInt(dEl.dataset.unpurchased||0)],
-                    backgroundColor: ['#681012','#e2e8f0'],
-                    borderWidth: 0, borderRadius: 4, hoverOffset: 6
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, cutout: '70%',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { label: c => '  '+c.label+': '+c.parsed+' item'+(c.parsed!==1?'s':'') }}
-                }
-            }
-        });
-    }
-
     /* BAR — Monthly */
     const bEl = document.getElementById('barChart');
     if (bEl) {
@@ -447,6 +438,80 @@
                 scales: {
                     x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
                     y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 12, weight: '600', family: pp } } }
+                }
+            }
+        });
+    }
+
+    /* HORIZONTAL BAR — Pipeline funnel */
+    const fEl = document.getElementById('funnelChart');
+    if (fEl) {
+        const stages = JSON.parse(fEl.dataset.stages || '{}');
+        new Chart(fEl, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(stages),
+                datasets: [{
+                    data: Object.values(stages),
+                    backgroundColor: ['#94a3b8','#0369a1','#854f0b','#5b21b6','#166534'],
+                    borderRadius: 6, borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, precision: 0 } },
+                    y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 11, weight: '600', family: pp } } }
+                }
+            }
+        });
+    }
+
+    /* DOUGHNUT — Category breakdown */
+    const cEl = document.getElementById('categoryChart');
+    if (cEl) {
+        const categories = JSON.parse(cEl.dataset.categories || '{}');
+        const palette = ['#681012','#0369a1','#854f0b','#5b21b6','#166534','#991b1b','#334155','#c9a84c'];
+        new Chart(cEl, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(categories),
+                datasets: [{
+                    data: Object.values(categories),
+                    backgroundColor: Object.keys(categories).map((_, i) => palette[i % palette.length]),
+                    borderWidth: 0, borderRadius: 4, hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '65%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: c => '  '+c.label+': PHP '+Number(c.parsed).toLocaleString() } }
+                }
+            }
+        });
+    }
+
+    /* BAR — Budget by quarter */
+    const qEl = document.getElementById('quarterChart');
+    if (qEl) {
+        new Chart(qEl, {
+            type: 'bar',
+            data: {
+                labels: ['Q1','Q2','Q3','Q4'],
+                datasets: [{
+                    label: 'Planned Budget (PHP)',
+                    data: JSON.parse(qEl.dataset.quarters || '[0,0,0,0]'),
+                    backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
+                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
                 }
             }
         });

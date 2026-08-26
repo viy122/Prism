@@ -422,6 +422,8 @@
                 // Rebuild view state
                 rebuildView(cell, selectedMode, isOverride, reason, recommended);
 
+                window.prismToast('Procurement mode override saved.');
+
                 $edit.style.display = 'none';
                 $view.style.display = 'block';
 

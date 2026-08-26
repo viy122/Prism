@@ -166,10 +166,47 @@ const timelineDotColor = (step) => {
 
     return colors[slugStatus(step)] ?? '#64748B';
 };
+const versionItemsTableHtml = (items) => {
+    if (!Array.isArray(items) || !items.length) {
+        return '<p style="font-size:13px;color:#64748b;">No items recorded for this version.</p>';
+    }
+
+    const rows = items.map((item) => `
+        <tr>
+            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#0f172a;">${escapeHtml(item.name ?? '—')}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${escapeHtml(item.quantity ?? '—')} ${escapeHtml(item.unit ?? '')}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${money(item.estimated_total_cost ?? 0)}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${escapeHtml(item.target_quarter ?? '—')}</td>
+        </tr>
+    `).join('');
+
+    return `
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:6px 10px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;border-bottom:2px solid #e2e8f0;">Item</th>
+                    <th style="text-align:left;padding:6px 10px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;border-bottom:2px solid #e2e8f0;">Qty</th>
+                    <th style="text-align:left;padding:6px 10px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;border-bottom:2px solid #e2e8f0;">Total</th>
+                    <th style="text-align:left;padding:6px 10px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;border-bottom:2px solid #e2e8f0;">Quarter</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+};
+
 const timelineItemMarkup = (event, isLast) => {
     const connector = isLast
         ? ''
         : `<span style="position:absolute;left:50%;top:24px;bottom:0;width:0;border-left:2px dashed #cbd5e1;transform:translateX(-50%);"></span>`;
+
+    const stepLabel = event.version ? `Version ${event.version} — ${event.step}` : event.step;
+    const hasSnapshot = Array.isArray(event.itemsSnapshot) && event.itemsSnapshot.length > 0;
+    const viewButton = hasSnapshot
+        ? `<button type="button" class="btn-view-version" data-items-snapshot="${escapeHtml(JSON.stringify(event.itemsSnapshot))}" data-version="${escapeHtml(event.version)}" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:7px;border:1px solid #e2e8f0;background:#f8fafc;color:#7A1113;font-size:11px;font-weight:700;cursor:pointer;font-family:'Poppins', sans-serif;">
+            <i data-lucide="file-text" aria-hidden="true" style="width:12px;height:12px;"></i> View this version's items
+        </button>`
+        : '';
 
     return `
         <li style="position:relative;display:flex;gap:12px;padding-bottom:14px;">
@@ -178,9 +215,10 @@ const timelineItemMarkup = (event, isLast) => {
                 ${connector}
             </div>
             <div style="flex:1;min-width:0;border-radius:10px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05);padding:10px 12px;">
-                <strong style="display:block;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(event.step)}</strong>
+                <strong style="display:block;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(stepLabel)}</strong>
                 <span style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-top:2px;">${escapeHtml(event.timestamp)}</span>
                 <p style="margin-top:6px;font-size:12px;line-height:1.5;color:#475569;word-break:break-word;white-space:pre-wrap;">${escapeHtml(event.remarks)}</p>
+                ${viewButton}
             </div>
         </li>
     `;
@@ -224,6 +262,58 @@ const showToast = (message) => {
     window.setTimeout(() => toast.remove(), 2800);
 };
 
+/*
+ * Global toast for pages with no page-local toast of their own (the
+ * `.pr-toast`/showToast() pattern most blade files already copy-paste).
+ * Only use this for a page that has neither — don't migrate existing working
+ * toasts to it. Backed by #globalToast, added once to prism.layouts.app and
+ * prism.layouts.office-head; CSS in resources/css/app.css.
+ */
+window.prismToast = (message, isError = false) => {
+    const toast = document.getElementById('globalToast');
+
+    if (!toast) {
+        return;
+    }
+
+    toast.textContent = message;
+    toast.className = 'pr-toast visible ' + (isError ? 'error' : 'success');
+
+    window.clearTimeout(toast._prismToastTimer);
+    toast._prismToastTimer = window.setTimeout(() => {
+        toast.className = 'pr-toast';
+    }, 3200);
+};
+
+/*
+ * Background polling for pages that used to hard `window.location.reload()`
+ * every N seconds. Fetches `url`, calls `onData(json)` with the parsed
+ * response so the page can patch its own DOM in place — this helper only
+ * owns the polling mechanics (interval, one-at-a-time, pause while the tab
+ * is hidden, silent retry on failure), not any rendering.
+ */
+window.prismAutoRefresh = function (url, onData, { intervalMs = 45000 } = {}) {
+    let inFlight = false;
+
+    return window.setInterval(async () => {
+        if (inFlight || document.hidden) {
+            return;
+        }
+        inFlight = true;
+
+        try {
+            const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (resp.ok) {
+                onData(await resp.json());
+            }
+        } catch {
+            // transient network hiccup — silently skip this cycle, retry next tick
+        } finally {
+            inFlight = false;
+        }
+    }, intervalMs);
+};
+
 const initProposalTimeline = () => {
     const rows = [...document.querySelectorAll('[data-proposal-row]')];
     const statusFilter = document.getElementById('proposalStatusFilter');
@@ -239,6 +329,19 @@ const initProposalTimeline = () => {
     if (!rows.length || !statusFilter || !yearFilter || !title || !content) {
         return;
     }
+
+    content.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-view-version');
+        if (!btn || !window.prismInfoModal) return;
+
+        let items = [];
+        try { items = JSON.parse(btn.dataset.itemsSnapshot || '[]'); } catch { items = []; }
+
+        window.prismInfoModal({
+            title: `Version ${btn.dataset.version} — Submitted Items`,
+            bodyHtml: versionItemsTableHtml(items),
+        });
+    });
 
     const proposals = readJson('proposalData');
     const proposalMap = new Map(proposals.map((proposal) => [proposal.id, proposal]));

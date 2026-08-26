@@ -41,7 +41,7 @@ class PrismProcurementOfficeController extends Controller
             ->with('purchaseRequests')
             ->get()
             ->map(fn ($office) => [
-                'office'     => $office->name,
+                'office'     => $office->code,
                 'completed'  => $office->purchaseRequests->where('status', 'completed')->count(),
                 'inProgress' => $office->purchaseRequests->where('status', 'in_progress')->count(),
                 'pending'    => $office->purchaseRequests->where('status', 'pending')->count(),
@@ -56,7 +56,7 @@ class PrismProcurementOfficeController extends Controller
             ->take(8)
             ->get()
             ->map(fn ($pr) => [
-                'office'        => $pr->office?->name ?? '—',
+                'office'        => $pr->office?->code ?? '—',
                 'prNumber'      => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
                 'item'          => $pr->title,
                 'targetQuarter' => '—',
@@ -81,7 +81,27 @@ class PrismProcurementOfficeController extends Controller
 
     public function purchaseRequestManagement(): View
     {
-        $prs = PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy', 'abstractOfCanvass.purchaseOrder'])
+        $prs = $this->purchaseRequestManagementRows();
+
+        return view('prism.procurement-office.purchase-request-management', $this->withCommon('purchase-request-management', [
+            'pageTitle'        => 'Purchase Request Management',
+            'purchaseRequests' => $prs,
+            'stageMeta'        => PurchaseRequest::signatoryStageMeta(),
+            'trackingStageOptions' => PurchaseRequest::allTrackingStageOptions(),
+            'offices'          => Office::select('id', 'name')->orderBy('name')->get()->toArray(),
+            'importPdfUrl'     => route('procurement-office.purchase-request.import-pdf'),
+            'importConfirmUrl' => route('procurement-office.purchase-request.import-confirm'),
+        ]));
+    }
+
+    public function purchaseRequestManagementRefresh(): JsonResponse
+    {
+        return response()->json(['purchaseRequests' => $this->purchaseRequestManagementRows()]);
+    }
+
+    private function purchaseRequestManagementRows(): array
+    {
+        return PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy', 'signatureLogs.attachments', 'abstractOfCanvass.purchaseOrder'])
             ->latest()
             ->get()
             ->map(fn ($pr) => [
@@ -101,7 +121,8 @@ class PrismProcurementOfficeController extends Controller
                 'remarks'          => $pr->remarks ?? '—',
                 'ocr'            => $pr->extracted_fields_json ?? [],
                 'activityLog'    => $pr->statusUpdates->map(fn ($u) => [
-                    'timestamp' => $u->created_at->format('M d, Y g:i A'),
+                    'timestamp'    => $u->created_at->format('M d, Y g:i A'),
+                    'timestampRaw' => $u->created_at->toIso8601String(),
                     'status'    => ucfirst(str_replace('_', ' ', $u->status)),
                     'remarks'   => $u->remarks ?? '—',
                 ])->all(),
@@ -110,9 +131,17 @@ class PrismProcurementOfficeController extends Controller
                     'action'    => $l->action,
                     'by'        => $l->signedBy?->name ?? '—',
                     'at'        => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                    'atRaw'     => $l->signed_at?->toIso8601String(),
                     'remarks'   => $l->remarks ?? '',
                     'photoUrl'      => $l->blurred_photo_path ? \Illuminate\Support\Facades\Storage::url($l->blurred_photo_path) : null,
                     'photoStatus'   => $l->detection_status,
+                    'attachments'   => $l->attachments->map(fn ($a) => [
+                        'filename' => $a->original_filename,
+                        'isImage'  => str_starts_with($a->mime_type ?? '', 'image/'),
+                        'url'      => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                            'signature-attachment.show', now()->addDay(), ['id' => $a->id]
+                        ),
+                    ])->all(),
                     'reprocessUrl'  => in_array($l->detection_status, ['pending', 'failed'], true)
                         ? route('procurement-office.signature-photo.reprocess', ['pr', $l->id])
                         : null,
@@ -125,16 +154,6 @@ class PrismProcurementOfficeController extends Controller
                 'uploadUrl'         => route('procurement-office.purchase-request.upload', $pr->id),
             ])
             ->all();
-
-        return view('prism.procurement-office.purchase-request-management', $this->withCommon('purchase-request-management', [
-            'pageTitle'        => 'Purchase Request Management',
-            'purchaseRequests' => $prs,
-            'stageMeta'        => PurchaseRequest::signatoryStageMeta(),
-            'trackingStageOptions' => PurchaseRequest::allTrackingStageOptions(),
-            'offices'          => Office::select('id', 'name')->orderBy('name')->get()->toArray(),
-            'importPdfUrl'     => route('procurement-office.purchase-request.import-pdf'),
-            'importConfirmUrl' => route('procurement-office.purchase-request.import-confirm'),
-        ]));
     }
 
     public function advancePrStage(Request $request, PurchaseRequest $pr, SignatoryActionService $signatory): JsonResponse
@@ -255,7 +274,7 @@ class PrismProcurementOfficeController extends Controller
 
             return [
                 'itemId'          => $item->id,
-                'office'          => $item->budgetProposal?->office?->name ?? '—',
+                'office'          => $item->budgetProposal?->office?->code ?? "—",
                 'fiscalYear'      => $item->budgetProposal?->fiscal_year,
                 'item'            => $item->name,
                 'quantity'        => (int) $item->quantity,
@@ -355,7 +374,7 @@ class PrismProcurementOfficeController extends Controller
             ->map(fn ($pr) => [
                 'id'              => $pr->id,
                 'prNumber'        => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
-                'office'          => $pr->office?->name ?? '—',
+                'office'          => $pr->office?->code ?? '—',
                 'title'           => $pr->title,
                 'canvassingStage' => $pr->canvassing_stage,
                 'canvassingLabel' => $pr->canvassing_label,
@@ -506,7 +525,24 @@ class PrismProcurementOfficeController extends Controller
 
     public function abstractOfCanvass(): View
     {
-        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'purchaseOrder'])
+        $data = $this->abstractOfCanvassData();
+
+        return view('prism.procurement-office.abstract-of-canvass', $this->withCommon('abstract-of-canvass', [
+            'pageTitle'   => 'Abstract of Canvass',
+            'aocs'        => $data['aocs'],
+            'eligiblePrs' => $data['eligiblePrs'],
+            'stageMeta'   => AbstractOfCanvass::signatoryStageMeta(),
+        ]));
+    }
+
+    public function abstractOfCanvassRefresh(): JsonResponse
+    {
+        return response()->json($this->abstractOfCanvassData());
+    }
+
+    private function abstractOfCanvassData(): array
+    {
+        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'signatureLogs.attachments', 'purchaseOrder'])
             ->latest()
             ->get()
             ->map(function ($aoc) {
@@ -516,7 +552,7 @@ class PrismProcurementOfficeController extends Controller
                     'id'             => $aoc->id,
                     'code'           => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
                     'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
-                    'office'         => $pr->office?->name ?? '—',
+                    'office'         => $pr->office?->code ?? '—',
                     'title'          => $pr->title,
                     'signatoryStage'   => $aoc->signatory_stage,
                     'signatoryLabel'   => $aoc->signatory_label,
@@ -529,7 +565,15 @@ class PrismProcurementOfficeController extends Controller
                         'display' => $aoc->describeSignatureLog($l),
                         'by'      => $l->signedBy?->name ?? '—',
                         'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                        'atRaw'   => $l->signed_at?->toIso8601String(),
                         'remarks' => $l->remarks ?? '',
+                        'attachments' => $l->attachments->map(fn ($a) => [
+                            'filename' => $a->original_filename,
+                            'isImage'  => str_starts_with($a->mime_type ?? '', 'image/'),
+                            'url'      => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                                'signature-attachment.show', now()->addDay(), ['id' => $a->id]
+                            ),
+                        ])->all(),
                     ])->all(),
                     'remarks'        => $aoc->remarks ?? '—',
                     'createdAt'      => $aoc->created_at->format('M d, Y'),
@@ -570,18 +614,13 @@ class PrismProcurementOfficeController extends Controller
             ->map(fn ($pr) => [
                 'id'       => $pr->id,
                 'prNumber' => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
-                'office'   => $pr->office?->name ?? '—',
+                'office'   => $pr->office?->code ?? '—',
                 'title'    => $pr->title,
                 'createUrl'=> route('procurement-office.aoc.create', $pr->id),
             ])
             ->all();
 
-        return view('prism.procurement-office.abstract-of-canvass', $this->withCommon('abstract-of-canvass', [
-            'pageTitle'   => 'Abstract of Canvass',
-            'aocs'        => $aocs,
-            'eligiblePrs' => $eligiblePrs,
-            'stageMeta'   => AbstractOfCanvass::signatoryStageMeta(),
-        ]));
+        return ['aocs' => $aocs, 'eligiblePrs' => $eligiblePrs];
     }
 
     public function createAoc(Request $request, PurchaseRequest $pr): JsonResponse
@@ -622,9 +661,26 @@ class PrismProcurementOfficeController extends Controller
 
     public function purchaseOrders(): View
     {
+        $data = $this->purchaseOrdersData();
+
+        return view('prism.procurement-office.purchase-order', $this->withCommon('purchase-orders', [
+            'pageTitle'    => 'Purchase Orders',
+            'purchaseOrders' => $data['purchaseOrders'],
+            'eligibleAocs' => $data['eligibleAocs'],
+            'statusChain'  => PurchaseOrder::statusChain(),
+        ]));
+    }
+
+    public function purchaseOrdersRefresh(): JsonResponse
+    {
+        return response()->json($this->purchaseOrdersData());
+    }
+
+    private function purchaseOrdersData(): array
+    {
         $chain = PurchaseOrder::statusChain();
 
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy'])
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
             ->latest()
             ->get()
             ->map(function ($po) use ($chain) {
@@ -640,7 +696,7 @@ class PrismProcurementOfficeController extends Controller
                     'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
                     'aocCode'      => $po->abstractOfCanvass->code ?? '—',
                     'prNumber'     => $pr->number ?? '—',
-                    'office'       => $pr?->office?->name ?? '—',
+                    'office'       => $pr?->office?->code ?? '—',
                     'title'        => $pr->title ?? '—',
                     'supplier'     => $po->supplier_name,
                     'supplierAddress' => $po->supplier_address ?? '—',
@@ -674,10 +730,20 @@ class PrismProcurementOfficeController extends Controller
                     'returnUrl'        => route('procurement-office.po.return', $po->id),
                     'uploadUrl'        => route('procurement-office.po.upload', $po->id),
                     'pdfFile'          => $po->file_path,
+                    'alobsNo'          => $po->alobs_no ?: '—',
+                    'fundSource'       => $po->fund_source ?: '—',
                     'signatureLogs'    => $po->signatureLogs->map(fn ($l) => [
                         'display' => $po->describeSignatureLog($l),
                         'by'      => $l->signedBy?->name ?? '—',
                         'at'      => $l->signed_at?->format('M d, Y g:i A') ?? '—',
+                        'atRaw'   => $l->signed_at?->toIso8601String(),
+                        'attachments' => $l->attachments->map(fn ($a) => [
+                            'filename' => $a->original_filename,
+                            'isImage'  => str_starts_with($a->mime_type ?? '', 'image/'),
+                            'url'      => \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                                'signature-attachment.show', now()->addDay(), ['id' => $a->id]
+                            ),
+                        ])->all(),
                     ])->all(),
                 ];
             })
@@ -692,19 +758,14 @@ class PrismProcurementOfficeController extends Controller
             ->map(fn ($aoc) => [
                 'id'      => $aoc->id,
                 'code'    => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
-                'office'  => $aoc->purchaseRequest->office?->name ?? '—',
+                'office'  => $aoc->purchaseRequest->office?->code ?? '—',
                 'title'   => $aoc->purchaseRequest->title,
                 'amount'  => (float) $aoc->purchaseRequest->total_amount,
                 'issueUrl'=> route('procurement-office.po.issue', $aoc->id),
             ])
             ->all();
 
-        return view('prism.procurement-office.purchase-order', $this->withCommon('purchase-orders', [
-            'pageTitle'    => 'Purchase Orders',
-            'purchaseOrders' => $pos,
-            'eligibleAocs' => $eligibleAocs,
-            'statusChain'  => PurchaseOrder::statusChain(),
-        ]));
+        return ['purchaseOrders' => $pos, 'eligibleAocs' => $eligibleAocs];
     }
 
     public function issuePo(Request $request, AbstractOfCanvass $aoc): JsonResponse
@@ -812,7 +873,7 @@ class PrismProcurementOfficeController extends Controller
             $rate     = $total > 0 ? round(($procured / $total) * 100) : 0;
 
             return collect(['Q1', 'Q2', 'Q3', 'Q4'])->map(fn ($q) => [
-                'office'         => $office->name,
+                'office'         => $office->code,
                 'quarter'        => $q,
                 'targeted'       => (int) ceil($total / 4),
                 'procured'       => (int) floor($procured / 4),
@@ -826,7 +887,7 @@ class PrismProcurementOfficeController extends Controller
             ->take(10)
             ->get()
             ->map(fn ($pr) => [
-                'office'        => $pr->office?->name ?? '—',
+                'office'        => $pr->office?->code ?? '—',
                 'item'          => $pr->title,
                 'prNumber'      => $pr->number ?? '—',
                 'completedDate' => $pr->updated_at->format('M d, Y'),
@@ -839,7 +900,7 @@ class PrismProcurementOfficeController extends Controller
             ->latest()
             ->get()
             ->map(fn ($pr) => [
-                'office'   => $pr->office?->name ?? '—',
+                'office'   => $pr->office?->code ?? '—',
                 'item'     => $pr->title,
                 'prNumber' => $pr->number ?? '—',
                 'reason'   => $pr->remarks ?? 'No remarks provided.',
@@ -882,7 +943,7 @@ class PrismProcurementOfficeController extends Controller
 
             if (!$matched) {
                 return [
-                    'office'          => $item->budgetProposal?->office?->name ?? '—',
+                    'office'          => $item->budgetProposal?->office?->code ?? '—',
                     'item'            => $item->name,
                     'plannedQty'      => $plannedQty,
                     'plannedTotal'    => $plannedTotal,
@@ -907,7 +968,7 @@ class PrismProcurementOfficeController extends Controller
             };
 
             return [
-                'office'         => $item->budgetProposal?->office?->name ?? '—',
+                'office'         => $item->budgetProposal?->office?->code ?? '—',
                 'item'           => $item->name,
                 'plannedQty'     => $plannedQty,
                 'plannedTotal'   => $plannedTotal,
@@ -958,16 +1019,29 @@ class PrismProcurementOfficeController extends Controller
         $year = now()->year;
         $slug = Str::slug($aoc->code ?? 'aoc-' . $aoc->id);
         $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
-        $path = $request->file('file')->storeAs("abstract-of-canvass/{$year}", $name, 'public');
+        $file = $request->file('file');
+        $path = $file->storeAs("abstract-of-canvass/{$year}", $name, 'public');
 
         $aoc->update([
             'file_path'   => $path,
             'uploaded_at' => now(),
         ]);
 
+        // The AOC's "Responsive Dealer" declaration is the authoritative winning
+        // supplier — once available, it supersedes the name Procurement typed in
+        // at canvassing time (see uploadCanvassDocument()) for any later reads
+        // (e.g. pre-filling the Issue PO form's supplier name).
+        $responsiveDealer = $this->extractResponsiveDealer($this->readPdfText($file));
+        if ($responsiveDealer) {
+            $aoc->purchaseRequest?->documents()
+                ->where('document_type', 'canvass_quotation')
+                ->update(['title' => $responsiveDealer]);
+        }
+
         return response()->json([
-            'success'  => true,
-            'filePath' => $path,
+            'success'      => true,
+            'filePath'     => $path,
+            'supplierName' => $responsiveDealer,
         ]);
     }
 
@@ -981,17 +1055,72 @@ class PrismProcurementOfficeController extends Controller
         $year = now()->year;
         $slug = Str::slug($po->po_number ?? 'po-' . $po->id);
         $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
-        $path = $request->file('file')->storeAs("purchase-orders/{$year}", $name, 'public');
+        $file = $request->file('file');
+        $path = $file->storeAs("purchase-orders/{$year}", $name, 'public');
+
+        $poFields = $this->extractPoFundingFields($this->readPdfText($file));
 
         $po->update([
             'file_path'   => $path,
             'uploaded_at' => now(),
+            'alobs_no'    => $poFields['alobsNo'] ?? $po->alobs_no,
+            'fund_source' => $poFields['fundSource'] ?? $po->fund_source,
         ]);
 
         return response()->json([
-            'success'  => true,
-            'filePath' => $path,
+            'success'    => true,
+            'filePath'   => $path,
+            'alobsNo'    => $po->fresh()->alobs_no,
+            'fundSource' => $po->fresh()->fund_source,
         ]);
+    }
+
+    /** Best-effort PDF text-layer read — scanned/image-only uploads just yield ''. */
+    private function readPdfText(\Illuminate\Http\UploadedFile $file): string
+    {
+        try {
+            $parser = new PdfParser();
+            return $parser->parseContent($file->get())->getText();
+        } catch (\Exception $e) {
+            return '';
+        }
+    }
+
+    /**
+     * The Abstract of Canvass form's recommendation paragraph always names the
+     * winning bidder the same way: "...prices offered by <Supplier> is/are
+     * considered reasonable and most advantageous...". Best-effort only.
+     */
+    private function extractResponsiveDealer(string $text): ?string
+    {
+        $normalized = preg_replace('/\s+/', ' ', $text);
+        if (preg_match('/offered by (.+?) is\s*\/?\s*are considered/i', $normalized, $m)) {
+            return trim($m[1]);
+        }
+        return null;
+    }
+
+    /**
+     * The Purchase Order form's "Funds Available" box lists the ALOBS No. and
+     * Fund Source on their own labeled lines. Best-effort only — a scanned,
+     * hand-filled PO may have no text layer at all for these values.
+     */
+    private function extractPoFundingFields(string $text): array
+    {
+        $result = ['alobsNo' => null, 'fundSource' => null];
+
+        // Colon is required (not "?") and the capture allows zero length — this
+        // keeps the match confined to the same line and stops the regex engine
+        // from "giving back" the colon into the capture group when the field is
+        // left blank on the form (which would otherwise wrongly extract ":").
+        if (preg_match('/ALOBS No\.?[ \t]*:[ \t]*([^\r\n]*)/i', $text, $m) && trim($m[1]) !== '') {
+            $result['alobsNo'] = trim($m[1]);
+        }
+        if (preg_match('/Fund Source[ \t]*:[ \t]*([^\r\n]*)/i', $text, $m) && trim($m[1]) !== '') {
+            $result['fundSource'] = trim($m[1]);
+        }
+
+        return $result;
     }
 
     // ── BSU PDF Import ───────────────────────────────────────────────────────
