@@ -115,14 +115,17 @@
         .sb-user {
             display: flex; align-items: center; gap: 10px; padding: 10px 12px;
             background: var(--crimson-mid); border: 1px solid var(--crimson-border); border-radius: var(--r-sm);
+            width: 100%; text-align: left; cursor: pointer; font-family: 'Poppins', sans-serif; transition: background .15s;
         }
+        .sb-user:hover { background: var(--crimson-border); }
         .sb-avatar {
             width: 34px; height: 34px; border-radius: 50%; background: var(--crimson);
             display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0;
+            font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0; overflow: hidden;
         }
+        .sb-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .sb-user-info { min-width: 0; overflow: hidden; }
-        .sb-user-label { font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--txt3); line-height: 1; margin-bottom: 2px; }
+        .sb-user-label { font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--txt3); line-height: 1.3; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sb-user-name { font-size: 12px; font-weight: 700; color: var(--crimson); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sb-logout {
             display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -223,13 +226,32 @@
         </a>
     </nav>
     <div class="sb-bottom">
-        <div class="sb-user">
-            <div class="sb-avatar">OH</div>
-            <div class="sb-user-info">
-                <div class="sb-user-label">Workspace</div>
-                <div class="sb-user-name">Office Head / Dean</div>
+        @php
+            $__me = auth()->user();
+            $__meInitials = $__me
+                ? collect(preg_split('/\s+/', trim($__me->name)))->map(fn ($w) => strtoupper(substr($w, 0, 1)))->take(2)->implode('')
+                : 'OH';
+            $__meAvatarUrl = $__me?->avatar_path ? \Illuminate\Support\Facades\Storage::url($__me->avatar_path) : null;
+            // Always the real roles held in the DB, not a hardcoded label —
+            // a dual-hat user (e.g. an Office Head who also sits on the BAC)
+            // holds more than one row in roles(), and every one should show.
+            $__meRoles = $__me?->roles->pluck('name')->implode(', ') ?: 'Office Head / Dean';
+        @endphp
+        <button type="button" class="sb-user" id="sbUserBtn" title="Edit your info">
+            <div class="sb-avatar">
+                @if($__meAvatarUrl)
+                    <img src="{{ $__meAvatarUrl }}" alt="" id="sbAvatarImg">
+                    <span id="sbAvatarInitials" style="display:none;">{{ $__meInitials }}</span>
+                @else
+                    <img src="" alt="" id="sbAvatarImg" style="display:none;">
+                    <span id="sbAvatarInitials">{{ $__meInitials }}</span>
+                @endif
             </div>
-        </div>
+            <div class="sb-user-info">
+                <div class="sb-user-label" title="{{ $__meRoles }}">{{ $__meRoles }}</div>
+                <div class="sb-user-name" id="sbUserName">{{ $__me?->name ?? 'User' }}</div>
+            </div>
+        </button>
         <form method="POST" action="{{ route('logout') }}" style="margin:0">
             @csrf
             <button type="submit" class="sb-logout" title="Logout">
@@ -238,6 +260,8 @@
         </form>
     </div>
 </aside>
+
+<x-prism.profile-modal />
 
 {{-- ══ MAIN ══ --}}
 <div class="main">
@@ -279,6 +303,13 @@
         sbBtn.addEventListener('click', function () {
             document.body.classList.toggle('sb-collapsed');
             localStorage.setItem('sb-collapsed', document.body.classList.contains('sb-collapsed') ? '1' : '0');
+        });
+    }
+
+    const sbUserBtn = document.getElementById('sbUserBtn');
+    if (sbUserBtn) {
+        sbUserBtn.addEventListener('click', function () {
+            if (window.prismOpenProfile) window.prismOpenProfile();
         });
     }
 })();

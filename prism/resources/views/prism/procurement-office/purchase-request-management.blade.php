@@ -145,57 +145,11 @@
     @media (max-width: 1200px) { .pr-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
 
-    /* Import BSU PDF button */
-    .btn-import-bsu { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; background: #0f5288; color: #fff; transition: background .15s; white-space: nowrap; }
-    .btn-import-bsu:hover { background: #0a3d68; }
-    .btn-import-bsu i { font-size: 15px; }
-
-    /* Import modal overlay */
-    .import-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .import-modal-overlay.hidden { display: none; }
-    .import-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(15,23,42,.22); display: flex; flex-direction: column; }
-    .import-modal-hdr { display: flex; align-items: center; justify-content: space-between; padding: 22px 26px 0; }
-    .import-modal-hdr h2 { font-size: 17px; font-weight: 800; color: #0f172a; letter-spacing: -.2px; }
-    .import-modal-hdr p { font-size: 12px; color: #64748b; margin-top: 3px; }
-    .import-modal-body { padding: 20px 26px 26px; display: flex; flex-direction: column; gap: 16px; }
-    .import-close { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; flex-shrink: 0; }
-    .import-close:hover { background: #e2e8f0; }
-
-    /* Drop zone */
-    .import-drop { border: 2px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
-    .import-drop:hover, .import-drop.drag-over { border-color: #0f5288; background: #e8f4fd; }
-    .import-drop i { font-size: 36px; color: #94a3b8; }
-    .import-drop p { font-size: 13px; color: #64748b; line-height: 1.5; }
-    .import-drop span { font-size: 11px; color: #94a3b8; }
-    .import-drop input { display: none; }
-
-    .import-field { display: flex; flex-direction: column; gap: 5px; }
-    .import-field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #64748b; }
-    .import-input { height: 40px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 13px; font-family: 'Poppins', sans-serif; color: #334155; outline: none; width: 100%; box-sizing: border-box; background: #fff; transition: border-color .15s; }
-    .import-input:focus { border-color: #0f5288; }
-    .import-textarea { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 9px; font-size: 13px; font-family: 'Poppins', sans-serif; color: #334155; outline: none; width: 100%; box-sizing: border-box; resize: vertical; min-height: 72px; line-height: 1.5; transition: border-color .15s; }
-    .import-textarea:focus { border-color: #0f5288; }
-    .import-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .import-divider { border: none; border-top: 1px solid #e2e8f0; margin: 0; }
-
-    /* Items table in modal */
-    .import-items-hdr { display: flex; align-items: center; justify-content: space-between; }
-    .import-items-hdr span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: #64748b; }
-    .btn-add-item { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1px solid #0f5288; background: #e8f4fd; color: #0f5288; }
-    .btn-add-item:hover { background: #cce4f7; }
-    .import-items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .import-items-table th { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #94a3b8; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    .import-items-table td { padding: 5px 4px; vertical-align: middle; }
-    .import-items-table .item-input { height: 34px; padding: 0 8px; border: 1px solid #e2e8f0; border-radius: 7px; font-size: 12px; font-family: 'Poppins', sans-serif; color: #334155; outline: none; width: 100%; box-sizing: border-box; }
-    .import-items-table .item-input:focus { border-color: #0f5288; }
-    .btn-del-item { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #fecaca; background: #fef2f2; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #ef4444; flex-shrink: 0; }
-    .btn-del-item:hover { background: #fee2e2; }
-
-    .import-no-text-warn { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 9px; padding: 12px 14px; font-size: 12px; color: #9a3412; line-height: 1.5; }
-
-    .btn-confirm-import { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 10px; background: #0f5288; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: background .15s; width: 100%; }
-    .btn-confirm-import:hover:not(:disabled) { background: #0a3d68; }
-    .btn-confirm-import:disabled { opacity: .6; cursor: not-allowed; }
+    .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 </style>
 @endpush
 
@@ -222,17 +176,28 @@
                     <h2 class="card-title">Purchase Request Queue</h2>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                    <button type="button" class="btn-import-bsu" id="btnOpenImport">
-                        <i class="ti ti-file-import"></i> Import from BSU PDF
-                    </button>
                     <span class="count-chip" id="prVisibleCount">{{ count($purchaseRequests) }} PR{{ count($purchaseRequests) !== 1 ? 's' : '' }}</span>
                 </div>
             </div>
 
             @if(count($purchaseRequests) > 0)
-                <div class="search-wrap" style="margin-bottom:14px;">
-                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input class="search-input" type="search" id="prSearch" placeholder="Search by PR number, item, office, or remarks">
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input class="search-input" type="search" id="prSearch" placeholder="Search by PR number, item, office, or remarks">
+                    </div>
+                    <select class="filter-select" id="prOfficeFilter" title="Filter by office">
+                        <option value="">All Offices</option>
+                        @foreach($offices as $office)
+                            <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
+                        @endforeach
+                    </select>
+                    <select class="filter-select" id="prStatusFilter" title="Filter by signatory status">
+                        <option value="">All Statuses</option>
+                        <option value="fully_signed">Fully Signed</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="pending">Pending</option>
+                    </select>
                 </div>
             @endif
 
@@ -262,7 +227,7 @@
                                     default        => 'badge-routing',
                                 };
                             @endphp
-                            <tr data-pr-row data-pr-id="{{ $pr['id'] }}" data-search="{{ strtolower($pr['prNumber'] . ' ' . $pr['item'] . ' ' . $pr['office'] . ' ' . $pr['remarks'] . ' ' . $pr['signatoryLabel']) }}" tabindex="0">
+                            <tr data-pr-row data-pr-id="{{ $pr['id'] }}" data-office="{{ $pr['office'] }}" data-status-bucket="{{ $pr['statusBucket'] }}" data-created-at="{{ $pr['createdAt'] }}" data-search="{{ strtolower($pr['prNumber'] . ' ' . $pr['item'] . ' ' . $pr['office'] . ' ' . $pr['remarks'] . ' ' . $pr['signatoryLabel']) }}" tabindex="0">
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">{{ $pr['office'] }}</td>
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
                                 <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $pr['item'] }}</td>
@@ -413,117 +378,6 @@
 
 </div>
 
-{{-- Import BSU PDF Modal --}}
-<div class="import-modal-overlay hidden" id="importModalOverlay">
-    <div class="import-modal">
-        <div class="import-modal-hdr">
-            <div>
-                <h2>Import PR from BSU PDF</h2>
-                <p>Upload a PR PDF from the BSU central system to extract and import its data.</p>
-            </div>
-            <button type="button" class="import-close" id="btnCloseImport"><i class="ti ti-x"></i></button>
-        </div>
-        <div class="import-modal-body">
-
-            {{-- Step 1: Upload --}}
-            <div id="importStep1">
-                <label class="import-drop" id="importDropZone">
-                    <i class="ti ti-file-upload"></i>
-                    <p><strong>Click to select</strong> or drag and drop a PR PDF</p>
-                    <span>BatStateU-FO-PRO-02 format &middot; Max 20 MB</span>
-                    <input type="file" id="importFileInput" accept="application/pdf,.pdf">
-                </label>
-                <div id="importFileName" style="font-size:12px;color:#64748b;margin-top:8px;text-align:center;display:none;"></div>
-                <button type="button" class="btn-confirm-import" id="btnExtract" style="margin-top:14px;" disabled>
-                    <i class="ti ti-scan"></i> Extract Fields from PDF
-                </button>
-            </div>
-
-            {{-- Step 2: Review (hidden until extraction done) --}}
-            <div id="importStep2" style="display:none;">
-                <div id="importNoTextWarn" class="import-no-text-warn" style="display:none;">
-                    <strong>Could not read text from this PDF.</strong> It may be a scanned/image PDF.
-                    Please fill in the fields below manually before confirming the import.
-                </div>
-
-                <hr class="import-divider">
-
-                <div class="import-row">
-                    <div class="import-field">
-                        <label>PR Number</label>
-                        <input type="text" class="import-input" id="impPrNumber" placeholder="e.g. PR-2024-001">
-                    </div>
-                    <div class="import-field">
-                        <label>Date</label>
-                        <input type="text" class="import-input" id="impDate" placeholder="e.g. January 15, 2024">
-                    </div>
-                </div>
-
-                <div class="import-field">
-                    <label>Requesting Office / Department</label>
-                    <select class="import-input" id="impOfficeId">
-                        <option value="">— Select Office —</option>
-                        @foreach($offices as $office)
-                            <option value="{{ $office['id'] }}">{{ $office['name'] }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="import-field">
-                    <label>Project Title / Name of Project</label>
-                    <input type="text" class="import-input" id="impTitle" placeholder="Describe the procurement project">
-                </div>
-
-                <div class="import-field">
-                    <label>Purpose</label>
-                    <textarea class="import-textarea" id="impPurpose" placeholder="State the purpose of this purchase request…"></textarea>
-                </div>
-
-                <div class="import-field">
-                    <label>Total Amount (₱)</label>
-                    <input type="number" class="import-input" id="impTotal" placeholder="0.00" min="0" step="0.01">
-                </div>
-
-                <hr class="import-divider">
-
-                <div>
-                    <div class="import-items-hdr" style="margin-bottom:10px;">
-                        <span>Items</span>
-                        <button type="button" class="btn-add-item" id="btnAddItem">
-                            <i class="ti ti-plus"></i> Add Row
-                        </button>
-                    </div>
-                    <div style="overflow-x:auto;">
-                        <table class="import-items-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:38%;">Item Description</th>
-                                    <th style="width:12%;">Qty</th>
-                                    <th style="width:15%;">Unit</th>
-                                    <th style="width:18%;">Unit Cost (₱)</th>
-                                    <th style="width:12%;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="importItemsBody"></tbody>
-                        </table>
-                    </div>
-                    <p style="font-size:11px;color:#94a3b8;margin-top:6px;">Add the items from the PR. These will be used for canvassing and AOC later.</p>
-                </div>
-
-                <hr class="import-divider">
-
-                <button type="button" class="btn-confirm-import" id="btnConfirmImport">
-                    <i class="ti ti-check"></i> Confirm Import
-                </button>
-                <button type="button" id="btnBackToStep1" style="display:block;margin-top:8px;width:100%;height:38px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;font-family:'Poppins',sans-serif;">
-                    &larr; Back / Upload Different PDF
-                </button>
-            </div>
-
-        </div>
-    </div>
-</div>
-
 {{-- Toast --}}
 <div class="pr-toast" id="prToast"></div>
 
@@ -531,8 +385,6 @@
 
 <script type="application/json" id="prData">@json($purchaseRequests)</script>
 <script type="application/json" id="stagesData">@json($stageMeta)</script>
-<script type="application/json" id="importPdfUrlData">@json($importPdfUrl)</script>
-<script type="application/json" id="importConfirmUrlData">@json($importConfirmUrl)</script>
 <script type="application/json" id="refreshUrlData">@json(route('procurement-office.purchase-request-management.refresh'))</script>
 
 @push('scripts')
@@ -752,7 +604,7 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = pr.pdfFile
-            ? `<iframe src="/storage/${pr.pdfFile}" title="PR Document"></iframe>`
+            ? `<iframe src="/storage/${pr.pdfFile}#toolbar=0" title="PR Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
         uploadPrText.textContent = pr.pdfFile ? 'Re-upload PDF' : 'Upload PR PDF';
 
@@ -797,21 +649,30 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
 
-    /* ── Search (PR number, item, office, remarks, signatory stage) ── */
+    /* ── Search (PR number, item, office, remarks, signatory stage) + filters ── */
     const prSearchInput = document.getElementById('prSearch');
     const prCountChip    = document.getElementById('prVisibleCount');
+    const prOfficeFilter = document.getElementById('prOfficeFilter');
+    const prStatusFilter = document.getElementById('prStatusFilter');
     function applyPrSearchFilter() {
         if (!prSearchInput) return;
-        const q = prSearchInput.value.trim().toLowerCase();
+        const q      = prSearchInput.value.trim().toLowerCase();
+        const office = prOfficeFilter ? prOfficeFilter.value : '';
+        const status = prStatusFilter ? prStatusFilter.value : '';
         let visible = 0;
         getRows().forEach(row => {
-            const match = !q || (row.dataset.search ?? '').includes(q);
+            const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
+            const matchesOffice = !office || row.dataset.office === office;
+            const matchesStatus = !status || row.dataset.statusBucket === status;
+            const match = matchesSearch && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (prCountChip) prCountChip.textContent = visible + (visible === 1 ? ' PR' : ' PRs');
     }
     prSearchInput?.addEventListener('input', applyPrSearchFilter);
+    prOfficeFilter?.addEventListener('change', applyPrSearchFilter);
+    prStatusFilter?.addEventListener('change', applyPrSearchFilter);
 
     logToggle.addEventListener('click', () => {
         logToggle.classList.toggle('open');
@@ -994,7 +855,7 @@
             if (resp.ok && json.success) {
                 activePr.pdfFile = json.filePath;
                 document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.filePath}" title="PR Document"></iframe>`;
+                    `<iframe src="/storage/${json.filePath}#toolbar=0" title="PR Document"></iframe>`;
                 uploadPrText.textContent = 'Re-upload PDF';
                 showToast('PR PDF uploaded successfully.');
             } else {
@@ -1020,16 +881,14 @@
     // web) otherwise wouldn't show up here without a manual reload. Poll for
     // fresh data and patch the list/detail panel in place instead of a full
     // page reload. Skipped entirely (data fetched but discarded) while an
-    // upload/import is in flight, a remark/status field is being edited, the
-    // return panel is open, or the third-signer choice hasn't been submitted
-    // yet — so it can't wipe in-progress work. Checks the import modal via
-    // its DOM state rather than the BSU-import IIFE's own `importing` flag,
-    // since that variable lives in a separate closure below.
+    // upload is in flight, a remark/status field is being edited, the return
+    // panel is open, or the third-signer choice hasn't been submitted yet —
+    // so it can't wipe in-progress work.
     function rowHtml(pr) {
         const stageBadge = pr.signatoryStage === 'fully_signed' ? 'badge-signed'
             : (pr.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
         const search = (pr.prNumber + ' ' + pr.item + ' ' + pr.office + ' ' + pr.remarks + ' ' + pr.signatoryLabel).toLowerCase();
-        return `<tr data-pr-row data-pr-id="${pr.id}" data-search="${escapeHtml(search)}" tabindex="0">
+        return `<tr data-pr-row data-pr-id="${pr.id}" data-office="${escapeHtml(pr.office)}" data-status-bucket="${pr.statusBucket || ''}" data-created-at="${pr.createdAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(pr.office)}</td>
             <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.prNumber)}</td>
             <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(pr.item)}</td>
@@ -1043,8 +902,6 @@
         if (remarksIn.value.trim()) return;
         if (returnIn.value.trim() || returnRemarks.style.display !== 'none') return;
         if (thirdSignerPanel.style.display !== 'none') return;
-        const importOverlay = document.getElementById('importModalOverlay');
-        if (importOverlay && !importOverlay.classList.contains('hidden')) return;
 
         const fresh = json.purchaseRequests || [];
         allPrs = fresh;
@@ -1059,6 +916,7 @@
                 const pr = freshById.get(id);
                 if (!pr) return; // don't remove rows missing from the fresh data
                 updateSigBadge(pr.id, pr.signatoryLabel, pr.signatoryStage);
+                if (pr.statusBucket) row.dataset.statusBucket = pr.statusBucket;
             });
 
             fresh.forEach(pr => {
@@ -1104,247 +962,5 @@
     }
 })();
 
-/* ── BSU PDF Import Modal ── */
-(function () {
-    const importPdfUrl     = JSON.parse(document.getElementById('importPdfUrlData').textContent);
-    const importConfirmUrl = JSON.parse(document.getElementById('importConfirmUrlData').textContent);
-    const csrfToken        = document.querySelector('meta[name="csrf-token"]').content;
-
-    const overlay       = document.getElementById('importModalOverlay');
-    const btnOpen       = document.getElementById('btnOpenImport');
-    const btnClose      = document.getElementById('btnCloseImport');
-    const step1         = document.getElementById('importStep1');
-    const step2         = document.getElementById('importStep2');
-    const fileInput     = document.getElementById('importFileInput');
-    const dropZone      = document.getElementById('importDropZone');
-    const fileNameEl    = document.getElementById('importFileName');
-    const btnExtract    = document.getElementById('btnExtract');
-    const btnConfirm    = document.getElementById('btnConfirmImport');
-    const btnBack       = document.getElementById('btnBackToStep1');
-    const btnAddItem    = document.getElementById('btnAddItem');
-    const itemsBody     = document.getElementById('importItemsBody');
-    const noTextWarn    = document.getElementById('importNoTextWarn');
-    const toastEl       = document.getElementById('prToast');
-
-    let storedFilePath = null;
-    let importing = false;
-
-    function showToast(msg, isError = false) {
-        toastEl.textContent = msg;
-        toastEl.className   = 'pr-toast visible ' + (isError ? 'error' : 'success');
-        clearTimeout(toastEl._t);
-        toastEl._t = setTimeout(() => { toastEl.className = 'pr-toast'; }, 2800);
-    }
-
-    function openModal() {
-        overlay.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeModal() {
-        overlay.classList.add('hidden');
-        document.body.style.overflow = '';
-        resetModal();
-    }
-
-    function resetModal() {
-        step1.style.display = '';
-        step2.style.display = 'none';
-        fileInput.value = '';
-        fileNameEl.style.display = 'none';
-        fileNameEl.textContent = '';
-        btnExtract.disabled = true;
-        storedFilePath = null;
-        noTextWarn.style.display = 'none';
-        itemsBody.innerHTML = '';
-        ['impPrNumber','impDate','impTitle','impPurpose','impTotal'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        const offSel = document.getElementById('impOfficeId');
-        if (offSel) offSel.value = '';
-    }
-
-    btnOpen.addEventListener('click', openModal);
-    btnClose.addEventListener('click', closeModal);
-    btnBack.addEventListener('click', resetModal);
-
-    overlay.addEventListener('click', e => {
-        if (e.target === overlay) closeModal();
-    });
-
-    /* File selection */
-    fileInput.addEventListener('change', function () {
-        const file = this.files[0];
-        if (!file) return;
-        fileNameEl.textContent  = file.name;
-        fileNameEl.style.display = '';
-        btnExtract.disabled = false;
-    });
-
-    /* Drag and drop */
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', e => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const file = e.dataTransfer.files[0];
-        if (file && file.type === 'application/pdf') {
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            fileInput.files = dt.files;
-            fileNameEl.textContent   = file.name;
-            fileNameEl.style.display = '';
-            btnExtract.disabled = false;
-        }
-    });
-
-    /* Extract fields */
-    btnExtract.addEventListener('click', async function () {
-        const file = fileInput.files[0];
-        if (!file || importing) return;
-        importing = true;
-        btnExtract.disabled = true;
-        btnExtract.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Extracting…';
-
-        try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const resp = await fetch(importPdfUrl, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: fd,
-            });
-            const json = await resp.json();
-
-            if (!resp.ok || !json.success) {
-                showToast(json.message || 'Could not process the PDF.', true);
-                btnExtract.disabled = false;
-                btnExtract.innerHTML = '<i class="ti ti-scan"></i> Extract Fields from PDF';
-                return;
-            }
-
-            storedFilePath = json.filePath;
-            noTextWarn.style.display = json.hasText ? 'none' : '';
-
-            const ex = json.extracted || {};
-            document.getElementById('impPrNumber').value = ex.pr_number || '';
-            document.getElementById('impDate').value     = ex.date      || '';
-            document.getElementById('impTitle').value    = ex.title     || '';
-            document.getElementById('impPurpose').value  = ex.purpose   || '';
-            document.getElementById('impTotal').value    = ex.total     || '';
-
-            // Auto-select the requesting office if the extracted text matches one by name.
-            if (ex.office) {
-                const officeSel = document.getElementById('impOfficeId');
-                const needle = ex.office.trim().toLowerCase();
-                const match = Array.from(officeSel.options).find(o =>
-                    o.value && (o.text.toLowerCase() === needle || o.text.toLowerCase().includes(needle) || needle.includes(o.text.toLowerCase()))
-                );
-                if (match) officeSel.value = match.value;
-            }
-
-            // Pre-fill the items table with whatever rows were detected in the PDF.
-            itemsBody.innerHTML = '';
-            if (Array.isArray(ex.items) && ex.items.length) {
-                ex.items.forEach(item => addItemRow(item.name, item.qty, item.unit, item.unit_cost));
-            } else {
-                addItemRow();
-            }
-
-            step1.style.display = 'none';
-            step2.style.display = '';
-        } catch {
-            showToast('Network error during extraction.', true);
-            btnExtract.disabled = false;
-        }
-
-        btnExtract.innerHTML = '<i class="ti ti-scan"></i> Extract Fields from PDF';
-        importing = false;
-    });
-
-    /* Add item row */
-    function addItemRow(name = '', qty = '', unit = '', unitCost = '') {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><input type="text"   class="item-input" placeholder="Item description" value="${name}"></td>
-            <td><input type="number" class="item-input" placeholder="1"   min="0" step="any" value="${qty}"     style="width:60px;"></td>
-            <td><input type="text"   class="item-input" placeholder="pc"  value="${unit}"    style="width:56px;"></td>
-            <td><input type="number" class="item-input" placeholder="0.00" min="0" step="0.01" value="${unitCost}"></td>
-            <td><button type="button" class="btn-del-item"><i class="ti ti-trash" style="font-size:13px;"></i></button></td>`;
-        tr.querySelector('.btn-del-item').addEventListener('click', () => tr.remove());
-        itemsBody.appendChild(tr);
-    }
-
-    btnAddItem.addEventListener('click', () => addItemRow());
-
-    /* Confirm import */
-    btnConfirm.addEventListener('click', async function () {
-        if (importing) return;
-
-        const officeId = document.getElementById('impOfficeId').value;
-        const title    = document.getElementById('impTitle').value.trim();
-
-        if (!officeId) { showToast('Please select the requesting office.', true); return; }
-        if (!title)    { showToast('Please enter a project title.', true); return; }
-
-        const items = [];
-        itemsBody.querySelectorAll('tr').forEach(tr => {
-            const inputs = tr.querySelectorAll('input');
-            if (inputs[0]?.value.trim()) {
-                items.push({
-                    name:      inputs[0].value.trim(),
-                    qty:       inputs[1]?.value || 1,
-                    unit:      inputs[2]?.value || 'pc',
-                    unit_cost: inputs[3]?.value || 0,
-                });
-            }
-        });
-
-        importing = true;
-        btnConfirm.disabled = true;
-        btnConfirm.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Importing…';
-
-        try {
-            const resp = await fetch(importConfirmUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({
-                    office_id:    officeId,
-                    number:       document.getElementById('impPrNumber').value.trim(),
-                    title,
-                    purpose:      document.getElementById('impPurpose').value.trim(),
-                    total_amount: document.getElementById('impTotal').value || 0,
-                    file_path:    storedFilePath,
-                    items,
-                }),
-            });
-            const json = await resp.json();
-
-            if (resp.ok && json.success) {
-                showToast('PR imported successfully from BSU system!');
-                closeModal();
-                setTimeout(() => window.location.reload(), 800);
-            } else {
-                const msg = json.message || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Import failed.');
-                showToast(msg, true);
-            }
-        } catch {
-            showToast('Network error during import.', true);
-        }
-
-        importing = false;
-        btnConfirm.disabled = false;
-        btnConfirm.innerHTML = '<i class="ti ti-check"></i> Confirm Import';
-    });
-    // Auto-refresh for this page now lives in the first IIFE above, where
-    // `allPrs`/`activePr`/`saving` are actually in scope — it polls the
-    // import modal's own DOM state (`#importModalOverlay`) instead of this
-    // IIFE's `importing` flag, which isn't visible from there.
-})();
 </script>
 @endpush

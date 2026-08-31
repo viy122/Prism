@@ -47,8 +47,21 @@
     .icon-btn-check { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
     .icon-btn-check:hover:not(:disabled) { background: #bbf7d0; }
     .icon-btn-x { background: var(--s100); color: var(--s400); border-color: var(--s200); cursor: default; }
+    .icon-btn-view { background: #e6f1fb; color: #185fa5; border-color: #b5d4f4; }
+    .icon-btn-view:hover:not(:disabled) { background: #b5d4f4; }
     .icon-btn:disabled { opacity: .5; cursor: not-allowed; }
     .payment-made-cell { display: flex; align-items: center; gap: 8px; }
+
+    .search-wrap { position: relative; }
+    .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+    .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+    .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    .search-input::placeholder { color: var(--s400); }
+    .search-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { flex: 1; min-width: 0; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
     /* Colors here use the globally-defined --crimson/--crimson-dark/--s200 (set
        on :root in the base layout) rather than this page's --m/--s* aliases
@@ -61,10 +74,15 @@
     .cm-modal-sub { font-size: 12px; color: #64748b; margin-bottom: 18px; }
     .cm-form-field { margin-bottom: 14px; }
     .cm-form-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 6px; }
-    .cm-form-field input[type="file"] { width: 100%; font-size: 12.5px; color: #334155; }
     .cm-form-field textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 11px; font-size: 12.5px; color: #334155; font-family: 'Poppins', sans-serif; resize: vertical; min-height: 64px; }
     .cm-form-field textarea:focus { outline: none; border-color: var(--crimson); }
     .cm-form-hint { font-size: 10.5px; color: #94a3b8; margin-top: 4px; }
+    .cm-file-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cm-choose-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; border: 1.5px dashed #cbd5e1; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; }
+    .cm-choose-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+    .cm-file-view { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 8px; background: #e6f1fb; border: 1px solid #b5d4f4; color: #185fa5; font-size: 12px; font-weight: 700; text-decoration: none; max-width: 220px; }
+    .cm-file-view span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cm-file-view:hover { background: #b5d4f4; }
     .cm-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
     .cm-btn { height: 38px; padding: 0 18px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1px solid transparent; transition: all .15s; }
     .cm-btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -157,9 +175,21 @@
                         <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['supplier'] }}</td>
                         <td style="font-weight:600;white-space:nowrap;">₱{{ number_format($po['totalAmount'], 2) }}</td>
                         <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $po['processingAt'] }}</td>
-                        <td><span class="badge badge-processing">Processing Payment</span></td>
+                        <td><span class="badge badge-processing">{{ $po['statusLabel'] }}</span></td>
                         <td>
                             <div class="payment-made-cell">
+                                <button type="button" class="icon-btn icon-btn-view btn-view-po-doc"
+                                    data-pdf="{{ $po['pdfFile'] }}"
+                                    data-po-number="{{ $po['poNumber'] }}"
+                                    title="View PO Document">
+                                    <i class="ti ti-file-text"></i>
+                                </button>
+                                <button type="button" class="icon-btn icon-btn-view btn-view-processing-doc"
+                                    data-pdf="{{ $po['processingAttachment'] }}"
+                                    data-po-number="{{ $po['poNumber'] }}"
+                                    title="View Accounting's Payment Processing Attachment">
+                                    <i class="ti ti-paperclip"></i>
+                                </button>
                                 <button type="button" class="icon-btn icon-btn-x" disabled title="Not yet paid">
                                     <i class="ti ti-x"></i>
                                 </button>
@@ -188,7 +218,23 @@
                 <p class="card-eyebrow">History</p>
                 <h2 class="card-title">Recently Paid Purchase Orders</h2>
             </div>
+            <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:20px;font-size:11px;font-weight:700;background:var(--s100);color:var(--s700);border:1px solid var(--s200);" id="paidVisibleCount">{{ count($recentlyPaid) }} shown</span>
         </div>
+
+        <div class="search-toolbar">
+            <div class="search-wrap">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="search-input" type="search" id="paidSearch" placeholder="Search by PO number, office, or supplier">
+            </div>
+            <select class="filter-select" id="paidOfficeFilter" title="Filter by office">
+                <option value="">All Offices</option>
+            </select>
+            <select class="filter-select" id="paidSortOrder" title="Sort by paid date">
+                <option value="desc">Newest → Oldest</option>
+                <option value="asc">Oldest → Newest</option>
+            </select>
+        </div>
+
         <div class="table-wrap">
             <table>
                 <thead>
@@ -202,9 +248,9 @@
                         <th>Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="paidTbody">
                     @foreach($recentlyPaid as $po)
-                    <tr>
+                    <tr data-paid-row data-office="{{ $po['office'] }}" data-paid-at-raw="{{ $po['paidAtRaw'] }}" data-search="{{ strtolower($po['poNumber'] . ' ' . $po['office'] . ' ' . $po['supplier']) }}">
                         <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}</td>
                         <td style="font-size:12px;font-weight:600;color:var(--s600);">{{ $po['office'] }}</td>
                         <td>{{ $po['supplier'] }}</td>
@@ -232,8 +278,17 @@
         <form id="cmModalForm">
             <div class="cm-form-field">
                 <label>Receipt (PDF/JPG/PNG, required)</label>
-                <input type="file" id="cmReceiptInput" accept=".pdf,.jpg,.jpeg,.png" required>
-                <p class="cm-form-hint">Max 10MB.</p>
+                <div class="cm-file-picker">
+                    <button type="button" class="cm-choose-btn" id="cmChooseBtn">
+                        <i class="ti ti-upload"></i> Choose File
+                    </button>
+                    <a href="#" class="cm-file-view" id="cmFileView" style="display:none;" target="_blank" rel="noopener" title="Click to view the attached file">
+                        <i class="ti ti-file-text"></i>
+                        <span id="cmFileViewName"></span>
+                    </a>
+                </div>
+                <input type="file" id="cmReceiptInput" accept=".pdf,.jpg,.jpeg,.png" required style="display:none;">
+                <p class="cm-form-hint">Max 10MB. Click the file name above to preview what you attached.</p>
             </div>
             <div class="cm-form-field">
                 <label>Remarks (optional)</label>
@@ -264,22 +319,35 @@
 
     const overlay      = document.getElementById('cmModalOverlay');
     const modalSub      = document.getElementById('cmModalSub');
+    const chooseBtn      = document.getElementById('cmChooseBtn');
     const receiptInput   = document.getElementById('cmReceiptInput');
+    const fileView        = document.getElementById('cmFileView');
+    const fileViewName    = document.getElementById('cmFileViewName');
     const remarksInput   = document.getElementById('cmRemarksInput');
     const cancelBtn      = document.getElementById('cmCancelBtn');
     const submitBtn       = document.getElementById('cmSubmitBtn');
     let activeBtn = null;
+    let attachedFileUrl = null;
+
+    function clearAttachedPreview() {
+        if (attachedFileUrl) { URL.revokeObjectURL(attachedFileUrl); attachedFileUrl = null; }
+        fileView.style.display = 'none';
+        fileView.removeAttribute('href');
+        fileViewName.textContent = '';
+    }
 
     function openModal(btn) {
         activeBtn = btn;
         receiptInput.value = '';
         remarksInput.value = '';
+        clearAttachedPreview();
         modalSub.textContent = `Attach the official receipt for ${btn.dataset.poNumber}.`;
         overlay.classList.add('open');
     }
 
     function closeModal() {
         overlay.classList.remove('open');
+        clearAttachedPreview();
         activeBtn = null;
     }
 
@@ -287,8 +355,41 @@
         btn.addEventListener('click', () => openModal(btn));
     });
 
+    // The attached file itself is a view-only preview link (opens in a new
+    // tab) — click the "Choose File" button, not the file, to change it.
+    chooseBtn.addEventListener('click', () => receiptInput.click());
+    receiptInput.addEventListener('change', () => {
+        const file = receiptInput.files[0];
+        if (attachedFileUrl) URL.revokeObjectURL(attachedFileUrl);
+        if (!file) { clearAttachedPreview(); return; }
+        attachedFileUrl = URL.createObjectURL(file);
+        fileView.href = attachedFileUrl;
+        fileViewName.textContent = file.name;
+        fileView.style.display = 'inline-flex';
+    });
+
     cancelBtn.addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+    /* ── View PO Document / Accounting's processing attachment ── */
+    function wireDocViewButtons(selector, missingMsg, titleSuffix) {
+        document.querySelectorAll(selector).forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pdf = btn.dataset.pdf;
+                if (!pdf) { showToast(missingMsg, true); return; }
+                if (window.prismInfoModal) {
+                    window.prismInfoModal({
+                        title: btn.dataset.poNumber + ' — ' + titleSuffix,
+                        bodyHtml: `<iframe src="/storage/${pdf}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>`,
+                    });
+                } else {
+                    window.open('/storage/' + pdf, '_blank', 'noopener');
+                }
+            });
+        });
+    }
+    wireDocViewButtons('.btn-view-po-doc', 'No PO document has been uploaded for this PO yet.', 'PO Document');
+    wireDocViewButtons('.btn-view-processing-doc', "Accounting hasn't attached a payment processing file for this PO yet.", 'Payment Processing Attachment');
 
     submitBtn.addEventListener('click', async () => {
         if (!activeBtn) return;
@@ -326,6 +427,56 @@
             submitBtn.textContent = 'Submit';
         }
     });
+
+    /* ── Recently Paid: search + office filter + sort ── */
+    const paidTbody       = document.getElementById('paidTbody');
+    const paidSearch      = document.getElementById('paidSearch');
+    const paidOfficeFilter = document.getElementById('paidOfficeFilter');
+    const paidSortOrder   = document.getElementById('paidSortOrder');
+    const paidCount       = document.getElementById('paidVisibleCount');
+
+    if (paidTbody && paidSearch) {
+        const paidRows = () => paidTbody.querySelectorAll('[data-paid-row]');
+
+        // Office list varies per session, so populate it from the rows already
+        // on the page instead of a fixed server-side list.
+        const offices = [...new Set([...paidRows()].map(r => r.dataset.office).filter(o => o && o !== '—'))].sort();
+        offices.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o;
+            opt.textContent = o;
+            paidOfficeFilter.appendChild(opt);
+        });
+
+        function applyPaidFilter() {
+            const q      = paidSearch.value.trim().toLowerCase();
+            const office = paidOfficeFilter.value;
+            let visible = 0;
+            paidRows().forEach(row => {
+                const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
+                const matchesOffice = !office || row.dataset.office === office;
+                const match = matchesSearch && matchesOffice;
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            paidCount.textContent = visible + ' shown';
+        }
+
+        function applyPaidSort() {
+            const dir  = paidSortOrder.value;
+            const rows = Array.from(paidRows());
+            rows.sort((a, b) => {
+                const ta = new Date(a.dataset.paidAtRaw || 0).getTime();
+                const tb = new Date(b.dataset.paidAtRaw || 0).getTime();
+                return dir === 'asc' ? ta - tb : tb - ta;
+            });
+            rows.forEach(row => paidTbody.appendChild(row));
+        }
+
+        paidSearch.addEventListener('input', applyPaidFilter);
+        paidOfficeFilter.addEventListener('change', applyPaidFilter);
+        paidSortOrder.addEventListener('change', applyPaidSort);
+    }
 })();
 </script>
 @endpush

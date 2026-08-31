@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Dashboard | Procurement Office')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
@@ -67,8 +71,11 @@
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
+    .charts-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 230px; }
+
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
+    @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
 </style>
 @endpush
@@ -82,12 +89,8 @@
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Dashboard</h1>
-            <p class="page-hdr-sub">Track received purchase requests, current processing status, overdue action items, and urgent PRs past target quarter.</p>
+            <p class="page-hdr-sub">Track received purchase requests, current processing status, and the PRs that have been waiting longest for action.</p>
         </div>
-        <button class="btn-outline" type="button" id="dueThisMonthButton">
-            <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            PRs Due This Month
-        </button>
     </div>
 
     <div class="stats-grid">
@@ -105,15 +108,15 @@
             </div>
             <p class="stat-label">PRs in progress</p>
             <strong class="stat-value">{{ number_format($summary['prsInProgress']) }}</strong>
-            <p class="stat-desc">Under canvassing, validation, or PO preparation</p>
+            <p class="stat-desc">Signature routing has started, not yet fully signed</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon">
                 <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
-            <p class="stat-label">Completed this month</p>
-            <strong class="stat-value">{{ number_format($summary['prsCompletedThisMonth']) }}</strong>
-            <p class="stat-desc">Completed purchases in the current month</p>
+            <p class="stat-label">Completed</p>
+            <strong class="stat-value">{{ number_format($summary['prsCompleted']) }}</strong>
+            <p class="stat-desc">Fully signed PRs, all time</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon">
@@ -121,14 +124,31 @@
             </div>
             <p class="stat-label">Overdue PRs</p>
             <strong class="stat-value">{{ number_format($summary['overduePrs']) }}</strong>
-            <p class="stat-desc">Past target quarter and needing action</p>
+            <p class="stat-desc">Not yet fully signed, {{ $summary['overdueThresholdDays'] }}+ days since submission</p>
         </div>
+    </div>
+
+    <div class="charts-grid">
+        <article class="card">
+            <p class="card-eyebrow">Campus-wide</p>
+            <h2 class="card-title" style="margin-bottom:16px;">PR Status</h2>
+            <div class="chart-wrap">
+                <canvas id="statusChart" data-status="{{ json_encode($statusChart) }}"></canvas>
+            </div>
+        </article>
+        <article class="card">
+            <p class="card-eyebrow">By office</p>
+            <h2 class="card-title" style="margin-bottom:16px;">PR Volume</h2>
+            <div class="chart-wrap">
+                <canvas id="officeVolumeChart" data-offices="{{ json_encode($officeVolumeChart) }}"></canvas>
+            </div>
+        </article>
     </div>
 
     <div class="card">
         <div class="card-head">
             <div>
-                <p class="card-eyebrow">This quarter</p>
+                <p class="card-eyebrow">Current status</p>
                 <h2 class="card-title">PRs per Office by Status</h2>
             </div>
         </div>
@@ -159,8 +179,9 @@
     <div class="card">
         <div class="card-head">
             <div>
-                <p class="card-eyebrow">Past target quarter</p>
+                <p class="card-eyebrow">Longest waiting</p>
                 <h2 class="card-title">Urgent PRs</h2>
+                <p class="card-sub">Not yet fully signed, oldest submission first. No due-date field exists on a PR — this is how long each has genuinely been waiting for action.</p>
             </div>
             <span class="count-chip" id="urgentPrVisibleCount">{{ count($urgentPrs) }} shown</span>
         </div>
@@ -172,7 +193,7 @@
                         <th>PR No.</th>
                         <th>Item</th>
                         <th>Quarter</th>
-                        <th>Due Date</th>
+                        <th>Days Pending</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -186,12 +207,12 @@
                                 default       => 'badge-overdue',
                             };
                         @endphp
-                        <tr data-urgent-pr-row data-due-month="{{ $pr['dueThisMonth'] ? 'yes' : 'no' }}">
+                        <tr>
                             <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $pr['office'] }}</td>
                             <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
                             <td style="font-size:13px;color:var(--s900);font-weight:600;">{{ $pr['item'] }}</td>
                             <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['targetQuarter'] }}</td>
-                            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['dueDate'] }}</td>
+                            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['daysPending'] }} days</td>
                             <td><span class="badge {{ $statusSlug }}">{{ $pr['status'] }}</span></td>
                         </tr>
                     @endforeach
@@ -206,25 +227,46 @@
 @push('scripts')
 <script>
 (function () {
-    const btn     = document.getElementById('dueThisMonthButton');
-    const countEl = document.getElementById('urgentPrVisibleCount');
-    const rows    = document.querySelectorAll('[data-urgent-pr-row]');
-    let   filtered = false;
-
-    btn.addEventListener('click', function () {
-        filtered = !filtered;
-        let visible = 0;
-
-        rows.forEach(row => {
-            const show = !filtered || row.dataset.dueMonth === 'yes';
-            row.style.display = show ? '' : 'none';
-            if (show) visible++;
+    const statusEl = document.getElementById('statusChart');
+    if (statusEl) {
+        const s = JSON.parse(statusEl.dataset.status || '{}');
+        new Chart(statusEl, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pending', 'In Progress', 'Completed'],
+                datasets: [{
+                    data: [s.pending || 0, s.in_progress || 0, s.completed || 0],
+                    backgroundColor: ['#854f0b', '#185fa5', '#3b6d11'],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
         });
+    }
 
-        countEl.textContent = visible + ' shown';
-        btn.style.background = filtered ? 'rgba(139,26,28,.07)' : '';
-        btn.style.borderColor = filtered ? '#8B1A1C' : '';
-    });
+    const officeEl = document.getElementById('officeVolumeChart');
+    if (officeEl) {
+        const offices = JSON.parse(officeEl.dataset.offices || '[]');
+        // Horizontal, not vertical — dozens of offices campus-wide means a
+        // vertical bar chart's x-axis labels collide past a handful of bars.
+        officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        new Chart(officeEl, {
+            type: 'bar',
+            data: {
+                labels: offices.map(o => o.office),
+                datasets: [{ label: 'Purchase Requests', data: offices.map(o => o.count), backgroundColor: '#681012', borderRadius: 4 }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
 })();
 </script>
 @endpush

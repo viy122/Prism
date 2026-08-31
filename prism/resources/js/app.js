@@ -436,22 +436,30 @@ const initProposalTimeline = () => {
                 ${proposal.timeline.map((event, idx) => timelineItemMarkup(event, idx === proposal.timeline.length - 1)).join('')}
             </ol>
             ${proposal.status === 'Returned' ? `
-                <div class="rounded-xl border border-red-200 bg-red-50 text-red-800 shadow-sm" style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;">
+                <div class="rounded-xl border border-red-200 bg-red-50 text-red-800 shadow-sm" style="padding:12px;">
                     <p style="margin:0;font-size:12px;line-height:1.5;"><strong>Returned remarks:</strong> ${escapeHtml(proposal.returnedRemarks)}</p>
-                    <a class="${primaryButtonClass}" style="align-self:flex-start;flex:none;height:30px;padding:0 12px;font-size:12px;gap:5px;" href="/office-head/budget-proposal?proposal=${encodeURIComponent(proposal.proposalId)}">
-                        <i data-lucide="refresh-cw" aria-hidden="true" style="width:13px;height:13px;"></i>
-                        Revise Proposal
-                    </a>
                 </div>
             ` : ''}
+            <a class="${primaryButtonClass}" style="align-self:flex-start;flex:none;height:32px;padding:0 14px;font-size:12px;gap:6px;" href="/office-head/budget-proposal?proposal=${encodeURIComponent(proposal.proposalId)}">
+                <i data-lucide="eye" aria-hidden="true" style="width:13px;height:13px;"></i>
+                View this PPMP
+            </a>
         `;
         refreshIcons();
     };
+
+    const kpiProposalCount  = document.getElementById('kpiProposalCount');
+    const kpiApprovedCount  = document.getElementById('kpiApprovedCount');
+    const kpiReturnedCount  = document.getElementById('kpiReturnedCount');
+    const kpiApprovedAmount = document.getElementById('kpiApprovedAmount');
 
     const applyFilters = () => {
         const selectedStatus = statusFilter.value;
         const selectedYear = yearFilter.value;
         let count = 0;
+        let approvedCount = 0;
+        let returnedCount = 0;
+        let approvedAmount = 0;
 
         rows.forEach((row) => {
             const matchesStatus = selectedStatus === 'all' || row.dataset.status === selectedStatus;
@@ -459,10 +467,24 @@ const initProposalTimeline = () => {
             const isVisible = matchesStatus && matchesYear;
 
             row.hidden = !isVisible;
-            count += isVisible ? 1 : 0;
+            if (isVisible) {
+                count += 1;
+                const proposal = proposalMap.get(row.dataset.proposalId);
+                if (proposal?.status === 'Approved') {
+                    approvedCount += 1;
+                    approvedAmount += proposal.totalAmount || 0;
+                }
+                if (proposal?.status === 'Returned') {
+                    returnedCount += 1;
+                }
+            }
         });
 
         visibleCount.textContent = `${count} shown`;
+        if (kpiProposalCount) kpiProposalCount.textContent = count;
+        if (kpiApprovedCount) kpiApprovedCount.textContent = approvedCount;
+        if (kpiReturnedCount) kpiReturnedCount.textContent = returnedCount;
+        if (kpiApprovedAmount) kpiApprovedAmount.textContent = money(approvedAmount).replace('PHP', '₱');
 
         const selectedRow = rows.find((row) => row.dataset.proposalId === selectedProposalId);
         const firstVisibleRow = rows.find((row) => !row.hidden);

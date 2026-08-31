@@ -114,7 +114,7 @@ class PurchaseOrder extends Model
             'awaiting_delivery' => 'Awaiting Delivery (Supply Office)',
             'partial_delivery'  => 'Partial Delivery (Supply Office)',
             'complete_delivery' => 'Complete Delivery (Supply Office)',
-            'processing_payment' => 'At Accounting – Processing Payment',
+            'processing_payment' => 'Waiting for Cashier – Payment Receipt',
             'paid'              => 'Paid – Payment Made (Cashier)',
             default             => ucfirst(str_replace('_', ' ', $this->status)),
         };

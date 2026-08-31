@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'BAC | PRISM')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
@@ -23,7 +27,7 @@
     .card-title   { font-size: 17px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
     .stat-card { background: var(--s50); border: 1px solid var(--s200); border-radius: 14px; padding: 18px 20px; }
     .stat-card.action { border-color: #fac775; background: #fdf7ec; }
     .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--s500); margin-bottom: 6px; }
@@ -32,16 +36,28 @@
     .stat-value.green { color: #3b6d11; }
     .stat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--m); text-decoration: none; }
 
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 230px; }
+
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; background: var(--white); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
     thead th { background: var(--s50); border-bottom: 1px solid var(--s200); padding: 11px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); white-space: nowrap; }
     tbody td { padding: 13px 16px; border-bottom: 1px solid var(--s100); vertical-align: middle; }
     tbody tr:last-child td { border-bottom: none; }
+    tbody tr.flagged { background: rgba(252,235,235,.5); }
+    tbody tr.flagged:hover { background: rgba(252,235,235,.8); }
+
+    .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .badge-stage    { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
+    .badge-days-ok  { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+    .badge-days-mid { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+    .badge-days-hot { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
 
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 140px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 28px; text-align: center; }
     .empty-state i { font-size: 36px; color: var(--s300); }
     .empty-state p { font-size: 13px; color: var(--s400); max-width: 260px; line-height: 1.6; }
 
+    @media (max-width: 1200px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 900px) { .stat-grid { grid-template-columns: 1fr; } .content { padding: 16px 16px 40px; } }
 </style>
 @endpush
@@ -70,9 +86,80 @@
             <p class="stat-value">{{ $summary['aocsInBacStages'] }}</p>
         </div>
         <div class="stat-card">
+            <p class="stat-label">Total Value Pending</p>
+            <p class="stat-value">₱{{ number_format($summary['totalValuePending'], 0) }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="stat-label">Avg. Days Pending</p>
+            <p class="stat-value">{{ $summary['avgDaysPending'] }}</p>
+        </div>
+        <div class="stat-card">
             <p class="stat-label">AOCs Fully Signed</p>
             <p class="stat-value green">{{ $summary['aocsFullySigned'] }}</p>
         </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="card">
+            <p class="card-eyebrow">By BAC stage</p>
+            <h2 class="card-title" style="margin-bottom:16px;">AOCs Pending, per Stage</h2>
+            <div class="chart-wrap">
+                <canvas id="stageChart" data-rows="{{ json_encode($stageChart) }}"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <p class="card-eyebrow">Per office</p>
+            <h2 class="card-title" style="margin-bottom:16px;">AOCs Pending, per Office</h2>
+            <div class="chart-wrap">
+                <canvas id="officeChart" data-rows="{{ json_encode($officeChart) }}"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <div>
+                <p class="card-eyebrow">Needs follow-up</p>
+                <h2 class="card-title">Oldest Pending AOCs</h2>
+            </div>
+        </div>
+
+        @if(count($oldestPending) === 0)
+            <div class="empty-state">
+                <i class="ti ti-checkbox"></i>
+                <p>Nothing waiting at a BAC stage right now.</p>
+            </div>
+        @else
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>AOC</th>
+                        <th>Office</th>
+                        <th>Stage</th>
+                        <th>Days Waiting</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($oldestPending as $row)
+                        @php
+                            $dayBadge = match(true) {
+                                $row['daysWaiting'] >= 7 => 'badge-days-hot',
+                                $row['daysWaiting'] >= 3 => 'badge-days-mid',
+                                default                  => 'badge-days-ok',
+                            };
+                        @endphp
+                        <tr class="{{ $row['daysWaiting'] >= 7 ? 'flagged' : '' }}">
+                            <td style="font-weight:700;font-size:12px;color:var(--s500);white-space:nowrap;">{{ $row['code'] }}</td>
+                            <td style="font-size:12px;font-weight:600;color:var(--s600);">{{ $row['office'] }}</td>
+                            <td><span class="badge badge-stage">{{ $row['stage'] }}</span></td>
+                            <td><span class="badge {{ $dayBadge }}">{{ $row['daysWaiting'] }} {{ Str::plural('day', $row['daysWaiting']) }}</span></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
     </div>
 
     <div class="card">
@@ -117,5 +204,48 @@
     </div>
 
 </div>
-
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const stageEl = document.getElementById('stageChart');
+    if (stageEl) {
+        const rows = JSON.parse(stageEl.dataset.rows || '[]');
+        new Chart(stageEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.stage),
+                datasets: [{ label: 'AOCs pending', data: rows.map(r => r.count), backgroundColor: '#681012', borderRadius: 4 }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+
+    const officeEl = document.getElementById('officeChart');
+    if (officeEl) {
+        const rows = JSON.parse(officeEl.dataset.rows || '[]');
+        // Horizontal — the number of offices routing AOCs through BAC can grow
+        // past what a vertical bar chart's x-axis labels could fit legibly.
+        officeEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        new Chart(officeEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.office),
+                datasets: [{ label: 'AOCs pending', data: rows.map(r => r.count), backgroundColor: '#185fa5', borderRadius: 4 }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush

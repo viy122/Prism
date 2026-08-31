@@ -176,7 +176,8 @@ class PurchaseRequest extends Model
     public function isReadyForAoc(): bool
     {
         return $this->signatory_stage === 'fully_signed'
-            && $this->canvassing_stage === 'completed';
+            && $this->canvassing_stage === 'completed'
+            && $this->abstractOfCanvass === null;
     }
 
     /**
@@ -268,6 +269,56 @@ class PurchaseRequest extends Model
         }
 
         return ['key' => 'po_status:' . $po->status, 'label' => $po->status_label];
+    }
+
+    /** Quarter tag parsed from the PR number (e.g. "PR-CICS-2026-Q1" → "Q1"), when present. */
+    public function numberQuarter(): ?string
+    {
+        return preg_match('/-(Q[1-4])(?:-|$)/', $this->number ?? '', $m) ? $m[1] : null;
+    }
+
+    /**
+     * Simple 4-state lifecycle bucket (pending / in_progress / completed /
+     * delayed), derived from the always-accurate currentTrackingStage() chain
+     * rather than the raw `status` column — that column only ever holds
+     * granular procurement-pipeline values written by Procurement Office
+     * ('new', 'for_alobs', 'po_confirmed', etc.); the simple values some
+     * reports filter on ('approved', 'completed') are never actually written
+     * by any real code path and only exist on hand-seeded demo rows.
+     * "Completed" here means the full downstream journey is done (paid) — for
+     * a narrower "is the PR document itself fully signed" check, see
+     * signingStatusBucket() instead.
+     */
+    public function lifecycleBucket(): string
+    {
+        $key = $this->currentTrackingStage()['key'];
+
+        return match (true) {
+            str_starts_with($key, 'halted:') => 'delayed',
+            $key === 'pr:not_yet_created'    => 'pending',
+            $key === 'paid'                  => 'completed',
+            default                          => 'in_progress',
+        };
+    }
+
+    /**
+     * 3-state bucket (pending / in_progress / completed) for the PR document's
+     * OWN signature chain only — not the downstream AOC/PO/payment journey
+     * lifecycleBucket() also tracks. "Pending" = the PR hasn't actually been
+     * created yet (draft stage, no uploaded file — the only real creation path
+     * always sets file_path); "Completed" = fully signed; anything else means
+     * the paper is actively circulating through signatories.
+     */
+    public function signingStatusBucket(): string
+    {
+        if ($this->signatory_stage === 'draft' && !$this->file_path) {
+            return 'pending';
+        }
+        if ($this->signatory_stage === 'fully_signed') {
+            return 'completed';
+        }
+
+        return 'in_progress';
     }
 
     /** Invalidate a manual tracking-status pin — called whenever real progress happens. */

@@ -21,6 +21,7 @@ class AbstractOfCanvass extends Model
         'remarks',
         'file_path',
         'uploaded_at',
+        'winning_supplier_name',
     ];
 
     protected function casts(): array

@@ -102,6 +102,14 @@
     .sig-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--s300); background: var(--white); z-index: 1; position: relative; transition: all .2s; }
     .sig-step.done .sig-dot { background: #3b6d11; border-color: #3b6d11; }
     .sig-step.active .sig-dot { background: var(--m); border-color: var(--m); box-shadow: 0 0 0 3px rgba(139,26,28,.2); }
+    /* This timeline renders PR/AOC/PO chains of varying length in the same
+       container, so a step can land last-in-its-row at any position once
+       flex-wrap kicks in (e.g. a long "Vice Chancellor – Countersign" label
+       forcing an earlier wrap) — the connector line assumes a same-row next
+       step and dangles into nothing at that point. JS (fixTimelineWraps)
+       measures actual layout after each render and tags whichever step is
+       really last-in-row, since no fixed nth-child could cover every chain. */
+    .sig-step.wrap-end::after { display: none; }
     .sig-label { font-size: 9px; font-weight: 700; text-align: center; color: var(--s400); margin-top: 5px; line-height: 1.3; max-width: 84px; }
     .sig-step.done .sig-label, .sig-step.active .sig-label { color: var(--s700); }
 
@@ -183,6 +191,15 @@
                         <option value="aoc">AOC</option>
                         <option value="po">PO</option>
                     </select>
+                    <select class="filter-select" id="docOfficeFilter" title="Filter by office/college">
+                        <option value="">All Offices</option>
+                    </select>
+                    <select class="filter-select" id="docStatusFilter" title="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="fully_signed">Fully Signed</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="pending">Pending</option>
+                    </select>
                     <select class="filter-select" id="docSortOrder" title="Sort by last updated">
                         <option value="desc">Newest → Oldest</option>
                         <option value="asc">Oldest → Newest</option>
@@ -217,7 +234,7 @@
                                     default                                  => 'badge-routing',
                                 };
                             @endphp
-                            <tr data-doc-row data-doc-key="{{ $doc['docType'] }}-{{ $doc['id'] }}" data-doc-type="{{ $doc['docType'] }}" data-updated-at="{{ $doc['updatedAt']->toIso8601String() }}" data-search="{{ strtolower($doc['number'] . ' ' . $doc['office'] . ' ' . $doc['title']) }}" tabindex="0">
+                            <tr data-doc-row data-doc-key="{{ $doc['docType'] }}-{{ $doc['id'] }}" data-doc-type="{{ $doc['docType'] }}" data-office="{{ $doc['office'] }}" data-status-bucket="{{ $doc['statusBucket'] }}" data-updated-at="{{ $doc['updatedAt']->toIso8601String() }}" data-search="{{ strtolower($doc['number'] . ' ' . $doc['office'] . ' ' . $doc['title']) }}" tabindex="0">
                                 <td><span class="doc-badge doc-{{ $doc['docType'] }}">{{ $doc['docLabel'] }}</span></td>
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $doc['number'] }}</td>
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['office'] }}</td>
@@ -340,6 +357,8 @@
     const docSearch       = document.getElementById('docSearch');
     const docCount        = document.getElementById('docVisibleCount');
     const docTypeFilter   = document.getElementById('docTypeFilter');
+    const docOfficeFilter = document.getElementById('docOfficeFilter');
+    const docStatusFilter = document.getElementById('docStatusFilter');
     const docSortOrder    = document.getElementById('docSortOrder');
     const previewSection  = document.getElementById('previewSection');
     const previewToggle   = document.getElementById('previewToggle');
@@ -359,6 +378,18 @@
         return doc.chain.map(step =>
             `<div class="sig-step${step.status === 'done' ? ' done' : ''}${step.status === 'active' ? ' active' : ''}"><div class="sig-dot"></div><span class="sig-label">${step.label}</span></div>`
         ).join('');
+    }
+
+    // Tags whichever step is actually last-in-its-visual-row (by comparing
+    // offsetTop, since flex-wrap can break at a different step depending on
+    // which doc type — PR/AOC/PO — is showing) so its dangling connector
+    // line can be hidden. Must run after the timeline HTML is in the DOM.
+    function fixTimelineWraps(container) {
+        const steps = Array.from(container.querySelectorAll('.sig-step'));
+        steps.forEach((step, i) => {
+            const next = steps[i + 1];
+            step.classList.toggle('wrap-end', !next || next.offsetTop !== step.offsetTop);
+        });
     }
 
     // Oldest first — callers that want newest-first (the log display) reverse
@@ -429,16 +460,24 @@
 
     function renderPreview(doc) {
         // Open by default whenever the selected document has something to
-        // preview (PR/AOC) — the reviewer shouldn't need an extra click.
-        const hasPreview = doc.docType === 'pr' || doc.docType === 'aoc';
+        // preview (PR/AOC/PO) — the reviewer shouldn't need an extra click.
+        const hasPreview = doc.docType === 'pr' || doc.docType === 'aoc' || doc.docType === 'po';
         previewToggle.classList.toggle('open', hasPreview);
         previewBody.classList.toggle('open', hasPreview);
 
         if (doc.docType === 'pr') {
             previewSection.style.display = '';
             previewBody.innerHTML = doc.pdfFile
-                ? `<div class="pdf-preview"><iframe src="/storage/${doc.pdfFile}" title="PR Document"></iframe></div>`
+                ? `<div class="pdf-preview"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PR Document"></iframe></div>`
                 : `<div class="pdf-preview"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this PR</span></div></div>`;
+            return;
+        }
+
+        if (doc.docType === 'po') {
+            previewSection.style.display = '';
+            previewBody.innerHTML = doc.pdfFile
+                ? `<div class="pdf-preview"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PO Document"></iframe></div>`
+                : `<div class="pdf-preview"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this PO</span></div></div>`;
             return;
         }
 
@@ -465,7 +504,7 @@
             }
 
             const pdfHtml = doc.pdfFile
-                ? `<div class="pdf-preview" style="margin-bottom:12px;"><iframe src="/storage/${doc.pdfFile}" title="AOC Document"></iframe></div>`
+                ? `<div class="pdf-preview" style="margin-bottom:12px;"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="AOC Document"></iframe></div>`
                 : `<div class="pdf-preview" style="margin-bottom:12px;"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this AOC</span></div></div>`;
 
             previewBody.innerHTML = `
@@ -483,13 +522,15 @@
         previewBody.innerHTML = '';
     }
 
-    function renderDetail(doc) {
+    function renderDetail(doc, { refreshPreview = true } = {}) {
         document.getElementById('fNumber').textContent  = doc.number;
         document.getElementById('fOffice').textContent  = doc.office;
         document.getElementById('fTitle').textContent   = doc.title;
         document.getElementById('fRemarks').textContent = doc.remarks;
-        document.getElementById('sigTimeline').innerHTML = timelineHtml(doc);
-        renderPreview(doc);
+        const sigTimelineEl = document.getElementById('sigTimeline');
+        sigTimelineEl.innerHTML = timelineHtml(doc);
+        fixTimelineWraps(sigTimelineEl);
+        if (refreshPreview) renderPreview(doc);
 
         btnMark.disabled = !doc.canAct;
         document.querySelectorAll('input[name="third_signer"]').forEach(r => r.checked = false);
@@ -559,13 +600,17 @@
 
     function applyDocSearchFilter() {
         if (!docSearch) return;
-        const q    = docSearch.value.trim().toLowerCase();
-        const type = docTypeFilter ? docTypeFilter.value : '';
+        const q      = docSearch.value.trim().toLowerCase();
+        const type   = docTypeFilter ? docTypeFilter.value : '';
+        const office = docOfficeFilter ? docOfficeFilter.value : '';
+        const status = docStatusFilter ? docStatusFilter.value : '';
         let visible = 0;
         getRows().forEach(row => {
             const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
             const matchesType   = !type || row.dataset.docType === type;
-            const match = matchesSearch && matchesType;
+            const matchesOffice = !office || row.dataset.office === office;
+            const matchesStatus = !status || row.dataset.statusBucket === status;
+            const match = matchesSearch && matchesType && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
@@ -573,6 +618,21 @@
     }
     docSearch?.addEventListener('input', applyDocSearchFilter);
     docTypeFilter?.addEventListener('change', applyDocSearchFilter);
+    docOfficeFilter?.addEventListener('change', applyDocSearchFilter);
+    docStatusFilter?.addEventListener('change', applyDocSearchFilter);
+
+    // Office list varies per role/session, so populate it from the documents
+    // already on the page instead of a fixed server-side list.
+    (function populateOfficeFilter() {
+        if (!docOfficeFilter) return;
+        const offices = [...new Set(allDocs.map(d => d.office).filter(o => o && o !== '—'))].sort();
+        offices.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o;
+            opt.textContent = o;
+            docOfficeFilter.appendChild(opt);
+        });
+    })();
 
     // Re-orders the DOM rows by last-updated — newest-first by default
     // (matches the initial server-side order), toggled to oldest-first here.
@@ -708,7 +768,7 @@
             : (doc.signatoryStage === 'fully_signed' ? 'badge-signed'
             : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing'));
         const search = (doc.number + ' ' + doc.office + ' ' + doc.title).toLowerCase();
-        return `<tr data-doc-row data-doc-key="${doc.docType}-${doc.id}" data-doc-type="${doc.docType}" data-updated-at="${doc.updatedAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
+        return `<tr data-doc-row data-doc-key="${doc.docType}-${doc.id}" data-doc-type="${doc.docType}" data-office="${escapeHtml(doc.office)}" data-status-bucket="${doc.statusBucket || ''}" data-updated-at="${doc.updatedAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td><span class="doc-badge doc-${doc.docType}">${doc.docLabel}</span></td>
             <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(doc.number)}</td>
             <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.office)}</td>
@@ -743,6 +803,7 @@
                     badge.textContent = doc.canAct ? 'Needs You' : doc.signatoryLabel;
                 }
                 if (doc.updatedAt) row.dataset.updatedAt = doc.updatedAt;
+                if (doc.statusBucket) row.dataset.statusBucket = doc.statusBucket;
             });
 
             fresh.forEach(doc => {
@@ -759,8 +820,15 @@
         if (activeDoc) {
             const freshActive = fresh.find(d => d.docType === activeDoc.docType && d.id === activeDoc.id);
             if (freshActive) {
+                // Rebuilding the preview section on every poll tears down and
+                // reloads the PDF <iframe> even when its src hasn't changed —
+                // a visible flash/"glitch" for no reason. Only touch it when
+                // something it actually shows has changed.
+                const previewUnchanged = freshActive.pdfFile === activeDoc.pdfFile
+                    && JSON.stringify(freshActive.prItems || []) === JSON.stringify(activeDoc.prItems || [])
+                    && JSON.stringify(freshActive.quotations || []) === JSON.stringify(activeDoc.quotations || []);
                 activeDoc = freshActive;
-                renderDetail(activeDoc);
+                renderDetail(activeDoc, { refreshPreview: !previewUnchanged });
             }
         }
     }

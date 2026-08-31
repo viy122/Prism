@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Admin | PRISM')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
@@ -31,6 +35,8 @@
     .stat-value.crimson { color: var(--m); }
 
     .two-col { display: grid; grid-template-columns: 1fr 1.4fr; gap: 20px; align-items: start; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 230px; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; background: var(--white); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
@@ -38,7 +44,7 @@
     tbody td { padding: 12px 16px; border-bottom: 1px solid var(--s100); vertical-align: middle; }
     tbody tr:last-child td { border-bottom: none; }
 
-    @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } .content { padding: 16px 16px 40px; } }
+    @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } .content { padding: 16px 16px 40px; } }
 </style>
 @endpush
 
@@ -71,6 +77,23 @@
         <div class="stat-card">
             <p class="stat-label">Roles</p>
             <p class="stat-value">{{ $summary['totalRoles'] }}</p>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="card">
+            <p class="card-eyebrow">Accounts</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Active vs Inactive</h2>
+            <div class="chart-wrap">
+                <canvas id="statusChart" data-summary="{{ json_encode($summary) }}"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <p class="card-eyebrow">Roles</p>
+            <h2 class="card-title" style="margin-bottom:16px;">User Distribution per Role</h2>
+            <div class="chart-wrap">
+                <canvas id="roleChart" data-rows="{{ json_encode($usersByRole) }}"></canvas>
+            </div>
         </div>
     </div>
 
@@ -127,3 +150,46 @@
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const statusEl = document.getElementById('statusChart');
+    if (statusEl) {
+        const s = JSON.parse(statusEl.dataset.summary || '{}');
+        new Chart(statusEl, {
+            type: 'doughnut',
+            data: {
+                labels: ['Active', 'Inactive'],
+                datasets: [{ data: [s.activeUsers || 0, s.inactiveUsers || 0], backgroundColor: ['#3b6d11', '#a32d2d'], borderWidth: 0 }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
+        });
+    }
+
+    const roleEl = document.getElementById('roleChart');
+    if (roleEl) {
+        const rows = JSON.parse(roleEl.dataset.rows || '[]');
+        // Horizontal — the role list can grow past what a vertical bar
+        // chart's x-axis labels could fit legibly.
+        roleEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        new Chart(roleEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.role),
+                datasets: [{ label: 'Users', data: rows.map(r => r.count), backgroundColor: '#681012', borderRadius: 4 }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush

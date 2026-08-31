@@ -79,7 +79,19 @@
 
     tr[data-vice-status-row].hidden-row { display: none; }
 
+    .btn-print { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 10px; background: var(--m); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: opacity .2s; white-space: nowrap; }
+    .btn-print:hover { opacity: .88; }
+    .btn-print svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
     @media (max-width: 1200px) { .split-layout { grid-template-columns: 1fr; } .filters-grid { grid-template-columns: repeat(2, 1fr); } .detail-panel { position: static; } }
+    @media print {
+        .btn-print { display: none !important; }
+        .filters-grid { display: none !important; }
+        body { background: #fff; }
+        .content { padding: 0; }
+        .table-wrap { max-height: none; overflow: visible; }
+        .split-layout { grid-template-columns: 1fr; }
+    }
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
     .page-hdr-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .page-hdr-icon i { font-size: 22px; color: var(--crimson); }
@@ -102,6 +114,10 @@
             <h1 class="page-hdr-title">Division Procurement Status</h1>
             <p class="page-hdr-sub">Review APP items under the assigned division, inspect activity timelines, and add follow-up notes for offices.</p>
         </div>
+        <button class="btn-print" type="button" onclick="window.print()">
+            <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+        </button>
     </div>
 
     <div class="card">

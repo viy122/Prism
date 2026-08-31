@@ -19,12 +19,16 @@ class PrismCashierController extends Controller
      */
     public function dashboard(): View
     {
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy'])
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy', 'documents'])
             ->whereIn('status', ['processing_payment', 'paid'])
             ->latest('id')
             ->get()
             ->map(function ($po) {
                 $pr = $po->abstractOfCanvass?->purchaseRequest;
+                $processingDoc = $po->documents
+                    ->where('document_type', 'payment_processing_proof')
+                    ->sortByDesc('uploaded_at')
+                    ->first();
 
                 return [
                     'id'            => $po->id,
@@ -34,10 +38,17 @@ class PrismCashierController extends Controller
                     'supplier'      => $po->supplier_name,
                     'totalAmount'   => (float) $po->total_amount,
                     'status'        => $po->status,
+                    'statusLabel'   => $po->status_label,
                     'processingAt'  => $po->payment_processing_at?->format('M d, Y') ?? '—',
                     'paidAt'        => $po->paid_at?->format('M d, Y') ?? '—',
+                    'paidAtRaw'     => $po->paid_at?->toIso8601String(),
                     'paidBy'        => $po->paidBy?->name ?? '—',
                     'uploadUrl'     => route('cashier.po.upload-receipt', $po->id),
+                    // The signed PO itself — the Cashier's audit basis before
+                    // releasing payment, same as Accounting sees it.
+                    'pdfFile'              => $po->file_path,
+                    'processingAttachment' => $processingDoc?->file_path,
+                    'processingAttachmentName' => $processingDoc?->original_filename,
                 ];
             });
 

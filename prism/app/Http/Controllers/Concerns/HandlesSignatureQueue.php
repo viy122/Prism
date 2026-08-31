@@ -204,6 +204,16 @@ trait HandlesSignatureQueue
             'remarks'        => $remarks ?: '—',
             'signatoryStage' => $doc->signatory_stage,
             'signatoryLabel' => $doc->signatory_label,
+            // Reliable 3-state bucket for filtering — PR/AOC/PO all share the
+            // same signatory_stage + file_path columns, so this is the same
+            // "not yet created" / "fully signed" / else logic as
+            // PurchaseRequest::signingStatusBucket(), just generic here since
+            // it applies identically across all three document types.
+            'statusBucket'   => match (true) {
+                $doc->signatory_stage === 'draft' && !$doc->file_path => 'pending',
+                $doc->signatory_stage === 'fully_signed'              => 'fully_signed',
+                default                                               => 'in_progress',
+            },
             'stageType'      => $doc->stageMetaFor($doc->signatory_stage)['type'] ?? 'signature',
             'nextStage'      => $doc->nextSignatoryStage(),
             'canAct'         => $doc->signatory_stage !== 'fully_signed'
@@ -232,11 +242,11 @@ trait HandlesSignatureQueue
             'updatedAt'      => $doc->updated_at,
         ];
 
-        // Preview: PR and AOC both embed their own uploaded scanned PDF.
-        // AOC additionally carries the parent PR's items + the canvass
-        // quotations gathered for it — the actual substance behind the
-        // Abstract of Canvass. PO has no file of its own and isn't previewed.
-        if ($docType === 'pr') {
+        // Preview: PR, AOC, and PO each carry their own uploaded scanned PDF
+        // (all three have a file_path column). AOC additionally carries the
+        // parent PR's items + the canvass quotations gathered for it — the
+        // actual substance behind the Abstract of Canvass.
+        if ($docType === 'pr' || $docType === 'po') {
             $row['pdfFile'] = $doc->file_path;
         } elseif ($docType === 'aoc') {
             $row['pdfFile'] = $doc->file_path;

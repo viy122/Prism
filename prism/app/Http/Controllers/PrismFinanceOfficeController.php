@@ -19,14 +19,11 @@ class PrismFinanceOfficeController extends Controller
     public function dashboard(): View
     {
         $awaitingReview    = BudgetProposal::where('status', 'submitted')->count();
-        $endorsedThisMonth = BudgetProposal::where('status', 'endorsed')
-            ->whereMonth('updated_at', now()->month)
-            ->whereYear('updated_at', now()->year)
-            ->count();
-        $returnedThisMonth = BudgetProposal::where('status', 'returned')
-            ->whereMonth('updated_at', now()->month)
-            ->whereYear('updated_at', now()->year)
-            ->count();
+        // All-time counts — a "this month" scope here would silently drop
+        // everything reviewed in an earlier month, going out of sync with the
+        // "Proposals by Status" table below (which was never month-scoped).
+        $endorsed          = BudgetProposal::where('status', 'endorsed')->count();
+        $returned          = BudgetProposal::where('status', 'returned')->count();
         $totalCampusBudget = BudgetProposal::whereIn('status', ['submitted', 'endorsed', 'approved'])
             ->sum('total_estimated_cost');
 
@@ -60,21 +57,86 @@ class PrismFinanceOfficeController extends Controller
             'pageTitle' => 'Budget Office Dashboard',
             'summary' => [
                 'awaitingReview'    => $awaitingReview,
-                'endorsedThisMonth' => $endorsedThisMonth,
-                'returned'          => $returnedThisMonth,
+                'endorsed'          => $endorsed,
+                'returned'          => $returned,
                 'totalCampusBudget' => (float) $totalCampusBudget,
             ],
-            'officeStatusGroups' => $officeStatusGroups,
-            'recentSubmissions'  => $recentSubmissions,
+            'officeStatusGroups'  => $officeStatusGroups,
+            'recentSubmissions'   => $recentSubmissions,
+            'proposalsByStatus'   => $this->proposalsByStatus(),
+            'budgetByOffice'      => $this->campusBudgetByOffice(),
+            'monthlyReviewActivity' => $this->monthlyReviewActivity(),
         ]));
+    }
+
+    /** Full campus PPMP pipeline breakdown (all 5 statuses), for the status doughnut chart. */
+    private function proposalsByStatus(): array
+    {
+        $counts = BudgetProposal::selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
+        $labels = ['draft' => 'Draft', 'submitted' => 'Submitted', 'endorsed' => 'Endorsed', 'returned' => 'Returned', 'approved' => 'Approved'];
+
+        return collect($labels)
+            ->map(fn ($label, $key) => ['label' => $label, 'count' => (int) ($counts[$key] ?? 0)])
+            ->values()
+            ->all();
+    }
+
+    /** Total proposed budget per office (active submissions only), for the office bar chart. */
+    private function campusBudgetByOffice(): array
+    {
+        return Office::has('budgetProposals')
+            ->withSum(['budgetProposals as totalBudget' => fn ($q) => $q->whereIn('status', ['submitted', 'endorsed', 'approved'])], 'total_estimated_cost')
+            ->get()
+            ->map(fn ($o) => ['office' => $o->code, 'total' => (float) ($o->totalBudget ?? 0)])
+            ->filter(fn ($g) => $g['total'] > 0)
+            ->sortByDesc('total')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Submitted vs endorsed counts per calendar month (current year), from the
+     * actual review-action log rather than `updated_at` (which can be touched
+     * by unrelated edits and drifts from when the action really happened).
+     * Both a past- and present-tense action value exist for endorsements
+     * ('endorse' and 'endorsed') from different code paths over time — both
+     * count toward the same bucket here.
+     */
+    private function monthlyReviewActivity(): array
+    {
+        $submitted = array_fill(1, 12, 0);
+        $endorsed  = array_fill(1, 12, 0);
+
+        BudgetProposalReview::whereYear('reviewed_at', now()->year)
+            ->get(['action', 'reviewed_at'])
+            ->each(function ($r) use (&$submitted, &$endorsed) {
+                $month = $r->reviewed_at->month;
+                if ($r->action === 'submitted') {
+                    $submitted[$month]++;
+                } elseif (in_array($r->action, ['endorse', 'endorsed'], true)) {
+                    $endorsed[$month]++;
+                }
+            });
+
+        return ['submitted' => array_values($submitted), 'endorsed' => array_values($endorsed)];
     }
 
     public function proposalReview(?string $proposal = null): View
     {
+        // Only what Budget Office actually still needs to act on: fresh
+        // submissions (first-time or revised-and-resubmitted — both land back
+        // on status 'submitted'), plus proposals the Chancellor sent back to
+        // *them* to reconsider. 'endorsed' proposals are with the Chancellor
+        // now, not Budget Office's to keep reviewing; a 'returned' proposal
+        // that Budget Office itself sent back to the Office Head is that
+        // office's job to revise, not something to keep showing here either —
+        // isActionableByFinance() (via the latest 'return' review's
+        // status_from) is what actually distinguishes the two 'returned' cases.
         $proposals = BudgetProposal::with(['office', 'submittedBy', 'items.marketReferences'])
-            ->whereIn('status', ['submitted', 'endorsed', 'returned'])
+            ->whereIn('status', ['submitted', 'returned'])
             ->latest('submitted_at')
             ->get()
+            ->filter(fn ($p) => $this->isActionableByFinance($p))
             // Submitted (awaiting endorsement) proposals surface first — stable sort
             // keeps each status group ordered by latest('submitted_at') above.
             ->sortBy(fn ($p) => $p->status === 'submitted' ? 0 : 1)
@@ -124,34 +186,47 @@ class PrismFinanceOfficeController extends Controller
 
     public function budgetUtilizationReport(): View
     {
-        $approvedProposals = BudgetProposal::with('office')
-            ->whereIn('status', ['endorsed', 'approved'])
-            ->get();
+        // "Approved allocation" — the official, endorsed-or-better figure.
+        // Deliberately narrower than the per-office table below, which needs
+        // every office's real spending visible regardless of where their PPMP
+        // currently sits in the approval pipeline (see campusBudgetByOffice()).
+        $campusBudget = BudgetProposal::whereIn('status', ['endorsed', 'approved'])->sum('total_estimated_cost');
 
-        $campusBudget  = $approvedProposals->sum('total_estimated_cost');
-        $totalUtilized = PurchaseRequest::whereIn('status', ['approved', 'completed'])->sum('total_amount');
+        // "Utilized" = real, non-cancelled procurement activity (in progress or
+        // fully paid) — derived from the always-accurate tracking chain
+        // (PurchaseRequest::lifecycleBucket()), not the raw `status` column.
+        // That column only ever holds granular Procurement-Office pipeline
+        // values ('new', 'for_alobs', 'po_confirmed', ...); the simple values
+        // this report used to filter on ('approved', 'completed') are never
+        // actually written by any real code path — only 2 hand-seeded demo
+        // rows ever had them, so utilization was silently ~93% undercounted.
+        $allPrs = PurchaseRequest::with('office')->get();
+        $isUtilized = fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true);
+
+        $totalUtilized  = $allPrs->filter($isUtilized)->sum('total_amount');
         $utilizationPct = $campusBudget > 0 ? round(($totalUtilized / $campusBudget) * 100) : 0;
 
         $utilizationRows = Office::has('budgetProposals')
-            ->with([
-                'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved']),
-                'purchaseRequests',
-            ])
+            ->with(['budgetProposals.items', 'purchaseRequests'])
             ->get()
-            ->flatMap(function ($office) {
-                $proposals = $office->budgetProposals;
-                if ($proposals->isEmpty()) return [];
+            ->flatMap(function ($office) use ($isUtilized) {
+                // Every proposal regardless of status — an office whose only
+                // PPMP is still 'returned' or 'submitted' can still have real,
+                // active spending Budget Office needs visibility into; filtering
+                // to endorsed/approved here used to drop those offices entirely.
+                $items = $office->budgetProposals->pluck('items')->flatten();
 
-                $quarters = $proposals->pluck('items')->flatten()
-                    ->pluck('target_quarter')->filter()->unique()->sort()->values();
-
+                $quarters = $items->pluck('target_quarter')->filter()->unique()->sort()->values();
                 if ($quarters->isEmpty()) $quarters = collect(['Q1', 'Q2', 'Q3', 'Q4']);
 
-                return $quarters->map(function ($quarter) use ($office) {
-                    $budget    = (float) $office->budgetProposals->sum('total_estimated_cost') / 4;
-                    $utilized  = (float) $office->purchaseRequests
-                        ->whereIn('status', ['approved', 'completed'])
-                        ->sum('total_amount');
+                $activePrs = $office->purchaseRequests->filter($isUtilized);
+
+                return $quarters->map(function ($quarter) use ($items, $activePrs, $office) {
+                    // Genuinely per-quarter now — was previously the office's
+                    // whole-year total divided by 4 and repeated identically
+                    // across all 4 rows regardless of $quarter.
+                    $budget   = (float) $items->where('target_quarter', $quarter)->sum('estimated_total_cost');
+                    $utilized = (float) $activePrs->filter(fn ($pr) => $pr->numberQuarter() === $quarter)->sum('total_amount');
                     $pct      = $budget > 0 ? min(100, round(($utilized / $budget) * 100)) : 0;
                     $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'Watch' : 'At Risk');
 
@@ -184,10 +259,26 @@ class PrismFinanceOfficeController extends Controller
                 'utilizationPercent' => $utilizationPct,
                 'officesAtRisk'      => $officesAtRisk,
             ],
-            'quarters'         => $quarters ?: ['Q1', 'Q2', 'Q3', 'Q4'],
-            'offices'          => $offices,
-            'utilizationRows'  => $utilizationRows,
+            'quarters'          => $quarters ?: ['Q1', 'Q2', 'Q3', 'Q4'],
+            'offices'           => $offices,
+            'utilizationRows'   => $utilizationRows,
+            'utilByOfficeChart' => $this->utilizationByOfficeChart($utilizationRows),
+            'riskDistribution'  => collect($utilizationRows)->countBy('risk')->all(),
         ]));
+    }
+
+    /** Budget vs utilized totals per office (summed across quarters), for the office bar chart. */
+    private function utilizationByOfficeChart(array $utilizationRows): array
+    {
+        return collect($utilizationRows)
+            ->groupBy('office')
+            ->map(fn ($rows, $office) => [
+                'office'   => $office,
+                'budget'   => $rows->sum('budget'),
+                'utilized' => $rows->sum('utilized'),
+            ])
+            ->values()
+            ->all();
     }
 
     public function endorse(Request $request, BudgetProposal $proposal): RedirectResponse
@@ -314,6 +405,7 @@ class PrismFinanceOfficeController extends Controller
 
         return [
             'id'         => $p->id,
+            'code'       => $p->code,
             'title'      => $p->title,
             'status'     => ucfirst($p->status),
             'actionable' => $this->isActionableByFinance($p),
@@ -323,12 +415,25 @@ class PrismFinanceOfficeController extends Controller
                 'by'   => $lastReturn->reviewedBy?->name ?? '—',
                 'date' => ($lastReturn->reviewed_at ?? $lastReturn->created_at)->format('M d, Y g:i A'),
             ] : null,
+            // Full submit/return/endorse trail — not just the latest return —
+            // so a reviewer can see the whole "submitted → returned → revised
+            // → resubmitted" story for a proposal, not just its most recent step.
+            'reviewHistory' => $p->reviews()->with('reviewedBy')->orderBy('reviewed_at')->get()
+                ->map(fn ($r) => [
+                    'action'  => ucfirst($r->action),
+                    'from'    => $r->status_from ? ucfirst($r->status_from) : null,
+                    'to'      => $r->status_to ? ucfirst($r->status_to) : null,
+                    'by'      => $r->reviewedBy?->name ?? '—',
+                    'date'    => ($r->reviewed_at ?? $r->created_at)->format('M d, Y g:i A'),
+                    'remarks' => $r->remarks ?: null,
+                ])->values()->all(),
             'office' => [
                 'name'          => $p->office?->name ?? '—',
                 'head'          => $p->submittedBy?->name ?? '—',
                 'fiscalYear'    => (string) $p->fiscal_year,
                 'submittedDate' => $p->submitted_at?->format('M d, Y') ?? '—',
                 'totalAmount'   => (float) $p->total_estimated_cost,
+                'proposedBudget' => (float) ($p->proposed_budget ?? $p->total_estimated_cost),
             ],
             'items' => $p->items->map(fn ($item) => [
                 'id'                => $item->id,

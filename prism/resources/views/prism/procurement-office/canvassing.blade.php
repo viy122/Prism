@@ -37,13 +37,18 @@
     .quote-link { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
     .quote-del { border: none; background: none; color: #b91c1c; cursor: pointer; font-size: 14px; }
 
-    .upload-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+    .upload-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .upload-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .upload-row input[type="text"] { flex: 1; min-width: 160px; border: 1px solid var(--s300); border-radius: 9px; padding: 8px 12px; font-size: 12px; font-family: inherit; }
+    .upload-row input[type="text"][readonly] { background: var(--s100); color: var(--s600); cursor: not-allowed; }
     .file-pick { display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--s300); border-radius: 9px; padding: 8px 14px; font-size: 12px; color: var(--s500); cursor: pointer; background: var(--s50); }
 
     .btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: all .2s; white-space: nowrap; }
     .btn-upload { background: var(--crimson); color: #fff; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-cancel-row { border: 1px solid var(--s300); background: var(--white); color: var(--s500); border-radius: 9px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .btn-add-row { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: none; border: 1.5px dashed var(--s300); color: var(--s600); border-radius: 9px; height: 36px; padding: 0 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; }
+    .btn-add-row:hover { border-color: var(--crimson); color: var(--crimson); }
 
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 160px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 28px; text-align: center; }
     .empty-state i { font-size: 36px; color: var(--s300); }
@@ -67,7 +72,7 @@
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Canvassing</h1>
-            <p class="page-hdr-sub">Upload a canvass document for each fully signed PR. Canvassing completes as soon as the document is uploaded, and the PR becomes eligible for AOC creation.</p>
+            <p class="page-hdr-sub">Attach canvass documents from different suppliers for each fully signed PR to compare quotes — choosing a file uploads it right away. Click "Mark Ready for AOC" once you're done comparing suppliers; quotations can still be added or removed until an Abstract of Canvass is actually created.</p>
         </div>
     </div>
 
@@ -96,15 +101,13 @@
                     };
                 @endphp
                 <span class="badge {{ $badgeCls }}" data-stage-badge="{{ $pr['id'] }}">{{ $pr['canvassingLabel'] }}</span>
-                @if($pr['readyForAoc'])
-                    <a class="quote-link" href="{{ route('procurement-office.abstract-of-canvass') }}">Create AOC →</a>
-                @endif
+                <a class="quote-link" href="{{ route('procurement-office.abstract-of-canvass') }}" data-aoc-link="{{ $pr['id'] }}" style="{{ $pr['readyForAoc'] ? '' : 'display:none;' }}">Create AOC →</a>
             </div>
         </div>
 
         {{-- Quotations --}}
         <div class="quote-list" data-quote-list="{{ $pr['id'] }}">
-            @forelse($pr['quotations'] as $q)
+            @foreach($pr['quotations'] as $q)
             <div class="quote-row" id="quote-{{ $q['id'] }}">
                 <i class="ti ti-file-invoice"></i>
                 <span class="quote-supplier">{{ $q['supplier'] }}</span>
@@ -112,25 +115,25 @@
                 <span style="font-size:11px;color:var(--s400);">{{ $q['uploadedAt'] }}</span>
                 <span class="quote-actions">
                     <a class="quote-link" href="{{ $q['url'] }}" target="_blank" rel="noopener">View</a>
-                    @if($pr['canvassingStage'] !== 'completed')
-                    <button class="quote-del btn-delete-quote" data-url="{{ $q['deleteUrl'] }}" data-quote-id="{{ $q['id'] }}" title="Remove quotation"><i class="ti ti-trash"></i></button>
+                    @if(!$pr['quotationsLocked'])
+                    <button class="quote-del btn-delete-quote" data-url="{{ $q['deleteUrl'] }}" data-quote-id="{{ $q['id'] }}" title="Remove quotation" type="button"><i class="ti ti-trash"></i></button>
                     @endif
                 </span>
             </div>
-            @empty
-            <p style="font-size:12px;color:var(--s400);">No document uploaded yet.</p>
-            @endforelse
+            @endforeach
+            <p style="font-size:12px;color:var(--s400);{{ count($pr['quotations']) ? ' display:none;' : '' }}" data-quote-empty="{{ $pr['id'] }}">No document uploaded yet.</p>
         </div>
 
-        @if($pr['canvassingStage'] !== 'completed')
-        <div class="upload-row">
-            <input type="text" placeholder="Supplier name" data-supplier-input="{{ $pr['id'] }}" maxlength="255">
-            <label class="file-pick">
-                <input type="file" accept="application/pdf,image/jpeg,image/png" data-file-input="{{ $pr['id'] }}" hidden>
-                <i class="ti ti-paperclip"></i> <span data-file-label="{{ $pr['id'] }}">Choose file</span>
-            </label>
-            <button class="btn btn-upload btn-upload-quote" data-pr-id="{{ $pr['id'] }}" data-url="{{ $pr['uploadUrl'] }}">
-                <i class="ti ti-upload"></i> Upload Document
+        @if(!$pr['quotationsLocked'])
+        <div class="upload-rows" data-upload-rows="{{ $pr['id'] }}"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn-add-row" data-add-row="{{ $pr['id'] }}" data-upload-url="{{ $pr['uploadUrl'] }}" type="button">
+                <i class="ti ti-plus"></i> Add Supplier Quotation
+            </button>
+            <button class="btn btn-upload btn-finalize" data-pr-id="{{ $pr['id'] }}" data-url="{{ $pr['finalizeUrl'] }}" type="button"
+                style="{{ $pr['canvassingStage'] === 'completed' ? 'display:none;' : '' }}"
+                {{ count($pr['quotations']) === 0 ? 'disabled' : '' }}>
+                <i class="ti ti-circle-check"></i> Mark Ready for AOC
             </button>
         </div>
         @endif
@@ -157,85 +160,197 @@
         toastEl._t = setTimeout(() => { toastEl.className = 'pr-toast'; }, 3200);
     }
 
-    document.querySelectorAll('[data-file-input]').forEach(input => {
-        input.addEventListener('change', async () => {
-            const prId  = input.dataset.fileInput;
-            const label = document.querySelector(`[data-file-label="${prId}"]`);
-            const file  = input.files[0];
+    let rowSeq = 0;
+
+    function deriveNameFromFilename(filename) {
+        return filename.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Unnamed Supplier';
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function updateStageUi(prId, stage, label, readyForAoc, hasQuotes) {
+        const badge = document.querySelector(`[data-stage-badge="${prId}"]`);
+        if (badge) {
+            badge.className = 'badge ' + (stage === 'in_progress' ? 'badge-in-progress' : stage === 'completed' ? 'badge-completed' : 'badge-not-started');
+            badge.textContent = label;
+        }
+        const aocLink = document.querySelector(`[data-aoc-link="${prId}"]`);
+        if (aocLink) aocLink.style.display = readyForAoc ? '' : 'none';
+
+        const finalizeBtn = document.querySelector(`.btn-finalize[data-pr-id="${prId}"]`);
+        if (finalizeBtn) {
+            finalizeBtn.style.display = stage === 'completed' ? 'none' : '';
+            finalizeBtn.disabled = !hasQuotes;
+        }
+    }
+
+    function addQuoteRow(prId, q) {
+        const list = document.querySelector(`[data-quote-list="${prId}"]`);
+        if (!list) return;
+
+        const emptyP = list.querySelector(`[data-quote-empty="${prId}"]`);
+        if (emptyP) emptyP.style.display = 'none';
+
+        const row = document.createElement('div');
+        row.className = 'quote-row';
+        row.id = `quote-${q.documentId}`;
+        row.innerHTML = `
+            <i class="ti ti-file-invoice"></i>
+            <span class="quote-supplier">${escapeHtml(q.supplierName)}</span>
+            <span class="quote-file">${escapeHtml(q.filename)}</span>
+            <span style="font-size:11px;color:var(--s400);">${escapeHtml(q.uploadedAt)}</span>
+            <span class="quote-actions">
+                <a class="quote-link" href="${q.url}" target="_blank" rel="noopener">View</a>
+                <button class="quote-del btn-delete-quote" data-url="${q.deleteUrl}" data-quote-id="${q.documentId}" title="Remove quotation" type="button"><i class="ti ti-trash"></i></button>
+            </span>
+        `;
+        if (emptyP) list.insertBefore(row, emptyP); else list.appendChild(row);
+        wireDeleteButton(row.querySelector('.btn-delete-quote'));
+    }
+
+    function addUploadRow(prId, uploadUrl) {
+        const rowsWrap = document.querySelector(`[data-upload-rows="${prId}"]`);
+        if (!rowsWrap) return;
+
+        const rowId = `${prId}-${++rowSeq}`;
+        const row = document.createElement('div');
+        row.className = 'upload-row';
+        row.dataset.rowId = rowId;
+        row.innerHTML = `
+            <input type="text" placeholder="Choose a file to auto-fill the supplier name" data-supplier-input="${rowId}" readonly>
+            <label class="file-pick" data-file-pick="${rowId}">
+                <input type="file" accept="application/pdf,image/jpeg,image/png" data-file-input="${rowId}" hidden>
+                <i class="ti ti-paperclip"></i> <span data-file-label="${rowId}">Choose file</span>
+            </label>
+            <button class="btn-cancel-row" data-row-id="${rowId}" title="Remove this row" type="button"><i class="ti ti-x"></i></button>
+        `;
+        rowsWrap.appendChild(row);
+
+        const fileInput     = row.querySelector(`[data-file-input="${rowId}"]`);
+        const supplierInput = row.querySelector(`[data-supplier-input="${rowId}"]`);
+        const label          = row.querySelector(`[data-file-label="${rowId}"]`);
+        const filePick       = row.querySelector(`[data-file-pick="${rowId}"]`);
+        const cancelBtn      = row.querySelector('.btn-cancel-row');
+
+        cancelBtn.addEventListener('click', () => row.remove());
+
+        fileInput.addEventListener('change', async () => {
+            const file = fileInput.files[0];
             if (!file) return;
-            if (label) label.textContent = file.name;
 
-            if (file.type !== 'application/pdf') return;
+            fileInput.disabled = true;
+            cancelBtn.disabled = true;
+            filePick.style.pointerEvents = 'none';
+            filePick.style.opacity = '.6';
+            supplierInput.value = deriveNameFromFilename(file.name);
+            label.textContent = 'Reading document…';
 
-            const supplierInput = document.querySelector(`[data-supplier-input="${prId}"]`);
-            if (!supplierInput || supplierInput.value.trim()) return; // don't clobber a manual entry
-
-            const originalLabelText = label ? label.textContent : '';
-            if (label) label.textContent = 'Reading document…';
-
-            try {
-                const fd = new FormData();
-                fd.append('document', file);
-                const resp = await fetch(extractSupplierUrl, {
-                    method:  'POST',
-                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body:    fd,
-                });
-                const json = await resp.json();
-                if (resp.ok && json.supplierName && !supplierInput.value.trim()) {
-                    supplierInput.value = json.supplierName;
+            let supplierName = supplierInput.value;
+            if (file.type === 'application/pdf') {
+                try {
+                    const fd = new FormData();
+                    fd.append('document', file);
+                    const resp = await fetch(extractSupplierUrl, {
+                        method:  'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body:    fd,
+                    });
+                    const json = await resp.json();
+                    if (resp.ok && json.supplierName) {
+                        supplierName = json.supplierName;
+                        supplierInput.value = supplierName;
+                    }
+                } catch {
+                    // best-effort only — filename-derived fallback stays in place
                 }
-            } catch {
-                // best-effort only — leave the field for manual entry
-            } finally {
-                if (label) label.textContent = originalLabelText;
             }
-        });
-    });
 
-    document.querySelectorAll('.btn-upload-quote').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const prId     = btn.dataset.prId;
-            const supplier = document.querySelector(`[data-supplier-input="${prId}"]`);
-            const file     = document.querySelector(`[data-file-input="${prId}"]`);
-
-            if (!supplier.value.trim()) { showToast('Enter the supplier name first.', true); return; }
-            if (!file.files[0])         { showToast('Choose a file first.', true); return; }
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Uploading…';
+            label.textContent = 'Uploading…';
 
             const fd = new FormData();
-            fd.append('document', file.files[0]);
-            fd.append('supplier_name', supplier.value.trim());
+            fd.append('document', file);
+            fd.append('supplier_name', supplierName);
 
             try {
-                const resp = await fetch(btn.dataset.url, {
+                const resp = await fetch(uploadUrl, {
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                     body: fd,
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    showToast('Canvassing completed — PR is ready for AOC.');
-                    setTimeout(() => window.location.reload(), 900);
+                    showToast(`Quotation from ${supplierName} uploaded.`);
+                    addQuoteRow(prId, json);
+                    updateStageUi(prId, json.canvassingStage, json.canvassingLabel, json.readyForAoc, true);
+                    row.remove();
                 } else {
                     showToast(json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Upload failed.'), true);
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="ti ti-upload"></i> Upload Document';
+                    fileInput.disabled = false;
+                    cancelBtn.disabled = false;
+                    filePick.style.pointerEvents = '';
+                    filePick.style.opacity = '';
+                    label.textContent = 'Choose file';
+                    supplierInput.value = '';
+                    fileInput.value = '';
                 }
             } catch {
                 showToast('Network error — please try again.', true);
+                fileInput.disabled = false;
+                cancelBtn.disabled = false;
+                filePick.style.pointerEvents = '';
+                filePick.style.opacity = '';
+                label.textContent = 'Choose file';
+            }
+        });
+    }
+
+    document.querySelectorAll('.btn-add-row').forEach(btn => {
+        btn.addEventListener('click', () => addUploadRow(btn.dataset.addRow, btn.dataset.uploadUrl));
+    });
+
+    document.querySelectorAll('.btn-finalize').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const originalHtml = btn.innerHTML;
+            const prId = btn.dataset.prId;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Finalizing…';
+            try {
+                const resp = await fetch(btn.dataset.url, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                });
+                const json = await resp.json();
+                if (resp.ok && json.success) {
+                    showToast('Canvassing finalized — ready for AOC.');
+                    updateStageUi(prId, json.canvassingStage, json.canvassingLabel, json.readyForAoc, true);
+                } else {
+                    showToast(json.error || 'Failed to finalize.', true);
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            } catch {
+                showToast('Network error.', true);
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-upload"></i> Upload Document';
+                btn.innerHTML = originalHtml;
             }
         });
     });
 
-    document.querySelectorAll('.btn-delete-quote').forEach(btn => {
+    function wireDeleteButton(btn) {
+        if (!btn) return;
         btn.addEventListener('click', async () => {
-            if (!confirm('Remove this document?')) return;
+            const ok = await window.prismConfirm({
+                title: 'Remove quotation?',
+                message: 'Remove this supplier quotation? You can attach a new file afterward.',
+                confirmText: 'Remove',
+            });
+            if (!ok) return;
             const originalHtml = btn.innerHTML;
+            const prId = btn.closest('[data-quote-list]')?.dataset.quoteList;
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i>';
             try {
@@ -246,7 +361,14 @@
                 const json = await resp.json();
                 if (resp.ok && json.success) {
                     showToast('Document removed.');
-                    setTimeout(() => window.location.reload(), 700);
+                    document.getElementById(`quote-${btn.dataset.quoteId}`)?.remove();
+                    if (prId) {
+                        if (json.quotationsRemaining === 0) {
+                            const emptyP = document.querySelector(`[data-quote-empty="${prId}"]`);
+                            if (emptyP) emptyP.style.display = '';
+                        }
+                        updateStageUi(prId, json.canvassingStage, json.canvassingLabel, json.readyForAoc, json.quotationsRemaining > 0);
+                    }
                 } else {
                     btn.disabled = false;
                     btn.innerHTML = originalHtml;
@@ -258,7 +380,9 @@
                 showToast('Network error.', true);
             }
         });
-    });
+    }
+
+    document.querySelectorAll('.btn-delete-quote').forEach(wireDeleteButton);
 
     if (!document.getElementById('spinStyle')) {
         const s = document.createElement('style');

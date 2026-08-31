@@ -4,11 +4,10 @@
 @php
     $prs             = collect($purchaseItems);
     $totalAmount     = $prs->sum('totalAmount');
-    $pendingCount    = $prs->where('status', 'pending')->count();
-    $inProgressCount = $prs->where('status', 'in_progress')->count();
-    $approvedCount   = $prs->where('status', 'approved')->count();
-    $completedCount  = $prs->where('status', 'completed')->count();
-    $delayedCount    = $prs->where('status', 'delayed')->count();
+    $pendingCount    = $prs->where('statusBucket', 'pending')->count();
+    $inProgressCount = $prs->where('statusBucket', 'in_progress')->count();
+    $completedCount  = $prs->where('statusBucket', 'completed')->count();
+    $delayedCount    = $prs->where('statusBucket', 'delayed')->count();
 @endphp
 
 @push('page-css')
@@ -85,6 +84,12 @@
         .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
         .search-input::placeholder { color: var(--s400); }
 
+        .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
+        .search-toolbar .search-wrap { flex: 1; min-width: 0; }
+        .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+        .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+        @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
+
         /* ─── PR list ─── */
         .pr-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -124,6 +129,17 @@
             color: var(--s400); font-size: 14px;
         }
         .pr-card.open .pr-chevron { transform: rotate(180deg); background: var(--s100); }
+
+        .btn-view-pr {
+            display: inline-flex; align-items: center; gap: 5px;
+            height: 28px; padding: 0 12px; border-radius: 8px;
+            border: 1px solid var(--s200); background: var(--white);
+            color: var(--s600); font-size: 11px; font-weight: 700;
+            cursor: pointer; font-family: 'Poppins', sans-serif;
+            white-space: nowrap; transition: background .15s, border-color .15s, color .15s;
+        }
+        .btn-view-pr:hover { background: rgba(104,16,18,.06); border-color: rgba(104,16,18,.2); color: var(--m); }
+        .btn-view-pr i { font-size: 13px; }
 
         /* ─── Items panel ─── */
         .pr-items-panel { border-top: 1px solid var(--s100); background: var(--s50); display: none; }
@@ -236,20 +252,31 @@
                     </div>
                 </div>
 
-                <div class="search-wrap" style="width:100%;margin-bottom:14px;">
-                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input class="search-input" type="search" id="prSearch" placeholder="Search Purchase Request number or title">
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input class="search-input" type="search" id="prSearch" placeholder="Search Purchase Request number or title">
+                    </div>
+                    <select class="filter-select" id="prStatusFilter" title="Filter by status">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="delayed">Delayed</option>
+                    </select>
+                    <select class="filter-select" id="prSortOrder" title="Sort by date submitted">
+                        <option value="desc">Newest → Oldest</option>
+                        <option value="asc">Oldest → Newest</option>
+                    </select>
                 </div>
 
                 <div class="pr-list" id="prList">
                     @forelse ($purchaseItems as $pr)
                     @php
                         $q      = strtolower($pr['quarter'] ?: 'pr');
-                        $status = $pr['status'];
-                        $badgeCls = match($status) {
+                        $badgeCls = match($pr['statusBucket']) {
                             'pending'     => 'badge-pending',
                             'in_progress' => 'badge-progress',
-                            'approved'    => 'badge-approved',
                             'completed'   => 'badge-completed',
                             'delayed'     => 'badge-delayed',
                             default       => 'badge-default',
@@ -261,7 +288,7 @@
                             default => 'badge-progress',
                         };
                     @endphp
-                    <div class="pr-card" data-search="{{ strtolower($pr['title'] . ' ' . $pr['number']) }}">
+                    <div class="pr-card" data-search="{{ strtolower($pr['title'] . ' ' . $pr['number']) }}" data-status-bucket="{{ $pr['statusBucket'] }}" data-created-at="{{ $pr['createdAt'] }}">
                         <div class="pr-card-header" onclick="this.closest('.pr-card').classList.toggle('open')">
                             <div class="pr-quarter-tag {{ $q }}">{{ $pr['quarter'] ?: 'PR' }}</div>
                             <div class="pr-card-info">
@@ -280,6 +307,9 @@
                                 @if($trackingKey)
                                     <span class="badge {{ $trackingBadgeCls }}" title="Tracking Status">{{ $pr['trackingStatus']['label'] }}</span>
                                 @endif
+                                <button type="button" class="btn-view-pr" data-pdf="{{ $pr['pdfFile'] ?? '' }}" data-number="{{ $pr['number'] }}" onclick="event.stopPropagation(); window.viewPrDocument(this);">
+                                    <i class="ti ti-file-text"></i> View PR
+                                </button>
                                 <i class="ti ti-chevron-down pr-chevron"></i>
                             </div>
                         </div>
@@ -346,8 +376,8 @@
                             <span class="badge badge-progress">{{ $inProgressCount }}</span>
                         </div>
                         <div class="health-row">
-                            <span class="health-label">Approved</span>
-                            <span class="badge badge-approved">{{ $approvedCount }}</span>
+                            <span class="health-label">Completed</span>
+                            <span class="badge badge-completed">{{ $completedCount }}</span>
                         </div>
                         <div class="health-row">
                             <span class="health-label">Delayed</span>
@@ -413,13 +443,46 @@
         badge.textContent = statusLabel.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
 
-    /* ── search ── */
-    document.getElementById('prSearch')?.addEventListener('input', function () {
-        const q = this.value.toLowerCase();
-        document.querySelectorAll('#prList .pr-card').forEach(function (card) {
-            card.style.display = q && !card.dataset.search?.includes(q) ? 'none' : '';
+    /* ── search + status filter ── */
+    const prList         = document.getElementById('prList');
+    const searchInput    = document.getElementById('prSearch');
+    const statusFilter    = document.getElementById('prStatusFilter');
+    const sortOrderSelect = document.getElementById('prSortOrder');
+
+    function applyPrFilter() {
+        const q      = (searchInput?.value || '').toLowerCase();
+        const status = statusFilter ? statusFilter.value : '';
+        prList?.querySelectorAll('.pr-card').forEach(function (card) {
+            const matchesSearch = !q || (card.dataset.search ?? '').includes(q);
+            const matchesStatus = !status || card.dataset.statusBucket === status;
+            card.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
         });
-    });
+    }
+    searchInput?.addEventListener('input', applyPrFilter);
+    statusFilter?.addEventListener('change', applyPrFilter);
+
+    function applyPrSortOrder() {
+        if (!prList) return;
+        const order = sortOrderSelect ? sortOrderSelect.value : 'desc';
+        const cards = Array.from(prList.querySelectorAll('.pr-card')).sort((a, b) => {
+            const ta = new Date(a.dataset.createdAt).getTime();
+            const tb = new Date(b.dataset.createdAt).getTime();
+            return order === 'asc' ? ta - tb : tb - ta;
+        });
+        cards.forEach(c => prList.appendChild(c));
+    }
+    sortOrderSelect?.addEventListener('change', applyPrSortOrder);
+
+    /* ── View PR document ── */
+    window.viewPrDocument = function (btn) {
+        const pdf    = btn.dataset.pdf;
+        const number = btn.dataset.number;
+        const body   = pdf
+            ? `<iframe src="/storage/${pdf}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>
+               <p style="margin-top:10px;font-size:11px;"><a href="/storage/${pdf}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`
+            : `<p style="font-size:13px;color:var(--s500,#64748b);padding:20px 0;text-align:center;">No PDF has been uploaded for this Purchase Request yet.</p>`;
+        window.prismInfoModal({ title: number, bodyHtml: body });
+    };
 })();
 </script>
 @endpush

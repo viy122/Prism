@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Procurement Reports | Chancellor')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .content {
@@ -57,6 +61,9 @@
     .badge-delayed { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
 
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 230px; }
+    .report-meta { font-size: 11px; color: var(--s400); margin-top: 2px; }
 
     .delay-list { display: flex; flex-direction: column; gap: 10px; }
     .delay-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 1px solid #f7c1c1; background: rgba(252,235,235,.6); transition: background .15s, box-shadow .15s; }
@@ -64,7 +71,7 @@
     .delay-office { font-size: 13px; font-weight: 700; color: var(--s900); margin-bottom: 4px; }
     .delay-entry  { font-size: 12px; color: var(--s600); line-height: 1.7; }
 
-    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
     @media (max-width: 640px)  { .stats-grid { grid-template-columns: 1fr; } }
 
@@ -103,6 +110,7 @@
             <p class="page-hdr-eyebrow">Chancellor</p>
             <h1 class="page-hdr-title">Procurement Reports</h1>
             <p class="page-hdr-sub">Review campus-wide procurement accomplishment, year-end utilization, and delayed items grouped by office.</p>
+            <p class="report-meta">Generated {{ $generatedAt }}</p>
         </div>
         <button class="btn-print" type="button" onclick="window.print()">
             <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -137,6 +145,23 @@
         </div>
     </div>
 
+    <div class="charts-grid">
+        <div class="card">
+            <p class="card-eyebrow">Per office</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Targeted vs Procured</h2>
+            <div class="chart-wrap">
+                <canvas id="accomplishmentChart" data-rows="{{ json_encode($accomplishmentChart) }}"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <p class="card-eyebrow">Per office</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Budget vs Utilized</h2>
+            <div class="chart-wrap">
+                <canvas id="utilizationChart" data-rows="{{ json_encode($utilizationChart) }}"></canvas>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-head">
             <div>
@@ -154,6 +179,38 @@
                     @foreach ($accomplishmentRows as $row)
                         <tr>
                             <td style="font-weight:600;color:var(--s600);">{{ $row['office'] }}</td>
+                            <td style="font-weight:600;color:var(--s700);">{{ $row['targeted'] }}</td>
+                            <td style="font-weight:600;color:var(--s700);">{{ $row['procured'] }}</td>
+                            <td>
+                                <div class="prog-wrap">
+                                    <p class="prog-label">{{ $row['completionRate'] }}%</p>
+                                    <div class="prog-track"><div class="prog-fill" style="width:{{ $row['completionRate'] }}%"></div></div>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <div>
+                <p class="card-eyebrow">Q1 to Q4</p>
+                <h2 class="card-title">Quarterly Accomplishment</h2>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Office</th><th>Quarter</th><th>Targeted</th><th>Procured</th><th>Completion Rate</th></tr>
+                </thead>
+                <tbody>
+                    @foreach ($quarterlyRows as $row)
+                        <tr>
+                            <td style="font-weight:600;color:var(--s600);">{{ $row['office'] }}</td>
+                            <td style="color:var(--s500);">{{ $row['quarter'] }}</td>
                             <td style="font-weight:600;color:var(--s700);">{{ $row['targeted'] }}</td>
                             <td style="font-weight:600;color:var(--s700);">{{ $row['procured'] }}</td>
                             <td>
@@ -231,3 +288,57 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    // Horizontal, not vertical — dozens of offices campus-wide (many with
+    // long codes) means a vertical bar chart's x-axis labels collide past a
+    // handful of bars. Horizontal bars read one office per row regardless of
+    // count, with the row growing to fit the data instead of squeezing it.
+    const accEl = document.getElementById('accomplishmentChart');
+    if (accEl) {
+        const rows = JSON.parse(accEl.dataset.rows || '[]');
+        accEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        new Chart(accEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.office),
+                datasets: [
+                    { label: 'Targeted', data: rows.map(r => r.targeted), backgroundColor: '#c9a84c', borderRadius: 4 },
+                    { label: 'Procured', data: rows.map(r => r.procured), backgroundColor: '#681012', borderRadius: 4 },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+
+    const utilEl = document.getElementById('utilizationChart');
+    if (utilEl) {
+        const rows = JSON.parse(utilEl.dataset.rows || '[]');
+        utilEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        new Chart(utilEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.office),
+                datasets: [
+                    { label: 'Budget', data: rows.map(r => r.budget), backgroundColor: '#c9a84c', borderRadius: 4 },
+                    { label: 'Utilized', data: rows.map(r => r.utilized), backgroundColor: '#681012', borderRadius: 4 },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { x: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString() } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush

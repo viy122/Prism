@@ -60,6 +60,10 @@ class PrismAccountingOfficeController extends Controller
             'supplier'     => $po->supplier_name,
             'totalAmount'  => (float) $po->total_amount,
             'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',
+            'statusLabel'  => $po->status_label,
+            // The signed PO PDF — Accounting's audit basis before marking
+            // payment processed, not just the row's summary fields.
+            'pdfFile'      => $po->file_path,
         ];
 
         // Delivered POs waiting for Accounting to start processing payment
@@ -95,6 +99,7 @@ class PrismAccountingOfficeController extends Controller
                 'supplier'    => $po->supplier_name,
                 'totalAmount' => (float) $po->total_amount,
                 'paidAt'      => $po->paid_at?->format('M d, Y') ?? '—',
+                'paidAtRaw'   => $po->paid_at?->toIso8601String(),
                 'paidBy'      => $po->paidBy?->name ?? '—',
             ])
             ->all();

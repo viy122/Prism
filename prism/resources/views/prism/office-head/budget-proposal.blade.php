@@ -312,19 +312,25 @@
         --}}
         @if($isReadOnly)
         @php
+            $currentFy = $proposalForm['fiscalYear'] ?? now()->year;
             $readOnlyBannerText = match($proposalStatus) {
                 'endorsed' => ['PPMP Endorsed — With the Chancellor', 'This PPMP has been endorsed by the Budget Office and forwarded to the Chancellor for approval. Editing is disabled.'],
-                'approved' => ['PPMP Approved', 'This PPMP has been approved by the Chancellor. Editing is disabled.'],
+                'approved' => ['PPMP Approved', "FY{$currentFy} PPMP is approved. Ready to begin FY" . ($currentFy + 1) . " budget planning, or add a supplemental PPMP for FY{$currentFy}?"],
                 'returned' => ['PPMP Returned — With Budget Office', 'This PPMP was returned by the Chancellor and is being reconsidered by the Budget Office. Editing is disabled.'],
                 default    => ['PPMP Submitted — Under Review', 'This PPMP has been submitted and is awaiting Budget Office review. Editing is disabled.'],
             };
         @endphp
         <div class="submitted-banner">
             <i class="ti ti-send"></i>
-            <div>
+            <div style="flex:1;">
                 <p class="submitted-banner-title">{{ $readOnlyBannerText[0] }}</p>
                 <p class="submitted-banner-sub">{{ $readOnlyBannerText[1] }}</p>
             </div>
+            @if($proposalStatus === 'approved')
+            <a href="{{ route('office-head.budget-proposal.new') }}" class="btn-primary" style="flex:none;">
+                <i class="ti ti-file-plus"></i> Create New PPMP
+            </a>
+            @endif
         </div>
         @endif
 

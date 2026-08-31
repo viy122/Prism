@@ -12,6 +12,7 @@ use App\Http\Controllers\PrismChancellorController;
 use App\Http\Controllers\PrismFinanceOfficeController;
 use App\Http\Controllers\PrismOfficeHeadController;
 use App\Http\Controllers\PrismProcurementOfficeController;
+use App\Http\Controllers\PrismProfileController;
 use App\Http\Controllers\PrismViceChancellorController;
 use App\Http\Controllers\SignatureAttachmentController;
 use App\Http\Controllers\SignaturePhotoController;
@@ -47,6 +48,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
     Route::prefix('office-head')->name('office-head.')->middleware('role:Office Head / Dean')->controller(PrismOfficeHeadController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
+        Route::get('/budget-proposal/new', 'createNewProposal')->name('budget-proposal.new');
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
         Route::put('/budget-proposal/item/{item}', 'updateItem')->name('budget-proposal.update-item');
         Route::delete('/budget-proposal/item/{item}', 'destroyItem')->name('budget-proposal.destroy-item');
@@ -92,14 +94,13 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/canvassing/extract-supplier', 'extractCanvassSupplier')->name('canvassing.extract-supplier');
         Route::post('/purchase-request/{pr}/canvass-document', 'uploadCanvassDocument')->name('purchase-request.canvass-document');
         Route::delete('/canvass-document/{document}', 'deleteCanvassDocument')->name('canvass-document.delete');
+        Route::post('/purchase-request/{pr}/canvassing/finalize', 'finalizeCanvassing')->name('purchase-request.canvassing-finalize');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::get('/purchase-request-management/refresh', 'purchaseRequestManagementRefresh')->name('purchase-request-management.refresh');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
         Route::post('/purchase-request/{pr}/tracking-status', 'updateTrackingStatus')->name('purchase-request.update-tracking-status');
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
         Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
-        Route::post('/purchase-request/import-pdf', 'importPrFromPdf')->name('purchase-request.import-pdf');
-        Route::post('/purchase-request/import-pdf/confirm', 'importPrConfirm')->name('purchase-request.import-confirm');
         Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
         Route::get('/abstract-of-canvass', 'abstractOfCanvass')->name('abstract-of-canvass');
         Route::get('/abstract-of-canvass/refresh', 'abstractOfCanvassRefresh')->name('abstract-of-canvass.refresh');
@@ -181,6 +182,9 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
     Route::get('/signature-photo/{docType}/{logId}/original', [SignaturePhotoController::class, 'original'])
         ->name('signature-photo.original')
         ->whereIn('docType', ['pr', 'aoc', 'po']);
+
+    // ── Self-service profile (all authenticated users) ────────────────────────
+    Route::post('/profile', [PrismProfileController::class, 'update'])->name('profile.update');
 
     // ── Notifications (all authenticated users) ───────────────────────────────
     Route::controller(NotificationController::class)->prefix('notifications')->name('notifications.')->group(function () {

@@ -125,7 +125,6 @@
     .attached-table tbody tr { transition: background .12s; }
     .td-supplier { font-weight: 700; color: var(--txt); }
     .td-price { font-weight: 800; color: var(--crimson); white-space: nowrap; }
-    .td-source { color: var(--txt3); font-weight: 500; }
     .td-remove-btn { background: none; border: none; cursor: pointer; color: var(--txt3); padding: 4px; line-height: 1; border-radius: 6px; transition: background .12s, color .12s; }
     .td-remove-btn:hover { background: var(--red-bg, #fee2e2); color: var(--red, #991b1b); }
     .td-remove-btn i { font-size: 13px; display: block; }
@@ -276,6 +275,8 @@
                     <option value="price_asc">Price: Low → High</option>
                     <option value="price_desc">Price: High → Low</option>
                     <option value="store_az">Store: A → Z</option>
+                    <option value="reviews_desc">Most Reviewed → Least Reviewed</option>
+                    <option value="rating_desc">Highest Rated → Lowest Rated</option>
                 </select>
 
                 <label>Price</label>
@@ -313,13 +314,12 @@
                             <tr>
                                 <th>Supplier</th>
                                 <th>Price / unit</th>
-                                <th>Source</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="attachedTableBody">
                             <tr id="tableEmptyRow">
-                                <td colspan="4">
+                                <td colspan="3">
                                     <div class="table-empty">
                                         <i class="ti ti-clipboard-list"></i>
                                         <p>No references attached yet.<br>Click <strong>Attach</strong> on a card.</p>
@@ -539,7 +539,6 @@
         tr.innerHTML =
             '<td class="td-supplier">' + esc(ref.supplier) + '</td>' +
             '<td class="td-price">₱' + esc(ref.priceStr) + '</td>' +
-            '<td class="td-source">' + esc(ref.source) + '</td>' +
             '<td><button type="button" class="td-remove-btn" onclick="window.detachRef(\'' + esc(String(refId)) + '\')" title="Remove"><i class="ti ti-x"></i></button></td>';
         tbody.appendChild(tr);
     }
@@ -1063,6 +1062,8 @@
         if (sortBy === 'price_desc')  list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
         if (sortBy === 'score_desc')  list = list.slice().sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
         if (sortBy === 'store_az')    list = list.slice().sort((a, b) => (a.source || '').localeCompare(b.source || ''));
+        if (sortBy === 'reviews_desc') list = list.slice().sort((a, b) => (parseFloat(b.reviews) || 0) - (parseFloat(a.reviews) || 0));
+        if (sortBy === 'rating_desc')  list = list.slice().sort((a, b) => (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0));
         /* 'match' keeps server order (already ranked by match score) */
 
         if (list.length === 0) {

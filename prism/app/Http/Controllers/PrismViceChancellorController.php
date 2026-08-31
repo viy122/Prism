@@ -6,12 +6,29 @@ use App\Http\Controllers\Concerns\HandlesSignatureQueue;
 use App\Models\BudgetProposalItem;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 class PrismViceChancellorController extends Controller
 {
     use HandlesSignatureQueue;
+
+    /**
+     * Real BatStateU ARASOF-Nasugbu org structure (per the campus FOI office
+     * listing): which offices report up through Academic Affairs vs
+     * Administration & Finance. office_user_assignments records where a user
+     * physically sits (e.g. every VC is "assigned" to the OVC office itself),
+     * not which offices their division covers — so it can't answer "what does
+     * this VC oversee" and assignedOfficeIds() below doesn't use it for that.
+     */
+    private const VCAA_OFFICE_CODES = [
+        'CICS', 'COE', 'CBA', 'CAS', 'CCJE', 'CHS', 'CTE', 'LS',
+        'RS', 'SDS', 'LIB', 'NSTP', 'CULT', 'SPORTS', 'SCHOL', 'HLTHO', 'SCILAB',
+    ];
+    private const VCAF_OFFICE_CODES = [
+        'HRMO', 'ACCT', 'BUD', 'CASH', 'PFM', 'PROC', 'PS', 'RMO', 'GS', 'EMU',
+    ];
 
     /**
      * Only two real Vice Chancellors sign procurement documents — VCAA and
@@ -70,47 +87,75 @@ class PrismViceChancellorController extends Controller
         return $this->queueRoleCode() === 'vcaf' ? ['pr', 'aoc', 'po'] : ['pr'];
     }
 
+    /**
+     * Every "is this item procured" / "is this budget utilized" check below
+     * goes through a real PPMP-item → PR match (matchPrItemsByOfficeAndName())
+     * and the matched PR's own lifecycleBucket() — never the raw
+     * PurchaseRequest::status column, which Procurement almost never writes
+     * the literal values 'completed'/'approved'/'delayed'/'pending' to (the
+     * real vocabulary is a much larger granular set). Same convention as the
+     * Chancellor and Finance dashboards, so the numbers agree across roles.
+     */
     public function dashboard(): View
     {
-        $currentQ = $this->currentQuarter();
+        $currentQ  = $this->currentQuarter();
+        $officeIds = $this->assignedOfficeIds();
 
         $offices = Office::has('budgetProposals')
             ->with([
                 'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
                 'purchaseRequests',
             ])
-            ->when($this->assignedOfficeIds(), fn ($q, $ids) => $q->whereIn('id', $ids))
+            ->when($officeIds, fn ($q, $ids) => $q->whereIn('id', $ids))
             ->get();
 
-        $totalAppItems = BudgetProposalItem::whereHas(
-            'budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])
-        )->count();
-        $procuredCount = PurchaseRequest::where('status', 'completed')->count();
+        $allItems = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->when($officeIds, fn ($q, $ids) => $q->whereHas('budgetProposal', fn ($q2) => $q2->whereIn('office_id', $ids)))
+            ->get();
 
-        $approvedBudget     = (float) $offices->flatMap->budgetProposals->sum('total_estimated_cost');
-        $utilized           = (float) $offices->flatMap->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+        $matchOfficeIds = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches  = $this->matchPrItemsByOfficeAndName($matchOfficeIds);
+        $matchedPrFor   = function ($item) use ($prItemMatches) {
+            $officeId = $item->budgetProposal?->office_id;
+
+            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest;
+        };
+        $isItemProcured = fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed';
+        $isUtilized     = fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true);
+
+        $totalAppItems = $allItems->count();
+        $procuredCount = $allItems->filter($isItemProcured)->count();
+
+        $approvedBudget      = (float) $offices->flatMap->budgetProposals->sum('total_estimated_cost');
+        $utilized            = (float) $offices->flatMap->purchaseRequests->filter($isUtilized)->sum('total_amount');
         $divisionUtilization = $approvedBudget > 0 ? round(($utilized / $approvedBudget) * 100) : 0;
 
-        $officeUtilization = $offices->map(function ($office) use ($currentQ) {
+        $officeUtilization = $offices->map(function ($office) use ($currentQ, $allItems, $isItemProcured, $isUtilized) {
             $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $utilized = (float) $office->purchaseRequests->filter($isUtilized)->sum('total_amount');
             $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
-            $delayed  = $office->purchaseRequests->where('status', 'delayed')->count();
-            $overdue  = BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $office->id)->whereIn('status', ['endorsed', 'approved']))
-                ->whereNotNull('target_quarter')
-                ->where('target_quarter', '<', $currentQ)
+
+            $delayed = $office->purchaseRequests->filter(fn ($pr) =>
+                $pr->signingStatusBucket() !== 'completed'
+                && $pr->submitted_at
+                && $pr->submitted_at->diffInDays(now()) > 30
+            )->count();
+
+            $overdue = $allItems
+                ->filter(fn ($item) => $item->budgetProposal?->office_id === $office->id)
+                ->filter(fn ($item) => $item->target_quarter && $item->target_quarter < $currentQ && !$isItemProcured($item))
                 ->count();
+
             $risk = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
             return ['office' => $office->code, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
-        $vcName = auth()->user()->name ?? 'Vice Chancellor';
-
         $pendingPrSummary = $offices->map(function ($office) {
-            $pending    = $office->purchaseRequests->where('status', 'pending')->count();
-            $inProgress = $office->purchaseRequests->where('status', 'in_progress')->count();
-            $oldest     = $office->purchaseRequests->where('status', 'pending')->sortBy('created_at')->first();
+            $pending    = $office->purchaseRequests->filter(fn ($pr) => $pr->signingStatusBucket() === 'pending')->count();
+            $inProgress = $office->purchaseRequests->filter(fn ($pr) => $pr->signingStatusBucket() === 'in_progress')->count();
+            $oldest     = $office->purchaseRequests->filter(fn ($pr) => $pr->signingStatusBucket() === 'pending')->sortBy('created_at')->first();
 
             return [
                 'office'         => $office->code,
@@ -122,9 +167,8 @@ class PrismViceChancellorController extends Controller
 
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle'         => 'Vice Chancellor Division Dashboard',
+            'generatedAt'       => now()->format('M d, Y g:i A'),
             'awaitingSignature' => app(\App\Services\SignatoryQueueService::class)->countForRole($this->queueRoleCode(), $this->queueOfficeIds()),
-            'divisionName'     => $vcName . "'s Division",
-            'offices'          => $offices->pluck('name')->all(),
             'summary'          => [
                 'totalAppItems'      => $totalAppItems,
                 'procuredCount'      => $procuredCount,
@@ -132,6 +176,7 @@ class PrismViceChancellorController extends Controller
             ],
             'officeUtilization'  => $officeUtilization,
             'pendingPrSummary'   => $pendingPrSummary,
+            'itemStatusChart'    => ['procured' => $procuredCount, 'pending' => max(0, $totalAppItems - $procuredCount)],
         ]));
     }
 
@@ -209,20 +254,38 @@ class PrismViceChancellorController extends Controller
 
     public function divisionPerformanceReport(): View
     {
+        $officeIds = $this->assignedOfficeIds();
+
         $offices = Office::has('budgetProposals')
             ->with([
                 'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
                 'purchaseRequests',
             ])
-            ->when($this->assignedOfficeIds(), fn ($q, $ids) => $q->whereIn('id', $ids))
+            ->when($officeIds, fn ($q, $ids) => $q->whereIn('id', $ids))
             ->get();
 
-        $rows = $offices->map(function ($office) {
-            $totalAppItems = $office->budgetProposals->flatMap->items->count();
-            $procured      = $office->purchaseRequests->where('status', 'completed')->count();
+        $allItems = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->when($officeIds, fn ($q, $ids) => $q->whereHas('budgetProposal', fn ($q2) => $q2->whereIn('office_id', $ids)))
+            ->get();
+
+        $matchOfficeIds = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches  = $this->matchPrItemsByOfficeAndName($matchOfficeIds);
+        $isItemProcured = function ($item) use ($prItemMatches) {
+            $officeId = $item->budgetProposal?->office_id;
+
+            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest?->lifecycleBucket() === 'completed';
+        };
+
+        $rows = $offices->map(function ($office) use ($allItems, $isItemProcured) {
+            $officeItems   = $allItems->filter(fn ($item) => $item->budgetProposal?->office_id === $office->id);
+            $totalAppItems = $officeItems->count();
+            $procured      = $officeItems->filter($isItemProcured)->count();
             $pending       = max(0, $totalAppItems - $procured);
             $budget        = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized      = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $utilized      = (float) $office->purchaseRequests
+                ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
+                ->sum('total_amount');
             $utilization   = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
 
             return ['office' => $office->code, 'totalAppItems' => $totalAppItems, 'procured' => $procured, 'pending' => $pending, 'utilization' => $utilization, 'budget' => $budget];
@@ -237,6 +300,7 @@ class PrismViceChancellorController extends Controller
 
         return view('prism.vice-chancellor.division-performance-report', $this->withCommon('division-performance-report', [
             'pageTitle'       => 'Vice Chancellor Division Performance Report',
+            'generatedAt'     => now()->format('M d, Y g:i A'),
             'performanceRows' => $performanceRows,
             'bestOffice'      => $bestOffice,
             'lowestOffice'    => $lowestOffice,
@@ -251,8 +315,37 @@ class PrismViceChancellorController extends Controller
      */
     private function assignedOfficeIds(): ?array
     {
-        $ids = auth()->user()->officeAssignments()->pluck('offices.id')->all();
+        $codes = match (auth()->user()?->vc_type) {
+            'vcaa'  => self::VCAA_OFFICE_CODES,
+            'vcaf'  => self::VCAF_OFFICE_CODES,
+            default => null,
+        };
+
+        if ($codes === null) {
+            return null;
+        }
+
+        $ids = Office::whereIn('code', $codes)->pluck('id')->all();
+
         return count($ids) > 0 ? $ids : null;
+    }
+
+    /**
+     * Best-effort match from a BudgetProposalItem (PPMP) to the downstream PR
+     * item eventually raised for it. No stored link exists yet between the two,
+     * so we match on office + item name and keep the most recently created PR
+     * per pair. Returns PurchaseRequestItem (not the PR itself), keyed by
+     * "office_id|lower(trim(item name))" — callers read ->purchaseRequest when
+     * they need the parent PR.
+     */
+    private function matchPrItemsByOfficeAndName(\Illuminate\Support\Collection $officeIds): \Illuminate\Support\Collection
+    {
+        return PurchaseRequestItem::with('purchaseRequest.abstractOfCanvass.purchaseOrder')
+            ->whereHas('purchaseRequest', fn ($q) => $q->whereIn('office_id', $officeIds))
+            ->get()
+            ->filter(fn ($pri) => $pri->purchaseRequest !== null)
+            ->groupBy(fn ($pri) => $pri->purchaseRequest->office_id . '|' . strtolower(trim($pri->name)))
+            ->map(fn ($group) => $group->sortByDesc(fn ($pri) => $pri->purchaseRequest->created_at)->first());
     }
 
     private function currentQuarter(): string

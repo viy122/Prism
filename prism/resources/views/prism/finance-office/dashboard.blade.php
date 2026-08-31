@@ -52,6 +52,7 @@
     .pd-card-title { font-size: 15px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; margin-bottom: 16px; }
 
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pd-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 
     .table-wrap {
         border-radius: 12px; border: 1px solid var(--s200);
@@ -96,7 +97,7 @@
     .pd-legend-item { display: flex; align-items: center; gap: 6px; }
     .pd-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-    @media (max-width: 1200px) { .pd-stat-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 1200px) { .pd-stat-grid { grid-template-columns: repeat(2,1fr); } .pd-charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) {
         .page-shell { padding: 16px 16px 40px; }
         .two-col { grid-template-columns: 1fr; }
@@ -131,8 +132,8 @@
             <div class="pd-stat-icon">
                 <i class="ti ti-circle-check"></i>
             </div>
-            <div class="pd-stat-label">Endorsed This Month</div>
-            <div class="pd-stat-value">{{ number_format($summary['endorsedThisMonth']) }}</div>
+            <div class="pd-stat-label">Endorsed</div>
+            <div class="pd-stat-value">{{ number_format($summary['endorsed']) }}</div>
             <div class="pd-stat-hint">Forwarded for Chancellor approval</div>
         </article>
         <article class="pd-stat">
@@ -152,6 +153,30 @@
             <div class="pd-stat-hint">Campus-wide across active submissions</div>
         </article>
     </dl>
+
+    <div class="pd-charts-grid">
+        <article class="pd-card">
+            <p class="pd-card-eyebrow">Campus PPMP pipeline</p>
+            <h2 class="pd-card-title">Proposals by Status</h2>
+            <div class="pd-chart-wrap" style="height:220px;">
+                <canvas id="statusChart" data-statuses="{{ json_encode($proposalsByStatus) }}"></canvas>
+            </div>
+        </article>
+        <article class="pd-card">
+            <p class="pd-card-eyebrow">Active submissions</p>
+            <h2 class="pd-card-title">Proposed Budget by Office</h2>
+            <div class="pd-chart-wrap" style="height:220px;">
+                <canvas id="officeBudgetChart" data-offices="{{ json_encode($budgetByOffice) }}"></canvas>
+            </div>
+        </article>
+        <article class="pd-card">
+            <p class="pd-card-eyebrow">This fiscal year</p>
+            <h2 class="pd-card-title">Monthly Review Activity</h2>
+            <div class="pd-chart-wrap" style="height:220px;">
+                <canvas id="activityChart" data-activity="{{ json_encode($monthlyReviewActivity) }}"></canvas>
+            </div>
+        </article>
+    </div>
 
     <div class="two-col">
 
@@ -240,3 +265,79 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const statusEl = document.getElementById('statusChart');
+    if (statusEl) {
+        const statuses = JSON.parse(statusEl.dataset.statuses || '[]');
+        new Chart(statusEl, {
+            type: 'doughnut',
+            data: {
+                labels: statuses.map(s => s.label),
+                datasets: [{
+                    data: statuses.map(s => s.count),
+                    backgroundColor: ['#94a3b8', '#d97706', '#2563eb', '#dc2626', '#16a34a'],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
+        });
+    }
+
+    const officeEl = document.getElementById('officeBudgetChart');
+    if (officeEl) {
+        const offices = JSON.parse(officeEl.dataset.offices || '[]');
+        // Row height grows with office count instead of squeezing many bars
+        // into a fixed box — this campus has dozens of offices.
+        officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        new Chart(officeEl, {
+            type: 'bar',
+            data: {
+                labels: offices.map(o => o.office),
+                datasets: [{
+                    label: 'Proposed Budget',
+                    data: offices.map(o => o.total),
+                    backgroundColor: '#681012',
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => 'PHP ' + Number(ctx.raw).toLocaleString() } },
+                },
+                scales: { x: { ticks: { callback: (v) => 'PHP ' + Number(v).toLocaleString(undefined, { notation: 'compact' }) } } },
+            },
+        });
+    }
+
+    const activityEl = document.getElementById('activityChart');
+    if (activityEl) {
+        const activity = JSON.parse(activityEl.dataset.activity || '{}');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        new Chart(activityEl, {
+            type: 'bar',
+            data: {
+                labels: months,
+                datasets: [
+                    { label: 'Submitted', data: activity.submitted || [], backgroundColor: '#d97706', borderRadius: 3 },
+                    { label: 'Endorsed', data: activity.endorsed || [], backgroundColor: '#2563eb', borderRadius: 3 },
+                ],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush

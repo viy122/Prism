@@ -232,12 +232,16 @@
     <div class="card">
         <div class="card-head">
             <div>
-                <p class="card-eyebrow">Full proposal details</p>
+                <p class="card-eyebrow">Full proposal details — {{ $selectedProposal['code'] ?? '—' }}</p>
                 <h2 class="card-title">{{ $selectedProposal['title'] }}</h2>
             </div>
             <x-prism.status-badge :status="$selectedProposal['status']" />
         </div>
         <dl class="meta-grid">
+            <div class="meta-box">
+                <dt>Proposal Code</dt>
+                <dd>{{ $selectedProposal['code'] ?? '—' }}</dd>
+            </div>
             <div class="meta-box">
                 <dt>Office</dt>
                 <dd>{{ $selectedProposal['office']['name'] }}</dd>
@@ -255,10 +259,37 @@
                 <dd>{{ $selectedProposal['office']['submittedDate'] }}</dd>
             </div>
             <div class="meta-box">
-                <dt>Total Amount</dt>
+                <dt>Proposed Budget</dt>
+                <dd>PHP {{ number_format($selectedProposal['office']['proposedBudget']) }}</dd>
+            </div>
+            <div class="meta-box">
+                <dt>Total Estimated Cost</dt>
                 <dd>PHP {{ number_format($selectedProposal['office']['totalAmount']) }}</dd>
             </div>
         </dl>
+
+        @if(count($selectedProposal['reviewHistory']) > 0)
+        <div style="margin-top:18px;">
+            <p class="card-eyebrow" style="margin-bottom:10px;">Review history</p>
+            <div style="display:flex;flex-direction:column;gap:1px;">
+                @foreach ($selectedProposal['reviewHistory'] as $event)
+                    <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--s100);">
+                        <div style="width:7px;height:7px;border-radius:50%;background:var(--crimson);flex-shrink:0;margin-top:5px;"></div>
+                        <div>
+                            <p style="font-size:12.5px;font-weight:700;color:var(--s900);">
+                                {{ $event['action'] }}{{ $event['from'] && $event['to'] ? " — {$event['from']} → {$event['to']}" : '' }}
+                                <span style="font-weight:500;color:var(--s500);">by {{ $event['by'] }}</span>
+                            </p>
+                            <p style="font-size:11px;color:var(--s400);margin-top:2px;">{{ $event['date'] }}</p>
+                            @if($event['remarks'])
+                                <p style="font-size:12px;color:var(--s600);margin-top:4px;line-height:1.5;white-space:pre-wrap;">{{ $event['remarks'] }}</p>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
     </div>
 
     <div class="card">
@@ -397,7 +428,7 @@
             @php $anyDisapproved = collect($selectedProposal['items'])->contains('financeOk', false); @endphp
             @if($selectedProposal['status'] === 'Returned')
             <p style="margin-top:6px;font-size:12px;font-weight:600;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:9px 12px;">
-                <i class="ti ti-alert-triangle"></i> Returned by the Chancellor — reconsider the items and remarks below, then Endorse or Return again.
+                <i class="ti ti-alert-triangle"></i> Returned by {{ $selectedProposal['returnRemarks']['from'] ?? 'the Chancellor' }} — reconsider the items and remarks below, then Endorse or Return again.
             </p>
             @endif
             <div class="action-row" style="margin-top:14px;">

@@ -32,6 +32,7 @@ class User extends Authenticatable
         'position_title',
         'vc_type',
         'bac_position',
+        'avatar_path',
         'password',
         'account_status',
         'expo_push_token',

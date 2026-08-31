@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Campus Monitoring | Chancellor')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .content {
@@ -74,8 +78,11 @@
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
+    .charts-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 230px; }
+
     @media (max-width: 1400px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
     @media (max-width: 640px)  { .stats-grid { grid-template-columns: 1fr; } }
 </style>
@@ -135,6 +142,23 @@
             <p class="stat-label">Campus Utilization</p>
             <strong class="stat-value">{{ $summary['campusUtilization'] }}%</strong>
             <p class="stat-desc">Campus-wide budget utilization</p>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="card">
+            <p class="card-eyebrow">Campus-wide</p>
+            <h2 class="card-title" style="margin-bottom:16px;">APP Item Status</h2>
+            <div class="chart-wrap">
+                <canvas id="itemStatusChart" data-status="{{ json_encode($itemStatusChart) }}"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <p class="card-eyebrow">Budget vs. Utilized</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Utilization by Office</h2>
+            <div class="chart-wrap">
+                <canvas id="officeUtilizationChart" data-offices="{{ json_encode($officeUtilizationChart) }}"></canvas>
+            </div>
         </div>
     </div>
 
@@ -206,13 +230,13 @@
                                 <td>
                                     <div class="prog-wrap">
                                         <p class="prog-label">{{ $forecast['currentUtilization'] }}%</p>
-                                        <div class="prog-track"><div class="prog-fill-maroon" style="width:{{ $forecast['currentUtilization'] }}%"></div></div>
+                                        <div class="prog-track"><div class="prog-fill-maroon" style="width:{{ min(100, $forecast['currentUtilization']) }}%"></div></div>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="prog-wrap">
                                         <p class="prog-label">{{ $forecast['forecast'] }}%</p>
-                                        <div class="prog-track"><div class="prog-fill-gold" style="width:{{ $forecast['forecast'] }}%"></div></div>
+                                        <div class="prog-track"><div class="prog-fill-gold" style="width:{{ min(100, $forecast['forecast']) }}%"></div></div>
                                     </div>
                                 </td>
                                 <td><span class="badge {{ $riskClass }}">{{ $forecast['risk'] }}</span></td>
@@ -265,7 +289,7 @@
                 <h2 class="card-title">Action List</h2>
             </div>
             <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:20px;font-size:11px;font-weight:700;background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1;">
-                {{ count($overdueAlerts) }} alerts
+                {{ $summary['itemsOverdue'] }} alerts{{ $summary['itemsOverdue'] > count($overdueAlerts) ? ' (showing ' . count($overdueAlerts) . ')' : '' }}
             </span>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;">
@@ -292,3 +316,56 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const statusEl = document.getElementById('itemStatusChart');
+    if (statusEl) {
+        const s = JSON.parse(statusEl.dataset.status || '{}');
+        new Chart(statusEl, {
+            type: 'doughnut',
+            data: {
+                labels: ['Procured', 'Pending', 'Overdue'],
+                datasets: [{
+                    data: [s.procured || 0, s.pending || 0, s.overdue || 0],
+                    backgroundColor: ['#3b6d11', '#185fa5', '#a32d2d'],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
+        });
+    }
+
+    const officeEl = document.getElementById('officeUtilizationChart');
+    if (officeEl) {
+        const offices = JSON.parse(officeEl.dataset.offices || '[]');
+        // Horizontal, not vertical — this campus has dozens of offices (many
+        // with long codes), so a vertical bar chart's x-axis labels collide
+        // once more than a handful show up. Horizontal bars read one office
+        // per row regardless of count, and the row height below grows with
+        // the data instead of squeezing bars to fit a fixed box.
+        officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        new Chart(officeEl, {
+            type: 'bar',
+            data: {
+                labels: offices.map(o => o.office),
+                datasets: [
+                    { label: 'Budget', data: offices.map(o => o.budget), backgroundColor: '#c9a84c', borderRadius: 4 },
+                    { label: 'Utilized', data: offices.map(o => o.utilized), backgroundColor: '#681012', borderRadius: 4 },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { x: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString() } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush

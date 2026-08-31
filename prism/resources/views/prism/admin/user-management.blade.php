@@ -43,15 +43,32 @@
 
     .search-input { border: 1px solid var(--s300); border-radius: 9px; padding: 8px 12px; font-size: 12px; font-family: inherit; min-width: 220px; }
 
+    /* This modal sits outside .content as a sibling, so the --s and --m
+       aliases .content defines for the page don't reach it — every color
+       below is either a genuine :root global (--crimson, --white, --s200)
+       or a hardcoded fallback, never a bare .content-scoped var(). */
     .adm-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
     .adm-modal-backdrop.open { display: flex; }
-    .adm-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
-    .adm-modal h3 { font-size: 16px; font-weight: 800; color: var(--s900); }
-    .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .adm-field label { display: block; font-size: 11px; font-weight: 700; color: var(--s600); margin-bottom: 4px; }
-    .adm-field input, .adm-field select { width: 100%; border: 1px solid var(--s300); border-radius: 9px; padding: 8px 12px; font-size: 12px; font-family: inherit; }
+    .adm-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.25); font-family: 'Poppins', sans-serif; }
+    .adm-modal h3 { font-size: 16px; font-weight: 800; color: #0f172a; }
+    .adm-modal-sub { font-size: 12px; color: #64748b; margin-top: -8px; }
+    .adm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .adm-field { margin-bottom: 0; }
+    .adm-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 6px; }
+    .adm-field input, .adm-field select {
+        width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc;
+        padding: 9px 11px; font-size: 12.5px; color: #334155; font-family: 'Poppins', sans-serif;
+        outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .adm-field input:focus, .adm-field select:focus { border-color: var(--crimson); background: #fff; box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    .adm-field-hint { font-size: 10.5px; color: #94a3b8; margin-top: 4px; }
     .adm-status { border-radius: 9px; padding: 9px 13px; font-size: 12px; font-weight: 600; display: none; }
     .adm-status.error { display: block; background: #fee2e2; color: #b91c1c; }
+
+    .adm-pw-generated { display: flex; align-items: center; gap: 8px; }
+    .adm-pw-generated input { font-family: 'SFMono-Regular', Consolas, monospace; letter-spacing: .03em; font-weight: 700; color: #0f172a !important; background: #fff !important; }
+    .adm-pw-icon-btn { flex-shrink: 0; width: 36px; height: 36px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+    .adm-pw-icon-btn:hover { border-color: var(--crimson); color: var(--crimson); }
 
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s; }
     .pr-toast.visible { opacity: 1; }
@@ -139,6 +156,7 @@
 <div class="adm-modal-backdrop" id="userModalBackdrop">
     <div class="adm-modal">
         <h3 id="userModalTitle">New User</h3>
+        <p class="adm-modal-sub" id="userModalSub">The account's email must match the address they'll sign in with.</p>
         <div class="adm-grid">
             <div class="adm-field"><label>Full name</label><input id="umName" maxlength="255"></div>
             <div class="adm-field"><label>Username</label><input id="umUsername" maxlength="100"></div>
@@ -156,8 +174,16 @@
                     @foreach($offices as $o)<option value="{{ $o['id'] }}">{{ $o['name'] }}</option>@endforeach
                 </select>
             </div>
-            <div class="adm-field" id="umPasswordField"><label>Password (min 8 chars)</label><input id="umPassword" type="password" minlength="8"></div>
             <div class="adm-field" id="umEmployeeField"><label>Employee number (optional)</label><input id="umEmployee" maxlength="100"></div>
+            <div class="adm-field" id="umPasswordField" style="grid-column:1/-1;">
+                <label>Auto-Generated Password</label>
+                <div class="adm-pw-generated">
+                    <input id="umPassword" type="text" readonly>
+                    <button type="button" class="adm-pw-icon-btn" id="umPwRegenBtn" title="Generate a new password"><i class="ti ti-refresh"></i></button>
+                    <button type="button" class="adm-pw-icon-btn" id="umPwCopyBtn" title="Copy password"><i class="ti ti-copy"></i></button>
+                </div>
+                <p class="adm-field-hint">Share this with the user — it won't be shown again after you save. They can change it once they sign in.</p>
+            </div>
         </div>
         <div class="adm-status" id="umStatus"></div>
         <div style="display:flex;justify-content:flex-end;gap:10px;">
@@ -181,6 +207,7 @@
     const backdrop = document.getElementById('userModalBackdrop');
     const toastEl  = document.getElementById('admToast');
     const statusEl = document.getElementById('umStatus');
+    const pwInput  = document.getElementById('umPassword');
     let editingId  = null;
 
     function showToast(msg, isError = false) {
@@ -190,23 +217,64 @@
         toastEl._t = setTimeout(() => { toastEl.className = 'pr-toast'; }, 3000);
     }
 
+    // Admins never type a password by hand — one is generated here and can
+    // only be regenerated, never edited, matching the "admin never sees/sets
+    // an existing user's password" rule (this one's only visible once, at
+    // creation, so it can be handed to the new user).
+    function generatePassword(length = 12) {
+        const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const lower = 'abcdefghijkmnpqrstuvwxyz';
+        const digits = '23456789';
+        const symbols = '!@#$%&*?';
+        const all = upper + lower + digits + symbols;
+        // Falls back to Math.random if the Web Crypto API isn't reachable
+        // (e.g. blocked by an extension/policy) — a weaker random source is
+        // still far better than the "New User" modal silently failing to open.
+        const randomInt = (max) => {
+            try { return crypto.getRandomValues(new Uint32Array(1))[0] % max; }
+            catch { return Math.floor(Math.random() * max); }
+        };
+        const pick = (chars) => chars[randomInt(chars.length)];
+
+        let chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+        while (chars.length < length) chars.push(pick(all));
+
+        // Fisher-Yates shuffle so the guaranteed classes aren't always up front.
+        for (let i = chars.length - 1; i > 0; i--) {
+            const j = randomInt(i + 1);
+            [chars[i], chars[j]] = [chars[j], chars[i]];
+        }
+        return chars.join('');
+    }
+
     function openModal(user) {
         editingId = user ? user.id : null;
         document.getElementById('userModalTitle').textContent = user ? 'Edit User — ' + user.name : 'New User';
+        document.getElementById('userModalSub').textContent = user
+            ? 'Role and office assignment can only be changed by an administrator.'
+            : "The account's email must match the address they'll sign in with.";
         document.getElementById('umName').value     = user?.name ?? '';
         document.getElementById('umUsername').value = user?.username ?? '';
         document.getElementById('umEmail').value    = user?.email ?? '';
         document.getElementById('umPosition').value = user?.positionTitle === '—' ? '' : (user?.positionTitle ?? '');
         if (user?.roleId)   document.getElementById('umRole').value   = user.roleId;
         if (user?.officeId) document.getElementById('umOffice').value = user.officeId;
-        document.getElementById('umPassword').value = '';
         document.getElementById('umEmployee').value = '';
         document.getElementById('umPasswordField').style.display = user ? 'none' : '';
         document.getElementById('umEmployeeField').style.display = user ? 'none' : '';
         statusEl.className = 'adm-status';
         backdrop.classList.add('open');
+        if (!user) pwInput.value = generatePassword();
     }
     function closeModal() { backdrop.classList.remove('open'); editingId = null; }
+
+    document.getElementById('umPwRegenBtn').addEventListener('click', () => { pwInput.value = generatePassword(); });
+    document.getElementById('umPwCopyBtn').addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(pwInput.value);
+            showToast('Password copied.');
+        } catch { showToast('Could not copy — select and copy manually.', true); }
+    });
 
     document.getElementById('newUserBtn').addEventListener('click', () => openModal(null));
     document.querySelectorAll('.btn-edit-user').forEach(btn => {
@@ -259,7 +327,15 @@
     document.querySelectorAll('.btn-toggle-user').forEach(btn => {
         btn.addEventListener('click', async () => {
             const verb = btn.dataset.action;
-            if (!confirm('Are you sure you want to ' + verb + ' this user?')) return;
+            const ok = await window.prismConfirm({
+                title: verb === 'deactivate' ? 'Deactivate this user?' : 'Reactivate this user?',
+                message: verb === 'deactivate'
+                    ? 'They will immediately lose access to PRISM until reactivated.'
+                    : 'They will regain access to PRISM with their existing credentials.',
+                confirmText: verb === 'deactivate' ? 'Deactivate' : 'Reactivate',
+                danger: verb === 'deactivate',
+            });
+            if (!ok) return;
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> ' + (verb === 'deactivate' ? 'Deactivating…' : 'Reactivating…');

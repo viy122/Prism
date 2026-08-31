@@ -4,7 +4,7 @@
 @php
     $proposalCollection   = collect($proposals);
     $proposalCount        = $proposalCollection->count();
-    $activeReviewCount    = $proposalCollection->whereIn('status', ['Submitted', 'Under Review', 'Endorsed'])->count();
+    $approvedCount        = $proposalCollection->where('status', 'Approved')->count();
     $returnedCount        = $proposalCollection->where('status', 'Returned')->count();
     $approvedAmount       = $proposalCollection->where('status', 'Approved')->sum('totalAmount');
 @endphp
@@ -399,22 +399,22 @@
                 <div class="stat-box">
                     <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
                     <dt>Proposals</dt>
-                    <dd>{{ $proposalCount }}</dd>
+                    <dd id="kpiProposalCount">{{ $proposalCount }}</dd>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
-                    <dt>Active Review</dt>
-                    <dd class="maroon">{{ $activeReviewCount }}</dd>
+                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                    <dt>Approved</dt>
+                    <dd class="maroon" id="kpiApprovedCount">{{ $approvedCount }}</dd>
                 </div>
                 <div class="stat-box">
                     <div class="stat-icon"><svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg></div>
                     <dt>Returned</dt>
-                    <dd>{{ $returnedCount }}</dd>
+                    <dd id="kpiReturnedCount">{{ $returnedCount }}</dd>
                 </div>
                 <div class="stat-box">
                     <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
                     <dt>Approved Amount</dt>
-                    <dd class="sm">₱ {{ number_format($approvedAmount) }}</dd>
+                    <dd class="sm" id="kpiApprovedAmount">₱ {{ number_format($approvedAmount) }}</dd>
                 </div>
             </dl>
 

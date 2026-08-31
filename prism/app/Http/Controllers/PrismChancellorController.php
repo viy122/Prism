@@ -8,6 +8,7 @@ use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
 use App\Models\Office;
 use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestItem;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,18 +52,41 @@ class PrismChancellorController extends Controller
         return ['pr', 'aoc', 'po'];
     }
 
+    /**
+     * Every "is this item actually procured" check below goes through a real
+     * PPMP-item → PR match (matchPrItemsByOfficeAndName()) and the matched
+     * PR's own lifecycleBucket() — never the raw PurchaseRequest::status
+     * column (Procurement almost never writes the literal values
+     * 'completed'/'approved'/'delayed' to it; the real vocabulary is a much
+     * larger granular set) and never a same-office-wide flag applied
+     * uniformly to every quarter, which is what made the old quarterly grid
+     * mark every past quarter "Completed" the moment the office had any one
+     * completed PR at all, regardless of that quarter's own items.
+     */
     public function dashboard(): View
     {
-        $allItems = BudgetProposalItem::whereHas(
-            'budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])
-        )->get();
+        $allItems = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->get();
+
+        $officeIds     = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
+
+        $matchedPrFor = function ($item) use ($prItemMatches) {
+            $officeId = $item->budgetProposal?->office_id;
+
+            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest;
+        };
+        $isItemProcured = fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed';
 
         $totalAppItems = $allItems->count();
-        $itemsProcured = PurchaseRequest::where('status', 'completed')->count();
+        $itemsProcured = $allItems->filter($isItemProcured)->count();
         $itemsPending  = max(0, $totalAppItems - $itemsProcured);
 
         $approvedBudget    = (float) BudgetProposal::whereIn('status', ['endorsed', 'approved'])->sum('total_estimated_cost');
-        $utilized          = (float) PurchaseRequest::whereIn('status', ['approved', 'completed'])->sum('total_amount');
+        $utilized          = (float) PurchaseRequest::get()
+            ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
+            ->sum('total_amount');
         $campusUtilization = $approvedBudget > 0 ? round(($utilized / $approvedBudget) * 100) : 0;
 
         $currentQ       = $this->currentQuarter();
@@ -75,19 +99,25 @@ class PrismChancellorController extends Controller
             ])
             ->get();
 
-        $quarterlyStatuses = $offices->map(function ($office) use ($currentQ) {
-            $items        = $office->budgetProposals->flatMap->items;
-            $completedPrs = $office->purchaseRequests->where('status', 'completed')->count();
-            $quarterRow   = [];
+        $quarterlyStatuses = $offices->map(function ($office) use ($currentQ, $matchedPrFor) {
+            $items      = $office->budgetProposals->flatMap->items;
+            $quarterRow = [];
 
             foreach (['Q1', 'Q2', 'Q3', 'Q4'] as $q) {
-                $hasItems = $items->where('target_quarter', $q)->isNotEmpty();
-                if (!$hasItems) {
+                $quarterItems = $items->where('target_quarter', $q);
+                if ($quarterItems->isEmpty()) {
                     $quarterRow[$q] = 'Pending';
-                } elseif ($q < $currentQ) {
-                    $quarterRow[$q] = $completedPrs > 0 ? 'Completed' : 'Delayed';
+                    continue;
+                }
+
+                $procuredCount = $quarterItems->filter(fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed')->count();
+
+                if ($procuredCount === $quarterItems->count()) {
+                    $quarterRow[$q] = 'Completed';
                 } elseif ($q === $currentQ) {
-                    $quarterRow[$q] = 'In Progress';
+                    $quarterRow[$q] = $procuredCount > 0 ? 'In Progress' : 'Pending';
+                } elseif ($q < $currentQ) {
+                    $quarterRow[$q] = $procuredCount > 0 ? 'In Progress' : 'Delayed';
                 } else {
                     $quarterRow[$q] = 'Pending';
                 }
@@ -108,12 +138,14 @@ class PrismChancellorController extends Controller
 
         $officeMetrics = $offices->map(function ($office) use ($currentQNumber) {
             $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $utilized = (float) $office->purchaseRequests
+                ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
+                ->sum('total_amount');
             $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->code, 'currentUtilization' => $pct, 'forecast' => $forecast, 'risk' => $risk, 'budget' => $budget];
+            return ['office' => $office->code, 'currentUtilization' => $pct, 'forecast' => $forecast, 'risk' => $risk, 'budget' => $budget, 'utilized' => $utilized];
         })->filter(fn ($r) => $r['budget'] > 0)->values();
 
         $forecasts            = $officeMetrics->all();
@@ -127,21 +159,26 @@ class PrismChancellorController extends Controller
             default => now()->startOfYear()->addMonths(12),
         };
 
-        $overdueItems = BudgetProposalItem::with('budgetProposal.office')
-            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
-            ->whereNotNull('target_quarter')
-            ->where('target_quarter', '<', $currentQ)
-            ->latest()
-            ->take(10)
-            ->get();
+        // Full overdue set (not yet procured, past its target quarter) — the
+        // "10 alerts to display" list below is only a slice of this, so the
+        // summary count must come from the full filtered set, not the slice.
+        $overdueItemsAll = $allItems->filter(fn ($item) =>
+            $item->target_quarter
+            && $item->target_quarter < $currentQ
+            && $matchedPrFor($item)?->lifecycleBucket() !== 'completed'
+        )->sortByDesc('target_quarter')->values();
 
-        $overdueAlerts = $overdueItems->map(fn ($item) => [
-            'item'        => $item->name,
-            'office'      => $item->budgetProposal?->office?->code ?? '—',
-            'prNumber'    => '—',
-            'daysOverdue' => (int) now()->diffInDays($quarterEnd($item->target_quarter)),
-            'status'      => 'Overdue',
-        ])->all();
+        $overdueAlerts = $overdueItemsAll->take(10)->map(function ($item) use ($matchedPrFor, $quarterEnd) {
+            $pr = $matchedPrFor($item);
+
+            return [
+                'item'        => $item->name,
+                'office'      => $item->budgetProposal?->office?->code ?? '—',
+                'prNumber'    => $pr?->number ?? 'Not yet raised',
+                'daysOverdue' => (int) now()->diffInDays($quarterEnd($item->target_quarter)),
+                'status'      => $pr ? ucfirst(str_replace('_', ' ', $pr->lifecycleBucket())) : 'Not Started',
+            ];
+        })->values()->all();
 
         return view('prism.chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Chancellor Campus Monitoring Dashboard',
@@ -150,28 +187,55 @@ class PrismChancellorController extends Controller
                 'totalAppItems'     => $totalAppItems,
                 'itemsProcured'     => $itemsProcured,
                 'itemsPending'      => $itemsPending,
-                'itemsOverdue'      => count($overdueAlerts),
+                'itemsOverdue'      => $overdueItemsAll->count(),
                 'campusUtilization' => $campusUtilization,
             ],
             'quarterlyStatuses'   => $quarterlyStatuses,
             'forecasts'           => $forecasts,
             'utilizationRankings' => $utilizationRankings,
             'overdueAlerts'       => $overdueAlerts,
+            'itemStatusChart'     => [
+                'procured' => $itemsProcured,
+                'pending'  => max(0, $itemsPending - $overdueItemsAll->count()),
+                'overdue'  => $overdueItemsAll->count(),
+            ],
+            'officeUtilizationChart' => $officeMetrics->map(fn ($r) => [
+                'office'   => $r['office'],
+                'budget'   => round($r['budget']),
+                'utilized' => round($r['utilized']),
+            ])->values()->all(),
         ]));
     }
 
+    private const CHANCELLOR_DETAIL_RELATIONS = ['office', 'submittedBy', 'items.marketReferences', 'reviews.reviewedBy'];
+
     public function budgetApproval(): View
     {
-        $proposals = BudgetProposal::with(['office', 'submittedBy', 'items.marketReferences', 'reviews.reviewedBy'])
+        $proposals = BudgetProposal::with(self::CHANCELLOR_DETAIL_RELATIONS)
             ->where('status', 'endorsed')
             ->latest('reviewed_at')
             ->get()
             ->map(fn ($p) => $this->formatProposalForChancellor($p))
             ->all();
 
+        // Proposals already decided on — kept visible here instead of just
+        // vanishing from the queue once acted on, so an approved/returned
+        // PPMP is still findable, not merely gone.
+        $archivedProposals = BudgetProposal::with(self::CHANCELLOR_DETAIL_RELATIONS)
+            ->whereIn('status', ['approved', 'returned'])
+            // approve() doesn't touch reviewed_at (only returnProposal() does),
+            // so sort by whichever of the two actually reflects the Chancellor's
+            // own decision, not just Finance's earlier endorsement timestamp.
+            ->orderByRaw('COALESCE(approved_at, reviewed_at) DESC')
+            ->get()
+            ->map(fn ($p) => $this->formatProposalForChancellor($p))
+            ->all();
+
         return view('prism.chancellor.budget-approval', $this->withCommon('budget-approval', [
-            'pageTitle' => 'Chancellor Budget Approval',
-            'proposals' => $proposals,
+            'pageTitle'          => 'Chancellor Budget Approval',
+            'proposals'          => $proposals,
+            'archivedProposals'  => $archivedProposals,
+            'offices'            => Office::whereHas('budgetProposals')->select('id', 'code', 'name')->orderBy('code')->get()->toArray(),
         ]));
     }
 
@@ -201,7 +265,13 @@ class PrismChancellorController extends Controller
 
         NotificationService::proposalApproved($proposal);
 
-        return response()->json(['success' => true, 'message' => 'Proposal approved.']);
+        $proposal->load(self::CHANCELLOR_DETAIL_RELATIONS);
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'Proposal approved.',
+            'proposal' => $this->formatProposalForChancellor($proposal),
+        ]);
     }
 
     /**
@@ -275,9 +345,24 @@ class PrismChancellorController extends Controller
 
         NotificationService::proposalReturnedByChancellor($proposal, $remarks);
 
-        return response()->json(['success' => true, 'message' => 'Proposal returned to Budget Office.']);
+        $proposal->load(self::CHANCELLOR_DETAIL_RELATIONS);
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'Proposal returned to Budget Office.',
+            'proposal' => $this->formatProposalForChancellor($proposal),
+        ]);
     }
 
+    /**
+     * Same real-data fixes as dashboard(): "procured" is a genuine PPMP-item →
+     * PR match reaching lifecycleBucket() 'completed' (not a raw PR count
+     * compared against an item count — different units entirely), "utilized"
+     * uses the lifecycleBucket() in_progress/completed convention shared with
+     * Finance's Budget Utilization Report, and "delayed" means genuinely
+     * still-open and past a reasonable turnaround, not the raw `status`
+     * column (which never actually holds the literal value 'delayed').
+     */
     public function procurementReports(): View
     {
         $offices = Office::has('budgetProposals')
@@ -287,19 +372,55 @@ class PrismChancellorController extends Controller
             ])
             ->get();
 
-        $currentQNumber = (int) ltrim($this->currentQuarter(), 'Q');
+        $currentQ       = $this->currentQuarter();
+        $currentQNumber = (int) ltrim($currentQ, 'Q');
 
-        $accomplishmentRows = $offices->map(function ($office) {
-            $targeted       = $office->budgetProposals->flatMap->items->count();
-            $procured       = $office->purchaseRequests->where('status', 'completed')->count();
+        $allItems = BudgetProposalItem::with('budgetProposal.office')
+            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->get();
+        $officeIds     = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
+        $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
+        $isItemProcured = function ($item) use ($prItemMatches) {
+            $officeId = $item->budgetProposal?->office_id;
+
+            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest?->lifecycleBucket() === 'completed';
+        };
+
+        $accomplishmentRows = $offices->map(function ($office) use ($allItems, $isItemProcured) {
+            $officeItems    = $allItems->filter(fn ($item) => $item->budgetProposal?->office_id === $office->id);
+            $targeted       = $officeItems->count();
+            $procured       = $officeItems->filter($isItemProcured)->count();
             $completionRate = $targeted > 0 ? round(($procured / $targeted) * 100) : 0;
 
             return ['office' => $office->code, 'targeted' => $targeted, 'procured' => $procured, 'completionRate' => $completionRate];
         })->filter(fn ($r) => $r['targeted'] > 0)->values()->all();
 
+        // Same items, broken down by target_quarter — gives a formal report
+        // reader the per-quarter picture, not just an office-level rollup.
+        $quarterlyRows = $allItems
+            ->filter(fn ($item) => $item->target_quarter)
+            ->groupBy(fn ($item) => ($item->budgetProposal?->office?->code ?? '—') . '|' . $item->target_quarter)
+            ->map(function ($group) use ($isItemProcured) {
+                $first    = $group->first();
+                $targeted = $group->count();
+                $procured = $group->filter($isItemProcured)->count();
+
+                return [
+                    'office'         => $first->budgetProposal?->office?->code ?? '—',
+                    'quarter'        => $first->target_quarter,
+                    'targeted'       => $targeted,
+                    'procured'       => $procured,
+                    'completionRate' => $targeted > 0 ? round(($procured / $targeted) * 100) : 0,
+                ];
+            })
+            ->sortBy(fn ($r) => $r['office'] . $r['quarter'])
+            ->values()->all();
+
         $utilizationSummary = $offices->map(function ($office) use ($currentQNumber) {
             $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized = (float) $office->purchaseRequests->whereIn('status', ['approved', 'completed'])->sum('total_amount');
+            $utilized = (float) $office->purchaseRequests
+                ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
+                ->sum('total_amount');
             $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
@@ -307,23 +428,36 @@ class PrismChancellorController extends Controller
             return ['office' => $office->code, 'budget' => $budget, 'utilized' => $utilized, 'forecast' => $forecast, 'risk' => $risk];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
+        $overdueThresholdDays = 30;
         $delayedByOffice = PurchaseRequest::with('office')
-            ->where('status', 'delayed')
-            ->latest()
             ->get()
+            ->filter(fn ($pr) =>
+                $pr->signingStatusBucket() !== 'completed'
+                && $pr->submitted_at
+                && $pr->submitted_at->diffInDays(now()) > $overdueThresholdDays
+            )
             ->groupBy(fn ($pr) => $pr->office?->code ?? '—')
-            ->map(fn ($prs) => $prs->map(fn ($pr) => [
-                'item'     => $pr->title,
-                'prNumber' => $pr->number ?? '—',
-                'remarks'  => $pr->remarks ?? '—',
-            ])->all())
+            ->map(fn ($prs) => $prs->sortByDesc(fn ($pr) => $pr->submitted_at->diffInDays(now()))
+                ->map(fn ($pr) => [
+                    'item'     => $pr->title,
+                    'prNumber' => $pr->number ?? '—',
+                    'remarks'  => $pr->remarks ?: ((int) $pr->submitted_at->diffInDays(now()) . " days pending — past the {$overdueThresholdDays}-day target."),
+                ])->values()->all())
             ->all();
 
         return view('prism.chancellor.procurement-reports', $this->withCommon('procurement-reports', [
             'pageTitle'          => 'Chancellor Procurement Reports',
+            'generatedAt'        => now()->format('M d, Y g:i A'),
             'accomplishmentRows' => $accomplishmentRows,
+            'quarterlyRows'      => $quarterlyRows,
             'utilizationSummary' => $utilizationSummary,
             'delayedByOffice'    => $delayedByOffice,
+            'accomplishmentChart' => collect($accomplishmentRows)->map(fn ($r) => [
+                'office' => $r['office'], 'targeted' => $r['targeted'], 'procured' => $r['procured'],
+            ])->values()->all(),
+            'utilizationChart' => collect($utilizationSummary)->map(fn ($r) => [
+                'office' => $r['office'], 'budget' => round($r['budget']), 'utilized' => round($r['utilized']),
+            ])->values()->all(),
         ]));
     }
 
@@ -334,26 +468,66 @@ class PrismChancellorController extends Controller
         $financeReview = $p->reviews->where('action', 'endorse')->sortByDesc('reviewed_at')->first();
 
         return [
-            'id'            => $p->id,
-            'office'        => $p->office?->code ?? '—',
-            'title'         => $p->title,
-            'totalAmount'   => (float) $p->total_estimated_cost,
-            'dateEndorsed'  => $p->reviewed_at?->format('M d, Y') ?? '—',
-            'financeRemarks'=> $financeReview?->remarks ?? $p->remarks ?? '—',
-            'status'        => ucfirst($p->status),
-            'marketScoping' => $p->items->flatMap->marketReferences->count() . ' market references attached',
-            'approveUrl'    => route('chancellor.budget-approval.approve', $p->id),
-            'returnUrl'     => route('chancellor.budget-approval.return', $p->id),
-            'items'         => $p->items->map(fn ($item) => [
-                'name'          => $item->name,
-                'quantity'      => (int) $item->quantity,
-                'justification' => $item->remarks ?? '',
-                'amount'        => (float) $item->estimated_total_cost,
+            'id'             => $p->id,
+            'code'           => $p->code ?? '—',
+            'office'         => $p->office?->code ?? '—',
+            'officeName'     => $p->office?->name ?? '—',
+            'title'          => $p->title,
+            'fiscalYear'     => (string) $p->fiscal_year,
+            'officeHead'     => $p->submittedBy?->name ?? '—',
+            'submittedDate'  => $p->submitted_at?->format('M d, Y') ?? '—',
+            'totalAmount'    => (float) $p->total_estimated_cost,
+            'proposedBudget' => (float) ($p->proposed_budget ?? $p->total_estimated_cost),
+            'dateEndorsed'   => $p->reviewed_at?->format('M d, Y') ?? '—',
+            'dateEndorsedRaw'=> $p->reviewed_at?->toIso8601String(),
+            // The Chancellor's own decision date — approve() doesn't touch
+            // reviewed_at (only returnProposal() does), so this is the
+            // reliable "when did Chancellor act" field for the archive.
+            'decidedDate'    => ($p->approved_at ?? $p->reviewed_at)?->format('M d, Y') ?? '—',
+            'decidedAtRaw'   => ($p->approved_at ?? $p->reviewed_at)?->toIso8601String(),
+            'financeRemarks' => $financeReview?->remarks ?? $p->remarks ?? '—',
+            'status'         => ucfirst($p->status),
+            'marketScoping'  => $p->items->flatMap->marketReferences->count() . ' market references attached',
+            'approveUrl'     => route('chancellor.budget-approval.approve', $p->id),
+            'returnUrl'      => route('chancellor.budget-approval.return', $p->id),
+            'items'          => $p->items->map(fn ($item) => [
+                'name'           => $item->name,
+                'quantity'       => (int) $item->quantity,
+                'unit'           => $item->unit ?: '—',
+                'unitCost'       => (float) $item->estimated_unit_cost,
+                'sourceOfFund'   => $item->source_of_fund ?: '—',
+                'classification' => $item->item_classification ?: '—',
+                'targetQuarter'  => $item->target_quarter ?: '—',
+                'justification'  => $item->remarks ?? '',
+                'amount'         => (float) $item->estimated_total_cost,
             ])->all(),
+            // {text, time} entries — rendered as a collapsible activity log,
+            // same as the PR/AOC/PO signature history elsewhere in the app.
             'approvalTrail' => $p->reviews->sortBy('reviewed_at')
-                ->map(fn ($r) => ($r->reviewed_at?->format('M d, Y') ?? '?') . ' — ' . ucfirst($r->action) . ' by ' . ($r->reviewedBy?->name ?? 'System'))
-                ->join('<br>'),
+                ->map(fn ($r) => [
+                    'text' => ucfirst($r->action) . ' by ' . ($r->reviewedBy?->name ?? 'System') . ($r->remarks ? ' — ' . $r->remarks : ''),
+                    'time' => $r->reviewed_at?->format('M d, Y g:i A') ?? '—',
+                ])
+                ->values()->all(),
         ];
+    }
+
+    /**
+     * Best-effort match from a BudgetProposalItem (PPMP) to the downstream PR
+     * item eventually raised for it. No stored link exists yet between the two,
+     * so we match on office + item name and keep the most recently created PR
+     * per pair. Returns PurchaseRequestItem (not the PR itself), keyed by
+     * "office_id|lower(trim(item name))" — callers read ->purchaseRequest when
+     * they need the parent PR.
+     */
+    private function matchPrItemsByOfficeAndName(\Illuminate\Support\Collection $officeIds): \Illuminate\Support\Collection
+    {
+        return PurchaseRequestItem::with('purchaseRequest.abstractOfCanvass.purchaseOrder')
+            ->whereHas('purchaseRequest', fn ($q) => $q->whereIn('office_id', $officeIds))
+            ->get()
+            ->filter(fn ($pri) => $pri->purchaseRequest !== null)
+            ->groupBy(fn ($pri) => $pri->purchaseRequest->office_id . '|' . strtolower(trim($pri->name)))
+            ->map(fn ($group) => $group->sortByDesc(fn ($pri) => $pri->purchaseRequest->created_at)->first());
     }
 
     private function currentQuarter(): string

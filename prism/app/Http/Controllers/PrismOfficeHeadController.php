@@ -297,6 +297,26 @@ class PrismOfficeHeadController extends Controller
     }
 
     /**
+     * Explicit "Create New PPMP" action — offered once the office head is
+     * viewing an approved PPMP with nothing left to edit (see the read-only
+     * banner in budget-proposal.blade.php). Mirrors the same find-or-create
+     * lookup the auto-start path uses, just triggered by a deliberate click
+     * instead of silently on landing, and always lands on the new draft
+     * explicitly (?proposal=) so it isn't ambiguous with whatever the
+     * session happened to remember.
+     */
+    public function createNewProposal(): RedirectResponse
+    {
+        $officeId = $this->officeId();
+        $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
+
+        $proposal = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
+            ?? $this->createDraftProposal($officeId, $nextYear);
+
+        return redirect()->route('office-head.budget-proposal', ['proposal' => $proposal->id]);
+    }
+
+    /**
      * A blank draft PPMP for the given office/fiscal year — no office/title
      * template baked in, so the office head starts from an empty form rather
      * than a presumptuous prefilled one. Used to auto-start a PPMP whenever the
@@ -494,38 +514,44 @@ class PrismOfficeHeadController extends Controller
     {
         $purchaseItems = PurchaseRequest::with(['items', 'abstractOfCanvass.purchaseOrder'])
             ->where('office_id', $this->officeId())
-            ->orderByRaw("FIELD(status, 'in_progress', 'pending', 'approved', 'completed', 'delayed')")
-            ->orderBy('number')
+            ->orderByDesc('created_at')
             ->get()
-            ->map(fn ($pr) => [
-                'dbId'        => $pr->id,
-                'number'      => $pr->number ?? "pr-{$pr->id}",
-                'title'       => $pr->title,
-                'quarter'     => $this->extractQuarter($pr->number ?? ''),
-                'fiscalYear'  => $pr->fiscal_year,
-                'totalAmount' => (float) ($pr->total_amount ?? 0),
-                'status'      => $pr->status,
-                'statusLabel' => ucwords(str_replace('_', ' ', $pr->status)),
-                'trackingStatus' => (function () use ($pr) {
-                    $tracking = $pr->effectiveTrackingStatus();
-                    // End users don't need internal-office phrasing — once paid, their
-                    // request has simply reached its final, completed state.
-                    if (($tracking['key'] ?? null) === 'paid') {
-                        $tracking['label'] = 'Completed';
-                    }
-                    return $tracking;
-                })(),
-                'remarks'     => $pr->remarks ?? '',
-                'uploadedAt'  => $pr->uploaded_at?->format('M d, Y'),
-                'itemCount'   => $pr->items->count(),
-                'items'       => $pr->items->map(fn ($item) => [
-                    'name'      => $item->name,
-                    'quantity'  => (int) $item->quantity,
-                    'unit'      => $item->unit,
-                    'unitCost'  => (float) $item->estimated_unit_cost,
-                    'totalCost' => (float) $item->estimated_total_cost,
-                ])->all(),
-            ])
+            ->map(function ($pr) {
+                $tracking = $pr->effectiveTrackingStatus();
+                // End users don't need internal-office phrasing — once paid, their
+                // request has simply reached its final, completed state.
+                if (($tracking['key'] ?? null) === 'paid') {
+                    $tracking['label'] = 'Completed';
+                }
+                $bucket = $this->bucketTrackingStage($tracking['key'] ?? '');
+
+                return [
+                    'dbId'        => $pr->id,
+                    'number'      => $pr->number ?? "pr-{$pr->id}",
+                    'title'       => $pr->title,
+                    'quarter'     => $this->extractQuarter($pr->number ?? ''),
+                    'fiscalYear'  => $pr->fiscal_year,
+                    'totalAmount' => (float) ($pr->total_amount ?? 0),
+                    // Drives the main status badge/KPI counts — derived from the
+                    // always-accurate tracking chain (see bucketTrackingStage()),
+                    // not the raw `status` column.
+                    'statusBucket' => $bucket,
+                    'statusLabel'  => ['pending' => 'Pending', 'in_progress' => 'In Progress', 'completed' => 'Completed', 'delayed' => 'Delayed'][$bucket],
+                    'trackingStatus' => $tracking,
+                    'remarks'     => $pr->remarks ?? '',
+                    'uploadedAt'  => $pr->uploaded_at?->format('M d, Y'),
+                    'createdAt'   => $pr->created_at->toIso8601String(),
+                    'pdfFile'     => $pr->file_path,
+                    'itemCount'   => $pr->items->count(),
+                    'items'       => $pr->items->map(fn ($item) => [
+                        'name'      => $item->name,
+                        'quantity'  => (int) $item->quantity,
+                        'unit'      => $item->unit,
+                        'unitCost'  => (float) $item->estimated_unit_cost,
+                        'totalCost' => (float) $item->estimated_total_cost,
+                    ])->all(),
+                ];
+            })
             ->all();
 
         return view('prism.office-head.purchase-requests', $this->withCommon('office-head', 'purchase-requests', [
@@ -537,6 +563,28 @@ class PrismOfficeHeadController extends Controller
     private function extractQuarter(string $number): string
     {
         return preg_match('/-(Q[1-4])(?:-|$)/', $number, $m) ? $m[1] : '';
+    }
+
+    /**
+     * Simple 4-state lifecycle bucket (pending / in_progress / completed /
+     * delayed) for the "My Purchase Requests" page's KPI cards, Queue Health
+     * panel, and status filter — derived from the always-accurate
+     * currentTrackingStage() chain (see PurchaseRequest::currentTrackingStage())
+     * rather than the raw `status` column, which mixes two different,
+     * inconsistent vocabularies across older vs newer records (plain
+     * 'pending'/'approved' alongside granular procurement-pipeline values
+     * like 'for_alobs'/'po_confirmed') and so can't be reliably matched
+     * against on its own — most of those granular values were silently
+     * falling out of every bucket entirely.
+     */
+    private function bucketTrackingStage(string $key): string
+    {
+        return match (true) {
+            str_starts_with($key, 'halted:') => 'delayed',
+            $key === 'pr:not_yet_created'    => 'pending',
+            $key === 'paid'                  => 'completed',
+            default                          => 'in_progress',
+        };
     }
 
     /** Sum of this office's PR totals per calendar month, current year, for the dashboard's bar chart. */

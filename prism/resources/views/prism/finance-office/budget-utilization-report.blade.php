@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Budget Utilization Report | Budget Office')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     :root {
@@ -80,11 +84,32 @@
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
+    .charts-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+    .chart-wrap  { position: relative; width: 100%; height: 240px; }
+
+    .btn-print {
+        display: inline-flex; align-items: center; gap: 6px;
+        height: 38px; padding: 0 16px; border-radius: 10px;
+        border: 1px solid var(--crimson-border); background: #fff;
+        color: var(--crimson); font-size: 12.5px; font-weight: 700;
+        cursor: pointer; font-family: 'Poppins', sans-serif; transition: background .15s;
+        margin-left: auto;
+    }
+    .btn-print:hover { background: var(--crimson-mid); }
+
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 1024px) { .page-shell { padding: 16px 16px 40px; } }
+    @media (max-width: 1024px) { .page-shell { padding: 16px 16px 40px; } .charts-grid { grid-template-columns: 1fr; } }
     @media (max-width: 640px) {
         .stats-grid { grid-template-columns: 1fr; }
         .filters-grid { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+        .btn-print { display: none !important; }
+        body { background: #fff; }
+        .page-shell { padding: 0; }
+        .table-wrap { max-height: none; overflow: visible; }
+        #filtersCard { display: none !important; }
     }
 </style>
 @endpush
@@ -100,6 +125,26 @@
             <h1 class="page-hdr-title">Budget Utilization Report</h1>
             <p class="page-hdr-sub">Track campus budget utilization, offices at risk, and office-level spending progress by quarter.</p>
         </div>
+        <button class="btn-print" type="button" onclick="window.print()">
+            <i class="ti ti-printer"></i> Print / Export
+        </button>
+    </div>
+
+    <div class="charts-grid">
+        <article class="card">
+            <p class="card-eyebrow">Per office</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Budget vs. Utilized</h2>
+            <div class="chart-wrap">
+                <canvas id="officeChart" data-offices="{{ json_encode($utilByOfficeChart) }}"></canvas>
+            </div>
+        </article>
+        <article class="card">
+            <p class="card-eyebrow">Across all offices/quarters</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Risk Distribution</h2>
+            <div class="chart-wrap">
+                <canvas id="riskChart" data-risk="{{ json_encode($riskDistribution) }}"></canvas>
+            </div>
+        </article>
     </div>
 
     <div class="stats-grid">
@@ -129,7 +174,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="filtersCard">
         <div class="filters-grid">
             <div>
                 <label class="field-label" for="utilQuarterFilter">Quarter</label>
@@ -229,6 +274,54 @@
 
     quarterEl.addEventListener('change', applyFilters);
     officeEl.addEventListener('change',  applyFilters);
+
+    const officeChartEl = document.getElementById('officeChart');
+    if (officeChartEl) {
+        const offices = JSON.parse(officeChartEl.dataset.offices || '[]');
+        // Horizontal, not vertical — dozens of offices campus-wide means a
+        // vertical bar chart's x-axis labels collide past a handful of bars.
+        officeChartEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        new Chart(officeChartEl, {
+            type: 'bar',
+            data: {
+                labels: offices.map(o => o.office),
+                datasets: [
+                    { label: 'Budget', data: offices.map(o => o.budget), backgroundColor: '#e2e8f0', borderRadius: 4 },
+                    { label: 'Utilized', data: offices.map(o => o.utilized), backgroundColor: '#681012', borderRadius: 4 },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                    tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': PHP ' + Number(ctx.raw).toLocaleString() } },
+                },
+                scales: { x: { ticks: { callback: (v) => 'PHP ' + Number(v).toLocaleString(undefined, { notation: 'compact' }) } } },
+            },
+        });
+    }
+
+    const riskChartEl = document.getElementById('riskChart');
+    if (riskChartEl) {
+        const risk = JSON.parse(riskChartEl.dataset.risk || '{}');
+        const labels = ['On Track', 'Watch', 'At Risk'];
+        new Chart(riskChartEl, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: labels.map(l => risk[l] || 0),
+                    backgroundColor: ['#16a34a', '#d97706', '#dc2626'],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+            },
+        });
+    }
 })();
 </script>
 @endpush

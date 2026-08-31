@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class PrismAdminController extends Controller
@@ -86,7 +87,7 @@ class PrismAdminController extends Controller
             'email'           => 'required|email|max:255|unique:users,email',
             'employee_number' => 'nullable|string|max:100',
             'position_title'  => 'nullable|string|max:255',
-            'password'        => 'required|string|min:8',
+            'password'        => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role_id'         => 'required|exists:roles,id',
             'office_id'       => 'required|exists:offices,id',
         ]);
@@ -157,7 +158,7 @@ class PrismAdminController extends Controller
 
     public function resetPassword(Request $request, User $user): JsonResponse
     {
-        $validated = $request->validate(['password' => 'required|string|min:8']);
+        $validated = $request->validate(['password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()]]);
 
         $user->update(['password' => Hash::make($validated['password'])]);
 

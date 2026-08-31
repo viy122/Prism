@@ -44,10 +44,15 @@
     .badge-issued    { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
     .badge-delivery  { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
     .badge-complete  { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
-    .badge-paid      { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
     .badge-draft     { background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
     .badge-routing   { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
     .badge-signed    { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+
+    .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
     /* Colors here use the globally-defined --crimson/--crimson-dark (set on
        :root in the base layout) rather than this page's --m/--m-dk aliases
@@ -115,7 +120,7 @@
     /* Delivery & payment timeline (separate chain) — same red/green as the
        signatory timeline above (PR and AOC's tracking uses only those two),
        so no color override here; just the wrap-related line fix below. */
-    /* 6 steps wrap onto a second row after "At Accounting – Processing Payment"
+    /* 6 steps wrap onto a second row after "Waiting for Cashier – Payment Receipt"
        (5th step) at this panel's width, dropping "Paid" to its own line below —
        the connector line assumes a same-row next step, so it dangles rightward
        into nothing at the wrap point. Cut just that one line. */
@@ -127,8 +132,6 @@
     .btn-route-ret { background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
     .btn-route-ret:hover:not(:disabled) { background: var(--s200); }
     .btn-route:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-route-purple { background: #5b21b6; color: #fff; }
-    .btn-route-purple:hover:not(:disabled) { background: #4c1d95; }
 
     .remarks-textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--s200); background: var(--white); color: var(--s700); font-size: 13px; font-family: 'Poppins', sans-serif; resize: vertical; min-height: 60px; outline: none; transition: border-color .2s; line-height: 1.6; box-sizing: border-box; }
     .remarks-textarea:focus { border-color: var(--m); }
@@ -181,7 +184,7 @@
 
     {{-- ── Eligible AOCs (ready for PO issuance) ── --}}
     @if(count($eligibleAocs) > 0)
-    <div class="card">
+    <div class="card" id="eligiblePoCard">
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">Ready for PO</p>
@@ -219,9 +222,23 @@
             </div>
 
             @if(count($purchaseOrders) > 0)
-                <div class="search-wrap" style="margin-bottom:14px;">
-                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input class="search-input" type="search" id="poSearch" placeholder="Search by PO number, AOC code, office, or supplier">
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input class="search-input" type="search" id="poSearch" placeholder="Search by PO number, AOC code, office, or supplier">
+                    </div>
+                    <select class="filter-select" id="poOfficeFilter" title="Filter by office">
+                        <option value="">All Offices</option>
+                        @foreach($offices as $office)
+                            <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
+                        @endforeach
+                    </select>
+                    <select class="filter-select" id="poStatusFilter" title="Filter by signatory status">
+                        <option value="">All Statuses</option>
+                        <option value="fully_signed">Fully Signed</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="draft">Draft</option>
+                    </select>
                 </div>
             @endif
 
@@ -252,7 +269,7 @@
                                 default        => 'badge-routing',
                             };
                         @endphp
-                        <tr data-po-row data-po-id="{{ $po['id'] }}" data-search="{{ strtolower($po['poNumber'] . ' ' . $po['aocCode'] . ' ' . $po['office'] . ' ' . $po['supplier']) }}" tabindex="0">
+                        <tr data-po-row data-po-id="{{ $po['id'] }}" data-office="{{ $po['office'] }}" data-status-bucket="{{ $po['statusBucket'] }}" data-search="{{ strtolower($po['poNumber'] . ' ' . $po['aocCode'] . ' ' . $po['office'] . ' ' . $po['supplier']) }}" tabindex="0">
                             <td style="font-weight:700;font-size:12px;color:var(--s500);white-space:nowrap;">{{ $po['poNumber'] }}</td>
                             <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $po['aocCode'] }}</td>
                             <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['office'] }}</td>
@@ -292,7 +309,7 @@
                 </div>
                 <label class="upload-pr-label" id="uploadPoLabel">
                     <i class="ti ti-upload"></i>
-                    <span id="uploadPoText">Upload Signed PO PDF</span>
+                    <span id="uploadPoText">Upload PO PDF</span>
                     <input type="file" id="uploadPoInput" accept="application/pdf,.pdf">
                 </label>
 
@@ -418,6 +435,8 @@
     const statusAction   = document.getElementById('statusAction');
     const csrfToken      = document.querySelector('meta[name="csrf-token"]').content;
     const poSearch       = document.getElementById('poSearch');
+    const poOfficeFilter = document.getElementById('poOfficeFilter');
+    const poStatusFilter = document.getElementById('poStatusFilter');
     const poCount        = document.getElementById('poVisibleCount');
     const uploadPoInput  = document.getElementById('uploadPoInput');
     const uploadPoText   = document.getElementById('uploadPoText');
@@ -536,7 +555,7 @@
                 partial_delivery:  'Mark Partial Delivery',
                 complete_delivery: 'Mark Complete Delivery',
             })[po.nextStatus] || 'Advance';
-            statusAction.innerHTML = `<button class="btn-route btn-route-purple" id="btnAdvanceStatus" type="button"><i class="ti ti-circle-arrow-right"></i> ${nextLabel}</button>`;
+            statusAction.innerHTML = `<button class="btn-route btn-route-fwd" id="btnAdvanceStatus" type="button"><i class="ti ti-circle-arrow-right"></i> ${nextLabel}</button>`;
 
             document.getElementById('btnAdvanceStatus').addEventListener('click', async () => {
                 const btn = document.getElementById('btnAdvanceStatus');
@@ -590,9 +609,9 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = po.pdfFile
-            ? `<iframe src="/storage/${po.pdfFile}" title="PO Document"></iframe>`
+            ? `<iframe src="/storage/${po.pdfFile}#toolbar=0" title="PO Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
-        uploadPoText.textContent = po.pdfFile ? 'Re-upload PDF' : 'Upload Signed PO PDF';
+        uploadPoText.textContent = po.pdfFile ? 'Re-upload PDF' : 'Upload PO PDF';
 
         document.getElementById('sigTimeline').innerHTML = timelineHtml(
             po.stageMeta ? po.stageMeta.filter(m => !['draft', 'fully_signed'].includes(m.key)).map(m => ({
@@ -651,16 +670,23 @@
 
     function applyPoSearchFilter() {
         if (!poSearch) return;
-        const q = poSearch.value.trim().toLowerCase();
+        const q      = poSearch.value.trim().toLowerCase();
+        const office = poOfficeFilter ? poOfficeFilter.value : '';
+        const status = poStatusFilter ? poStatusFilter.value : '';
         let visible = 0;
         getRows().forEach(row => {
-            const match = !q || (row.dataset.search ?? '').includes(q);
+            const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
+            const matchesOffice = !office || row.dataset.office === office;
+            const matchesStatus = !status || row.dataset.statusBucket === status;
+            const match = matchesSearch && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (poCount) poCount.textContent = visible + (visible === 1 ? ' PO' : ' POs');
     }
     poSearch?.addEventListener('input', applyPoSearchFilter);
+    poOfficeFilter?.addEventListener('change', applyPoSearchFilter);
+    poStatusFilter?.addEventListener('change', applyPoSearchFilter);
 
     logToggle.addEventListener('click', () => {
         logToggle.classList.toggle('open');
@@ -763,7 +789,7 @@
                 activePo.alobsNo    = json.alobsNo || activePo.alobsNo;
                 activePo.fundSource = json.fundSource || activePo.fundSource;
                 document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.filePath}" title="PO Document"></iframe>`;
+                    `<iframe src="/storage/${json.filePath}#toolbar=0" title="PO Document"></iframe>`;
                 document.getElementById('fAlobsNo').textContent    = activePo.alobsNo || '—';
                 document.getElementById('fFundSource').textContent = activePo.fundSource || '—';
                 uploadPoText.textContent = 'Re-upload PDF';
@@ -785,10 +811,12 @@
     const btnCancel  = document.getElementById('btnCancelPo');
     const btnConfirm = document.getElementById('btnConfirmPo');
     let pendingIssueUrl = null;
+    let pendingAocId    = null;
 
     document.querySelectorAll('.btn-issue-po').forEach(btn => {
         btn.addEventListener('click', () => {
             pendingIssueUrl = btn.dataset.url;
+            pendingAocId    = btn.dataset.aocId;
             document.getElementById('poModalAocCode').textContent = 'AOC: ' + btn.dataset.aocCode;
             document.getElementById('poSupplierName').value = '';
             document.getElementById('poSupplierAddr').value = '';
@@ -800,6 +828,22 @@
 
     btnCancel.addEventListener('click', () => { modal.style.display = 'none'; });
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+    /* ── Issue PO — appends to the top of the list and opens it immediately,
+       no reload / second click needed. ── */
+    function addNewPo(po, aocId) {
+        allPos.unshift(po);
+
+        document.querySelector(`.btn-issue-po[data-aoc-id="${aocId}"]`)?.closest('.eligible-card')?.remove();
+        if (!document.querySelector('.eligible-card')) {
+            document.getElementById('eligiblePoCard')?.remove();
+        }
+
+        if (!tbody) { location.reload(); return; } // rare: list was empty at page load
+        tbody.insertAdjacentHTML('afterbegin', rowHtml(po));
+        applyPoSearchFilter();
+        openPo(po);
+    }
 
     btnConfirm.addEventListener('click', async () => {
         const supplierName = document.getElementById('poSupplierName').value.trim();
@@ -822,8 +866,9 @@
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
-                showToast('Purchase Order issued. Reloading…');
-                setTimeout(() => location.reload(), 1000);
+                showToast('Purchase Order issued — ' + json.po.poNumber);
+                modal.style.display = 'none';
+                addNewPo(json.po, pendingAocId);
             } else {
                 showToast(json.error || 'Failed to issue PO.', true);
             }
@@ -852,7 +897,7 @@
         const sigBadge = po.signatoryStage === 'fully_signed' ? 'badge-signed'
             : (po.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
         const search = (po.poNumber + ' ' + po.aocCode + ' ' + po.office + ' ' + po.supplier).toLowerCase();
-        return `<tr data-po-row data-po-id="${po.id}" data-search="${escapeHtml(search)}" tabindex="0">
+        return `<tr data-po-row data-po-id="${po.id}" data-office="${escapeHtml(po.office)}" data-status-bucket="${po.statusBucket || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td style="font-weight:700;font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(po.poNumber)}</td>
             <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(po.aocCode)}</td>
             <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(po.office)}</td>
@@ -888,10 +933,11 @@
             });
 
             fresh.forEach(po => {
-                if (!existingIds.has(String(po.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(po));
+                if (!existingIds.has(String(po.id))) tbody.insertAdjacentHTML('afterbegin', rowHtml(po));
             });
 
             if (activePo) tbody.querySelector(`[data-po-id="${activePo.id}"]`)?.classList.add('selected');
+            applyPoSearchFilter();
 
             applyPoSearchFilter();
         }
@@ -909,6 +955,20 @@
                 renderDetail(activePo);
             }
         }
+    }
+
+    // Jump straight to a specific PO's row/detail when arriving via a
+    // "?po=<id>" link (e.g. "View in Purchase Orders →" from the AOC page)
+    // instead of landing on the tab in general and leaving the user to find
+    // the record themselves.
+    const targetPoId = new URLSearchParams(location.search).get('po');
+    if (targetPoId) {
+        const targetPo = allPos.find(p => String(p.id) === String(targetPoId));
+        if (targetPo) {
+            openPo(targetPo);
+            tbody?.querySelector(`[data-po-id="${targetPoId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        history.replaceState(null, '', location.pathname);
     }
 
     if (refreshUrl) {

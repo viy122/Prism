@@ -52,6 +52,11 @@
     .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
     .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     .search-input::placeholder { color: var(--s400); }
+    .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
     /* Detail panel */
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
@@ -179,15 +184,15 @@
 
     {{-- ── Eligible PRs (ready for AOC creation) ── --}}
     @if(count($eligiblePrs) > 0)
-    <div class="card">
+    <div class="card" id="eligibleAocCard">
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">Ready for AOC</p>
                 <h2 class="card-title">Fully-Signed PRs — Create AOC</h2>
             </div>
-            <span class="count-chip">{{ count($eligiblePrs) }} PR{{ count($eligiblePrs) !== 1 ? 's' : '' }} waiting</span>
+            <span class="count-chip" id="eligibleAocCount">{{ count($eligiblePrs) }} PR{{ count($eligiblePrs) !== 1 ? 's' : '' }} waiting</span>
         </div>
-        <div class="eligible-grid">
+        <div class="eligible-grid" id="eligibleAocGrid">
             @foreach($eligiblePrs as $pr)
             <div class="eligible-card">
                 <div>
@@ -217,9 +222,23 @@
             </div>
 
             @if(count($aocs) > 0)
-                <div class="search-wrap" style="margin-bottom:14px;">
-                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input class="search-input" type="search" id="aocSearch" placeholder="Search by AOC code, PR number, office, or title">
+                <div class="search-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input class="search-input" type="search" id="aocSearch" placeholder="Search by AOC code, PR number, office, or title">
+                    </div>
+                    <select class="filter-select" id="aocOfficeFilter" title="Filter by office">
+                        <option value="">All Offices</option>
+                        @foreach($offices as $office)
+                            <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
+                        @endforeach
+                    </select>
+                    <select class="filter-select" id="aocStatusFilter" title="Filter by signatory status">
+                        <option value="">All Statuses</option>
+                        <option value="fully_signed">Fully Signed</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="draft">Draft</option>
+                    </select>
                 </div>
             @endif
 
@@ -250,7 +269,7 @@
                                     default        => 'badge-routing',
                                 };
                             @endphp
-                            <tr data-aoc-row data-aoc-id="{{ $aoc['id'] }}" data-search="{{ strtolower($aoc['code'] . ' ' . $aoc['prNumber'] . ' ' . $aoc['office'] . ' ' . $aoc['title']) }}" tabindex="0">
+                            <tr data-aoc-row data-aoc-id="{{ $aoc['id'] }}" data-office="{{ $aoc['office'] }}" data-status-bucket="{{ $aoc['statusBucket'] }}" data-search="{{ strtolower($aoc['code'] . ' ' . $aoc['prNumber'] . ' ' . $aoc['office'] . ' ' . $aoc['title']) }}" tabindex="0">
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">{{ $aoc['office'] }}</td>
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $aoc['code'] }}</td>
                                 <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $aoc['prNumber'] }}</td>
@@ -296,7 +315,7 @@
                 </div>
                 <label class="upload-pr-label" id="uploadAocLabel">
                     <i class="ti ti-upload"></i>
-                    <span id="uploadAocText">Upload Signed AOC PDF</span>
+                    <span id="uploadAocText">Upload AOC PDF</span>
                     <input type="file" id="uploadAocInput" accept="application/pdf,.pdf">
                 </label>
 
@@ -400,6 +419,8 @@
     const issuePoSection  = document.getElementById('issuePoSection');
     const csrfToken       = document.querySelector('meta[name="csrf-token"]').content;
     const aocSearch       = document.getElementById('aocSearch');
+    const aocOfficeFilter = document.getElementById('aocOfficeFilter');
+    const aocStatusFilter = document.getElementById('aocStatusFilter');
     const aocCount        = document.getElementById('aocVisibleCount');
     const uploadAocInput  = document.getElementById('uploadAocInput');
     const uploadAocText   = document.getElementById('uploadAocText');
@@ -468,7 +489,7 @@
             issuePoSection.innerHTML = `
                 <div class="po-done-note">
                     <i class="ti ti-circle-check"></i> PO Issued — ${escapeHtml(aoc.poNumber || '')}
-                    <a href="${poListUrl}">View in Purchase Orders →</a>
+                    <a href="${poListUrl}${aoc.poId ? '?po=' + aoc.poId : ''}">View in Purchase Orders →</a>
                 </div>`;
             return;
         }
@@ -483,7 +504,7 @@
                     </div>
                     <div class="full">
                         <label>Supplier Address</label>
-                        <input type="text" class="issue-po-input" id="poSupplierAddr" placeholder="Optional address…">
+                        <input type="text" class="issue-po-input" id="poSupplierAddr" placeholder="Optional address…" value="${escapeHtml(aoc.supplierAddress || '')}">
                     </div>
                     <div>
                         <label>Total Amount (₱) *</label>
@@ -521,9 +542,11 @@
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    aoc.hasPo = true;
+                    aoc.hasPo    = true;
+                    aoc.poId     = json.po.id;
+                    aoc.poNumber = json.po.poNumber;
                     const badge = document.querySelector(`[data-aoc-row][data-aoc-id="${aoc.id}"]`)?.querySelector('td:last-child');
-                    if (badge) badge.innerHTML = '<span class="badge badge-signed">PO Issued</span>';
+                    if (badge) badge.innerHTML = `<span class="badge badge-signed">${escapeHtml(json.po.poNumber || 'PO Issued')}</span>`;
                     showToast('Purchase Order issued — routing continues on the PO.');
                     renderIssuePo(aoc);
                 } else {
@@ -655,9 +678,9 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = aoc.pdfFile
-            ? `<iframe src="/storage/${aoc.pdfFile}" title="AOC Document"></iframe>`
+            ? `<iframe src="/storage/${aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
-        uploadAocText.textContent = aoc.pdfFile ? 'Re-upload PDF' : 'Upload Signed AOC PDF';
+        uploadAocText.textContent = aoc.pdfFile ? 'Re-upload PDF' : 'Upload AOC PDF';
 
         renderPreview(aoc);
 
@@ -705,16 +728,23 @@
 
     function applyAocSearchFilter() {
         if (!aocSearch) return;
-        const q = aocSearch.value.trim().toLowerCase();
+        const q      = aocSearch.value.trim().toLowerCase();
+        const office = aocOfficeFilter ? aocOfficeFilter.value : '';
+        const status = aocStatusFilter ? aocStatusFilter.value : '';
         let visible = 0;
         getRows().forEach(row => {
-            const match = !q || (row.dataset.search ?? '').includes(q);
+            const matchesSearch = !q || (row.dataset.search ?? '').includes(q);
+            const matchesOffice = !office || row.dataset.office === office;
+            const matchesStatus = !status || row.dataset.statusBucket === status;
+            const match = matchesSearch && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
         });
         if (aocCount) aocCount.textContent = visible + (visible === 1 ? ' AOC' : ' AOCs');
     }
     aocSearch?.addEventListener('input', applyAocSearchFilter);
+    aocOfficeFilter?.addEventListener('change', applyAocSearchFilter);
+    aocStatusFilter?.addEventListener('change', applyAocSearchFilter);
 
     /* ── Route Forward ── */
     async function doAdvance() {
@@ -793,7 +823,30 @@
         finally { saving = false; btnConfirmRet.disabled = false; }
     });
 
-    /* ── Create AOC (from eligible PRs) ── */
+    /* ── Create AOC (from eligible PRs) — appends to the top of the list and
+       opens it immediately, no reload / second click needed. ── */
+    function addNewAoc(aoc, prId) {
+        allAocs.unshift(aoc);
+
+        const card = document.querySelector(`.btn-create-aoc[data-pr-id="${prId}"]`)?.closest('.eligible-card');
+        card?.remove();
+        const eligibleCard = document.getElementById('eligibleAocCard');
+        if (eligibleCard) {
+            const remaining = document.querySelectorAll('.eligible-card').length;
+            if (remaining === 0) {
+                eligibleCard.remove();
+            } else {
+                const chip = document.getElementById('eligibleAocCount');
+                if (chip) chip.textContent = remaining + (remaining !== 1 ? ' PRs waiting' : ' PR waiting');
+            }
+        }
+
+        if (!tbody) { location.reload(); return; } // rare: list was empty at page load
+        tbody.insertAdjacentHTML('afterbegin', rowHtml(aoc));
+        applyAocSearchFilter();
+        openAoc(aoc);
+    }
+
     document.querySelectorAll('.btn-create-aoc').forEach(btn => {
         btn.addEventListener('click', async () => {
             btn.disabled = true;
@@ -806,8 +859,8 @@
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    showToast('AOC created. Reloading…');
-                    setTimeout(() => location.reload(), 900);
+                    showToast('AOC created — ' + json.aoc.code);
+                    addNewAoc(json.aoc, btn.dataset.prId);
                 } else {
                     showToast(json.error || 'Failed to create AOC.', true);
                     btn.disabled = false;
@@ -834,12 +887,13 @@
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
-                activeAoc.pdfFile = json.filePath;
-                if (json.supplierName) activeAoc.supplierName = json.supplierName;
+                activeAoc.pdfFile         = json.aoc.pdfFile;
+                activeAoc.supplierName    = json.aoc.supplierName;
+                activeAoc.supplierAddress = json.aoc.supplierAddress;
                 document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.filePath}" title="AOC Document"></iframe>`;
+                    `<iframe src="/storage/${json.aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`;
                 uploadAocText.textContent = 'Re-upload PDF';
-                showToast('AOC PDF uploaded successfully.' + (json.supplierName ? ' Responsive dealer detected: ' + json.supplierName + '.' : ''));
+                showToast('AOC PDF uploaded successfully.' + (json.aoc.supplierName ? ' Responsive dealer detected: ' + json.aoc.supplierName + '.' : ''));
                 renderIssuePo(activeAoc);
             } else {
                 uploadAocText.textContent = origText;
@@ -874,7 +928,7 @@
         const poCell = aoc.hasPo
             ? `<span class="badge badge-signed">${escapeHtml(aoc.poNumber || '')}</span>`
             : `<span style="font-size:11px;color:var(--s400);">—</span>`;
-        return `<tr data-aoc-row data-aoc-id="${aoc.id}" data-search="${escapeHtml(search)}" tabindex="0">
+        return `<tr data-aoc-row data-aoc-id="${aoc.id}" data-office="${escapeHtml(aoc.office)}" data-status-bucket="${aoc.statusBucket || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(aoc.office)}</td>
             <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(aoc.code)}</td>
             <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(aoc.prNumber)}</td>

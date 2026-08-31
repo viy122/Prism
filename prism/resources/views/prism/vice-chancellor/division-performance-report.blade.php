@@ -1,6 +1,10 @@
 @extends('prism.layouts.app')
 @section('title', 'Division Performance Report | Vice Chancellor')
 
+@push('head-extras')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+@endpush
+
 @push('page-css')
 <style>
     .content {
@@ -81,6 +85,8 @@
     .badge-low    { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
     .badge-steady { background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
+    .chart-wrap { position: relative; width: 100%; height: 230px; }
+
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .highlight-grid { grid-template-columns: 1fr; } }
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
     .page-hdr-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -110,6 +116,7 @@
             <p class="page-hdr-eyebrow">Vice Chancellor</p>
             <h1 class="page-hdr-title">Division Performance Report</h1>
             <p class="page-hdr-sub">Review APP item accomplishment, budget utilization, and procurement completion rates across division offices.</p>
+            <p style="font-size:11px;color:var(--s400);margin-top:2px;">Generated {{ $generatedAt }}</p>
         </div>
         <button class="btn-print" type="button" onclick="window.print()">
             <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -157,6 +164,14 @@
             <p class="stat-label">Average Utilization</p>
             <strong class="stat-value">{{ $averageUtilization }}%</strong>
             <p class="stat-desc">Mean utilization rate across offices</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <p class="card-eyebrow">Per office</p>
+        <h2 class="card-title" style="margin-bottom:16px;">Procured vs Pending, Utilization</h2>
+        <div class="chart-wrap">
+            <canvas id="performanceChart" data-rows="{{ json_encode($performanceRows) }}"></canvas>
         </div>
     </div>
 
@@ -237,3 +252,33 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const el = document.getElementById('performanceChart');
+    if (el) {
+        const rows = JSON.parse(el.dataset.rows || '[]');
+        // Horizontal — a division can cover many offices, so a vertical bar
+        // chart's x-axis labels would collide past a handful of bars.
+        el.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.office),
+                datasets: [
+                    { label: 'Procured', data: rows.map(r => r.procured), backgroundColor: '#3b6d11', borderRadius: 4 },
+                    { label: 'Pending', data: rows.map(r => r.pending), backgroundColor: '#854f0b', borderRadius: 4 },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+})();
+</script>
+@endpush
