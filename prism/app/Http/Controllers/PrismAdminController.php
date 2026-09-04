@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MarketSourceVerification;
 use App\Models\Office;
 use App\Models\Role;
 use App\Models\User;
@@ -195,12 +196,64 @@ class PrismAdminController extends Controller
             $serviceDown = true;
         }
 
+        // PhilGEPS has no public API to check this automatically (confirmed —
+        // its merchant search is a session-based HTML form, not a callable
+        // endpoint), so verification is a manual admin judgment recorded here
+        // in PRISM's own DB, keyed by the same `source` name the price-api
+        // uses everywhere else on this page (toggle/remove already key on it).
+        $verifications = MarketSourceVerification::with('verifiedBy')
+            ->get()
+            ->keyBy('source_name');
+
+        $sources = collect($sources)->map(function ($s) use ($verifications) {
+            $v = $verifications->get($s['source'] ?? null);
+            return $s + [
+                'verified'       => $v !== null,
+                'verifiedAt'     => $v?->verified_at?->format('M d, Y g:i A'),
+                'verifiedByName' => $v?->verifiedBy?->name,
+                'notes'          => $v?->notes,
+            ];
+        })->all();
+
         return view('prism.admin.market-sources', $this->withCommon('market-sources', [
             'pageTitle'   => 'Market Scoping Sources',
             'sources'     => $sources,
             'vendors'     => $vendors,
             'serviceDown' => $serviceDown,
         ]));
+    }
+
+    /** Admin manually confirms a source is a legitimate, PhilGEPS-registered supplier. */
+    public function verifyMarketSource(Request $request, string $sourceName): JsonResponse
+    {
+        $validated = $request->validate([
+            'seller' => 'nullable|string|max:255',
+            'notes'  => 'nullable|string|max:1000',
+        ]);
+
+        $verification = MarketSourceVerification::updateOrCreate(
+            ['source_name' => $sourceName],
+            [
+                'seller_name'         => $validated['seller'] ?? null,
+                'verified_by_user_id' => auth()->id(),
+                'verified_at'         => now(),
+                'notes'               => $validated['notes'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'success'    => true,
+            'verifiedAt' => $verification->verified_at->format('M d, Y g:i A'),
+            'verifiedByName' => auth()->user()->name,
+        ]);
+    }
+
+    /** Revoke a previously-recorded verification (mistaken mark, or the supplier's status changed). */
+    public function unverifyMarketSource(string $sourceName): JsonResponse
+    {
+        MarketSourceVerification::where('source_name', $sourceName)->delete();
+
+        return response()->json(['success' => true]);
     }
 
     public function addMarketSource(Request $request): JsonResponse

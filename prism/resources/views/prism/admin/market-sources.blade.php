@@ -58,6 +58,16 @@
     .badge-unknown { background: var(--s100); color: var(--s500); border: 1px solid var(--s200); }
     .badge-manual  { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
     .badge-builtin { background: var(--s100); color: var(--s600); border: 1px solid var(--s200); }
+    .badge-verified   { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-unverified { background: var(--s100); color: var(--s500); border: 1px solid var(--s200); }
+
+    .verify-cell { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+    .verify-meta { font-size: 10px; color: var(--s400); }
+    .btn-link { background: none; border: none; padding: 0; font-size: 11px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; color: var(--m); text-decoration: none; }
+    .btn-link:hover { text-decoration: underline; }
+    .btn-link.muted { color: var(--s500); }
+    .philgeps-link { font-size: 11px; font-weight: 700; color: #185fa5; text-decoration: none; }
+    .philgeps-link:hover { text-decoration: underline; }
 
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 140px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 26px; text-align: center; }
     .empty-state i { font-size: 32px; color: var(--s300); }
@@ -154,6 +164,7 @@
                         <th>Department</th>
                         <th>Status</th>
                         <th>Last Success</th>
+                        <th>PhilGEPS Verification</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -173,6 +184,19 @@
                             <td style="font-size:12px;color:var(--s500);">{{ $s['department'] ?? '—' }}</td>
                             <td><span class="badge {{ $statusCls }}" data-status-badge>{{ ucfirst($s['status'] ?? 'unknown') }}</span></td>
                             <td style="font-size:12px;color:var(--s500);">{{ $s['last_success'] ?? '—' }}</td>
+                            <td>
+                                <div class="verify-cell" data-verify-cell="{{ $s['source'] ?? '' }}">
+                                    @if($s['verified'])
+                                        <span class="badge badge-verified" title="Verified by {{ $s['verifiedByName'] ?? '—' }} on {{ $s['verifiedAt'] }}"><i class="ti ti-shield-check"></i> Verified</span>
+                                        <span class="verify-meta">{{ $s['verifiedAt'] }}</span>
+                                        <button type="button" class="btn-link muted btn-unverify" data-source-name="{{ $s['source'] ?? '' }}">Unverify</button>
+                                    @else
+                                        <span class="badge badge-unverified">Not Verified</span>
+                                        <button type="button" class="btn-link btn-verify" data-source-name="{{ $s['source'] ?? '' }}">Mark as Verified</button>
+                                    @endif
+                                    <a class="philgeps-link btn-check-philgeps" href="https://open.philgeps.gov.ph/analytics/load/merchantInfo" target="_blank" rel="noopener" data-source-name="{{ $s['source'] ?? '' }}">Check on PhilGEPS →</a>
+                                </div>
+                            </td>
                             <td style="display:flex;gap:6px;">
                                 <button class="btn btn-sm {{ $enabled ? 'btn-danger' : 'btn-ok' }} btn-toggle-source"
                                     data-source-name="{{ $s['source'] ?? '' }}"
@@ -302,6 +326,113 @@
             }
         });
     });
+
+    /* ── PhilGEPS verification: no public API for automated checking, so this
+       is an admin's own manual confirmation, recorded in PRISM's DB. Each
+       action re-renders its cell and re-wires the fresh buttons via these
+       same named functions, so Verify → Unverify → Verify keeps working. ── */
+    function wireVerifyBtn(btn) {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.sourceName;
+            const ok = await window.prismConfirm({
+                title: 'Mark as verified?',
+                message: `Confirm that you've personally checked "${name}" on PhilGEPS Open Data and it's a legitimate registered supplier.`,
+                confirmText: 'Mark as Verified',
+                danger: false,
+            });
+            if (!ok) return;
+
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/admin/market-sources/${encodeURIComponent(name)}/verify`, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    body:    JSON.stringify({ seller: name }),
+                });
+                const json = await resp.json();
+                if (resp.ok && json.success) {
+                    const cell = document.querySelector(`[data-verify-cell="${name}"]`);
+                    if (cell) {
+                        cell.innerHTML = `
+                            <span class="badge badge-verified" title="Verified by ${json.verifiedByName} on ${json.verifiedAt}"><i class="ti ti-shield-check"></i> Verified</span>
+                            <span class="verify-meta">${json.verifiedAt}</span>
+                            <button type="button" class="btn-link muted btn-unverify" data-source-name="${name}">Unverify</button>
+                            <a class="philgeps-link btn-check-philgeps" href="https://open.philgeps.gov.ph/analytics/load/merchantInfo" target="_blank" rel="noopener" data-source-name="${name}">Check on PhilGEPS →</a>`;
+                        wireVerifyCellButtons(cell);
+                    }
+                    showToast(`${name} marked as verified.`);
+                } else {
+                    showToast(json.error || 'Could not save verification.', true);
+                    btn.disabled = false;
+                }
+            } catch {
+                showToast('Network error.', true);
+                btn.disabled = false;
+            }
+        });
+    }
+
+    function wireUnverifyBtn(btn) {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.sourceName;
+            const ok = await window.prismConfirm({
+                title: 'Remove verification?',
+                message: `"${name}" will show as Not Verified again until re-checked.`,
+                confirmText: 'Unverify',
+                danger: true,
+            });
+            if (!ok) return;
+
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/admin/market-sources/${encodeURIComponent(name)}/unverify`, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                    body:    JSON.stringify({}),
+                });
+                const json = await resp.json();
+                if (resp.ok && json.success) {
+                    const cell = document.querySelector(`[data-verify-cell="${name}"]`);
+                    if (cell) {
+                        cell.innerHTML = `
+                            <span class="badge badge-unverified">Not Verified</span>
+                            <button type="button" class="btn-link btn-verify" data-source-name="${name}">Mark as Verified</button>
+                            <a class="philgeps-link btn-check-philgeps" href="https://open.philgeps.gov.ph/analytics/load/merchantInfo" target="_blank" rel="noopener" data-source-name="${name}">Check on PhilGEPS →</a>`;
+                        wireVerifyCellButtons(cell);
+                    }
+                    showToast(`${name} verification removed.`);
+                } else {
+                    showToast(json.error || 'Failed.', true);
+                    btn.disabled = false;
+                }
+            } catch {
+                showToast('Network error.', true);
+                btn.disabled = false;
+            }
+        });
+    }
+
+    function wireCheckPhilgepsBtn(link) {
+        link.addEventListener('click', async () => {
+            const name = link.dataset.sourceName;
+            try {
+                await navigator.clipboard.writeText(name);
+                showToast(`Copied "${name}" — paste it into PhilGEPS' merchant search.`);
+            } catch {
+                // Clipboard API needs a secure context; the link still opens PhilGEPS either way.
+            }
+        });
+    }
+
+    // Re-wires a cell's Verify/Unverify/Check-on-PhilGEPS buttons after an
+    // in-place innerHTML swap (the freshly-inserted elements have no listeners yet).
+    function wireVerifyCellButtons(cell) {
+        cell.querySelectorAll('.btn-verify').forEach(wireVerifyBtn);
+        cell.querySelectorAll('.btn-unverify').forEach(wireUnverifyBtn);
+        cell.querySelectorAll('.btn-check-philgeps').forEach(wireCheckPhilgepsBtn);
+    }
+
+    document.querySelectorAll('.verify-cell').forEach(wireVerifyCellButtons);
 
     document.querySelectorAll('.btn-remove-source').forEach(btn => {
         btn.addEventListener('click', async () => {

@@ -176,6 +176,8 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/market-sources/{vendorId}/remove', 'removeMarketSource')->name('market-sources.remove')->whereNumber('vendorId');
         Route::post('/market-sources/{sourceName}/disable', 'disableMarketSource')->name('market-sources.disable');
         Route::post('/market-sources/{sourceName}/enable', 'enableMarketSource')->name('market-sources.enable');
+        Route::post('/market-sources/{sourceName}/verify', 'verifyMarketSource')->name('market-sources.verify');
+        Route::post('/market-sources/{sourceName}/unverify', 'unverifyMarketSource')->name('market-sources.unverify');
     });
 
     // Unblurred signed-document photo — procurement / admin / uploader only
