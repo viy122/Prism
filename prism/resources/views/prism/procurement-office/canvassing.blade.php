@@ -60,6 +60,27 @@
     .pr-toast.error   { background: #a32d2d; }
 
     @media (max-width: 900px) { .content { padding: 16px 16px 40px; } }
+
+    .ppmp-section-hdr { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--s500); padding: 4px 2px; margin-top: 4px; }
+    .ppmp-section-hdr i { font-size: 15px; color: var(--m); }
+
+    .card-meta { font-size: 11.5px; color: var(--s400); margin-top: 3px; font-weight: 500; }
+
+    .items-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--s600); border: 1px solid var(--s200); border-radius: 9px; padding: 8px 14px; margin-bottom: 12px; background: var(--s50); user-select: none; }
+    .items-toggle:hover { border-color: var(--m); color: var(--m); }
+    .items-toggle .chev { margin-left: auto; transition: transform .18s; }
+    .items-toggle.open .chev { transform: rotate(180deg); }
+
+    .items-panel { display: none; margin: -6px 0 12px; border: 1px solid var(--s200); border-radius: 10px; overflow: hidden; }
+    .items-panel.open { display: block; }
+
+    .items-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .items-table th { padding: 9px 14px; text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--s400); border-bottom: 1px solid var(--s200); background: var(--s50); white-space: nowrap; }
+    .items-table td { padding: 10px 14px; border-bottom: 1px solid var(--s200); color: var(--s600); vertical-align: middle; }
+    .items-table tbody tr:last-child td { border-bottom: none; }
+    .items-table .item-name-cell { font-weight: 600; color: var(--s900); }
+    .items-table .num-cell   { font-weight: 700; color: var(--s700); text-align: right; }
+    .items-table .total-cell { font-weight: 700; color: var(--m); text-align: right; }
 </style>
 @endpush
 
@@ -85,12 +106,20 @@
         </div>
     @endif
 
-    @foreach($prs as $pr)
+    @foreach($sections as $section)
+        @if($section['label'])
+        <div class="ppmp-section-hdr">
+            <i class="ti ti-folder"></i>
+            <span>{{ $section['label'] }}</span>
+        </div>
+        @endif
+        @foreach($section['prs'] as $pr)
     <div class="card" id="canvass-card-{{ $pr['id'] }}">
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">{{ $pr['prNumber'] }} — {{ $pr['office'] }}</p>
                 <h2 class="card-title">{{ $pr['title'] }}</h2>
+                <p class="card-meta">{{ $pr['itemCount'] }} {{ Str::plural('item', $pr['itemCount']) }}</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 @php
@@ -103,6 +132,35 @@
                 <span class="badge {{ $badgeCls }}" data-stage-badge="{{ $pr['id'] }}">{{ $pr['canvassingLabel'] }}</span>
                 <a class="quote-link" href="{{ route('procurement-office.abstract-of-canvass') }}" data-aoc-link="{{ $pr['id'] }}" style="{{ $pr['readyForAoc'] ? '' : 'display:none;' }}">Create AOC →</a>
             </div>
+        </div>
+
+        <div class="items-toggle" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+            <span>{{ $pr['itemCount'] }} {{ Str::plural('item', $pr['itemCount']) }} in this PR</span>
+            <i class="ti ti-chevron-down chev"></i>
+        </div>
+        <div class="items-panel">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width:40%">Item Description</th>
+                        <th class="num-cell">Quantity</th>
+                        <th>Unit</th>
+                        <th class="num-cell">Unit Cost</th>
+                        <th class="num-cell">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($pr['items'] as $item)
+                    <tr>
+                        <td class="item-name-cell">{{ $item['name'] }}</td>
+                        <td class="num-cell">{{ $item['quantity'] }}</td>
+                        <td>{{ $item['unit'] }}</td>
+                        <td class="num-cell">PHP {{ number_format($item['unitCost']) }}</td>
+                        <td class="total-cell">PHP {{ number_format($item['totalCost']) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
 
         {{-- Quotations --}}
@@ -138,6 +196,7 @@
         </div>
         @endif
     </div>
+        @endforeach
     @endforeach
 
 </div>

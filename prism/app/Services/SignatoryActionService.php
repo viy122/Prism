@@ -29,8 +29,36 @@ class SignatoryActionService
         PurchaseOrder::class     => [PoSignatureLog::class, 'purchase_order_id'],
     ];
 
-    public function __construct(private SignatureDetectionService $detector)
+    public function __construct(
+        private SignatureDetectionService $detector,
+        private DocumentValidationService $validator,
+    ) {
+    }
+
+    /**
+     * Why this document may not move forward, or null when it may.
+     *
+     * Every route that advances a document — the web signature queues, the
+     * mobile API and the Procurement screens — funnels through advance(), so
+     * this single check covers all of them. A document whose contents were
+     * found not to match the document it came from (an item that was never in
+     * the approved PPMP, a quantity beyond what was approved) or that could not
+     * be read at all is held here rather than being allowed to collect
+     * signatures on its way to the Chancellor.
+     *
+     * Documents recorded before validation existed have no row at all and are
+     * deliberately let through — this gates new uploads, it does not
+     * retroactively freeze the existing queue.
+     */
+    private function contentValidationBlock(Model $doc): ?string
     {
+        $validation = $this->validator->latestFor($doc);
+
+        if (!$validation || !$validation->blocksRouting()) {
+            return null;
+        }
+
+        return $doc::SIGNATORY_DOC_PREFIX . ' cannot be routed. ' . $validation->blockReason();
     }
 
     /**
@@ -46,6 +74,10 @@ class SignatoryActionService
         $next = $doc->nextSignatoryStage();
         if (!$next) {
             return ['success' => false, 'error' => $doc::SIGNATORY_DOC_PREFIX . ' is already fully signed.', 'status' => 422];
+        }
+
+        if ($block = $this->contentValidationBlock($doc)) {
+            return ['success' => false, 'error' => $block, 'status' => 422];
         }
 
         $current         = $doc->signatory_stage;

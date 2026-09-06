@@ -181,6 +181,8 @@ trait HandlesSignatureQueue
         $stages  = $doc::signatoryStages();
         $current = $doc->stageIndex($doc->signatory_stage);
 
+        $validation = app(\App\Services\DocumentValidationService::class)->latestFor($doc);
+
         $chain = collect($doc->resolvedStageMeta())
             ->filter(fn ($m) => !in_array($m['key'], ['draft', 'fully_signed'], true))
             ->values()
@@ -218,6 +220,11 @@ trait HandlesSignatureQueue
             'nextStage'      => $doc->nextSignatoryStage(),
             'canAct'         => $doc->signatory_stage !== 'fully_signed'
                 && $doc->stageOwnerRole($doc->signatory_stage) === $this->queueRoleCode(),
+            // Set when the document failed the content check against the
+            // document it came from. advance() refuses it either way; surfacing
+            // it here lets the queue explain the hold instead of only failing
+            // once somebody has already signed and pressed the button.
+            'blockedReason'  => $validation?->blocksRouting() ? $validation->blockReason() : null,
             'chain'          => $chain,
             'signatureLogs'  => $doc->signatureLogs->map(fn ($l) => [
                 'display'     => $doc->describeSignatureLog($l),

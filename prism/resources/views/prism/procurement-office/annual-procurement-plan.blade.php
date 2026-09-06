@@ -78,6 +78,11 @@
     .tracking-cell { min-width: 260px; }
     .tracking-badge { white-space: normal; height: auto; line-height: 1.4; padding: 5px 10px; text-align: left; }
 
+    .dates-cell { min-width: 140px; }
+    .dates-view { font-size: 13px; font-weight: 600; color: var(--s600); white-space: nowrap; }
+    .action-cell { min-width: 90px; }
+    .action-cell .mode-edit-actions { margin-top: 6px; }
+
     .rec-badge {
         display: flex; align-items: center; gap: 7px;
         background: #EFF6FF; border: 1px solid #BFDBFE;
@@ -209,13 +214,17 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Office</th>
-                        <th>Item</th>
+                        <th>End User / Implementing Unit</th>
+                        <th>Project Title</th>
                         <th>Qty</th>
-                        <th>ABC Amount</th>
+                        <th>Estimated Budget</th>
                         <th>Quarter</th>
+                        <th>Source of Fund</th>
                         <th>Procurement Mode</th>
+                        <th>Start of Procurement Activity</th>
+                        <th>Date Needed</th>
                         <th>Tracking Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -231,6 +240,7 @@
                             <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $item['quantity'] }}</td>
                             <td><p class="amount-val">PHP {{ number_format($item['abcAmount']) }}</p></td>
                             <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $item['targetQuarter'] }}</td>
+                            <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $item['sourceOfFund'] }}</td>
 
                             {{-- ── Procurement Mode cell ── --}}
                             <td class="mode-cell"
@@ -297,9 +307,31 @@
 
                             </td>
 
+                            {{-- ── Start of Procurement Activity / Date Needed — the two fields Procurement sets by hand, toggled together via the Action cell's Edit/Save button ── --}}
+                            <td class="dates-cell">
+                                <span class="dates-view js-start-view">{{ $item['procurementStartDate'] ? \Carbon\Carbon::parse($item['procurementStartDate'])->format('M d, Y') : '—' }}</span>
+                                <input type="date" class="field-select js-start-input" style="display:none;height:34px;font-size:12px;" value="{{ $item['procurementStartDate'] }}">
+                            </td>
+                            <td class="dates-cell">
+                                <span class="dates-view js-needed-view">{{ $item['dateNeeded'] ? \Carbon\Carbon::parse($item['dateNeeded'])->format('M d, Y') : '—' }}</span>
+                                <input type="date" class="field-select js-needed-input" style="display:none;height:34px;font-size:12px;" value="{{ $item['dateNeeded'] }}">
+                            </td>
+
                             {{-- ── Tracking Status cell — read-only, inherited from the PPMP/PR/AOC/PO/payment chain ── --}}
                             <td class="tracking-cell">
                                 <span class="badge tracking-badge">{{ $item['trackingStatus']['label'] }}</span>
+                            </td>
+
+                            {{-- ── Action cell — edits Start of Procurement Activity + Date Needed together; Procurement Mode keeps its own Override button above ── --}}
+                            <td class="action-cell dates-action-cell" data-item-id="{{ $item['itemId'] }}" data-save-url="{{ $item['datesSaveUrl'] }}">
+                                <button class="btn-override js-row-edit-btn" type="button">
+                                    <i class="ti ti-pencil"></i> Edit
+                                </button>
+                                <p class="err-msg js-dates-err-msg">End date can't be before the start date.</p>
+                                <div class="mode-edit-actions" style="display:none;">
+                                    <button class="btn-save js-row-save-btn" type="button">Save</button>
+                                    <button class="btn-cancel js-row-cancel-btn" type="button">Cancel</button>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
@@ -309,6 +341,7 @@
     </div>
 
 </div>
+
 @endsection
 
 @push('scripts')
@@ -441,6 +474,103 @@
         });
     });
 
+    // ── Start of Procurement Activity / Date Needed — edited together via the row's Action cell ──
+    document.querySelectorAll('.dates-action-cell').forEach(function (actionCell) {
+        const tr           = actionCell.closest('tr');
+        const $startView   = tr.querySelector('.js-start-view');
+        const $startInput  = tr.querySelector('.js-start-input');
+        const $neededView  = tr.querySelector('.js-needed-view');
+        const $neededInput = tr.querySelector('.js-needed-input');
+        const $err         = actionCell.querySelector('.js-dates-err-msg');
+        const $actions     = actionCell.querySelector('.mode-edit-actions');
+        const $editBtn     = actionCell.querySelector('.js-row-edit-btn');
+        const $saveBtn     = actionCell.querySelector('.js-row-save-btn');
+        const $cancelBtn   = actionCell.querySelector('.js-row-cancel-btn');
+        const saveUrl      = actionCell.dataset.saveUrl;
+
+        function formatDate(iso) {
+            if (!iso) return '—';
+            const [y, m, d] = iso.split('-');
+            return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+
+        function enterEditMode() {
+            $startView.style.display   = 'none';
+            $neededView.style.display  = 'none';
+            $startInput.style.display  = '';
+            $neededInput.style.display = '';
+            $editBtn.style.display     = 'none';
+            $actions.style.display     = 'flex';
+        }
+
+        function exitEditMode() {
+            $startView.style.display   = '';
+            $neededView.style.display  = '';
+            $startInput.style.display  = 'none';
+            $neededInput.style.display = 'none';
+            $editBtn.style.display     = '';
+            $actions.style.display     = 'none';
+            $err.style.display         = 'none';
+        }
+
+        $editBtn.addEventListener('click', enterEditMode);
+
+        $cancelBtn.addEventListener('click', function () {
+            $startInput.value  = $startInput.defaultValue;
+            $neededInput.value = $neededInput.defaultValue;
+            exitEditMode();
+        });
+
+        $saveBtn.addEventListener('click', async function () {
+            if ($neededInput.value && $startInput.value && $neededInput.value < $startInput.value) {
+                $err.style.display = 'block';
+                return;
+            }
+            $err.style.display = 'none';
+
+            $saveBtn.disabled    = true;
+            $saveBtn.textContent = 'Saving…';
+
+            try {
+                const res = await fetch(saveUrl, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': CSRF,
+                    },
+                    body: JSON.stringify({
+                        procurement_start_date: $startInput.value || null,
+                        date_needed:             $neededInput.value || null,
+                    }),
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    $err.textContent   = data.message || 'Failed to save.';
+                    $err.style.display = 'block';
+                    return;
+                }
+
+                $startInput.value   = data.procurementStartDate || '';
+                $neededInput.value  = data.dateNeeded || '';
+                $startInput.defaultValue  = $startInput.value;
+                $neededInput.defaultValue = $neededInput.value;
+                $startView.textContent  = formatDate(data.procurementStartDate);
+                $neededView.textContent = formatDate(data.dateNeeded);
+
+                window.prismToast('Procurement dates saved.');
+                exitEditMode();
+            } catch {
+                $err.textContent   = 'Network error. Please try again.';
+                $err.style.display = 'block';
+            } finally {
+                $saveBtn.disabled    = false;
+                $saveBtn.textContent = 'Save';
+            }
+        });
+    });
+
     function rebuildView(cell, currentMode, isOverridden, reason, recommended) {
         const $view  = cell.querySelector('.mode-view');
         const $badge = $view.querySelector('.badge');
@@ -471,10 +601,6 @@
 
         // Update override button label
         $btn.innerHTML = '<i class="ti ti-pencil"></i> ' + (isOverridden ? 'Edit Override' : 'Override');
-    }
-
-    function escHtml(s) {
-        return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
 })();

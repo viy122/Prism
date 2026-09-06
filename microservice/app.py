@@ -679,6 +679,144 @@ def advantageous():
 
 
 # ════════════════════════════════════════════════════════════════════════════════
+# 6. CROSS-DOCUMENT ITEM MATCHING
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _normalize_item_name(name: str) -> str:
+    """Lowercase, strip punctuation noise, collapse whitespace."""
+    s = re.sub(r'[^\w\s./-]', ' ', str(name or '').lower())
+    return re.sub(r'\s+', ' ', s).strip()
+
+
+def _token_overlap(a: str, b: str) -> float:
+    """
+    Containment-biased token overlap, 0.0-1.0.
+
+    Deliberately asymmetric-friendly: a PPMP line often says just "monitor"
+    while the PR spells out "Monitor, 24-inch LED Full HD Display". Dividing by
+    the SHORTER token set means a short upstream name fully contained in a long
+    downstream one scores 1.0 instead of being penalised for the extra detail.
+    """
+    ta = {t for t in _normalize_item_name(a).split() if len(t) > 1}
+    tb = {t for t in _normalize_item_name(b).split() if len(t) > 1}
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / min(len(ta), len(tb))
+
+
+def _match_items_semantic(left_names: list, right_names: list):
+    """Cosine similarity matrix via sentence-transformers, or None if unavailable."""
+    if not _ST_AVAILABLE or not left_names or not right_names:
+        return None
+    try:
+        le = _ST_MODEL.encode(left_names,  convert_to_tensor=True)
+        re_ = _ST_MODEL.encode(right_names, convert_to_tensor=True)
+        return _ST_UTIL.cos_sim(le, re_)          # shape: (len(left), len(right))
+    except Exception as e:
+        print(f'  [!!] /match-items semantic pass failed: {e}')
+        return None
+
+
+@app.route('/match-items', methods=['POST'])
+def match_items():
+    """
+    Pair every item in `left` with its best counterpart in `right`.
+
+    Used for cross-document validation: left = items read out of an uploaded
+    document (a PR, quotation, AOC or PO), right = the items it is supposed to
+    correspond to (the approved PPMP, the parent PR, and so on).
+
+    Input:
+        {
+          "left":  [{"name": "Monitor, 24-inch LED", "quantity": 5, "unit": "unit"}, ...],
+          "right": [{"name": "monitor", "quantity": 5, "unit": "unit"}, ...]
+        }
+
+    Output:
+        {
+          "strategy": "semantic" | "token",
+          "matches": [
+            {"left_index": 0, "right_index": 3, "score": 0.93, "matched": true},
+            ...
+          ],
+          "unmatched_right": [2, 5]
+        }
+
+    Scores are 0.0-1.0. Every left item gets exactly one entry, in order; a left
+    item with no acceptable counterpart comes back with right_index = null and
+    matched = false. Right items are consumed at most once, so two near-identical
+    PR lines cannot both claim the same PPMP line.
+    """
+    data  = request.get_json(silent=True) or {}
+    left  = data.get('left', [])  or []
+    right = data.get('right', []) or []
+    try:
+        threshold = float(data.get('threshold', 0.55))
+    except (TypeError, ValueError):
+        threshold = 0.55
+
+    if not left:
+        return jsonify({'strategy': 'none', 'matches': [], 'unmatched_right': list(range(len(right)))})
+    if not right:
+        return jsonify({
+            'strategy': 'none',
+            'matches': [{'left_index': i, 'right_index': None, 'score': 0.0, 'matched': False}
+                        for i in range(len(left))],
+            'unmatched_right': [],
+        })
+
+    left_names  = [str(i.get('name', '') or '') for i in left]
+    right_names = [str(i.get('name', '') or '') for i in right]
+
+    sim      = _match_items_semantic(left_names, right_names)
+    strategy = 'semantic' if sim is not None else 'token'
+
+    def score_of(li: int, ri: int) -> float:
+        # The token score is a floor, not just a fallback: an exact-substring
+        # match ("monitor" inside "Monitor, 24-inch LED") is unambiguous even
+        # when the embedding is lukewarm about the extra words.
+        tok = _token_overlap(left_names[li], right_names[ri])
+        if sim is None:
+            return tok
+        return max(float(sim[li][ri]), tok)
+
+    # Greedy best-first over all pairs: strongest pairings win regardless of
+    # document order, so a reordered PR still matches its PPMP correctly.
+    pairs = sorted(
+        ((score_of(li, ri), li, ri) for li in range(len(left)) for ri in range(len(right))),
+        key=lambda p: p[0],
+        reverse=True,
+    )
+
+    taken_left, taken_right, chosen = set(), set(), {}
+    for score, li, ri in pairs:
+        if score < threshold:
+            break
+        if li in taken_left or ri in taken_right:
+            continue
+        chosen[li] = (ri, round(float(score), 4))
+        taken_left.add(li)
+        taken_right.add(ri)
+
+    matches = []
+    for li in range(len(left)):
+        if li in chosen:
+            ri, sc = chosen[li]
+            matches.append({'left_index': li, 'right_index': ri, 'score': sc, 'matched': True})
+        else:
+            # Report the best score it *did* reach, so the caller can tell
+            # "nothing like this at all" from "close, but under threshold".
+            best = max((score_of(li, ri) for ri in range(len(right))), default=0.0)
+            matches.append({'left_index': li, 'right_index': None, 'score': round(float(best), 4), 'matched': False})
+
+    return jsonify({
+        'strategy': strategy,
+        'matches': matches,
+        'unmatched_right': [ri for ri in range(len(right)) if ri not in taken_right],
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT
 # ════════════════════════════════════════════════════════════════════════════════
 

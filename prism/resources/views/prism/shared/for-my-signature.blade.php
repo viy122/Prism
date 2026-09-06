@@ -59,6 +59,12 @@
     @media (max-width: 560px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
+
+    .blocked-notice { display: flex; gap: 10px; align-items: flex-start; background: #fef2f2; border: 1px solid #fecaca; border-radius: 9px; padding: 10px 13px; margin-top: 12px; }
+    .blocked-notice i { color: #dc2626; font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .blocked-notice-title { font-size: 12px; font-weight: 800; color: #991b1b; }
+    .blocked-notice-body { font-size: 11px; color: #b91c1c; line-height: 1.55; margin-top: 2px; }
+    .badge-blocked { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
     .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 220px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); text-align: center; padding: 32px; }
     .detail-empty i { font-size: 36px; color: var(--s300); }
     .detail-empty p { font-size: 13px; color: var(--s400); line-height: 1.6; max-width: 220px; }
@@ -228,6 +234,7 @@
                         @foreach ($documents as $doc)
                             @php
                                 $stageBadge = match(true) {
+                                    !empty($doc['blockedReason'])           => 'badge-blocked',
                                     $doc['canAct']                          => 'badge-action',
                                     $doc['signatoryStage'] === 'fully_signed' => 'badge-signed',
                                     $doc['signatoryStage'] === 'draft'        => 'badge-draft',
@@ -239,7 +246,7 @@
                                 <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $doc['number'] }}</td>
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['office'] }}</td>
                                 <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['title'] }}</td>
-                                <td><span class="badge {{ $stageBadge }}" data-sig-badge="{{ $doc['docType'] }}-{{ $doc['id'] }}">{{ $doc['canAct'] ? 'Needs You' : $doc['signatoryLabel'] }}</span></td>
+                                <td><span class="badge {{ $stageBadge }}" data-sig-badge="{{ $doc['docType'] }}-{{ $doc['id'] }}" @if(!empty($doc['blockedReason'])) title="{{ $doc['blockedReason'] }}" @endif>{{ !empty($doc['blockedReason']) ? 'Blocked' : ($doc['canAct'] ? 'Needs You' : $doc['signatoryLabel']) }}</span></td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -284,6 +291,16 @@
                     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--s500);margin-bottom:10px;">Signature Routing</div>
                     <div class="sig-timeline" id="sigTimeline"></div>
                     <p id="sigWaitingNote" style="font-size:11px;color:var(--s500);margin-top:8px;"></p>
+
+                    {{-- Why this document can't move forward — shown up front so a
+                         signatory isn't told only after they've tried to sign. --}}
+                    <div class="blocked-notice" id="blockedNotice" style="display:none;">
+                        <i class="ti ti-alert-triangle"></i>
+                        <div>
+                            <p class="blocked-notice-title">Held — content validation failed</p>
+                            <p class="blocked-notice-body" id="blockedNoticeText"></p>
+                        </div>
+                    </div>
 
                     <div style="display:flex;gap:8px;margin-top:12px;">
                         <button class="btn-route btn-route-fwd" id="btnMarkSigned" type="button" disabled>
@@ -348,6 +365,8 @@
     const logEl          = document.getElementById('activityLog');
     const logToggle       = document.getElementById('logToggle');
     const toastEl        = document.getElementById('prToast');
+    const blockedNotice     = document.getElementById('blockedNotice');
+    const blockedNoticeText = document.getElementById('blockedNoticeText');
     const btnMark         = document.getElementById('btnMarkSigned');
     const btnMarkIcon     = document.getElementById('btnMarkSignedIcon');
     const btnMarkLabel    = document.getElementById('btnMarkSignedLabel');
@@ -532,11 +551,21 @@
         fixTimelineWraps(sigTimelineEl);
         if (refreshPreview) renderPreview(doc);
 
-        btnMark.disabled = !doc.canAct;
-        document.querySelectorAll('input[name="third_signer"]').forEach(r => r.checked = false);
-        thirdPanel.style.display = (doc.canAct && doc.docType === 'pr' && doc.nextStage === 'at_third_sign') ? 'block' : 'none';
+        // A document held by content validation can't be routed no matter whose
+        // turn it is, so say why here and take the button away — rather than
+        // letting someone sign and only then hit the refusal.
+        const blocked = !!doc.blockedReason;
+        blockedNotice.style.display = blocked ? 'flex' : 'none';
+        blockedNoticeText.textContent = doc.blockedReason || '';
 
-        if (doc.canAct) {
+        btnMark.disabled = !doc.canAct || blocked;
+        document.querySelectorAll('input[name="third_signer"]').forEach(r => r.checked = false);
+        thirdPanel.style.display = (doc.canAct && !blocked && doc.docType === 'pr' && doc.nextStage === 'at_third_sign') ? 'block' : 'none';
+
+        if (blocked) {
+            btnMarkLabel.textContent = 'Blocked';
+            waitingNote.textContent  = 'This document must be corrected and re-uploaded before it can continue.';
+        } else if (doc.canAct) {
             btnMarkLabel.textContent = doc.stageType === 'routing' ? 'Forward' : 'Mark Signed';
             waitingNote.textContent = '';
         } else {
@@ -764,16 +793,18 @@
     // flight, a remark is being composed, or a third-signer choice hasn't
     // been submitted yet — so it can't wipe in-progress work.
     function rowHtml(doc) {
-        const stageBadge = doc.canAct ? 'badge-action'
+        const stageBadge = doc.blockedReason ? 'badge-blocked'
+            : (doc.canAct ? 'badge-action'
             : (doc.signatoryStage === 'fully_signed' ? 'badge-signed'
-            : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing'));
+            : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing')));
+        const badgeText = doc.blockedReason ? 'Blocked' : (doc.canAct ? 'Needs You' : doc.signatoryLabel);
         const search = (doc.number + ' ' + doc.office + ' ' + doc.title).toLowerCase();
         return `<tr data-doc-row data-doc-key="${doc.docType}-${doc.id}" data-doc-type="${doc.docType}" data-office="${escapeHtml(doc.office)}" data-status-bucket="${doc.statusBucket || ''}" data-updated-at="${doc.updatedAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td><span class="doc-badge doc-${doc.docType}">${doc.docLabel}</span></td>
             <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(doc.number)}</td>
             <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.office)}</td>
             <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.title)}</td>
-            <td><span class="badge ${stageBadge}" data-sig-badge="${doc.docType}-${doc.id}">${doc.canAct ? 'Needs You' : doc.signatoryLabel}</span></td>
+            <td><span class="badge ${stageBadge}" data-sig-badge="${doc.docType}-${doc.id}"${doc.blockedReason ? ` title="${escapeHtml(doc.blockedReason)}"` : ''}>${escapeHtml(badgeText)}</span></td>
         </tr>`;
     }
 
@@ -796,11 +827,13 @@
                 if (!doc) return; // don't remove rows missing from the fresh data
                 const badge = row.querySelector(`[data-sig-badge="${key}"]`);
                 if (badge) {
-                    const stageBadge = doc.canAct ? 'badge-action'
+                    const stageBadge = doc.blockedReason ? 'badge-blocked'
+                        : (doc.canAct ? 'badge-action'
                         : (doc.signatoryStage === 'fully_signed' ? 'badge-signed'
-                        : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing'));
+                        : (doc.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing')));
                     badge.className = 'badge ' + stageBadge;
-                    badge.textContent = doc.canAct ? 'Needs You' : doc.signatoryLabel;
+                    badge.textContent = doc.blockedReason ? 'Blocked' : (doc.canAct ? 'Needs You' : doc.signatoryLabel);
+                    if (doc.blockedReason) badge.title = doc.blockedReason; else badge.removeAttribute('title');
                 }
                 if (doc.updatedAt) row.dataset.updatedAt = doc.updatedAt;
                 if (doc.statusBucket) row.dataset.statusBucket = doc.statusBucket;
@@ -833,8 +866,14 @@
         }
     }
 
+    // app.js loads as a module script, which the spec always defers until
+    // after the document finishes parsing — this classic inline script runs
+    // immediately as the parser reaches it, before that, so calling
+    // window.prismAutoRefresh here directly throws and silently never wires
+    // up the poll. The 'load' event fires only once all deferred module
+    // scripts have already run, so it's defined by then.
     if (refreshUrl) {
-        window.prismAutoRefresh(refreshUrl, handleRefresh);
+        window.addEventListener('load', () => window.prismAutoRefresh(refreshUrl, handleRefresh));
     }
 })();
 </script>

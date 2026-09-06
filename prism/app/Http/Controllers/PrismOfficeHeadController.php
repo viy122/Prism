@@ -119,15 +119,26 @@ class PrismOfficeHeadController extends Controller
     {
         $officeId = $this->officeId();
         $office   = Office::find($officeId);
+        $reachableOfficeIds = $this->reachableOfficeIds();
+        $childOffices       = $office?->childOffices()->orderBy('name')->get(['id', 'name']) ?? collect();
 
         // One office can have several PPMPs within the same fiscal year (e.g. a
         // supplemental proposal), so the selector lists individual proposals —
-        // not just distinct years — and is keyed by proposal id.
-        $proposalOptions = BudgetProposal::where('office_id', $officeId)
+        // not just distinct years — and is keyed by proposal id. Spans this
+        // account's own office plus any child offices (see reachableOfficeIds())
+        // so a parent-office account can switch between PPMPs it created for
+        // different child colleges, not just its own.
+        $proposalOptions = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
+            ->with('office:id,code,name')
             ->orderByDesc('fiscal_year')->orderByDesc('created_at')
-            ->get(['id', 'fiscal_year', 'code', 'status'])
-            ->map(function ($p) {
+            ->get(['id', 'fiscal_year', 'code', 'status', 'office_id'])
+            ->map(function ($p) use ($officeId) {
                 $label = 'FY ' . $p->fiscal_year . ' — ' . $p->code;
+                // Only differs from the account's own office once a child-office
+                // PPMP exists — otherwise every label already implies "my office".
+                if ($p->office_id !== $officeId) {
+                    $label .= ' — ' . ($p->office?->code ?? $p->office?->name ?? '—');
+                }
                 if ($p->status === 'returned') {
                     // 'returned' covers two different senders — only a Budget Office
                     // return actually needs the office head to revise; a Chancellor
@@ -150,9 +161,9 @@ class PrismOfficeHeadController extends Controller
         $sessionKey  = "office_head.selected_proposal.{$officeId}";
 
         if ($requestedId) {
-            $proposal = BudgetProposal::where('office_id', $officeId)->find($requestedId);
+            $proposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)->find($requestedId);
         } elseif ($requestedFy) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
                 ->where('fiscal_year', $requestedFy)
                 ->latest()
                 ->first();
@@ -163,12 +174,12 @@ class PrismOfficeHeadController extends Controller
             // page to whatever happens to be the latest proposal.
             $rememberedId = $request->session()->get($sessionKey);
             if ($rememberedId) {
-                $proposal = BudgetProposal::where('office_id', $officeId)->find($rememberedId);
+                $proposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)->find($rememberedId);
             }
         }
 
         if (!$proposal) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
                 ->whereIn('status', ['draft', 'returned'])
                 ->latest()
                 ->first();
@@ -183,7 +194,7 @@ class PrismOfficeHeadController extends Controller
         $proposalStatus = $proposal?->status ?? 'draft';
 
         if (!$proposal) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
                 ->whereIn('status', ['submitted', 'endorsed', 'approved'])
                 ->latest()
                 ->first();
@@ -191,20 +202,6 @@ class PrismOfficeHeadController extends Controller
                 $isReadOnly     = true;
                 $proposalStatus = $proposal->status;
             }
-        }
-
-        // Landing on the tab with nothing currently editable auto-starts a fresh
-        // blank PPMP for the office — no manual "Create New" / "Start FY" step.
-        // Skipped only when the office head explicitly browsed to a specific
-        // (necessarily read-only, since editable ones are already caught above)
-        // past proposal via the selector — that deliberate choice is respected
-        // as-is, not overridden by a new draft.
-        if (!$explicitlySelected && (!$proposal || $isReadOnly)) {
-            $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
-            $proposal = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
-                ?? $this->createDraftProposal($officeId, $nextYear);
-            $isReadOnly     = false;
-            $proposalStatus = $proposal->status;
         }
 
         // Line items lock once a market study has been submitted for this proposal —
@@ -219,7 +216,8 @@ class PrismOfficeHeadController extends Controller
         // item-sum total (total_estimated_cost) — falls back to that sum until the office
         // head explicitly sets their own figure.
         $proposalForm = [
-            'officeName'          => $office?->name ?? 'Your Office',
+            'officeName'          => $proposal?->office?->name ?? $office?->name ?? 'Your Office',
+            'officeId'            => $proposal?->office_id ?? $officeId,
             'title'               => $proposal?->title ?? '',
             'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
             // Once a PPMP has actually been submitted, "Date Prepared" should reflect
@@ -230,6 +228,7 @@ class PrismOfficeHeadController extends Controller
 
         $titleUpdateUrl          = $proposal ? route('office-head.budget-proposal.update-title', $proposal->id) : null;
         $proposedBudgetUpdateUrl = $proposal ? route('office-head.budget-proposal.update-proposed-budget', $proposal->id) : null;
+        $officeUpdateUrl         = $proposal ? route('office-head.budget-proposal.update-office', $proposal->id) : null;
 
         $encodedItems = $proposal
             ? $proposal->items()->with(['marketReferences', 'sourceFiles'])->get()
@@ -287,8 +286,11 @@ class PrismOfficeHeadController extends Controller
             'proposalStatus'        => $proposalStatus,
             'proposalOptions'       => $proposalOptions,
             'selectedProposalId'    => $proposal?->id,
+            'hasActiveProposal'     => (bool) $proposal,
             'titleUpdateUrl'        => $titleUpdateUrl,
             'proposedBudgetUpdateUrl' => $proposedBudgetUpdateUrl,
+            'officeUpdateUrl'       => $officeUpdateUrl,
+            'childOffices'          => $childOffices,
             'itemCount'             => $itemCount,
             'scopingReferenceCount' => $scopingReferenceCount,
             'missingScopingCount'   => $missingScopingCount,
@@ -297,13 +299,12 @@ class PrismOfficeHeadController extends Controller
     }
 
     /**
-     * Explicit "Create New PPMP" action — offered once the office head is
-     * viewing an approved PPMP with nothing left to edit (see the read-only
-     * banner in budget-proposal.blade.php). Mirrors the same find-or-create
-     * lookup the auto-start path uses, just triggered by a deliberate click
-     * instead of silently on landing, and always lands on the new draft
-     * explicitly (?proposal=) so it isn't ambiguous with whatever the
-     * session happened to remember.
+     * Explicit "Create New PPMP" action — offered whenever the office head has
+     * nothing currently editable, whether that's an empty state (no proposal
+     * at all yet) or an approved PPMP with nothing left to edit (see the
+     * read-only banner / empty state in budget-proposal.blade.php). Always
+     * lands on the new draft explicitly (?proposal=) so it isn't ambiguous
+     * with whatever the session happened to remember.
      */
     public function createNewProposal(): RedirectResponse
     {
@@ -317,10 +318,37 @@ class PrismOfficeHeadController extends Controller
     }
 
     /**
+     * A second (or third...) PPMP for a fiscal year that already has one —
+     * a supplemental proposal, sitting side by side with the existing
+     * draft/returned/approved one rather than replacing it. Unlike
+     * createNewProposal() (which finds-or-creates for next year), this
+     * always creates a genuinely new row — the whole point is to add
+     * alongside whatever's already there for that year. Targets whichever
+     * proposal the office head currently has open (`?proposal=`), so the
+     * button always supplements the year they're actually looking at.
+     */
+    public function createSupplementalProposal(Request $request): RedirectResponse
+    {
+        $officeId    = $this->officeId();
+        $requestedId = (int) $request->query('proposal', 0);
+
+        $sourceProposal = $requestedId
+            ? BudgetProposal::where('office_id', $officeId)->find($requestedId)
+            : null;
+        $fiscalYear = $sourceProposal?->fiscal_year
+            ?? (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year);
+
+        $proposal = $this->createDraftProposal($officeId, $fiscalYear);
+
+        return redirect()->route('office-head.budget-proposal', ['proposal' => $proposal->id]);
+    }
+
+    /**
      * A blank draft PPMP for the given office/fiscal year — no office/title
      * template baked in, so the office head starts from an empty form rather
-     * than a presumptuous prefilled one. Used to auto-start a PPMP whenever the
-     * office head lands on the tab with nothing currently editable.
+     * than a presumptuous prefilled one. Only ever created on a deliberate
+     * "Create New PPMP" click (see createNewProposal()) — the PPMP tab no
+     * longer auto-starts one just because nothing is currently editable.
      */
     private function createDraftProposal(int $officeId, int $fiscalYear): BudgetProposal
     {
@@ -343,7 +371,7 @@ class PrismOfficeHeadController extends Controller
 
     public function updateTitle(Request $request, BudgetProposal $proposal): JsonResponse
     {
-        abort_if($proposal->office_id !== $this->officeId(), 403);
+        abort_if(!in_array($proposal->office_id, $this->reachableOfficeIds(), true), 403);
         abort_if(!in_array($proposal->status, ['draft', 'returned'], true), 403);
 
         $validated = $request->validate([
@@ -357,7 +385,7 @@ class PrismOfficeHeadController extends Controller
 
     public function updateProposedBudget(Request $request, BudgetProposal $proposal): JsonResponse
     {
-        abort_if($proposal->office_id !== $this->officeId(), 403);
+        abort_if(!in_array($proposal->office_id, $this->reachableOfficeIds(), true), 403);
         abort_if(!in_array($proposal->status, ['draft', 'returned'], true), 403);
 
         $validated = $request->validate([
@@ -369,25 +397,48 @@ class PrismOfficeHeadController extends Controller
         return response()->json(['success' => true, 'proposed_budget' => (float) $proposal->proposed_budget]);
     }
 
+    /**
+     * Which child college/office this PPMP is actually for — only meaningful
+     * for a parent office (e.g. one whose account manages several colleges
+     * under it) with real childOffices(); the target must be the account's
+     * own office or one of its direct children, never an arbitrary office id.
+     */
+    public function updateOffice(Request $request, BudgetProposal $proposal): JsonResponse
+    {
+        abort_if(!in_array($proposal->office_id, $this->reachableOfficeIds(), true), 403);
+        abort_if(!in_array($proposal->status, ['draft', 'returned'], true), 403);
+
+        $validated = $request->validate(['office_id' => 'required|integer']);
+
+        $officeId      = $this->officeId();
+        $selectableIds = [$officeId, ...Office::find($officeId)?->childOffices()->pluck('id')->all() ?? []];
+        abort_if(!in_array((int) $validated['office_id'], $selectableIds, true), 403);
+
+        $proposal->update(['office_id' => $validated['office_id']]);
+
+        return response()->json(['success' => true, 'officeId' => $proposal->office_id]);
+    }
+
     public function marketScoping(Request $request): View
     {
-        $officeId    = $this->officeId();
-        $requestedId = (int) $request->query('proposal', 0);
+        $officeId           = $this->officeId();
+        $reachableOfficeIds = $this->reachableOfficeIds();
+        $requestedId        = (int) $request->query('proposal', 0);
 
         // Which proposal "owns" this scoping session — carried forward through
         // attach/add-item calls and back-links so navigating away and back
         // doesn't silently land on a different (e.g. newer) PPMP.
         $activeProposal = $requestedId
-            ? BudgetProposal::where('office_id', $officeId)->where('id', $requestedId)
+            ? BudgetProposal::whereIn('office_id', $reachableOfficeIds)->where('id', $requestedId)
                 ->whereIn('status', ['draft', 'returned'])->first()
             : null;
         if (!$activeProposal) {
-            $activeProposal = BudgetProposal::where('office_id', $officeId)
+            $activeProposal = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
                 ->whereIn('status', ['draft', 'returned'])
                 ->latest()->first();
         }
 
-        $draftIds    = BudgetProposal::where('office_id', $officeId)
+        $draftIds    = BudgetProposal::whereIn('office_id', $reachableOfficeIds)
                            ->whereIn('status', ['draft', 'returned'])
                            ->pluck('id');
         $itemIds     = BudgetProposalItem::whereIn('budget_proposal_id', $draftIds)->pluck('id');
@@ -424,7 +475,7 @@ class PrismOfficeHeadController extends Controller
         $requestedItemId  = (int) $request->query('item', 0);
         if ($requestedItemId) {
             $existingItem = BudgetProposalItem::where('id', $requestedItemId)
-                ->whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+                ->whereHas('budgetProposal', fn ($q) => $q->whereIn('office_id', $reachableOfficeIds))
                 ->with(['marketReferences' => fn ($q) => $q->where('is_selected', true)])
                 ->first();
 
@@ -697,7 +748,7 @@ class PrismOfficeHeadController extends Controller
         $proposal = null;
         if (!empty($validated['proposal_id'])) {
             $proposal = BudgetProposal::where('id', $validated['proposal_id'])
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->first();
 
@@ -710,7 +761,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         if (!$proposal) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->orderByDesc('fiscal_year')
                 ->first();
@@ -842,7 +893,7 @@ class PrismOfficeHeadController extends Controller
     public function storeItemAttachment(Request $request, BudgetProposalItem $item): JsonResponse
     {
         $proposal = $item->budgetProposal;
-        if ($proposal->office_id !== $this->officeId()) {
+        if (!in_array($proposal->office_id, $this->reachableOfficeIds(), true)) {
             abort(403);
         }
         if (!in_array($proposal->status, ['draft', 'returned'], true)) {
@@ -888,7 +939,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         $item = $document->attachable;
-        if (!$item instanceof BudgetProposalItem || $item->budgetProposal->office_id !== $this->officeId()) {
+        if (!$item instanceof BudgetProposalItem || !in_array($item->budgetProposal->office_id, $this->reachableOfficeIds(), true)) {
             abort(403);
         }
         if (!in_array($item->budgetProposal->status, ['draft', 'returned'], true)) {
@@ -913,11 +964,11 @@ class PrismOfficeHeadController extends Controller
         // "latest draft" as a fallback for old callers that don't send an id.
         $requestedId = (int) $request->input('proposal_id', 0);
         $proposal    = $requestedId
-            ? BudgetProposal::where('id', $requestedId)->where('office_id', $officeId)
+            ? BudgetProposal::where('id', $requestedId)->whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])->first()
             : null;
         if (!$proposal) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->latest()
                 ->firstOrFail();
@@ -1235,19 +1286,18 @@ class PrismOfficeHeadController extends Controller
             'item_id'     => 'nullable|integer|exists:budget_proposal_items,id',
         ]);
 
-        $officeId = $this->officeId();
         $query    = trim($request->input('query'));
         $refs     = $request->input('refs');
 
         $draftProposal = null;
         if ($request->filled('proposal_id')) {
             $draftProposal = BudgetProposal::where('id', $request->input('proposal_id'))
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->first();
         }
         if (!$draftProposal) {
-            $draftProposal = BudgetProposal::where('office_id', $officeId)
+            $draftProposal = BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->latest()->first();
         }
@@ -1302,13 +1352,13 @@ class PrismOfficeHeadController extends Controller
         $proposal = null;
         if (!empty($validated['proposal_id'])) {
             $proposal = BudgetProposal::where('id', $validated['proposal_id'])
-                ->where('office_id', $officeId)
+                ->whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->first();
         }
         if (!$proposal) {
             // Fall back to the existing draft/returned proposal for any fiscal year
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->orderByDesc('fiscal_year')
                 ->first();
@@ -1362,10 +1412,9 @@ class PrismOfficeHeadController extends Controller
 
     public function deleteRef(MarketScopingReference $ref): JsonResponse
     {
-        $officeId = $this->officeId();
         $itemOffice = $ref->budgetProposalItem?->budgetProposal?->office_id;
 
-        if ($itemOffice !== $officeId) {
+        if (!in_array($itemOffice, $this->reachableOfficeIds(), true)) {
             return response()->json(['success' => false], 403);
         }
 
@@ -1376,10 +1425,9 @@ class PrismOfficeHeadController extends Controller
 
     public function previewMps(Request $request): View
     {
-        $officeId    = $this->officeId();
         $requestedId = (int) $request->query('proposal', 0);
 
-        $withRelations = fn () => BudgetProposal::where('office_id', $officeId)->with([
+        $withRelations = fn () => BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())->with([
             'items.marketReferences' => fn ($q) => $q->where('is_selected', true)->orderBy('price'),
             'items.sourceFiles',
             'marketPriceSurvey.submittedBy',
@@ -1408,15 +1456,14 @@ class PrismOfficeHeadController extends Controller
 
     public function submitMps(Request $request): JsonResponse
     {
-        $officeId    = $this->officeId();
         $requestedId = (int) $request->input('proposal_id', 0);
 
         $proposal = $requestedId
-            ? BudgetProposal::where('office_id', $officeId)->where('id', $requestedId)
+            ? BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())->where('id', $requestedId)
                 ->whereIn('status', ['draft', 'returned'])->first()
             : null;
         if (!$proposal) {
-            $proposal = BudgetProposal::where('office_id', $officeId)
+            $proposal = BudgetProposal::whereIn('office_id', $this->reachableOfficeIds())
                 ->whereIn('status', ['draft', 'returned'])
                 ->latest()
                 ->firstOrFail();
@@ -1508,6 +1555,21 @@ class PrismOfficeHeadController extends Controller
     private function officeId(): int
     {
         return auth()->user()?->office_id ?? 1;
+    }
+
+    /**
+     * This account's own office plus any direct childOffices() — lets one
+     * office-head login (e.g. a parent office like CABEIHM with several
+     * colleges under it) view and edit PPMPs it created for a specific child
+     * college, not just its own office_id. Resolves to just [officeId] for
+     * every office that has no children — i.e. every office today — so this
+     * is a no-op until a parent/child pair is actually set up.
+     */
+    private function reachableOfficeIds(): array
+    {
+        $officeId = $this->officeId();
+
+        return [$officeId, ...Office::find($officeId)?->childOffices()->pluck('id')->all() ?? []];
     }
 
     /**

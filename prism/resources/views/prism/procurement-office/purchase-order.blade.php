@@ -971,8 +971,14 @@
         history.replaceState(null, '', location.pathname);
     }
 
+    // app.js loads as a module script, which the spec always defers until
+    // after the document finishes parsing — this classic inline script runs
+    // immediately as the parser reaches it, before that, so calling
+    // window.prismAutoRefresh here directly throws and silently never wires
+    // up the poll. The 'load' event fires only once all deferred module
+    // scripts have already run, so it's defined by then.
     if (refreshUrl) {
-        window.prismAutoRefresh(refreshUrl, handleRefresh);
+        window.addEventListener('load', () => window.prismAutoRefresh(refreshUrl, handleRefresh));
     }
 })();
 </script>

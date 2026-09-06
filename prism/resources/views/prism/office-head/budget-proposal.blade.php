@@ -48,6 +48,13 @@
             border-bottom: 1px solid var(--border2);
             flex-wrap: wrap;
         }
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 10px; padding: 48px 28px; text-align: center;
+        }
+        .empty-state i { font-size: 34px; color: var(--txt3); }
+        .empty-state p { font-size: 13px; color: var(--txt3); max-width: 360px; line-height: 1.6; }
+
         .card-head-icon {
             width: 32px; height: 32px; border-radius: 9px;
             background: var(--crimson-mid); border: 1px solid var(--crimson-border);
@@ -86,6 +93,8 @@
             border-color: var(--crimson-border); cursor: default;
         }
         .field-hint { font-size: 10.5px; color: var(--txt3); margin-top: 4px; }
+        .field-hint a { color: var(--crimson); font-weight: 700; text-decoration: none; }
+        .field-hint a:hover { text-decoration: underline; }
 
         /* ── PPMP Name ghost-text suggestion (type-ahead, Tab to accept) ──
            Two stacked, identically-styled inputs: the ghost (behind, greyed,
@@ -305,11 +314,6 @@
 @section('content')
     <div class="page-shell">
 
-        {{--
-            Only reachable when the office head explicitly browsed to a past
-            proposal via the selector — the default landing state always auto-starts
-            a fresh editable draft, so there's nothing to show here otherwise.
-        --}}
         @if($isReadOnly)
         @php
             $currentFy = $proposalForm['fiscalYear'] ?? now()->year;
@@ -360,6 +364,17 @@
         </script>
         @endif
 
+        @if(!$hasActiveProposal)
+        <div class="card">
+            <div class="empty-state">
+                <i class="ti ti-file-plus"></i>
+                <p>No active PPMP yet for this office. Start one when you're ready — it stays a draft until you submit it.</p>
+                <a href="{{ route('office-head.budget-proposal.new') }}" class="btn-primary" style="margin-top:6px;">
+                    <i class="ti ti-file-plus"></i> Create New PPMP
+                </a>
+            </div>
+        </div>
+        @else
         {{-- ═══ TOP GRID — PPMP Info (left) aligned with Readiness Check (right) ═══ --}}
         <div class="top-grid">
             <div class="col-left">
@@ -377,6 +392,9 @@
                         @if($needsRevisionCount > 0)
                             <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
                         @endif
+                        <a href="{{ route('office-head.budget-proposal.new-supplemental', ['proposal' => $selectedProposalId]) }}" class="btn-outline" style="margin-left:8px;white-space:nowrap;" title="Start another PPMP for FY{{ $proposalForm['fiscalYear'] }}, side by side with this one">
+                            <i class="ti ti-plus"></i> New Supplemental PPMP
+                        </a>
                     </div>
                     <div class="card-body">
                         <div class="field-group" style="margin-bottom:14px;">
@@ -394,8 +412,23 @@
                         </div>
                         <div class="form-grid-4">
                             <div class="field-group">
-                                <label class="field-label">Office / College</label>
+                                <label class="field-label" for="officeSelect">Office / College</label>
+                                @if($isReadOnly || count($childOffices ?? []) === 0)
                                 <input class="field-input readonly" readonly value="{{ $proposalForm['officeName'] }}">
+                                @else
+                                <div style="display:flex; gap:8px;">
+                                    <select id="officeSelect" class="field-select">
+                                        <option value="{{ auth()->user()->office_id }}" {{ $proposalForm['officeId'] == auth()->user()->office_id ? 'selected' : '' }}>{{ auth()->user()->office?->name }} (Main)</option>
+                                        @foreach($childOffices as $child)
+                                        <option value="{{ $child->id }}" {{ $proposalForm['officeId'] == $child->id ? 'selected' : '' }}>{{ $child->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" class="btn-outline" id="btnSaveOffice" style="white-space:nowrap;" title="Which child college this PPMP is for">
+                                        <i class="ti ti-device-floppy"></i> Save
+                                    </button>
+                                </div>
+                                <p id="officeSaveStatus" style="display:none; font-size:11px; font-weight:600; margin-top:4px;"></p>
+                                @endif
                             </div>
                             <div class="field-group">
                                 <label class="field-label" for="fiscalYearSelect">Select PPMP</label>
@@ -528,9 +561,12 @@
                         <div class="field-group">
                             <label class="field-label" for="itemQuarter">Target Quarter</label>
                             <select id="itemQuarter" name="targetQuarter" class="field-select">
-                                <option>Q1</option><option>Q2</option>
-                                <option>Q3</option><option>Q4</option>
+                                <option value="Q1">Q1 (Jan–Mar)</option>
+                                <option value="Q2">Q2 (Apr–Jun)</option>
+                                <option value="Q3">Q3 (Jul–Sep)</option>
+                                <option value="Q4">Q4 (Oct–Dec)</option>
                             </select>
+                            <p class="field-hint">When your office expects to procure this item. Procurement uses it to match your PR back to this PPMP.</p>
                         </div>
                         <div style="display:flex;align-items:flex-end;">
                             <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
@@ -647,6 +683,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
     </div>{{-- /page-shell --}}
 
@@ -681,6 +718,7 @@
     const refDeleteBase = '{{ url("office-head/market-scoping/ref") }}/';
     const titleUrl    = @json($titleUpdateUrl);
     const proposedBudgetUrl = @json($proposedBudgetUpdateUrl);
+    const officeUpdateUrl   = @json($officeUpdateUrl);
     const isReadOnly  = {{ $isReadOnly ? 'true' : 'false' }};
     const itemsLocked = {{ $itemsLocked ? 'true' : 'false' }};
     const proposalId  = {{ $selectedProposalId ?? 'null' }};
@@ -790,6 +828,38 @@
                     || 'Could not save.';
                 status.style.color = '#991b1b';
             }
+        } catch {
+            status.style.display = '';
+            status.textContent = 'Network error.';
+            status.style.color = '#991b1b';
+        } finally {
+            this.disabled = false;
+        }
+    });
+
+    // Changing the target office/college reshapes the doc-preview subtitle and
+    // the "Select PPMP" switcher labels too — simplest to just reload against
+    // the same proposal rather than patch every affected spot in place.
+    document.getElementById('btnSaveOffice')?.addEventListener('click', async function () {
+        if (!officeUpdateUrl) return;
+        const select = document.getElementById('officeSelect');
+        const status = document.getElementById('officeSaveStatus');
+        this.disabled = true;
+
+        try {
+            const res  = await fetch(officeUpdateUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ office_id: select.value }),
+            });
+            const json = await res.json();
+            status.style.display = '';
+            if (res.ok && json.success) {
+                window.location.href = '{{ route("office-head.budget-proposal") }}?proposal={{ $selectedProposalId }}';
+                return;
+            }
+            status.textContent = json.message || 'Could not save.';
+            status.style.color = '#991b1b';
         } catch {
             status.style.display = '';
             status.textContent = 'Network error.';

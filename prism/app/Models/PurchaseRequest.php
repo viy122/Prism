@@ -17,6 +17,7 @@ class PurchaseRequest extends Model
 
     protected $fillable = [
         'annual_procurement_plan_id',
+        'budget_proposal_id',
         'office_id',
         'created_by_user_id',
         'submitted_by_user_id',
@@ -60,6 +61,12 @@ class PurchaseRequest extends Model
     public function annualProcurementPlan(): BelongsTo
     {
         return $this->belongsTo(AnnualProcurementPlan::class);
+    }
+
+    /** The specific approved PPMP this PR was raised against — see Upload Purchase Request. */
+    public function budgetProposal(): BelongsTo
+    {
+        return $this->belongsTo(BudgetProposal::class);
     }
 
     public function office(): BelongsTo

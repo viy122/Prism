@@ -43,4 +43,10 @@ return [
         'key' => env('SERPAPI_KEY'),
     ],
 
+    // Local Flask matcher (microservice/app.py) — semantic item matching for
+    // cross-document validation, plus market scoping and signature detection.
+    'matcher' => [
+        'url' => env('MATCHER_URL', 'http://localhost:5001'),
+    ],
+
 ];

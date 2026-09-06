@@ -75,6 +75,11 @@
 
     /* Detail panel */
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
+    .pr-ppmp-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--s50); border: 1px solid var(--s200); border-radius: 10px; padding: 8px 10px; margin-top: -6px; }
+    .pr-ppmp-nav-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--s200); background: var(--white); color: var(--s600); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .pr-ppmp-nav-btn:hover:not(:disabled) { background: var(--crimson-mid); color: var(--m); border-color: var(--crimson-border); }
+    .pr-ppmp-nav-btn:disabled { opacity: .4; cursor: not-allowed; }
+    #ppmpNavLabel { font-size: 11.5px; font-weight: 700; color: var(--s600); text-align: center; flex: 1; }
     .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 220px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); text-align: center; padding: 32px; }
     .detail-empty i { font-size: 36px; color: var(--s300); }
     .detail-empty p { font-size: 13px; color: var(--s400); line-height: 1.6; max-width: 220px; }
@@ -101,6 +106,14 @@
     .detail-field.full { grid-column: 1 / -1; }
     .detail-field label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); display: block; margin-bottom: 3px; }
     .detail-field span { font-size: 13px; font-weight: 600; color: var(--s700); }
+
+    .items-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .items-table th { padding: 9px 14px; text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--s400); border-bottom: 1px solid var(--s200); background: var(--white); white-space: nowrap; }
+    .items-table td { padding: 9px 14px; border-bottom: 1px solid var(--s200); color: var(--s600); vertical-align: middle; }
+    .items-table tbody tr:last-child td { border-bottom: none; }
+    .items-table .item-name-cell { font-weight: 600; color: var(--s900); }
+    .items-table .num-cell   { font-weight: 700; color: var(--s700); text-align: right; }
+    .items-table .total-cell { font-weight: 700; color: var(--m); text-align: right; }
 
     /* Status control */
     .status-control { display: flex; flex-direction: column; gap: 8px; }
@@ -150,6 +163,103 @@
     .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
     .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
+
+    .btn-primary {
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 8px; height: 42px; padding: 0 20px; border-radius: 10px;
+        background: var(--crimson); color: #fff;
+        font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+        font-family: 'Poppins', sans-serif; box-shadow: 0 2px 10px rgba(139,26,28,.2);
+        transition: background .2s; white-space: nowrap;
+    }
+    .btn-primary:hover { background: var(--crimson-dark); }
+
+    /* This modal sits outside .content as a sibling, so the --s and --m
+       aliases .content defines for this page don't reach it. Everything
+       below uses either a real :root global (--crimson, --white, --s200)
+       or a hardcoded fallback instead. */
+    .pr-modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .pr-modal-overlay.open { display: flex; }
+    .pr-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; padding: 24px 28px; box-shadow: 0 24px 60px rgba(0,0,0,.25); font-family: 'Poppins', sans-serif; }
+    .pr-modal-title { font-size: 17px; font-weight: 800; color: #0f172a; }
+    .pr-modal-sub { font-size: 12.5px; color: #64748b; margin-top: 3px; }
+    .pr-modal-close { position: absolute; top: 20px; right: 24px; background: none; border: none; font-size: 22px; color: #94a3b8; cursor: pointer; line-height: 1; }
+    .pr-modal-close:hover { color: #334155; }
+    .pr-modal-body { position: relative; }
+
+    .pr-step { margin-top: 18px; }
+    .pr-step-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+
+    .pr-ppmp-list { border: 1px solid #e2e8f0; border-radius: 10px; max-height: 220px; overflow-y: auto; }
+    .pr-ppmp-row { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background .12s; }
+    .pr-ppmp-row:last-child { border-bottom: none; }
+    .pr-ppmp-row:hover { background: #f8fafc; }
+    .pr-ppmp-row.selected { background: rgba(139,26,28,.06); border-left: 3px solid var(--crimson); padding-left: 11px; }
+    .pr-ppmp-row-main { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    .pr-ppmp-code { font-size: 12.5px; font-weight: 800; color: #0f172a; }
+    .pr-ppmp-office { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 20px; background: #f1f5f9; color: #334155; font-size: 10px; font-weight: 700; }
+    .pr-ppmp-title { font-size: 12px; color: #475569; margin-bottom: 4px; }
+    .pr-ppmp-row-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #94a3b8; }
+    .pr-ppmp-missing-count { font-weight: 700; color: #854f0b; }
+
+    .pr-missing-box { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; padding: 12px 14px; max-height: 160px; overflow-y: auto; }
+    .pr-missing-empty { font-size: 12.5px; color: #94a3b8; }
+    .pr-missing-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .pr-missing-row:last-child { border-bottom: none; }
+    .pr-missing-row .name { color: #334155; font-weight: 600; }
+    .pr-missing-row .qty { color: #64748b; white-space: nowrap; }
+
+    .pr-file-picker { display: flex; align-items: center; gap: 10px; }
+    .pr-choose-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 9px; border: 1.5px dashed #cbd5e1; background: #f8fafc; color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; }
+    .pr-choose-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+    .pr-file-name { font-size: 12px; color: #475569; font-weight: 600; }
+    .pr-extract-status { font-size: 12px; color: #64748b; margin-top: 8px; display: none; }
+    .pr-extract-status.show { display: flex; align-items: center; gap: 6px; }
+    .pr-extract-warn { font-size: 11.5px; color: #92400E; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 8px 10px; margin-top: 8px; display: none; }
+    .pr-extract-warn.show { display: block; }
+
+    .pr-review { display: none; }
+    .pr-review.show { display: block; }
+    .pr-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+    .pr-field label { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 5px; display: block; }
+    .pr-field input { width: 100%; height: 38px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 11px; font-size: 12.5px; font-family: 'Poppins', sans-serif; color: #0f172a; outline: none; }
+    .pr-field input:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
+
+    .pr-items-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    .pr-items-table th { text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; padding: 6px 6px; border-bottom: 1px solid #e2e8f0; }
+    .pr-items-table td { padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+    .pr-items-table input { width: 100%; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 8px; font-size: 12px; font-family: 'Poppins', sans-serif; }
+    .pr-items-table input.pr-item-name { min-width: 160px; }
+    .pr-items-table input.pr-item-num { text-align: right; width: 80px; }
+    .pr-row-remove { background: none; border: none; color: #DC2626; cursor: pointer; font-size: 15px; padding: 4px; }
+    .pr-add-item-btn { margin-top: 8px; background: none; border: 1.5px dashed #cbd5e1; border-radius: 8px; color: #475569; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer; font-family: 'Poppins', sans-serif; }
+    .pr-add-item-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+    .pr-items-total { text-align: right; font-size: 12.5px; font-weight: 700; color: #0f172a; margin-top: 8px; }
+
+    .pr-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .pr-btn-cancel { height: 40px; padding: 0 18px; border-radius: 9px; background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; }
+    .pr-status-msg { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 9px 12px; margin-top: 12px; display: none; }
+    .pr-status-msg.error { display: block; background: #fee2e2; color: #b91c1c; }
+    .pr-status-msg.success { display: block; background: #dcfce7; color: #166534; }
+
+    /* Quarter picker */
+    .pr-quarter-select { height: 38px; width: 100%; border-radius: 9px; border: 1px solid #cbd5e1; background: #fff; padding: 0 12px; font-size: 12.5px; font-weight: 600; color: #334155; font-family: 'Poppins', sans-serif; }
+    .pr-quarter-hint { font-size: 10.5px; color: #94a3b8; margin-top: 5px; }
+
+    /* Content-validation result */
+    .pr-validation { border-radius: 9px; padding: 10px 13px; margin-bottom: 12px; }
+    .pr-validation.pass { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .pr-validation.fail { background: #fee2e2; border: 1px solid #fecaca; }
+    .pr-validation-summary { font-size: 12px; font-weight: 700; }
+    .pr-validation.pass .pr-validation-summary { color: #166534; }
+    .pr-validation.fail .pr-validation-summary { color: #b91c1c; }
+    .pr-validation-warnings { margin: 6px 0 0 16px; padding: 0; }
+    .pr-validation-warnings li { font-size: 11px; color: #854f0b; line-height: 1.5; }
+
+    .pr-items-table tr.row-fail td { background: #fef2f2; }
+    .pr-item-verdict { display: block; font-size: 10.5px; font-weight: 700; margin-top: 3px; line-height: 1.4; }
+    .pr-item-verdict.ok   { color: #166534; }
+    .pr-item-verdict.bad  { color: #dc2626; }
 </style>
 @endpush
 
@@ -164,6 +274,7 @@
             <h1 class="page-hdr-title">Purchase Request Management</h1>
             <p class="page-hdr-sub">Review uploaded PRs, update status, add remarks, and track activity history.</p>
         </div>
+        <button type="button" class="btn-primary" id="btnOpenUploadPr"><i class="ti ti-upload"></i> Upload Purchase Request</button>
     </div>
 
     <div class="pr-grid">
@@ -220,6 +331,7 @@
                     </thead>
                     <tbody>
                         @foreach ($purchaseRequests as $pr)
+                            @continue(!$pr['isTableRow'])
                             @php
                                 $stageBadge = match($pr['signatoryStage']) {
                                     'fully_signed' => 'badge-signed',
@@ -229,8 +341,20 @@
                             @endphp
                             <tr data-pr-row data-pr-id="{{ $pr['id'] }}" data-office="{{ $pr['office'] }}" data-status-bucket="{{ $pr['statusBucket'] }}" data-created-at="{{ $pr['createdAt'] }}" data-search="{{ strtolower($pr['prNumber'] . ' ' . $pr['item'] . ' ' . $pr['office'] . ' ' . $pr['remarks'] . ' ' . $pr['signatoryLabel']) }}" tabindex="0">
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">{{ $pr['office'] }}</td>
-                                <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
-                                <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $pr['item'] }}</td>
+                                <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">
+                                    {{ $pr['prNumber'] }}
+                                    @if($pr['budgetProposalId'])
+                                        <span class="count-chip" style="height:18px;padding:0 7px;font-size:9.5px;margin-left:4px;" title="{{ $pr['siblingCount'] }} {{ $pr['siblingCount'] === 1 ? 'PR' : 'PRs' }} against {{ $pr['budgetProposalCode'] }}{{ $pr['siblingCount'] > 1 ? ' — open this one, then use Next to see the rest' : '' }}">
+                                            {{ $pr['budgetProposalCode'] }}{{ $pr['siblingCount'] > 1 ? ' · ' . $pr['siblingCount'] . ' PRs' : '' }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    {{ $pr['item'] }}
+                                    @if($pr['itemCount'] > 1)
+                                        <span class="count-chip" style="height:17px;padding:0 6px;font-size:9px;margin-left:4px;" title="{{ $pr['itemCount'] }} items bundled in this PR">{{ $pr['itemCount'] }} items</span>
+                                    @endif
+                                </td>
                                 <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['dateSubmitted'] }}</td>
                                 <td>
                                     <span class="badge {{ $stageBadge }}" data-sig-badge="{{ $pr['id'] }}">{{ $pr['signatoryLabel'] }}</span>
@@ -251,6 +375,14 @@
                     <h2 class="card-title" id="detailPrNumber">Select a PR</h2>
                 </div>
                 <span class="count-chip" id="detailPrOffice" style="display:none;"></span>
+            </div>
+
+            {{-- Only shown when this PR is linked to a PPMP with more than one PR —
+                 those are usually uploaded at different times, not all at once. --}}
+            <div class="pr-ppmp-nav" id="ppmpNav" style="display:none;">
+                <button type="button" class="pr-ppmp-nav-btn" id="ppmpPrevBtn" title="Previous PR from this PPMP"><i class="ti ti-chevron-left"></i></button>
+                <span id="ppmpNavLabel"></span>
+                <button type="button" class="pr-ppmp-nav-btn" id="ppmpNextBtn" title="Next PR from this PPMP"><i class="ti ti-chevron-right"></i></button>
             </div>
 
             {{-- Empty state --}}
@@ -283,6 +415,20 @@
                     <div class="detail-field"><label>Date Submitted</label><span id="fDate">—</span></div>
                     <div class="detail-field"><label>Signatory Stage</label><span id="fSigLabel">—</span></div>
                     <div class="detail-field full"><label>Remarks on File</label><span id="fRemarks" style="white-space:pre-line;">—</span></div>
+                    <div class="detail-field full" id="fItemsField" style="display:none;padding:0;overflow:hidden;">
+                        <table class="items-table" id="fItemsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:40%">Item Description</th>
+                                    <th class="num-cell">Quantity</th>
+                                    <th>Unit</th>
+                                    <th class="num-cell">Unit Cost</th>
+                                    <th class="num-cell">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fItemsBody"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {{-- Signatory timeline --}}
@@ -381,11 +527,105 @@
 {{-- Toast --}}
 <div class="pr-toast" id="prToast"></div>
 
+{{-- ── Upload Purchase Request modal ── --}}
+<div class="pr-modal-overlay" id="prModalOverlay">
+    <div class="pr-modal">
+        <div class="pr-modal-body">
+            <button type="button" class="pr-modal-close" id="prModalCloseBtn" aria-label="Close">&times;</button>
+            <p class="pr-modal-title">Upload Purchase Request</p>
+            <p class="pr-modal-sub">Pick the approved PPMP this PR is for, then upload the signed document — its contents get read automatically for you to review before creating it.</p>
+
+            <div class="pr-step">
+                <p class="pr-step-label">1. Approved PPMP <span style="text-transform:none;font-weight:600;color:#94a3b8;">(newest first)</span></p>
+                <div class="pr-ppmp-list" id="prPpmpList">
+                    @forelse ($approvedPpmps as $p)
+                    <div class="pr-ppmp-row" data-ppmp-id="{{ $p['id'] }}" data-office-code="{{ $p['officeCode'] }}" data-missing="{{ json_encode($p['missingItems']) }}">
+                        <div class="pr-ppmp-row-main">
+                            <span class="pr-ppmp-code">{{ $p['code'] }}</span>
+                            <span class="pr-ppmp-office">{{ $p['officeCode'] }}</span>
+                        </div>
+                        <p class="pr-ppmp-title">{{ $p['title'] }}</p>
+                        <div class="pr-ppmp-row-meta">
+                            <span>Approved {{ $p['approvedAt'] }}</span>
+                            <span class="pr-ppmp-missing-count">{{ count($p['missingItems']) }} {{ Str::plural('item', count($p['missingItems'])) }} still need a PR</span>
+                        </div>
+                    </div>
+                    @empty
+                    <p class="pr-missing-empty">No approved PPMPs currently have items still waiting on a Purchase Request.</p>
+                    @endforelse
+                </div>
+                <div class="pr-missing-box" id="prMissingBox" style="margin-top:10px;display:none;"></div>
+
+                <div id="prQuarterWrap" style="margin-top:12px;display:none;">
+                    <label class="pr-step-label" for="prQuarterSelect" style="display:block;margin-bottom:6px;">
+                        Target quarter to check against
+                    </label>
+                    <select id="prQuarterSelect" class="pr-quarter-select">
+                        <option value="">All quarters (check the whole PPMP)</option>
+                        <option value="Q1">Q1 (Jan–Mar)</option>
+                        <option value="Q2">Q2 (Apr–Jun)</option>
+                        <option value="Q3">Q3 (Jul–Sep)</option>
+                        <option value="Q4">Q4 (Oct–Dec)</option>
+                    </select>
+                    <p class="pr-quarter-hint">
+                        This is the <strong>Target Quarter the requesting office set on each PPMP item</strong> — not a date on the PR itself.
+                        Pick one to compare only that quarter's items; leave it on "All quarters" if you're unsure.
+                    </p>
+                </div>
+            </div>
+
+            <div class="pr-step" id="prUploadStep" style="display:none;">
+                <p class="pr-step-label">2. PR Document (PDF)</p>
+                <div class="pr-file-picker">
+                    <button type="button" class="pr-choose-btn" id="prChooseFileBtn"><i class="ti ti-file-upload"></i> Choose PDF</button>
+                    <span class="pr-file-name" id="prFileName"></span>
+                </div>
+                <input type="file" id="prFileInput" accept="application/pdf,.pdf" style="display:none;">
+                <div class="pr-extract-status" id="prExtractStatus"><i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Reading document…</div>
+                <div class="pr-extract-warn" id="prExtractWarn"></div>
+            </div>
+
+            <div class="pr-step pr-review" id="prReview">
+                <p class="pr-step-label">3. Review Before Creating</p>
+                <div class="pr-review-grid">
+                    <div class="pr-field"><label>PR Number</label><input type="text" id="prNumberInput"></div>
+                    <div class="pr-field"><label>Title (optional)</label><input type="text" id="prTitleInput" placeholder="e.g. project/purpose"></div>
+                </div>
+
+                {{-- Content check against the selected PPMP — filled in by the
+                     extract call, and re-checked server-side on submit. --}}
+                <div class="pr-validation" id="prValidation" style="display:none;">
+                    <p class="pr-validation-summary" id="prValidationSummary"></p>
+                    <ul class="pr-validation-warnings" id="prValidationWarnings"></ul>
+                </div>
+
+                <table class="pr-items-table">
+                    <thead>
+                        <tr><th>Item</th><th>Unit</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th></th></tr>
+                    </thead>
+                    <tbody id="prItemsBody"></tbody>
+                </table>
+                <button type="button" class="pr-add-item-btn" id="prAddItemBtn"><i class="ti ti-plus"></i> Add item row</button>
+                <p class="pr-items-total" id="prItemsTotal">Total: ₱0.00</p>
+            </div>
+
+            <div class="pr-status-msg" id="prStatusMsg"></div>
+
+            <div class="pr-modal-actions">
+                <button type="button" class="pr-btn-cancel" id="prCancelBtn">Cancel</button>
+                <button type="button" class="btn-primary" id="prSubmitBtn" disabled><i class="ti ti-check"></i> Create Purchase Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 <script type="application/json" id="prData">@json($purchaseRequests)</script>
 <script type="application/json" id="stagesData">@json($stageMeta)</script>
 <script type="application/json" id="refreshUrlData">@json(route('procurement-office.purchase-request-management.refresh'))</script>
+<script type="application/json" id="extractPrUrlData">@json($extractPrUrl)</script>
+<script type="application/json" id="createPrUrlData">@json($createPrUrl)</script>
 
 @push('scripts')
 <script>
@@ -579,6 +819,32 @@
     }
 
     /* ── Open PR ── */
+    // PRs against the same PPMP are usually uploaded at different times (see
+    // Upload Purchase Request), not all in one sitting — this lets someone
+    // reviewing one of them jump straight to the others instead of hunting
+    // through the whole queue for the matching budget_proposal_id.
+    function updatePpmpNav(pr) {
+        const nav = document.getElementById('ppmpNav');
+        if (!pr.budgetProposalId) { nav.style.display = 'none'; return; }
+
+        const siblings = allPrs
+            .filter(p => p.budgetProposalId === pr.budgetProposalId)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        if (siblings.length <= 1) { nav.style.display = 'none'; return; }
+
+        const idx = siblings.findIndex(p => p.id === pr.id);
+        document.getElementById('ppmpNavLabel').textContent =
+            `PR ${idx + 1} of ${siblings.length} for ${pr.budgetProposalCode || 'this PPMP'}`;
+
+        const prevBtn = document.getElementById('ppmpPrevBtn');
+        const nextBtn = document.getElementById('ppmpNextBtn');
+        prevBtn.disabled = idx === 0;
+        nextBtn.disabled = idx === siblings.length - 1;
+        prevBtn.onclick = () => { if (idx > 0) openPr(siblings[idx - 1]); };
+        nextBtn.onclick = () => { if (idx < siblings.length - 1) openPr(siblings[idx + 1]); };
+        nav.style.display = 'flex';
+    }
+
     function openPr(pr) {
         activePr = pr;
 
@@ -590,6 +856,7 @@
         titleEl.textContent      = pr.prNumber;
         officeChip.textContent   = pr.office;
         officeChip.style.display = '';
+        updatePpmpNav(pr);
 
         document.getElementById('fOffice').textContent   = pr.office;
         document.getElementById('fPrNumber').textContent = pr.prNumber;
@@ -597,6 +864,24 @@
         document.getElementById('fDate').textContent     = pr.dateSubmitted;
         document.getElementById('fSigLabel').textContent = pr.signatoryLabel;
         document.getElementById('fRemarks').textContent  = pr.remarks !== '—' ? pr.remarks : '—';
+
+        const fItemsField = document.getElementById('fItemsField');
+        const fItemsBody  = document.getElementById('fItemsBody');
+        if (pr.items && pr.items.length) {
+            fItemsBody.innerHTML = pr.items.map(it => `
+                <tr>
+                    <td class="item-name-cell">${escapeHtml(it.name)}</td>
+                    <td class="num-cell">${it.quantity}</td>
+                    <td>${escapeHtml(it.unit || '')}</td>
+                    <td class="num-cell">${money(it.unitCost)}</td>
+                    <td class="total-cell">${money(it.totalCost)}</td>
+                </tr>
+            `).join('');
+            fItemsField.style.display = '';
+        } else {
+            fItemsBody.innerHTML = '';
+            fItemsField.style.display = 'none';
+        }
 
         statusSel.value = pr.currentStatus ?? 'new';
         statusDirty = false;
@@ -888,10 +1173,16 @@
         const stageBadge = pr.signatoryStage === 'fully_signed' ? 'badge-signed'
             : (pr.signatoryStage === 'draft' ? 'badge-draft' : 'badge-routing');
         const search = (pr.prNumber + ' ' + pr.item + ' ' + pr.office + ' ' + pr.remarks + ' ' + pr.signatoryLabel).toLowerCase();
+        const siblingBadge = pr.budgetProposalId
+            ? ` <span class="count-chip" style="height:18px;padding:0 7px;font-size:9.5px;margin-left:4px;" title="${pr.siblingCount} ${pr.siblingCount === 1 ? 'PR' : 'PRs'} against ${escapeHtml(pr.budgetProposalCode || '')}${pr.siblingCount > 1 ? ' — open this one, then use Next to see the rest' : ''}">${escapeHtml(pr.budgetProposalCode || '')}${pr.siblingCount > 1 ? ' · ' + pr.siblingCount + ' PRs' : ''}</span>`
+            : '';
+        const itemCountBadge = pr.itemCount > 1
+            ? ` <span class="count-chip" style="height:17px;padding:0 6px;font-size:9px;margin-left:4px;" title="${pr.itemCount} items bundled in this PR">${pr.itemCount} items</span>`
+            : '';
         return `<tr data-pr-row data-pr-id="${pr.id}" data-office="${escapeHtml(pr.office)}" data-status-bucket="${pr.statusBucket || ''}" data-created-at="${pr.createdAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td style="font-size:12px;font-weight:600;color:var(--s600);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(pr.office)}</td>
-            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.prNumber)}</td>
-            <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(pr.item)}</td>
+            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.prNumber)}${siblingBadge}</td>
+            <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(pr.item)}${itemCountBadge}</td>
             <td style="font-size:12px;color:var(--s500);white-space:nowrap;">${escapeHtml(pr.dateSubmitted)}</td>
             <td><span class="badge ${stageBadge}" data-sig-badge="${pr.id}">${escapeHtml(pr.signatoryLabel)}</span></td>
         </tr>`;
@@ -920,7 +1211,7 @@
             });
 
             fresh.forEach(pr => {
-                if (!existingIds.has(String(pr.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(pr));
+                if (pr.isTableRow && !existingIds.has(String(pr.id))) tbody.insertAdjacentHTML('beforeend', rowHtml(pr));
             });
 
             if (activePr) tbody.querySelector(`[data-pr-id="${activePr.id}"]`)?.classList.add('selected');
@@ -957,9 +1248,333 @@
         }
     }
 
+    // app.js loads as a module script, which the spec always defers until
+    // after the document finishes parsing — this classic inline script runs
+    // immediately as the parser reaches it, before that, so calling
+    // window.prismAutoRefresh here directly throws (ReferenceError) and
+    // aborts every statement after it in this IIFE, including the Upload
+    // Purchase Request wiring below. The 'load' event fires only once all
+    // deferred module scripts have already run, so it's defined by then.
     if (refreshUrl) {
-        window.prismAutoRefresh(refreshUrl, handleRefresh);
+        window.addEventListener('load', () => window.prismAutoRefresh(refreshUrl, handleRefresh));
     }
+
+    // ── Upload Purchase Request ──────────────────────────────────────────
+    const extractUrl = JSON.parse(document.getElementById('extractPrUrlData').textContent);
+    const createUrl  = JSON.parse(document.getElementById('createPrUrlData').textContent);
+
+    const prOverlay       = document.getElementById('prModalOverlay');
+    const prPpmpList      = document.getElementById('prPpmpList');
+    const prMissingBox    = document.getElementById('prMissingBox');
+    const prUploadStep    = document.getElementById('prUploadStep');
+    const prChooseFileBtn = document.getElementById('prChooseFileBtn');
+    const prFileInput     = document.getElementById('prFileInput');
+    const prFileNameEl    = document.getElementById('prFileName');
+    const prExtractStatus = document.getElementById('prExtractStatus');
+    const prExtractWarn   = document.getElementById('prExtractWarn');
+    const prReview        = document.getElementById('prReview');
+    const prNumberInput   = document.getElementById('prNumberInput');
+    const prTitleInput    = document.getElementById('prTitleInput');
+    const prItemsBody     = document.getElementById('prItemsBody');
+    const prItemsTotalEl  = document.getElementById('prItemsTotal');
+    const prStatusMsg     = document.getElementById('prStatusMsg');
+    const prSubmitBtn     = document.getElementById('prSubmitBtn');
+    const prQuarterWrap   = document.getElementById('prQuarterWrap');
+    const prQuarterSelect = document.getElementById('prQuarterSelect');
+    const prValidation        = document.getElementById('prValidation');
+    const prValidationSummary = document.getElementById('prValidationSummary');
+    const prValidationWarnings = document.getElementById('prValidationWarnings');
+
+    let selectedPpmpId = null;
+    let selectedPpmpOfficeCode = null;
+    let lastValidation = null;
+
+    function money(n) {
+        return '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function resetPrModal() {
+        selectedPpmpId = null;
+        selectedPpmpOfficeCode = null;
+        lastValidation = null;
+        prPpmpList.querySelectorAll('.pr-ppmp-row.selected').forEach(r => r.classList.remove('selected'));
+        prMissingBox.style.display = 'none';
+        prMissingBox.innerHTML = '';
+        if (prQuarterWrap) prQuarterWrap.style.display = 'none';
+        if (prQuarterSelect) prQuarterSelect.value = '';
+        if (prValidation) prValidation.style.display = 'none';
+        prUploadStep.style.display = 'none';
+        prFileInput.value = '';
+        prFileNameEl.textContent = '';
+        prExtractStatus.classList.remove('show');
+        prExtractWarn.classList.remove('show');
+        prReview.classList.remove('show');
+        prItemsBody.innerHTML = '';
+        prNumberInput.value = '';
+        prTitleInput.value = '';
+        prStatusMsg.className = 'pr-status-msg';
+        prSubmitBtn.disabled = true;
+        recalcPrItemsTotal();
+    }
+
+    document.getElementById('btnOpenUploadPr').addEventListener('click', () => {
+        resetPrModal();
+        prOverlay.classList.add('open');
+    });
+    function closePrModal() { prOverlay.classList.remove('open'); }
+    document.getElementById('prModalCloseBtn').addEventListener('click', closePrModal);
+    document.getElementById('prCancelBtn').addEventListener('click', closePrModal);
+    prOverlay.addEventListener('click', (e) => { if (e.target === prOverlay) closePrModal(); });
+
+    // Selecting a specific PPMP row is what actually ties the new PR back to
+    // that exact PPMP (budget_proposal_id) — not just "some approved PPMP for
+    // this office" the way office-only matching would leave ambiguous.
+    prPpmpList.querySelectorAll('.pr-ppmp-row').forEach(row => {
+        row.addEventListener('click', () => {
+            prPpmpList.querySelectorAll('.pr-ppmp-row.selected').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+            selectedPpmpId = row.dataset.ppmpId;
+            selectedPpmpOfficeCode = row.dataset.officeCode;
+
+            const missing = JSON.parse(row.dataset.missing || '[]');
+            prMissingBox.style.display = '';
+            prMissingBox.innerHTML = missing.length
+                ? missing.map(it => `
+                    <div class="pr-missing-row">
+                        <span class="name">${escapeHtml(it.name)}</span>
+                        <span class="qty">${it.quantity}${it.unit ? ' ' + escapeHtml(it.unit) : ''}</span>
+                    </div>`).join('')
+                : '<p class="pr-missing-empty">Every item in this PPMP already has a Purchase Request.</p>';
+
+            prQuarterWrap.style.display = '';
+            prUploadStep.style.display = '';
+            prReview.classList.remove('show');
+            prSubmitBtn.disabled = true;
+        });
+    });
+
+    // Changing the quarter changes which PPMP items the document is checked
+    // against, so re-run the check on whatever file is already chosen.
+    prQuarterSelect?.addEventListener('change', () => {
+        if (prFileInput.files[0]) extractAndValidate();
+    });
+
+    prChooseFileBtn.addEventListener('click', () => prFileInput.click());
+
+    function addPrItemRow(item) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="pr-item-name" value="${escapeHtml(item?.name ?? '')}"></td>
+            <td><input type="text" class="pr-item-unit" style="width:70px;" value="${escapeHtml(item?.unit ?? '')}"></td>
+            <td><input type="number" class="pr-item-num pr-item-qty" min="0.01" step="0.01" value="${item?.quantity ?? ''}"></td>
+            <td><input type="number" class="pr-item-num pr-item-cost" min="0" step="0.01" value="${item?.unitCost ?? ''}"></td>
+            <td class="pr-item-row-total" style="text-align:right;font-weight:700;white-space:nowrap;">${money((item?.quantity || 0) * (item?.unitCost || 0))}</td>
+            <td><button type="button" class="pr-row-remove" title="Remove row"><i class="ti ti-trash"></i></button></td>`;
+        prItemsBody.appendChild(tr);
+
+        const qtyInput  = tr.querySelector('.pr-item-qty');
+        const costInput = tr.querySelector('.pr-item-cost');
+        const totalCell = tr.querySelector('.pr-item-row-total');
+        function updateRowTotal() {
+            totalCell.textContent = money((parseFloat(qtyInput.value) || 0) * (parseFloat(costInput.value) || 0));
+            recalcPrItemsTotal();
+        }
+        qtyInput.addEventListener('input', updateRowTotal);
+        costInput.addEventListener('input', updateRowTotal);
+        tr.querySelector('.pr-row-remove').addEventListener('click', () => { tr.remove(); recalcPrItemsTotal(); });
+    }
+
+    function recalcPrItemsTotal() {
+        let total = 0;
+        prItemsBody.querySelectorAll('tr').forEach(tr => {
+            const qty  = parseFloat(tr.querySelector('.pr-item-qty')?.value) || 0;
+            const cost = parseFloat(tr.querySelector('.pr-item-cost')?.value) || 0;
+            total += qty * cost;
+        });
+        prItemsTotalEl.textContent = 'Total: ' + money(total);
+        // A document whose contents don't match the approved PPMP can't be
+        // submitted — the server refuses it anyway, so don't invite the trip.
+        const blocked = lastValidation && lastValidation.verdict !== 'passed';
+        prSubmitBtn.disabled = prItemsBody.children.length === 0 || !!blocked;
+    }
+
+    document.getElementById('prAddItemBtn').addEventListener('click', () => addPrItemRow(null));
+
+    /**
+     * Paints the content-check result: a summary banner, per-row verdicts, and
+     * the submit gate. A failing check disables submission outright — the
+     * server refuses it too, this just says so before the round-trip.
+     */
+    function renderValidation(validation) {
+        lastValidation = validation || null;
+
+        prItemsBody.querySelectorAll('tr').forEach(tr => {
+            tr.classList.remove('row-fail');
+            tr.querySelector('.pr-item-verdict')?.remove();
+        });
+
+        if (!validation) {
+            prValidation.style.display = 'none';
+            return;
+        }
+
+        const passed = validation.verdict === 'passed';
+        prValidation.style.display = '';
+        prValidation.className = 'pr-validation ' + (passed ? 'pass' : 'fail');
+        prValidationSummary.textContent = (passed ? '✓ ' : '✕ ') + (validation.summary || '');
+
+        prValidationWarnings.innerHTML = (validation.warnings || [])
+            .map(w => `<li>${escapeHtml(w)}</li>`).join('');
+
+        // Verdicts are positional — the extract response and the rendered rows
+        // come from the same list in the same order.
+        const rows = [...prItemsBody.querySelectorAll('tr')];
+        (validation.items || []).forEach((res, i) => {
+            const tr = rows[i];
+            if (!tr) return;
+            const ok = res.verdict === 'passed';
+            if (!ok) tr.classList.add('row-fail');
+            const cell = tr.querySelector('td');
+            if (!cell) return;
+            const note = document.createElement('span');
+            note.className = 'pr-item-verdict ' + (ok ? 'ok' : 'bad');
+            note.textContent = (ok ? '✓ ' : '✕ ') + (res.reason || '');
+            cell.appendChild(note);
+        });
+
+        recalcPrItemsTotal();
+    }
+
+    async function extractAndValidate() {
+        const file = prFileInput.files[0];
+        if (!file) return;
+
+        prFileNameEl.textContent = file.name;
+        prExtractWarn.classList.remove('show');
+        prExtractStatus.classList.add('show');
+        prReview.classList.remove('show');
+        prSubmitBtn.disabled = true;
+        renderValidation(null);
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            // Sending these lets the server check the document's contents
+            // against the chosen PPMP in the same round-trip.
+            if (selectedPpmpId) fd.append('budget_proposal_id', selectedPpmpId);
+            if (prQuarterSelect?.value) fd.append('quarter', prQuarterSelect.value);
+
+            const resp = await fetch(extractUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: fd,
+            });
+            const json = await resp.json();
+            prExtractStatus.classList.remove('show');
+
+            if (!resp.ok || !json.success) {
+                prExtractWarn.textContent = 'Could not read the document automatically — enter the items manually below.';
+                prExtractWarn.classList.add('show');
+            } else {
+                // The office is already known from the PPMP row picked in
+                // step 1 — the document's own office field is only useful
+                // here as a sanity check that the right file was uploaded.
+                if (json.officeCode && selectedPpmpOfficeCode && json.officeCode !== selectedPpmpOfficeCode) {
+                    prExtractWarn.textContent = `Heads up — this document looks like it's for "${json.officeCode}", but the PPMP you selected is for "${selectedPpmpOfficeCode}". Double-check before creating.`;
+                    prExtractWarn.classList.add('show');
+                }
+                if (!json.items || !json.items.length) {
+                    prExtractWarn.textContent = (prExtractWarn.classList.contains('show') ? prExtractWarn.textContent + ' ' : '') + 'No item rows were recognized — add them manually below.';
+                    prExtractWarn.classList.add('show');
+                }
+                prNumberInput.value = json.prNumber || '';
+                prTitleInput.value = json.projectName || '';
+            }
+
+            prItemsBody.innerHTML = '';
+            (json.items || []).forEach(it => addPrItemRow(it));
+            if (!json.items || !json.items.length) addPrItemRow(null);
+            recalcPrItemsTotal();
+            prReview.classList.add('show');
+            renderValidation(json.validation);
+        } catch {
+            prExtractStatus.classList.remove('show');
+            prExtractWarn.textContent = 'Network error while reading the document — you can still enter the items manually below.';
+            prExtractWarn.classList.add('show');
+            prItemsBody.innerHTML = '';
+            addPrItemRow(null);
+            recalcPrItemsTotal();
+            prReview.classList.add('show');
+        }
+    }
+
+    prFileInput.addEventListener('change', extractAndValidate);
+
+    prSubmitBtn.addEventListener('click', async () => {
+        prStatusMsg.className = 'pr-status-msg';
+
+        if (!selectedPpmpId) {
+            prStatusMsg.className = 'pr-status-msg error'; prStatusMsg.textContent = 'Select an approved PPMP first.'; return;
+        }
+        if (!prFileInput.files[0]) {
+            prStatusMsg.className = 'pr-status-msg error'; prStatusMsg.textContent = 'Attach the PR document.'; return;
+        }
+        const prRows = [...prItemsBody.querySelectorAll('tr')];
+        if (!prRows.length) {
+            prStatusMsg.className = 'pr-status-msg error'; prStatusMsg.textContent = 'Add at least one item.'; return;
+        }
+        const items = prRows.map(tr => ({
+            name: tr.querySelector('.pr-item-name').value.trim(),
+            unit: tr.querySelector('.pr-item-unit').value.trim(),
+            quantity: tr.querySelector('.pr-item-qty').value,
+            unit_cost: tr.querySelector('.pr-item-cost').value,
+        }));
+        if (items.some(it => !it.name || !it.quantity || it.unit_cost === '')) {
+            prStatusMsg.className = 'pr-status-msg error'; prStatusMsg.textContent = 'Every item needs a name, quantity, and unit cost.'; return;
+        }
+
+        prSubmitBtn.disabled = true;
+        prSubmitBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Creating…';
+
+        try {
+            const fd = new FormData();
+            fd.append('budget_proposal_id', selectedPpmpId);
+            fd.append('pr_number', prNumberInput.value.trim());
+            fd.append('title', prTitleInput.value.trim());
+            if (prQuarterSelect?.value) fd.append('quarter', prQuarterSelect.value);
+            fd.append('file', prFileInput.files[0]);
+            items.forEach((it, i) => {
+                fd.append(`items[${i}][name]`, it.name);
+                fd.append(`items[${i}][unit]`, it.unit);
+                fd.append(`items[${i}][quantity]`, it.quantity);
+                fd.append(`items[${i}][unit_cost]`, it.unit_cost);
+            });
+
+            const resp = await fetch(createUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: fd,
+            });
+            const json = await resp.json();
+            if (resp.ok && json.success) {
+                showToast(`${json.prNumber} created.`);
+                closePrModal();
+                setTimeout(() => window.location.reload(), 700);
+            } else {
+                prStatusMsg.className = 'pr-status-msg error';
+                prStatusMsg.textContent = json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Could not create the Purchase Request.');
+                // The server re-checks the reviewed list, which the user may
+                // have edited after the file was read — show its verdict.
+                if (json.validation) renderValidation(json.validation);
+            }
+        } catch {
+            prStatusMsg.className = 'pr-status-msg error';
+            prStatusMsg.textContent = 'Network error — please try again.';
+        } finally {
+            prSubmitBtn.innerHTML = '<i class="ti ti-check"></i> Create Purchase Request';
+            recalcPrItemsTotal();   // owns the disabled state, incl. the validation gate
+        }
+    });
 })();
 
 </script>

@@ -377,10 +377,10 @@
                 <div class="modal-field">
                     <label class="modal-label">Target Quarter <span class="modal-req">*</span></label>
                     <select id="modalQuarter" class="modal-input">
-                        <option value="Q1">Q1</option>
-                        <option value="Q2">Q2</option>
-                        <option value="Q3">Q3</option>
-                        <option value="Q4">Q4</option>
+                        <option value="Q1">Q1 (Jan–Mar)</option>
+                        <option value="Q2">Q2 (Apr–Jun)</option>
+                        <option value="Q3">Q3 (Jul–Sep)</option>
+                        <option value="Q4">Q4 (Oct–Dec)</option>
                     </select>
                 </div>
             </div>

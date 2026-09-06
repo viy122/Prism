@@ -261,8 +261,6 @@ class PrismChancellorController extends Controller
             'reviewed_at'         => now(),
         ]);
 
-        $this->createPurchaseRequestsFromProposal($proposal);
-
         NotificationService::proposalApproved($proposal);
 
         $proposal->load(self::CHANCELLOR_DETAIL_RELATIONS);
@@ -272,54 +270,6 @@ class PrismChancellorController extends Controller
             'message'  => 'Proposal approved.',
             'proposal' => $this->formatProposalForChancellor($proposal),
         ]);
-    }
-
-    /**
-     * Give Procurement an immediate new row in Purchase Request Management for each
-     * approved PPMP, grouped by target quarter (matching the PR-{OFFICE}-{FY}-{Q}
-     * numbering already used across the system). The proposal id is folded into the
-     * number so every approved proposal always gets its own fresh PR row — it must
-     * never be merged into an older cycle's PR, which could already be sitting at a
-     * later stage (e.g. already paid), and would otherwise wrongly show that old
-     * status instead of the fresh "PR to be Created" a newly approved PPMP should have.
-     */
-    private function createPurchaseRequestsFromProposal(BudgetProposal $proposal): void
-    {
-        $office = $proposal->office;
-        if (!$office) {
-            return;
-        }
-
-        $itemsByQuarter = $proposal->items()->get()->groupBy(fn ($item) => $item->target_quarter ?: 'Q1');
-
-        foreach ($itemsByQuarter as $quarter => $items) {
-            $pr = PurchaseRequest::firstOrCreate(
-                ['number' => "PR-{$office->code}-{$proposal->fiscal_year}-{$quarter}-{$proposal->id}"],
-                [
-                    'office_id'          => $office->id,
-                    'created_by_user_id' => auth()->id(),
-                    'title'              => "Approved PPMP Items – {$office->name} – {$quarter} {$proposal->fiscal_year}",
-                    'description'        => "Auto-generated from approved PPMP: {$proposal->title}",
-                    'fiscal_year'        => $proposal->fiscal_year,
-                    'status'             => 'new',
-                    'signatory_stage'    => 'draft',
-                    'canvassing_stage'   => 'not_started',
-                    'remarks'            => 'Auto-generated from approved PPMP.',
-                ]
-            );
-
-            foreach ($items as $item) {
-                $pr->items()->create([
-                    'name'                 => $item->name,
-                    'quantity'             => $item->quantity,
-                    'unit'                 => $item->unit,
-                    'estimated_unit_cost'  => $item->estimated_unit_cost,
-                    'estimated_total_cost' => $item->estimated_total_cost,
-                ]);
-            }
-
-            $pr->update(['total_amount' => $pr->items()->sum('estimated_total_cost')]);
-        }
     }
 
     public function returnProposal(Request $request, BudgetProposal $proposal): JsonResponse

@@ -79,6 +79,12 @@ class BudgetProposal extends Model
         return $this->hasMany(BudgetProposalItem::class);
     }
 
+    /** PRs raised directly against this PPMP via Upload Purchase Request. */
+    public function purchaseRequests(): HasMany
+    {
+        return $this->hasMany(PurchaseRequest::class);
+    }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(BudgetProposalReview::class);

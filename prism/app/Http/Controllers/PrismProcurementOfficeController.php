@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\AbstractOfCanvass;
 use Smalot\PdfParser\Parser as PdfParser;
 use App\Models\AocSignatureLog;
+use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\DocumentUpload;
+use App\Models\DocumentValidation;
 use App\Models\Office;
 use App\Models\PoSignatureLog;
 use App\Models\ProcurementStatusUpdate;
@@ -14,6 +16,7 @@ use App\Models\PrSignatureLog;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
+use App\Services\DocumentValidationService;
 use App\Services\NotificationService;
 use App\Services\ProcurementModeService;
 use App\Services\SignatoryActionService;
@@ -123,6 +126,9 @@ class PrismProcurementOfficeController extends Controller
             'stageMeta'        => PurchaseRequest::signatoryStageMeta(),
             'trackingStageOptions' => PurchaseRequest::allTrackingStageOptions(),
             'offices'          => Office::whereHas('purchaseRequests')->select('id', 'code', 'name')->orderBy('code')->get()->toArray(),
+            'approvedPpmps'    => $this->approvedPpmpsForUpload(),
+            'extractPrUrl'     => route('procurement-office.purchase-request-management.extract-pr'),
+            'createPrUrl'      => route('procurement-office.purchase-request-management.create-pr'),
         ]));
     }
 
@@ -133,14 +139,53 @@ class PrismProcurementOfficeController extends Controller
 
     private function purchaseRequestManagementRows(): array
     {
-        return PurchaseRequest::with(['office', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy', 'signatureLogs.attachments', 'abstractOfCanvass.purchaseOrder'])
+        $prs = PurchaseRequest::with(['office', 'budgetProposal', 'items', 'statusUpdates' => fn ($q) => $q->latest(), 'signatureLogs.signedBy', 'signatureLogs.attachments', 'abstractOfCanvass.purchaseOrder'])
             ->latest()
-            ->get()
-            ->map(fn ($pr) => [
+            ->get();
+
+        // One table row per PPMP group, not one per PR — several PRs against
+        // the same PPMP are usually uploaded at different times (see Upload
+        // Purchase Request), and listing every one of them as its own row
+        // would clutter the queue with near-duplicate entries. $prs is
+        // already newest-first, so the first PR encountered per
+        // budget_proposal_id here is the most recent — that's the one shown;
+        // the rest stay reachable via "Next PR from this PPMP" in the detail
+        // panel (updatePpmpNav() client-side) instead.
+        $siblingCounts = $prs->filter(fn ($pr) => $pr->budget_proposal_id)
+            ->groupBy('budget_proposal_id')
+            ->map->count();
+        $seenProposalIds = [];
+
+        return $prs
+            ->map(function ($pr) use (&$seenProposalIds, $siblingCounts) {
+                $isTableRow = true;
+                if ($pr->budget_proposal_id) {
+                    $isTableRow = !in_array($pr->budget_proposal_id, $seenProposalIds, true);
+                    if ($isTableRow) {
+                        $seenProposalIds[] = $pr->budget_proposal_id;
+                    }
+                }
+
+                return [
                 'id'             => $pr->id,
                 'office'         => $pr->office?->code ?? $pr->office?->name ?? '—',
                 'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
                 'item'           => $pr->title,
+                'itemCount'      => $pr->items->count(),
+                'items'          => $pr->items->map(fn ($item) => [
+                    'name'      => $item->name,
+                    'quantity'  => (int) $item->quantity,
+                    'unit'      => $item->unit,
+                    'unitCost'  => (float) $item->estimated_unit_cost,
+                    'totalCost' => (float) $item->estimated_total_cost,
+                ])->all(),
+                'isTableRow'     => $isTableRow,
+                'siblingCount'   => $pr->budget_proposal_id ? ($siblingCounts[$pr->budget_proposal_id] ?? 1) : 1,
+                // Lets the detail panel offer a "Next PR from this PPMP" nav —
+                // PRs against the same PPMP are usually uploaded at different
+                // times (see Upload Purchase Request), not all at once.
+                'budgetProposalId'   => $pr->budget_proposal_id,
+                'budgetProposalCode' => $pr->budgetProposal?->code,
                 'dateSubmitted'  => $pr->submitted_at?->format('M d, Y') ?? $pr->created_at->format('M d, Y'),
                 'currentStatus'  => $pr->status,
                 'signatoryStage'   => $pr->signatory_stage,
@@ -186,7 +231,8 @@ class PrismProcurementOfficeController extends Controller
                 'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
                 'uploadUrl'         => route('procurement-office.purchase-request.upload', $pr->id),
-            ])
+                ];
+            })
             ->all();
     }
 
@@ -311,6 +357,7 @@ class PrismProcurementOfficeController extends Controller
                 'office'          => $item->budgetProposal?->office?->code ?? "—",
                 'fiscalYear'      => $item->budgetProposal?->fiscal_year,
                 'item'            => $item->name,
+                'unit'            => $item->unit,
                 'quantity'        => (int) $item->quantity,
                 'abcAmount'       => $abc,
                 'targetQuarter'   => $item->target_quarter ?? 'Q1',
@@ -320,6 +367,10 @@ class PrismProcurementOfficeController extends Controller
                 'isOverridden'    => (bool) $item->is_overridden,
                 'overrideReason'  => $item->override_reason ?? '',
                 'saveUrl'         => route('procurement-office.annual-procurement-plan.save-mode', $item->id),
+                'sourceOfFund'         => $item->source_of_fund ?: '—',
+                'procurementStartDate' => $item->procurement_start_date?->format('Y-m-d'),
+                'dateNeeded'           => $item->date_needed?->format('Y-m-d'),
+                'datesSaveUrl'         => route('procurement-office.annual-procurement-plan.update-dates', $item->id),
                 'trackingStatus'     => $trackingStatus,
                 'trackingStatusAuto' => $trackingStatusAuto,
                 'trackingStatusUrl'  => route('procurement-office.annual-procurement-plan.update-tracking-status', $item->id),
@@ -337,6 +388,90 @@ class PrismProcurementOfficeController extends Controller
             'procurementModes' => ProcurementModeService::MODES,
             'trackingStageOptions' => $trackingOptions,
         ]));
+    }
+
+    /**
+     * Approved PPMPs that still have at least one item without a PR, sorted
+     * most-recently-approved first — the Upload Purchase Request picker's
+     * row list. Only 'approved' (Chancellor-signed) PPMPs are eligible; an
+     * endorsed-but-not-yet-approved one isn't something Procurement should
+     * be raising a PR against yet.
+     *
+     * "Already has a PR" is checked two ways: the real budget_proposal_id
+     * link (what every new upload sets) and, for PRs that predate that
+     * column, the same office+item-name match used everywhere else in this
+     * app (matchPrItemsByOfficeAndName) — so already-covered legacy items
+     * don't show up as "missing" just because they were never linked.
+     */
+    private function approvedPpmpsForUpload(): array
+    {
+        $proposals = BudgetProposal::with(['office', 'items', 'purchaseRequests.items'])
+            ->where('status', 'approved')
+            ->orderByDesc('approved_at')
+            ->get();
+
+        $officeIds = $proposals->pluck('office_id')->filter()->unique()->values();
+        $legacyMatches = $this->matchPrItemsByOfficeAndName($officeIds);
+
+        return $proposals->map(function ($proposal) use ($legacyMatches) {
+            $coveredNames = $proposal->purchaseRequests
+                ->flatMap->items
+                ->map(fn ($i) => strtolower(trim($i->name)))
+                ->filter()
+                ->unique();
+
+            $missing = $proposal->items
+                ->filter(function ($item) use ($legacyMatches, $proposal, $coveredNames) {
+                    $name = strtolower(trim($item->name));
+                    // A PR already linked to this exact PPMP (budget_proposal_id)
+                    // still won't necessarily spell an item's name identically —
+                    // the PPMP might say "monitor" while the real PR document
+                    // (typed or read off the upload) says "Monitor, 24-inch LED
+                    // Full HD Display". A substring match either direction
+                    // covers that without needing the human to explicitly link
+                    // each PR row back to a specific PPMP item.
+                    if ($coveredNames->contains(fn ($n) => str_contains($n, $name) || str_contains($name, $n))) {
+                        return false;
+                    }
+                    // Same office + same item name isn't enough on its own —
+                    // a generic name like "laptop" or "monitor" can coincide
+                    // across completely unrelated PPMP cycles years apart.
+                    // Requiring the matched legacy PR's fiscal year to equal
+                    // this proposal's is what keeps that from wrongly marking
+                    // a brand-new PPMP's item as "already has a PR" just
+                    // because some old, unrelated PR happened to share a name.
+                    $legacyMatch = $legacyMatches->get($proposal->office_id . '|' . $name);
+                    if (!$legacyMatch) {
+                        return true;
+                    }
+                    return $legacyMatch->purchaseRequest?->fiscal_year !== $proposal->fiscal_year;
+                })
+                ->map(fn ($item) => [
+                    'itemId'    => $item->id,
+                    'name'      => $item->name,
+                    'quantity'  => (int) $item->quantity,
+                    'abcAmount' => (float) $item->estimated_total_cost,
+                    'unit'      => $item->unit,
+                ])
+                ->values()
+                ->all();
+
+            return [
+                'id'           => $proposal->id,
+                'code'         => $proposal->code,
+                'officeId'     => $proposal->office_id,
+                'officeCode'   => $proposal->office?->code ?? '—',
+                'officeName'   => $proposal->office?->name ?? '—',
+                'title'        => $proposal->title,
+                'fiscalYear'   => $proposal->fiscal_year,
+                'approvedAt'   => $proposal->approved_at?->format('M d, Y') ?? '—',
+                'totalItems'   => $proposal->items->count(),
+                'missingItems' => $missing,
+            ];
+        })
+        ->filter(fn ($p) => count($p['missingItems']) > 0)
+        ->values()
+        ->all();
     }
 
     public function saveProcurementMode(Request $request, BudgetProposalItem $item): JsonResponse
@@ -397,11 +532,321 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Start of Procurement Activity / Date Needed — the two APP Item Matrix
+     * fields Procurement sets by hand (everything else on that row is
+     * auto-fetched from the item's own PPMP data).
+     */
+    public function updateAppItemDates(Request $request, BudgetProposalItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'procurement_start_date' => 'nullable|date',
+            'date_needed'            => 'nullable|date|after_or_equal:procurement_start_date',
+        ]);
+
+        $item->update($validated);
+
+        return response()->json([
+            'success'              => true,
+            'procurementStartDate' => $item->procurement_start_date?->format('Y-m-d'),
+            'dateNeeded'           => $item->date_needed?->format('Y-m-d'),
+        ]);
+    }
+
+    // ── Manual PR creation from an approved PPMP's still-uncovered items ─────
+    // Replaces the old auto-generated-on-approval PR: Procurement now uploads
+    // the real PR document themselves, for however many items they're ready
+    // to act on right now — the rest of a PPMP simply waits for a later upload.
+
+    /**
+     * Best-effort read of a Purchase Request PDF — shown for review, never trusted blindly.
+     *
+     * When the caller says which PPMP (and optionally which quarter) this PR is
+     * being raised against, the extracted items are also checked against that
+     * PPMP right here, so the modal can show a per-item verdict before anything
+     * is created. Nothing is persisted on this path.
+     */
+    public function extractPurchaseRequestFields(Request $request, DocumentValidationService $validator): JsonResponse
+    {
+        $request->validate([
+            'file'               => 'required|file|mimes:pdf|max:10240',
+            'budget_proposal_id' => 'nullable|integer|exists:budget_proposals,id',
+            'quarter'            => 'nullable|in:Q1,Q2,Q3,Q4',
+        ]);
+
+        $text   = $this->readPdfText($request->file('file'));
+        $parsed = $this->parsePurchaseRequestForm($text);
+
+        $payload = ['success' => true] + $parsed;
+
+        if ($request->filled('budget_proposal_id')) {
+            $proposal = BudgetProposal::find($request->input('budget_proposal_id'));
+            if ($proposal) {
+                $payload['validation'] = $validator->validatePrAgainstPpmp(
+                    $parsed['items'],
+                    $proposal,
+                    $request->input('quarter'),
+                    $parsed['parseError'] ?? null
+                );
+            }
+        }
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Parses the standardized BatStateU-FO-PRO-02 Purchase Request Form.
+     * Tested against a real filled-out sample: extraction of the item table
+     * (6 rows, correct qty/unit-cost/total-cost each) and header fields
+     * (PR No, Department/Office, Date) all matched exactly.
+     *
+     * The item table is read as a repeating pattern (unit-of-measure word,
+     * description, qty, ₱unit cost, ₱total cost) scanned across the whole
+     * table section — not a per-line split — because smalot/pdfparser's
+     * getText() glues adjacent table cells together inconsistently (no space
+     * between a short description and the next column, a literal tab
+     * elsewhere, a real line break when a description wraps to 2 lines).
+     * Scanning for the pattern instead of relying on line boundaries is also
+     * what makes this naturally tolerant of a table that runs onto a 2nd
+     * page — the row pattern doesn't care which page its text came from,
+     * only that it sits between the column header and the grand-total line.
+     */
+    private function parsePurchaseRequestForm(string $text): array
+    {
+        $prNumber = null;
+        if (preg_match('/PR\s*No:?\s*([A-Za-z0-9\-\/]+)/u', $text, $m)) {
+            $prNumber = $m[1];
+        }
+
+        $office = $this->parseLabeledBlock($text, 'Department /Office:', 'Project Location:');
+        $officeCode = null;
+        if ($office && preg_match('/\(([A-Z]{2,10})\)\s*$/u', $office, $m)) {
+            $officeCode = $m[1];
+        }
+
+        $projectName = $this->parseLabeledBlock($text, 'Name of Project:', 'Department /Office:');
+
+        $date = null;
+        if (preg_match('/(?<!Effectivity )Date:\s*([A-Za-z]+ \d{1,2},\s*\d{4})/u', $text, $m)) {
+            $date = $m[1];
+        }
+
+        $totalCost = null;
+        if (preg_match('/TOTAL COST\s*Php\s*([\d,]+\.\d{2})/u', $text, $m)) {
+            $totalCost = (float) str_replace(',', '', $m[1]);
+        }
+
+        $items = [];
+        if (preg_match('/QTY\s*UNIT COST\s*TOTAL COST(.*?)TOTAL COST\s*Php/su', $text, $tableMatch)) {
+            // Per-item costs are usually prefixed with "₱", but some forms
+            // (or this same form filled via different software) spell it out
+            // as "Php"/"PHP" instead — same as this form's own grand-total
+            // row always does. Accept either.
+            // Rows are found by their TAIL — a quantity followed by two currency
+            // amounts — rather than by their leading unit of measure. The tail is
+            // the only part of a row whose shape ordinary prose never produces,
+            // and anchoring on it is what makes long multi-page tables safe.
+            //
+            // Leading on the unit instead (the previous approach) meant matching
+            // against a fixed vocabulary, because pdfparser frequently glues the
+            // unit straight onto the description with no space at all — real
+            // output from the BatStateU form looks like "unitAir Conditioner,
+            // Split Type Inverter, 1.5HP, with installation kit2 ₱36,998.00".
+            // Any unit outside that vocabulary silently dropped its whole row,
+            // and "pad" was missing from it — a unit these very forms use
+            // ("Manila Paper Pad"). For content validation that is not a
+            // cosmetic gap: an item the parser never sees is an item nobody can
+            // check against the PPMP, so a smuggled line item would sail through
+            // simply by carrying an unusual unit.
+            $currency = '(?:₱|Php|PHP)';
+            $matched  = preg_match_all(
+                '/(\d+(?:\.\d+)?)\s*' . $currency . '\s*([\d,]+\.\d{2})\s*' . $currency . '\s*([\d,]+\.\d{2})/u',
+                $tableMatch[1],
+                $rows,
+                PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+            );
+
+            // A long, many-page table can exhaust PCRE's backtrack limit, and
+            // preg_* reports that by returning false rather than throwing. Left
+            // unchecked it reads as "this PR has no items" — the most dangerous
+            // possible misreading here — so surface it as a parse error instead
+            // and let the caller treat the document as unreadable.
+            if ($matched === false) {
+                return [
+                    'prNumber'    => $prNumber,
+                    'office'      => $office,
+                    'officeCode'  => $officeCode,
+                    'projectName' => $projectName,
+                    'date'        => $date,
+                    'totalCost'   => $totalCost,
+                    'items'       => [],
+                    'parseError'  => 'The item table was too large or complex to read reliably (PCRE error ' . preg_last_error() . ').',
+                ];
+            }
+
+            // Known units are still used — not to find rows, but to split a glued
+            // "unitAir Conditioner" back into its unit and its description.
+            $uom = 'units?|reams?|boxe?s?|packs?|sets?|lots?|rolls?|kgs?|liters?|gallons?|pcs?|pieces?|bottles?|cans?|dozens?|pairs?|bundles?|sacks?|sheets?|tubes?|pads?|trays?|cartons?|ctns?|jars?|tins?|bags?|drums?|cases?|kits?|spools?|meters?|m|ea|each|unit\/s';
+
+            $cursor = 0;
+            foreach ($rows as $row) {
+                // Everything between the previous row's tail and this one's is
+                // this row's unit + description, however many lines it spans.
+                [$qtyRaw, $qtyOffset] = $row[1];
+                $head   = trim(substr($tableMatch[1], $cursor, $qtyOffset - $cursor));
+                $cursor = $row[3][1] + strlen($row[3][0]);
+
+                // On a multi-page PR the whole form header is re-printed between
+                // two rows, so it lands inside the next row's head. Cut everything
+                // up to and including the last repeated column-header line rather
+                // than discarding the head wholesale — the first item on every
+                // page after the first is a real item and must survive.
+                if (preg_match('/^.*QTY\s*UNIT COST\s*TOTAL COST(.*)$/su', $head, $hm)) {
+                    $head = trim($hm[1]);
+                }
+
+                if ($head === '') {
+                    continue;
+                }
+
+                if (preg_match('/^(' . $uom . ')\s*(.+)$/isu', $head, $split)) {
+                    $unit = $split[1];
+                    $name = $split[2];
+                } elseif (preg_match('/^(\S{1,15})\s+(.+)$/su', $head, $split)) {
+                    $unit = $split[1];   // unknown but space-separated unit
+                    $name = $split[2];
+                } else {
+                    $unit = '';
+                    $name = $head;
+                }
+
+                $items[] = [
+                    'name'      => trim(preg_replace('/\s+/', ' ', $name)),
+                    'unit'      => trim($unit),
+                    'quantity'  => (float) $qtyRaw,
+                    'unitCost'  => (float) str_replace(',', '', $row[2][0]),
+                    'totalCost' => (float) str_replace(',', '', $row[3][0]),
+                ];
+            }
+        }
+
+        return [
+            'prNumber'    => $prNumber,
+            'office'      => $office,
+            'officeCode'  => $officeCode,
+            'projectName' => $projectName,
+            'date'        => $date,
+            'totalCost'   => $totalCost,
+            'items'       => $items,
+        ];
+    }
+
+    /** A form label followed by a value that may span 1-2 lines before the next label starts. */
+    private function parseLabeledBlock(string $text, string $label, string $stopLabel): ?string
+    {
+        $pattern = '/' . preg_quote($label, '/') . '\s*(.*?)\s*' . preg_quote($stopLabel, '/') . '/su';
+        if (preg_match($pattern, $text, $m)) {
+            return trim(preg_replace('/\s+/', ' ', $m[1])) ?: null;
+        }
+        return null;
+    }
+
+    /**
+     * Creates the PR from Procurement's reviewed/edited item list — the
+     * counterpart to extractPurchaseRequestFields(). Items don't have to be
+     * every item in the PPMP; whatever's left over just waits for the next
+     * upload against the same (or a later) approved PPMP.
+     */
+    public function createPurchaseRequestFromApp(Request $request, DocumentValidationService $validator): JsonResponse
+    {
+        $validated = $request->validate([
+            'budget_proposal_id' => 'required|exists:budget_proposals,id',
+            'pr_number'          => 'nullable|string|max:100',
+            'title'              => 'nullable|string|max:255',
+            'quarter'            => 'nullable|in:Q1,Q2,Q3,Q4',
+            'file'               => 'required|file|mimes:pdf|max:10240',
+            'items'              => 'required|array|min:1',
+            'items.*.name'       => 'required|string|max:255',
+            'items.*.unit'       => 'nullable|string|max:50',
+            'items.*.quantity'   => 'required|numeric|min:0.01',
+            'items.*.unit_cost'  => 'required|numeric|min:0',
+        ]);
+
+        $proposal = BudgetProposal::with('office')->findOrFail($validated['budget_proposal_id']);
+        abort_if($proposal->status !== 'approved', 422, 'This PPMP is not approved.');
+        $office = $proposal->office;
+        abort_if(!$office, 422, 'This PPMP has no office on record.');
+
+        $number = trim((string) ($validated['pr_number'] ?? '')) ?: ('PR-' . $office->code . '-' . now()->format('Ymd-His'));
+
+        if (PurchaseRequest::where('number', $number)->exists()) {
+            return response()->json(['error' => "A Purchase Request numbered \"{$number}\" already exists."], 422);
+        }
+
+        // Authoritative content check. The modal already showed a verdict for
+        // the extracted text, but what actually gets saved is the reviewed list
+        // — which the user can edit — so the decision is re-made here against
+        // exactly what is about to be written, and refused outright if it
+        // doesn't hold up.
+        $quarter    = $validated['quarter'] ?? null;
+        $forCheck   = array_map(fn ($i) => [
+            'name'     => $i['name'],
+            'quantity' => (float) $i['quantity'],
+            'unit'     => $i['unit'] ?? '',
+            'unitCost' => (float) $i['unit_cost'],
+        ], $validated['items']);
+        $validation = $validator->validatePrAgainstPpmp($forCheck, $proposal, $quarter);
+
+        if ($validation['verdict'] !== DocumentValidation::PASSED) {
+            return response()->json([
+                'error'      => $validation['summary'],
+                'validation' => $validation,
+            ], 422);
+        }
+
+        $file = $request->file('file');
+        $path = $file->storeAs('purchase-requests/' . now()->year, Str::slug($number) . '-' . now()->format('His') . '.pdf', 'public');
+
+        $pr = PurchaseRequest::create([
+            'budget_proposal_id' => $proposal->id,
+            'office_id'          => $office->id,
+            'created_by_user_id' => auth()->id(),
+            'number'             => $number,
+            'title'              => trim((string) ($validated['title'] ?? '')) ?: "Purchase Request – {$office->name}",
+            'fiscal_year'        => $proposal->fiscal_year,
+            'status'             => 'new',
+            'signatory_stage'    => 'draft',
+            'canvassing_stage'   => 'not_started',
+            'file_path'          => $path,
+            'uploaded_at'        => now(),
+        ]);
+
+        foreach ($validated['items'] as $item) {
+            $unitCost = (float) $item['unit_cost'];
+            $qty      = (float) $item['quantity'];
+            $pr->items()->create([
+                'name'                 => $item['name'],
+                'quantity'             => $qty,
+                'unit'                 => $item['unit'] ?? null,
+                'estimated_unit_cost'  => $unitCost,
+                'estimated_total_cost' => round($unitCost * $qty, 2),
+            ]);
+        }
+
+        $pr->update(['total_amount' => $pr->items()->sum('estimated_total_cost')]);
+
+        // Recorded against the PR itself so the routing gate — and anyone
+        // reviewing later — can see exactly what was checked and why it passed.
+        $validator->record($pr, $proposal, DocumentValidation::PAIR_PPMP_PR, $validation, $quarter);
+
+        return response()->json(['success' => true, 'prId' => $pr->id, 'prNumber' => $pr->number]);
+    }
+
     // ── Canvassing tab (quotation uploads + stage tracking) ──────────────────
 
     public function canvassing(): View
     {
-        $prs = PurchaseRequest::with(['office', 'documents' => fn ($q) => $q->where('document_type', 'canvass_quotation')])
+        $prs = PurchaseRequest::with(['office', 'budgetProposal', 'items', 'documents' => fn ($q) => $q->where('document_type', 'canvass_quotation')])
             ->where('signatory_stage', 'fully_signed')
             ->orderByDesc('id')
             ->get()
@@ -410,10 +855,20 @@ class PrismProcurementOfficeController extends Controller
                 'prNumber'        => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
                 'office'          => $pr->office?->code ?? '—',
                 'title'           => $pr->title,
+                'itemCount'       => $pr->items->count(),
+                'items'           => $pr->items->map(fn ($item) => [
+                    'name'      => $item->name,
+                    'quantity'  => (int) $item->quantity,
+                    'unit'      => $item->unit,
+                    'unitCost'  => (float) $item->estimated_unit_cost,
+                    'totalCost' => (float) $item->estimated_total_cost,
+                ])->all(),
                 'canvassingStage'  => $pr->canvassing_stage,
                 'canvassingLabel'  => $pr->canvassing_label,
                 'readyForAoc'      => $pr->isReadyForAoc(),
                 'quotationsLocked' => $pr->abstractOfCanvass !== null,
+                'budgetProposalId'   => $pr->budget_proposal_id,
+                'budgetProposalCode' => $pr->budgetProposal?->code,
                 'quotations'      => $pr->documents->map(fn ($doc) => [
                     'id'        => $doc->id,
                     'supplier'  => $doc->title,
@@ -424,12 +879,41 @@ class PrismProcurementOfficeController extends Controller
                 ])->all(),
                 'uploadUrl'   => route('procurement-office.purchase-request.canvass-document', $pr->id),
                 'finalizeUrl' => route('procurement-office.purchase-request.canvassing-finalize', $pr->id),
-            ])
+            ]);
+
+        // Cards for PRs raised against the same PPMP sit together under one
+        // section header (office + PPMP code + count) — every card still
+        // shows, nothing collapsed or hidden; this is purely about scanning
+        // a long list faster once several PRs share a PPMP, unlike the
+        // single-row-plus-Next collapse used on Purchase Request Management
+        // (canvassing is itself the actionable task per PR, not a summary
+        // list, so nothing here should require a click to even see).
+        $sections = $prs
+            ->groupBy(fn ($pr) => $pr['budgetProposalId'] ?? ('solo-' . $pr['id']))
+            ->map(function ($group) {
+                $first = $group->first();
+                // Shown whenever the PPMP link is actually known — not just
+                // for groups of 2+. A PR that's the only one raised so far
+                // against its PPMP still has a real, known origin; hiding
+                // that until a second PR shows up would be an arbitrary cutoff.
+                $label = $first['budgetProposalId']
+                    ? "{$first['budgetProposalCode']} — {$first['office']} · {$group->count()} " . ($group->count() === 1 ? 'PR' : 'PRs')
+                    : null;
+
+                return [
+                    'label'   => $label,
+                    'prs'     => $group->values()->all(),
+                    'sortKey' => $group->max('id'),
+                ];
+            })
+            ->sortByDesc('sortKey')
+            ->values()
             ->all();
 
         return view('prism.procurement-office.canvassing', $this->withCommon('canvassing', [
             'pageTitle'          => 'Canvassing',
-            'prs'                => $prs,
+            'prs'                => $prs->values()->all(),
+            'sections'           => $sections,
             'extractSupplierUrl' => route('procurement-office.canvassing.extract-supplier'),
         ]));
     }
@@ -663,11 +1147,33 @@ class PrismProcurementOfficeController extends Controller
 
     private function abstractOfCanvassData(): array
     {
-        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'signatureLogs.attachments', 'purchaseOrder'])
+        $aocs = AbstractOfCanvass::with(['purchaseRequest.office', 'purchaseRequest.budgetProposal', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'signatureLogs.attachments', 'purchaseOrder'])
             ->latest()
             ->get()
-            ->map(fn ($aoc) => $this->mapAocForFrontend($aoc))
-            ->all();
+            ->map(fn ($aoc) => $this->mapAocForFrontend($aoc));
+
+        // Same "one row per PPMP group" collapse as Purchase Request
+        // Management — an AOC has no PPMP link of its own, it inherits its
+        // parent PR's, so several AOCs can share one just like several PRs
+        // can (see purchaseRequestManagementRows()).
+        $aocSiblingCounts = $aocs->filter(fn ($a) => $a['budgetProposalId'])
+            ->groupBy('budgetProposalId')
+            ->map->count();
+        $seenAocProposalIds = [];
+
+        $aocs = $aocs->map(function ($a) use (&$seenAocProposalIds, $aocSiblingCounts) {
+            $isTableRow = true;
+            if ($a['budgetProposalId']) {
+                $isTableRow = !in_array($a['budgetProposalId'], $seenAocProposalIds, true);
+                if ($isTableRow) {
+                    $seenAocProposalIds[] = $a['budgetProposalId'];
+                }
+            }
+            return array_merge($a, [
+                'isTableRow'   => $isTableRow,
+                'siblingCount' => $a['budgetProposalId'] ? ($aocSiblingCounts[$a['budgetProposalId']] ?? 1) : 1,
+            ]);
+        })->all();
 
         // PRs that completed canvassing but don't have an AOC yet
         $eligiblePrs = PurchaseRequest::with('office')
@@ -722,6 +1228,17 @@ class PrismProcurementOfficeController extends Controller
             'prNumber'       => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
             'office'         => $pr->office?->code ?? '—',
             'title'          => $pr->title,
+            // Inherited from the parent PR — an AOC has no PPMP link of its
+            // own, it's whichever PPMP its PR was raised against. Real
+            // grouping (isTableRow/siblingCount) needs the full AOC list, so
+            // it's only computed in abstractOfCanvassData(); these are safe
+            // solo-item defaults for mapAocForFrontend()'s other two callers
+            // (createAoc()/signing actions), which only ever return one AOC
+            // in isolation and would otherwise leave them undefined.
+            'budgetProposalId'   => $pr->budget_proposal_id,
+            'budgetProposalCode' => $pr->budgetProposal?->code,
+            'isTableRow'         => true,
+            'siblingCount'       => 1,
             'signatoryStage'   => $aoc->signatory_stage,
             'signatoryLabel'   => $aoc->signatory_label,
             'statusBucket'     => match ($aoc->signatory_stage) {
@@ -832,11 +1349,32 @@ class PrismProcurementOfficeController extends Controller
 
     private function purchaseOrdersData(): array
     {
-        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
+        $pos = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'abstractOfCanvass.purchaseRequest.budgetProposal', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy', 'signatureLogs.attachments'])
             ->orderByDesc('id')
             ->get()
-            ->map(fn ($po) => $this->mapPoForFrontend($po))
-            ->all();
+            ->map(fn ($po) => $this->mapPoForFrontend($po));
+
+        // Same "one row per PPMP group" collapse as Purchase Request
+        // Management/Abstract of Canvass — a PO inherits its PPMP link from
+        // its AOC's PR, so several POs can share one just like several PRs can.
+        $poSiblingCounts = $pos->filter(fn ($p) => $p['budgetProposalId'])
+            ->groupBy('budgetProposalId')
+            ->map->count();
+        $seenPoProposalIds = [];
+
+        $pos = $pos->map(function ($p) use (&$seenPoProposalIds, $poSiblingCounts) {
+            $isTableRow = true;
+            if ($p['budgetProposalId']) {
+                $isTableRow = !in_array($p['budgetProposalId'], $seenPoProposalIds, true);
+                if ($isTableRow) {
+                    $seenPoProposalIds[] = $p['budgetProposalId'];
+                }
+            }
+            return array_merge($p, [
+                'isTableRow'   => $isTableRow,
+                'siblingCount' => $p['budgetProposalId'] ? ($poSiblingCounts[$p['budgetProposalId']] ?? 1) : 1,
+            ]);
+        })->all();
 
         // AOCs that are fully signed but don't have a PO yet
         $eligibleAocs = AbstractOfCanvass::with('purchaseRequest.office')
@@ -880,6 +1418,15 @@ class PrismProcurementOfficeController extends Controller
             'prNumber'     => $pr->number ?? '—',
             'office'       => $pr?->office?->code ?? '—',
             'title'        => $pr->title ?? '—',
+            // Inherited from the parent PR via its AOC. Solo-item defaults
+            // here (isTableRow/siblingCount) are for mapPoForFrontend()'s
+            // other caller (issuePo(), a single-PO response) — the real
+            // grouping is only computed in purchaseOrdersData(), which needs
+            // the full list.
+            'budgetProposalId'   => $pr?->budget_proposal_id,
+            'budgetProposalCode' => $pr?->budgetProposal?->code,
+            'isTableRow'         => true,
+            'siblingCount'       => 1,
             'supplier'     => $po->supplier_name,
             'supplierAddress' => $po->supplier_address ?? '—',
             'totalAmount'  => (float) $po->total_amount,

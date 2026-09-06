@@ -187,6 +187,18 @@ class NotificationService
             "{$office}'s FY {$year} PPMP has been approved by the Chancellor.",
             route('vice-chancellor.division-procurement-status', [], false),
         );
+
+        // A PPMP no longer auto-generates a PR on approval — Procurement has
+        // to notice it themselves in the Upload Purchase Request picker, so
+        // this notification is now their only heads-up that one just became
+        // available to act on.
+        self::sendToRole(
+            'Procurement Office',
+            'proposal_approved',
+            'PPMP Approved — Ready for Purchase Requests',
+            "{$office}'s FY {$year} PPMP has been approved. Its items are now ready to be picked up via Upload Purchase Request.",
+            route('procurement-office.purchase-request-management', [], false),
+        );
     }
 
     /**

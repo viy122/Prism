@@ -49,6 +49,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
         Route::get('/budget-proposal/new', 'createNewProposal')->name('budget-proposal.new');
+        Route::get('/budget-proposal/new-supplemental', 'createSupplementalProposal')->name('budget-proposal.new-supplemental');
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
         Route::put('/budget-proposal/item/{item}', 'updateItem')->name('budget-proposal.update-item');
         Route::delete('/budget-proposal/item/{item}', 'destroyItem')->name('budget-proposal.destroy-item');
@@ -57,6 +58,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/budget-proposal/submit', 'submitProposal')->name('budget-proposal.submit');
         Route::post('/budget-proposal/{proposal}/title', 'updateTitle')->name('budget-proposal.update-title');
         Route::post('/budget-proposal/{proposal}/proposed-budget', 'updateProposedBudget')->name('budget-proposal.update-proposed-budget');
+        Route::post('/budget-proposal/{proposal}/office', 'updateOffice')->name('budget-proposal.update-office');
         Route::get('/market-scoping', 'marketScoping')->name('market-scoping');
         Route::post('/market-scoping/run', 'runMarketScoping')->name('market-scoping.run');
         Route::get('/market-scoping/suggestions', 'marketScopingSuggestions')->name('market-scoping.suggestions');
@@ -90,6 +92,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
         Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
         Route::post('/annual-procurement-plan/item/{item}/tracking-status', 'updateAppItemTrackingStatus')->name('annual-procurement-plan.update-tracking-status');
+        Route::post('/annual-procurement-plan/item/{item}/dates', 'updateAppItemDates')->name('annual-procurement-plan.update-dates');
         Route::get('/canvassing', 'canvassing')->name('canvassing');
         Route::post('/canvassing/extract-supplier', 'extractCanvassSupplier')->name('canvassing.extract-supplier');
         Route::post('/purchase-request/{pr}/canvass-document', 'uploadCanvassDocument')->name('purchase-request.canvass-document');
@@ -97,6 +100,8 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/purchase-request/{pr}/canvassing/finalize', 'finalizeCanvassing')->name('purchase-request.canvassing-finalize');
         Route::get('/purchase-request-management', 'purchaseRequestManagement')->name('purchase-request-management');
         Route::get('/purchase-request-management/refresh', 'purchaseRequestManagementRefresh')->name('purchase-request-management.refresh');
+        Route::post('/purchase-request-management/extract-pr', 'extractPurchaseRequestFields')->name('purchase-request-management.extract-pr');
+        Route::post('/purchase-request-management/create-pr', 'createPurchaseRequestFromApp')->name('purchase-request-management.create-pr');
         Route::post('/purchase-request/{pr}/status', 'updatePrStatus')->name('purchase-request.update-status');
         Route::post('/purchase-request/{pr}/tracking-status', 'updateTrackingStatus')->name('purchase-request.update-tracking-status');
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
