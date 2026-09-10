@@ -40,7 +40,12 @@ return [
     ],
 
     'serpapi' => [
-        'key' => env('SERPAPI_KEY'),
+        'key'        => env('SERPAPI_KEY'),
+        'backup_key' => env('SERPAPI_KEY_BACKUP'),
+    ],
+
+    'serper' => [
+        'key' => env('SERPER_API_KEY'),
     ],
 
     // Local Flask matcher (microservice/app.py) — semantic item matching for

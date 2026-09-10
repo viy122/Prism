@@ -67,6 +67,7 @@ class PriceApiService
                         'reviews'         => null,
                         'snippet'         => null,
                         'is_official'     => (bool) ($item['is_official'] ?? false),
+                        'warranty'        => $item['warranty'] ?? 'Wala',
                         'date_retrieved'  => now()->format('M d, Y'),
                         'cached'          => false,
                     ];

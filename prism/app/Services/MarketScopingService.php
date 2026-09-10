@@ -15,7 +15,63 @@ class MarketScopingService
 
     public function isQuotaExhausted(): bool
     {
-        return Cache::get('serpapi_quota_exhausted', false);
+        $hasAnyProvider = $this->primaryKey() !== null || $this->backupKey() !== null || $this->serperKey() !== null;
+        if (!$hasAnyProvider) {
+            return false;
+        }
+
+        $serpApiUsable = $this->activeApiKey() !== null;
+        $serperUsable  = $this->serperKey() !== null && !$this->isSlotExhausted('serper');
+
+        return !$serpApiUsable && !$serperUsable;
+    }
+
+    private function primaryKey(): ?string
+    {
+        return config('services.serpapi.key') ?: null;
+    }
+
+    private function backupKey(): ?string
+    {
+        return config('services.serpapi.backup_key') ?: null;
+    }
+
+    private function serperKey(): ?string
+    {
+        return config('services.serper.key') ?: null;
+    }
+
+    private function isSlotExhausted(string $slot): bool
+    {
+        return (bool) Cache::get("serpapi_quota_exhausted_{$slot}", false);
+    }
+
+    /**
+     * Quota resets monthly, so there's no point retrying a dead key every
+     * hour — a day-long cooldown just avoids wasting calls on it.
+     */
+    private function markSlotExhausted(string $slot): void
+    {
+        Cache::put("serpapi_quota_exhausted_{$slot}", true, 86400);
+    }
+
+    /**
+     * The SerpApi key to use right now: the primary key unless its quota is
+     * known to be exhausted, in which case the backup key (if configured)
+     * takes over automatically. Returns null when no usable key remains.
+     *
+     * @return array{key: string, slot: string}|null
+     */
+    private function activeApiKey(): ?array
+    {
+        if ($this->primaryKey() !== null && !$this->isSlotExhausted('primary')) {
+            return ['key' => $this->primaryKey(), 'slot' => 'primary'];
+        }
+        if ($this->backupKey() !== null && !$this->isSlotExhausted('backup')) {
+            return ['key' => $this->backupKey(), 'slot' => 'backup'];
+        }
+
+        return null;
     }
 
     public function matcherAvailable(): bool
@@ -36,7 +92,7 @@ class MarketScopingService
             );
         }
 
-        // Local price aggregator (PS-DBM + PH stores) — free/official prices.
+        // Local price aggregator (PH retailer stores) — free prices, no quota.
         // Fail-soft: returns [] when the service is down, SerpApi still runs.
         $priceApi        = new PriceApiService();
         $priceApiResults = $priceApi->search($query, $limit, $department);
@@ -199,8 +255,8 @@ class MarketScopingService
      */
     private function fetchImmersiveProduct(string $pageToken): ?array
     {
-        $apiKey = config('services.serpapi.key');
-        if (!$apiKey || $pageToken === '') {
+        $active = $this->activeApiKey();
+        if ($active === null || $pageToken === '') {
             return null;
         }
 
@@ -216,7 +272,7 @@ class MarketScopingService
             $response = Http::timeout(10)->get(self::SERPAPI_URL, [
                 'engine'     => 'google_immersive_product',
                 'page_token' => $pageToken,
-                'api_key'    => $apiKey,
+                'api_key'    => $active['key'],
             ]);
 
             $product = $response->successful() ? $response->json('product_results') : null;
@@ -231,11 +287,31 @@ class MarketScopingService
         }
     }
 
+    /**
+     * External Google Shopping data, tried across independent providers in
+     * order: SerpApi primary key, SerpApi backup key, then Serper.dev — each
+     * with its own separate free quota. Falls through to the next provider
+     * only once the current one is confirmed exhausted/unconfigured, not
+     * just because a query happened to return zero results.
+     */
     private function searchGoogleShopping(string $query, int $limit): array
     {
-        $apiKey = config('services.serpapi.key');
+        if ($this->activeApiKey() !== null) {
+            $results = $this->searchViaSerpApi($query, $limit);
+            if (!empty($results) || $this->activeApiKey() !== null) {
+                return $results;
+            }
+            // Both SerpApi keys just got marked exhausted by that call —
+            // fall through to Serper below.
+        }
 
-        if (!$apiKey) {
+        return $this->searchViaSerper($query, $limit);
+    }
+
+    private function searchViaSerpApi(string $query, int $limit): array
+    {
+        $active = $this->activeApiKey();
+        if ($active === null) {
             return [];
         }
 
@@ -246,7 +322,7 @@ class MarketScopingService
                 'gl'       => 'ph',        // Philippines — prices in PHP peso
                 'hl'       => 'en',
                 'num'      => $limit,
-                'api_key'  => $apiKey,
+                'api_key'  => $active['key'],
             ]);
 
             if (!$response->successful()) {
@@ -255,7 +331,14 @@ class MarketScopingService
                     || str_contains($errorMsg, 'run out')
                     || str_contains($errorMsg, 'quota')
                     || str_contains($errorMsg, 'limit')) {
-                    Cache::put('serpapi_quota_exhausted', true, 3600);
+                    $this->markSlotExhausted($active['slot']);
+
+                    // The key we just used ran dry — retry once immediately on
+                    // whichever key is next in line instead of making the user
+                    // re-run the search.
+                    if ($this->activeApiKey() !== null) {
+                        return $this->searchViaSerpApi($query, $limit);
+                    }
                 }
                 return [];
             }
@@ -306,6 +389,93 @@ class MarketScopingService
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /**
+     * Serper.dev — a second, independent Google Shopping scraping provider
+     * with its own free quota, used once every SerpApi key is exhausted.
+     * No immersive-product equivalent is wired up for it, so its results
+     * carry no page_token (resolveDirectLink/fetchProductDetails simply
+     * fall back to the plain source_url for these, same as any result
+     * without a token today).
+     */
+    private function searchViaSerper(string $query, int $limit): array
+    {
+        $apiKey = $this->serperKey();
+        if ($apiKey === null || $this->isSlotExhausted('serper')) {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(15)
+                ->withHeaders(['X-API-KEY' => $apiKey])
+                ->post('https://google.serper.dev/shopping', [
+                    'q'   => $query,
+                    'gl'  => 'ph',
+                    'hl'  => 'en',
+                    'num' => $limit,
+                ]);
+
+            if (!$response->successful()) {
+                $errorMsg = strtolower((string) ($response->json('message') ?? $response->json('error') ?? ''));
+                if (in_array($response->status(), [401, 403, 429], true)
+                    || str_contains($errorMsg, 'quota')
+                    || str_contains($errorMsg, 'credit')
+                    || str_contains($errorMsg, 'limit')) {
+                    $this->markSlotExhausted('serper');
+                }
+                return [];
+            }
+
+            $items = $response->json('shopping', []);
+
+            return collect($items)
+                ->take($limit)
+                ->map(function ($item) {
+                    $name  = $item['title'] ?? null;
+                    $price = $this->parsePriceString($item['price'] ?? null);
+
+                    if (!$name || !$price) {
+                        return null;
+                    }
+
+                    if ($this->looksNonLatin($name)) {
+                        return null;
+                    }
+
+                    return [
+                        'name'            => $name,
+                        'price'           => $price,
+                        'price_formatted' => '₱' . number_format($price, 2),
+                        'image_url'       => $item['imageUrl'] ?? null,
+                        'source_icon'     => null,
+                        'source_url'      => $item['link'] ?? 'https://shopping.google.com/',
+                        'page_token'      => null,
+                        'source'          => $item['source']      ?? 'Google Shopping',
+                        'rating'          => $item['rating']      ?? null,
+                        'reviews'         => $item['ratingCount'] ?? null,
+                        'snippet'         => null,
+                        'date_retrieved'  => now()->format('M d, Y'),
+                        'cached'          => false,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** Serper prices arrive as formatted strings (e.g. "₱34,999.00"), not floats. */
+    private function parsePriceString(?string $raw): ?float
+    {
+        if ($raw === null) {
+            return null;
+        }
+        $cleaned = preg_replace('/[^0-9.]/', '', $raw);
+
+        return ($cleaned === null || $cleaned === '') ? null : (float) $cleaned;
     }
 
     /** True if $text contains CJK, Hangul, Cyrillic, Thai, or Arabic script. */

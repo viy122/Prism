@@ -77,6 +77,8 @@
     .ref-date { font-size: 11px; color: var(--txt3); font-weight: 500; }
     .ref-rating { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--txt2); font-weight: 600; margin-bottom: 4px; }
     .ref-rating i { font-size: 12px; color: var(--amber); }
+    .ref-warranty { display: flex; align-items: center; font-size: 11px; color: var(--green); font-weight: 600; margin-bottom: 4px; }
+    .ref-warranty i { color: var(--green); }
 
     .ref-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; min-width: 110px; }
     .ref-price { font-size: 20px; font-weight: 800; color: var(--crimson); letter-spacing: -.5px; line-height: 1; }
@@ -951,6 +953,11 @@
                 ? '<p class="advantageous-reason"><i class="ti ti-bulb" style="font-size:11px;margin-right:4px"></i>' + esc(advReason) + '</p>'
                 : '';
 
+            const warranty = item.warranty;
+            const warrantyHtml = (warranty && warranty !== 'Wala')
+                ? '<p class="ref-warranty"><i class="ti ti-shield-check" style="font-size:11px;margin-right:4px"></i>' + esc(warranty) + '</p>'
+                : '';
+
             card.innerHTML =
                 '<div class="ref-logo' + (hasDetail ? ' has-detail' : '') + '"' +
                     (hasDetail ? ' title="Click to see product details" onclick="window.showProductDetails(\'' + esc(item.page_token) + '\', \'' + esc(name).replace(/'/g, '&#39;') + '\')"' : '') +
@@ -960,6 +967,7 @@
                     '<p class="ref-supplier">' + esc(source) + '</p>' +
                     '<div class="ref-tags">' + sourceTag + cachedTag + '</div>' +
                     ratingHtml +
+                    warrantyHtml +
                     advBlock +
                     '<p class="ref-date">Retrieved: ' + esc(date) + '</p>' +
                 '</div>' +
