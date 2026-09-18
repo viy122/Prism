@@ -119,7 +119,7 @@
            label below (next to it) purely to match that same offset, so
            it still lines up with the actual input/select controls. */
         .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: start; margin-bottom: 14px; }
-        .item-row3   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+        .item-row3   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 14px; }
 
         /* ── Buttons ── */
         .btn-primary {
@@ -435,7 +435,7 @@
                             <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
                         @endif
                         <a href="{{ route('office-head.budget-proposal.new-supplemental', ['proposal' => $selectedProposalId]) }}" class="btn-outline" style="margin-left:8px;white-space:nowrap;" title="Start another PPMP for FY{{ $proposalForm['fiscalYear'] }}, side by side with this one">
-                            <i class="ti ti-plus"></i> New Supplemental PPMP
+                            <i class="ti ti-plus"></i> Create New PPMP
                         </a>
                     </div>
                     <div class="card-body">
@@ -643,9 +643,7 @@
                         </div>
                         {{-- PPMP Column 2 (Type of the Project) and Column 5
                              (Pre-Procurement Conference) — the encoding office's
-                             own call, unlike Recommended Mode / procurement dates
-                             which Procurement Office fills in later at the APP
-                             stage, so these get input fields here. --}}
+                             own call, so these get input fields here. --}}
                         <div class="field-group">
                             <label class="field-label" for="itemProjectType">Type of Project</label>
                             <select id="itemProjectType" name="projectType" class="field-select">
@@ -660,6 +658,24 @@
                                 <option value="0">No</option>
                                 <option value="1">Yes</option>
                             </select>
+                        </div>
+                        {{-- PPMP Column 4 (Recommended Mode of Procurement) — same
+                             RA 9184 cost-threshold suggestion the Procurement Office's
+                             Annual Procurement Plan page computes (ProcurementModeService),
+                             pre-filled here and recalculated live as Quantity/Budget
+                             change, but always a plain editable select — the office
+                             head can pick a different mode outright, no separate
+                             override-justification step (that belongs to Procurement
+                             Office's own, more formal review at the APP stage). --}}
+                        <div class="field-group">
+                            <label class="field-label" for="itemProcurementMode">Procurement Mode</label>
+                            <select id="itemProcurementMode" name="procurementMode" class="field-select">
+                                <option value="Shopping">Shopping</option>
+                                <option value="Small Value Procurement">Small Value Procurement</option>
+                                <option value="Public Bidding">Public Bidding</option>
+                                <option value="Direct Contracting">Direct Contracting</option>
+                            </select>
+                            <p class="field-hint" id="itemProcurementModeHint"></p>
                         </div>
                     </div>
                     <p id="itemFormMsg" class="submit-msg"></p>
@@ -1223,6 +1239,41 @@
             : classificationSelect.value;
     }
 
+    // ── Procurement Mode — same RA 9184 cost thresholds as ProcurementModeService
+    //    (Direct Contracting is never auto-suggested, matching the PHP side) ──────
+    function recommendProcurementMode(quantity, unitCost) {
+        const abc = (parseFloat(quantity) || 0) * (parseFloat(unitCost) || 0);
+        if (abc > 1000000) return 'Public Bidding';
+        if (abc > 200000)  return 'Small Value Procurement';
+        return 'Shopping';
+    }
+
+    const procurementModeSelect = document.getElementById('itemProcurementMode');
+    const procurementModeHint   = document.getElementById('itemProcurementModeHint');
+    let procurementModeTouched  = false;
+
+    function refreshProcurementModeSuggestion() {
+        if (!procurementModeSelect) return;
+        const recommended = recommendProcurementMode(
+            document.getElementById('itemQuantity')?.value,
+            document.getElementById('itemUnitCost')?.value
+        );
+        if (!procurementModeTouched) procurementModeSelect.value = recommended;
+        if (procurementModeHint) {
+            procurementModeHint.textContent = procurementModeSelect.value === recommended
+                ? `Suggested based on this item's budget.`
+                : `System suggests "${recommended}" — you've picked a different mode.`;
+        }
+    }
+
+    procurementModeSelect?.addEventListener('change', () => {
+        procurementModeTouched = true;
+        refreshProcurementModeSuggestion();
+    });
+    document.getElementById('itemQuantity')?.addEventListener('input', refreshProcurementModeSuggestion);
+    document.getElementById('itemUnitCost')?.addEventListener('input', refreshProcurementModeSuggestion);
+    refreshProcurementModeSuggestion(); // initial suggestion on page load
+
     // ── Add / update item (same form; branches on hidden itemId) ───────────────
     function resetItemFormToAddMode(f) {
         f.itemId.value = '';
@@ -1233,6 +1284,8 @@
         sourceOfFundOther.value = '';
         classificationOther.style.display = 'none';
         classificationOther.value = '';
+        procurementModeTouched = false;
+        refreshProcurementModeSuggestion();
         editingId = null;
         document.getElementById('editItemBanner').style.display = 'none';
         document.getElementById('saveItemButton').innerHTML = '<i class="ti ti-plus"></i>Add Item';
@@ -1264,6 +1317,7 @@
             itemClassification: resolvedClassification() || null,
             projectType:              f.projectType.value,
             preProcurementConference: f.preProcurementConference.value === '1',
+            procurementMode:          f.procurementMode.value,
         };
         if (!itemId) payload.proposal_id = proposalId;
 
@@ -1417,6 +1471,9 @@
         f.targetQuarter.value        = item.targetQuarter;
         f.projectType.value          = item.projectType || 'Goods';
         f.preProcurementConference.value = item.preProcurementConference ? '1' : '0';
+        f.procurementMode.value      = item.procurementMode || recommendProcurementMode(item.quantity, item.estimatedUnitCost);
+        procurementModeTouched = true; // loaded value stands until the user actually changes it
+        refreshProcurementModeSuggestion();
         const knownFunds = ['', 'General Fund', 'Special Trust Fund', 'Income'];
         const fund = item.sourceOfFund || '';
         if (fund && !knownFunds.includes(fund)) {

@@ -778,6 +778,7 @@ class PrismOfficeHeadController extends Controller
             'itemClassification' => 'nullable|string|max:50',
             'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
             'preProcurementConference' => 'nullable|boolean',
+            'procurementMode'   => 'nullable|in:' . implode(',', ProcurementModeService::MODES),
             'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
 
@@ -815,6 +816,14 @@ class PrismOfficeHeadController extends Controller
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
 
+        // Office Head's proposed mode — a plain editable pick, defaulting to
+        // the same RA 9184 suggestion the form showed. Procurement Office's
+        // own (more formal, reason-required) override at the APP stage is
+        // untouched: this only seeds procurement_mode/is_overridden with
+        // whatever the office head already indicated here.
+        $recommendedMode = ProcurementModeService::recommend($total);
+        $procurementMode = $validated['procurementMode'] ?? $recommendedMode;
+
         $item = $proposal->items()->create([
             'created_by_user_id'   => auth()->id(),
             'name'                 => $validated['description'],
@@ -829,6 +838,9 @@ class PrismOfficeHeadController extends Controller
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
             'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
+            'recommended_mode'     => $recommendedMode,
+            'procurement_mode'     => $procurementMode,
+            'is_overridden'        => $procurementMode !== $recommendedMode,
             'status'               => 'draft',
         ]);
 
@@ -852,6 +864,7 @@ class PrismOfficeHeadController extends Controller
                 'itemClassification' => $item->item_classification,
                 'projectType'       => $item->project_type,
                 'preProcurementConference' => (bool) $item->pre_procurement_conference,
+                'procurementMode'   => $item->procurement_mode,
                 'scoping'           => [],
                 'attachments'       => [],
                 'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
@@ -880,9 +893,12 @@ class PrismOfficeHeadController extends Controller
             'itemClassification' => 'nullable|string|max:50',
             'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
             'preProcurementConference' => 'nullable|boolean',
+            'procurementMode'   => 'nullable|in:' . implode(',', ProcurementModeService::MODES),
         ]);
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
+        $recommendedMode = ProcurementModeService::recommend($total);
+        $procurementMode = $validated['procurementMode'] ?? $recommendedMode;
 
         $item->update([
             'name'                 => $validated['description'],
@@ -897,6 +913,9 @@ class PrismOfficeHeadController extends Controller
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
             'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
+            'recommended_mode'     => $recommendedMode,
+            'procurement_mode'     => $procurementMode,
+            'is_overridden'        => $procurementMode !== $recommendedMode,
         ]);
 
         $proposal->update([
@@ -918,6 +937,7 @@ class PrismOfficeHeadController extends Controller
                 'itemClassification' => $item->item_classification,
                 'projectType'       => $item->project_type,
                 'preProcurementConference' => (bool) $item->pre_procurement_conference,
+                'procurementMode'   => $item->procurement_mode,
             ],
         ]);
     }
