@@ -13,6 +13,7 @@ use App\Models\Office;
 use App\Models\PurchaseRequest;
 use App\Services\MarketScopingService;
 use App\Services\NotificationService;
+use App\Services\ProcurementModeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -215,15 +216,38 @@ class PrismOfficeHeadController extends Controller
         // Proposed Budget is a manually-set target/ceiling, separate from the auto-derived
         // item-sum total (total_estimated_cost) — falls back to that sum until the office
         // head explicitly sets their own figure.
+        // Official-form print block (letterhead, PPMP NO., Prepared/Reviewed/
+        // Approved by) — every signatory here comes from the proposal's own
+        // recorded trail (createdBy = who encoded it, reviewedBy/approvedBy
+        // set by Budget Office's endorse() and the Chancellor's approve()),
+        // so a not-yet-reviewed or not-yet-approved PPMP correctly leaves
+        // those blank rather than guessing a name.
+        $proposal?->loadMissing(['createdBy', 'reviewedBy', 'approvedBy']);
+
         $proposalForm = [
             'officeName'          => $proposal?->office?->name ?? $office?->name ?? 'Your Office',
             'officeId'            => $proposal?->office_id ?? $officeId,
             'title'               => $proposal?->title ?? '',
+            'code'                => $proposal?->code ?? '',
             'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
             // Once a PPMP has actually been submitted, "Date Prepared" should reflect
             // that — not when the draft was first started, which can be weeks earlier.
             'date'                => ($proposal?->submitted_at ?? $proposal?->created_at)?->format('Y-m-d') ?? now()->format('Y-m-d'),
             'totalProposedBudget' => $proposal?->proposed_budget ?? $proposal?->total_estimated_cost ?? 0,
+            // The BSU form's own INDICATIVE/FINAL checkboxes: a PPMP is only
+            // "Final" once the Chancellor has actually approved it — anything
+            // still in progress (draft, submitted, endorsed, returned) is by
+            // definition still indicative/subject to change.
+            'isFinal'             => $proposalStatus === 'approved',
+            'preparedByName'      => $proposal?->createdBy?->name ?? '',
+            'preparedByTitle'     => $proposal?->createdBy?->position_title ?? '',
+            'preparedDate'        => $proposal?->created_at?->format('M d, Y') ?? '',
+            'reviewedByName'      => $proposal?->reviewedBy?->name ?? '',
+            'reviewedByTitle'     => $proposal?->reviewedBy?->position_title ?? '',
+            'reviewedDate'        => $proposal?->reviewed_at?->format('M d, Y') ?? '',
+            'approvedByName'      => $proposal?->approvedBy?->name ?? '',
+            'approvedByTitle'     => $proposal?->approvedBy?->position_title ?? '',
+            'approvedDate'        => $proposal?->approved_at?->format('M d, Y') ?? '',
         ];
 
         $titleUpdateUrl          = $proposal ? route('office-head.budget-proposal.update-title', $proposal->id) : null;
@@ -246,6 +270,21 @@ class PrismOfficeHeadController extends Controller
                     'category'          => $item->category ?? $item->ppmpCategoryLabel() ?? 'General',
                     'sourceOfFund'      => $item->source_of_fund,
                     'itemClassification' => $item->item_classification ?? 'Regular',
+                    // Official PPMP form columns 2/5 — unlike mode/dates below,
+                    // these belong to the encoding office, not Procurement's
+                    // later APP stage, so they're office-head input from the start.
+                    'projectType'       => $item->project_type ?? 'Goods',
+                    'preProcurementConference' => (bool) $item->pre_procurement_conference,
+                    // Official PPMP form columns 4/6/8 — the mode and dates are
+                    // only finalized later by Procurement Office at the Annual
+                    // Procurement Plan stage (same row, filled in over time), so
+                    // show the live RA 9184 recommendation until an actual mode
+                    // has been saved, and leave the dates blank until then —
+                    // exactly like the paper form looks before those columns
+                    // are filled in.
+                    'procurementMode'      => $item->procurement_mode ?: ProcurementModeService::recommend((float) $item->estimated_total_cost),
+                    'procurementStartDate' => $item->procurement_start_date?->format('M d, Y'),
+                    'dateNeeded'           => $item->date_needed?->format('M d, Y'),
                     'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
                     'attachments'       => $item->sourceFiles->map(fn ($doc) => [
                         'id'        => $doc->id,
@@ -737,6 +776,8 @@ class PrismOfficeHeadController extends Controller
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'sourceOfFund'      => 'nullable|string|max:100',
             'itemClassification' => 'nullable|string|max:50',
+            'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
+            'preProcurementConference' => 'nullable|boolean',
             'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
 
@@ -786,6 +827,8 @@ class PrismOfficeHeadController extends Controller
             'remarks'              => $validated['justification'] ?? null,
             'source_of_fund'       => $validated['sourceOfFund'] ?? null,
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
+            'project_type'         => $validated['projectType'] ?? 'Goods',
+            'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
             'status'               => 'draft',
         ]);
 
@@ -807,6 +850,8 @@ class PrismOfficeHeadController extends Controller
                 'category'          => $item->category ?? 'General',
                 'sourceOfFund'      => $item->source_of_fund,
                 'itemClassification' => $item->item_classification,
+                'projectType'       => $item->project_type,
+                'preProcurementConference' => (bool) $item->pre_procurement_conference,
                 'scoping'           => [],
                 'attachments'       => [],
                 'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
@@ -833,6 +878,8 @@ class PrismOfficeHeadController extends Controller
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'sourceOfFund'      => 'nullable|string|max:100',
             'itemClassification' => 'nullable|string|max:50',
+            'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
+            'preProcurementConference' => 'nullable|boolean',
         ]);
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
@@ -848,6 +895,8 @@ class PrismOfficeHeadController extends Controller
             'remarks'              => $validated['justification'] ?? null,
             'source_of_fund'       => $validated['sourceOfFund'] ?? null,
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
+            'project_type'         => $validated['projectType'] ?? 'Goods',
+            'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
         ]);
 
         $proposal->update([
@@ -867,6 +916,8 @@ class PrismOfficeHeadController extends Controller
                 'targetQuarter'     => $item->target_quarter,
                 'sourceOfFund'      => $item->source_of_fund,
                 'itemClassification' => $item->item_classification,
+                'projectType'       => $item->project_type,
+                'preProcurementConference' => (bool) $item->pre_procurement_conference,
             ],
         ]);
     }

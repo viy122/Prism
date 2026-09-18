@@ -131,10 +131,10 @@ class PrismInitialSeeder extends Seeder
                 'role' => 'system-admin',
             ],
             [
-                'name' => 'Office Head Demo',
+                'name' => 'Dr. Lorissa Joana E. Buenas',
                 'username' => 'office_head',
                 'email' => 'office.head@prism.test',
-                'position_title' => 'Dean',
+                'position_title' => 'Dean, College of Informatics and Computing Sciences',
                 'office' => 'CICS',
                 'role' => 'office-head',
             ],

@@ -42,6 +42,8 @@ class BudgetProposalItem extends Model
         'category',
         'source_of_fund',
         'item_classification',
+        'project_type',
+        'pre_procurement_conference',
         'schedule_type',
         'ppmp_category',
         'iar_flag',
@@ -83,6 +85,7 @@ class BudgetProposalItem extends Model
             'specifications_json'   => 'array',
             'is_overridden'         => 'boolean',
             'finance_ok'            => 'boolean',
+            'pre_procurement_conference' => 'boolean',
             'tracking_status_overridden_at' => 'datetime',
         ];
     }

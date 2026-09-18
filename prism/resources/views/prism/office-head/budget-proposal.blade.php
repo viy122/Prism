@@ -111,8 +111,15 @@
         .title-suggest-wrap #ppmpTitle:focus { position: relative; z-index: 1; background: transparent; }
         .form-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
         .item-row1   { display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: end; margin-bottom: 14px; }
-        .item-row3   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        /* align-items: start (not end) — Target Quarter carries an extra
+           hint line under its select that Purpose/Justification and the
+           button don't have, so bottom-aligning the row pushed each
+           field's label to a different height. Top-aligning instead keeps
+           every label on the same line; the button gets its own invisible
+           label below (next to it) purely to match that same offset, so
+           it still lines up with the actual input/select controls. */
+        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: start; margin-bottom: 14px; }
+        .item-row3   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
 
         /* ── Buttons ── */
         .btn-primary {
@@ -252,6 +259,7 @@
         @media (max-width: 960px) {
             .item-row1 { grid-template-columns: 1fr 1fr; }
             .item-row2 { grid-template-columns: 1fr 1fr; }
+            .item-row3 { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 720px) {
             .form-grid-4 { grid-template-columns: 1fr; }
@@ -281,11 +289,45 @@
         /* ── PPMP document preview ── */
         .ppmp-preview-wrap { padding: 6px 22px 18px; }
         .ppmp-doc { border: 1px solid var(--border2); border-radius: 12px; overflow: hidden; background: #fff; }
+        /* Letterhead + office label — mirrors the official form's header block. */
+        .ppmp-letterhead { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 16px 20px 10px; border-bottom: 2px solid #000; }
+        .ppmp-letterhead-logo { width: 62px; height: 62px; object-fit: contain; flex-shrink: 0; }
+        .ppmp-letterhead-text { text-align: center; }
+        .ppmp-letterhead-text p { margin: 0; font-size: 11px; line-height: 1.4; color: #111; }
+        .ppmp-letterhead-uni { font-size: 16px !important; font-weight: 800; color: #7a0019; }
+        .ppmp-letterhead-sub { font-weight: 700; color: #7a0019; }
+        .ppmp-letterhead-campus { font-weight: 700; }
+        .ppmp-letterhead-addr { color: #444 !important; }
+        .ppmp-office-label { margin: 0; padding: 7px 20px; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border2); }
         .ppmp-doc-head { text-align: center; padding: 18px 16px 12px; border-bottom: 1px solid var(--border2); }
         .ppmp-doc-title { font-size: 14px; font-weight: 800; letter-spacing: .04em; color: var(--txt); }
         .ppmp-doc-sub { font-size: 12px; font-weight: 600; color: var(--txt2); margin-top: 2px; }
+        /* INDICATIVE / FINAL checkboxes */
+        .ppmp-checkbox-row { display: flex; justify-content: center; gap: 32px; margin-top: 10px; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+        .ppmp-checkbox { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #000; margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }
+        .ppmp-checkbox.checked { background: #000; }
+        /* Fiscal Year / End-User fields */
+        .ppmp-meta-row { padding: 10px 20px; font-size: 12px; border-bottom: 1px solid var(--border2); }
+        .ppmp-meta-row div { margin-bottom: 3px; color: var(--txt2); }
+        .ppmp-meta-row div:last-child { margin-bottom: 0; }
+        /* Grouped header row + "Column N" legend row */
+        .ppmp-preview-table thead tr:first-child th { text-align: center; }
+        .ppmp-col-number-row th { background: #fff !important; font-size: 9px !important; font-weight: 600 !important; text-transform: none !important; color: var(--txt3) !important; text-align: center !important; white-space: nowrap; border-top: 1px solid var(--border2); }
+        /* TOTAL BUDGET row, inside the table like the official form */
+        .ppmp-total-label { text-align: right; font-weight: 800; font-size: 12px; padding: 10px 12px; border-top: 2px solid var(--border2); }
+        .ppmp-total-amount { font-weight: 800; font-size: 12px; padding: 10px 12px; border-top: 2px solid var(--border2); }
+        /* Prepared by / Reviewed by / Approved by */
+        .ppmp-signoff { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 26px 24px 20px; }
+        .ppmp-signoff-label { display: block; font-size: 12px; font-weight: 600; color: var(--txt2); margin-bottom: 26px; }
+        .ppmp-signoff-name { font-size: 13px; font-weight: 800; text-align: center; text-decoration: underline; text-underline-offset: 3px; color: var(--txt); }
+        .ppmp-signoff-title { font-size: 11px; text-align: center; color: var(--txt3); margin-top: 2px; min-height: 14px; }
+        .ppmp-signoff-date { font-size: 11px; text-align: center; color: var(--txt3); margin-top: 12px; }
+        /* Headers use short labels — the full official BSU column wording is
+             on each <th>'s title="" attribute instead, as a native hover
+             tooltip, so the row stays compact without losing the exact
+             official name. */
         .ppmp-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); text-align: left; white-space: nowrap; }
+        .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); text-align: left; white-space: nowrap; cursor: help; }
         .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: var(--txt2); }
 
         /* ── Attach source file modal ── */
@@ -566,9 +608,13 @@
                                 <option value="Q3">Q3 (Jul–Sep)</option>
                                 <option value="Q4">Q4 (Oct–Dec)</option>
                             </select>
-                            <p class="field-hint">When your office expects to procure this item. Procurement uses it to match your PR back to this PPMP.</p>
                         </div>
-                        <div style="display:flex;align-items:flex-end;">
+                        <div class="field-group">
+                            {{-- Invisible label matching the real ones' height, so this
+                                 button lines up with the actual input/select boxes next
+                                 to it (row is top-aligned now) rather than sitting up at
+                                 label height. --}}
+                            <label class="field-label" aria-hidden="true" style="visibility:hidden;">Action</label>
                             <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
                                 <i class="ti ti-plus"></i>Add Item
                             </button>
@@ -594,6 +640,26 @@
                                 <option value="Other">Other</option>
                             </select>
                             <input id="itemClassificationOther" class="field-input" placeholder="Specify classification…" style="display:none;margin-top:8px;">
+                        </div>
+                        {{-- PPMP Column 2 (Type of the Project) and Column 5
+                             (Pre-Procurement Conference) — the encoding office's
+                             own call, unlike Recommended Mode / procurement dates
+                             which Procurement Office fills in later at the APP
+                             stage, so these get input fields here. --}}
+                        <div class="field-group">
+                            <label class="field-label" for="itemProjectType">Type of Project</label>
+                            <select id="itemProjectType" name="projectType" class="field-select">
+                                <option value="Goods">Goods</option>
+                                <option value="Infrastructure">Infrastructure</option>
+                                <option value="Consulting Services">Consulting Services</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label class="field-label" for="itemPrePpmpConference">Pre-Procurement Conference</label>
+                            <select id="itemPrePpmpConference" name="preProcurementConference" class="field-select">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
                         </div>
                     </div>
                     <p id="itemFormMsg" class="submit-msg"></p>
@@ -623,35 +689,106 @@
                 </div>
             </div>
 
-            {{-- PPMP-format document preview (default state) --}}
+            {{-- PPMP-format document preview (default state) — laid out to match
+                 the official BSU PPMP form (letterhead, PPMP NO., INDICATIVE/
+                 FINAL, Fiscal Year / End-User fields, the exact 12-column
+                 table with its grouped headers and "Column N" row, TOTAL
+                 BUDGET, and the Prepared/Reviewed/Approved by block) — this is
+                 the same element print uses, so on-screen and printed output
+                 always match. --}}
             <div id="ppmpPreviewWrap" class="ppmp-preview-wrap">
                 <div class="ppmp-doc" id="ppmpPreviewDoc">
-                    <div class="ppmp-doc-head">
-                        <p class="ppmp-doc-title">PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP)</p>
-                        <p class="ppmp-doc-sub">FY {{ $proposalForm['fiscalYear'] }} — {{ $proposalForm['officeName'] }}</p>
-                        <p class="ppmp-doc-sub" style="color:var(--txt3);">Date Prepared: {{ \Carbon\Carbon::parse($proposalForm['date'])->format('F d, Y') }} · Status: {{ ucfirst($proposalStatus) }}</p>
+                    <div class="ppmp-letterhead">
+                        <img src="{{ asset('images/bsulogo.png') }}" alt="BSU Logo" class="ppmp-letterhead-logo">
+                        <div class="ppmp-letterhead-text">
+                            <p>Republic of the Philippines</p>
+                            <p class="ppmp-letterhead-uni">BATANGAS STATE UNIVERSITY</p>
+                            <p class="ppmp-letterhead-sub">The National Engineering University</p>
+                            <p class="ppmp-letterhead-campus">ARASOF-Nasugbu Campus</p>
+                            <p class="ppmp-letterhead-addr">R. Martinez St, Brgy. Bucana, Nasugbu, Batangas, Philippines 4231</p>
+                            <p class="ppmp-letterhead-addr">Tel Nos.: (+63 43) 416-0350 local 101; (+63 43) 416-0068</p>
+                            <p class="ppmp-letterhead-addr">E-mail Address: nasugbu@g.batstate-u.edu.ph | Website Address: http://www.batstate-u.edu.ph</p>
+                        </div>
                     </div>
+                    <p class="ppmp-office-label">Office of the Chancellor</p>
+
+                    <div class="ppmp-doc-head">
+                        <p class="ppmp-doc-title">PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) NO. {{ $proposalForm['code'] ?: '___' }}</p>
+                        <div class="ppmp-checkbox-row">
+                            <span><span class="ppmp-checkbox{{ $proposalForm['isFinal'] ? '' : ' checked' }}"></span>INDICATIVE</span>
+                            <span><span class="ppmp-checkbox{{ $proposalForm['isFinal'] ? ' checked' : '' }}"></span>FINAL</span>
+                        </div>
+                    </div>
+
+                    <div class="ppmp-meta-row">
+                        <div><strong>Fiscal Year :</strong> {{ $proposalForm['fiscalYear'] }}</div>
+                        <div><strong>End-User/Implementing Unit:</strong> {{ $proposalForm['officeName'] }}</div>
+                    </div>
+
                     <div class="table-scroll">
+                        {{-- Column order AND grouping follow the official BSU PPMP
+                             form exactly: PROCUREMENT PROJECT DETAILS (Cols 1-5),
+                             PROJECTED TIMELINE (Cols 6-8), FUNDING DETAILS (Cols
+                             9-10), then Attached Supporting Document/s and Remarks
+                             ungrouped. Column-name headers show short labels —
+                             hover any header for its exact official wording. --}}
                         <table class="ppmp-preview-table">
                             <thead>
                                 <tr>
-                                    <th style="width:34px;">#</th>
-                                    <th>General Description</th>
-                                    <th>Category</th>
-                                    <th>Qty</th>
-                                    <th>Unit</th>
-                                    <th>Budget</th>
-                                    <th>Estimated Budget</th>
-                                    <th>Schedule</th>
-                                    <th>Source</th>
+                                    <th colspan="5">Procurement Project Details</th>
+                                    <th colspan="3">Projected Timeline (MM/YYYY)</th>
+                                    <th colspan="2">Funding Details</th>
+                                    <th rowspan="2" title="Attached Supporting Document/s">Attached Supporting Document/s</th>
+                                    <th rowspan="2" title="Remarks">Remarks</th>
+                                </tr>
+                                <tr>
+                                    <th title="General Description and Objective of the Project to be Procured">General Description and Objective</th>
+                                    <th title="Type of the Project to be Procured (whether Goods, Infrastructure and Consulting Services)">Type</th>
+                                    <th title="Quantity and Size of the Project to be Procured">Qty &amp; Size</th>
+                                    <th title="Recommended Mode of Procurement">Recommended Mode of Procurement</th>
+                                    <th title="Pre-Procurement Conference, if applicable (Yes/No)">Pre-Proc. Conference</th>
+                                    <th title="Start of Procurement Activity">Start of Procurement Activity</th>
+                                    <th title="End of Procurement Activity">End of Procurement Activity</th>
+                                    <th title="Expected Delivery/Implementation Period">Expected Delivery / Implementation</th>
+                                    <th title="Source of Funds">Source of Funds</th>
+                                    <th title="Estimated Budget / Authorized Budgetary Allocation">Estimated Budget</th>
+                                </tr>
+                                <tr class="ppmp-col-number-row">
+                                    <th>Column 1</th><th>Column 2</th><th>Column 3</th><th>Column 4</th><th>Column 5</th>
+                                    <th>Column 6</th><th>Column 7</th><th>Column 8</th><th>Column 9</th><th>Column 10</th>
+                                    <th>Column 11</th><th>Column 12</th>
                                 </tr>
                             </thead>
                             <tbody id="ppmpPreviewBody"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="9" class="ppmp-total-label">TOTAL BUDGET:</td>
+                                    <td class="ppmp-total-amount" id="ppmpPreviewTotal">PHP {{ number_format($proposalTotal) }}</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
-                    <div class="total-row" style="border-top:1px solid var(--border2);">
-                        <span class="total-label">Total Estimated Budget</span>
-                        <span class="total-amount" id="ppmpPreviewTotal">PHP {{ number_format($proposalTotal) }}</span>
+
+                    <div class="ppmp-signoff">
+                        <div class="ppmp-signoff-col">
+                            <span class="ppmp-signoff-label">Prepared by:</span>
+                            <div class="ppmp-signoff-name">{{ $proposalForm['preparedByName'] ?: '—' }}</div>
+                            <div class="ppmp-signoff-title">{{ $proposalForm['preparedByTitle'] ?: '' }}</div>
+                            <div class="ppmp-signoff-date">Date: {{ $proposalForm['preparedDate'] ?: '_____________' }}</div>
+                        </div>
+                        <div class="ppmp-signoff-col">
+                            <span class="ppmp-signoff-label">Reviewed by:</span>
+                            <div class="ppmp-signoff-name">{{ $proposalForm['reviewedByName'] ?: '—' }}</div>
+                            <div class="ppmp-signoff-title">{{ $proposalForm['reviewedByTitle'] ?: '' }}</div>
+                            <div class="ppmp-signoff-date">Date: {{ $proposalForm['reviewedDate'] ?: '_____________' }}</div>
+                        </div>
+                        <div class="ppmp-signoff-col">
+                            <span class="ppmp-signoff-label">Approved by:</span>
+                            <div class="ppmp-signoff-name">{{ $proposalForm['approvedByName'] ?: '—' }}</div>
+                            <div class="ppmp-signoff-title">{{ $proposalForm['approvedByTitle'] ?: '' }}</div>
+                            <div class="ppmp-signoff-date">Date: {{ $proposalForm['approvedDate'] ?: '_____________' }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -669,6 +806,8 @@
                                 <th>Quarter</th>
                                 <th>Source of Fund</th>
                                 <th>Classification</th>
+                                <th>Type</th>
+                                <th title="Pre-Procurement Conference">Pre-Proc. Conf.</th>
                                 <th>Market Scoping / Source</th>
                                 @if(!$itemsLocked)<th>Actions</th>@endif
                             </tr>
@@ -911,7 +1050,7 @@
         const tbody = document.getElementById('encodedItemsTable');
         if (!tbody) return;
         if (!items.length) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--txt3);font-weight:600;">
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--txt3);font-weight:600;">
                 No items added yet. Use the form above to add procurement items.</td></tr>`;
             return;
         }
@@ -976,6 +1115,8 @@
                 <td>${esc(item.targetQuarter)}</td>
                 <td>${esc(item.sourceOfFund || '—')}</td>
                 <td>${esc(item.itemClassification || 'Regular')}</td>
+                <td>${esc(item.projectType || 'Goods')}</td>
+                <td>${item.preProcurementConference ? 'Yes' : 'No'}</td>
                 <td>${scopingCell}</td>
                 ${itemsLocked ? '' : `<td><div class="tbl-actions">
                     <button class="tbl-btn" title="Edit item" type="button" onclick="prismBP.editItem('${esc(item.id)}')">
@@ -1121,6 +1262,8 @@
             targetQuarter:     f.targetQuarter.value,
             sourceOfFund:       resolvedSourceOfFund() || null,
             itemClassification: resolvedClassification() || null,
+            projectType:              f.projectType.value,
+            preProcurementConference: f.preProcurementConference.value === '1',
         };
         if (!itemId) payload.proposal_id = proposalId;
 
@@ -1272,6 +1415,8 @@
         f.estimatedUnitCost.value    = item.estimatedUnitCost;
         f.justification.value        = item.justification || '';
         f.targetQuarter.value        = item.targetQuarter;
+        f.projectType.value          = item.projectType || 'Goods';
+        f.preProcurementConference.value = item.preProcurementConference ? '1' : '0';
         const knownFunds = ['', 'General Fund', 'Special Trust Fund', 'Income'];
         const fund = item.sourceOfFund || '';
         if (fund && !knownFunds.includes(fund)) {
@@ -1311,30 +1456,43 @@
         if (!tbody) return;
 
         if (!items.length) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--txt3);font-weight:600;">
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:26px;color:var(--txt3);font-weight:600;">
                 No items encoded yet. ${itemsLocked ? '' : 'Click "Edit Items" to start.'}</td></tr>`;
         } else {
             tbody.innerHTML = items.map((item, i) => {
-                // This table is the print/export document — a clickable pill or
-                // a "missing" warning badge means nothing on paper (nothing to
-                // click, nothing to fix). Show the actual source instead: the
-                // market references' supplier names only (not the full reference
-                // title, which runs too long for this column), up to 3;
-                // otherwise leave the cell blank rather than a banner that
-                // can't be acted on.
-                const srcCell = (item.scoping && item.scoping.length)
-                    ? esc(item.scoping.slice(0, 3).map(ref => ref.supplierName || '').filter(Boolean).join(', '))
-                    : '';
+                // Column 11 (Attached Supporting Document/s) on the official form.
+                // An item is "supported" by either an uploaded source file OR a
+                // market scoping reference (submitProposal() accepts either —
+                // see the missingScopingCount check), so both belong here, not
+                // just uploads: a reference backed by a source URL links out to
+                // it the same way an attachment links to its file; a reference
+                // with no URL still names its supplier so the row isn't blank.
+                const uploadLinks = (item.attachments || []).map(f =>
+                    `<a class="ref-tree-link" href="${esc(f.url)}" target="_blank" rel="noopener">` +
+                    `<i class="ti ti-paperclip" style="font-size:11px"></i> ${esc(f.name)}</a>`
+                );
+                const scopingLinks = (item.scoping || []).slice(0, 3).map(ref => {
+                    const label = esc(ref.supplierName || ref.title || 'Market reference');
+                    return ref.sourceLink
+                        ? `<a class="ref-tree-link" href="${esc(ref.sourceLink)}" target="_blank" rel="noopener">` +
+                          `<i class="ti ti-link" style="font-size:11px"></i> ${label}</a>`
+                        : `<span class="ref-tree-link" style="cursor:default;">${label}</span>`;
+                });
+                const attachCell = [...uploadLinks, ...scopingLinks].join('<br>');
+
                 return `<tr>
-                    <td>${i + 1}</td>
-                    <td><strong>${esc(item.description)}</strong>${item.justification ? `<br><span style="font-size:11px;color:var(--txt3);">${esc(item.justification)}</span>` : ''}</td>
-                    <td>${esc(item.category || 'General')}</td>
-                    <td>${esc(item.quantity)}</td>
-                    <td>${esc(item.unit)}</td>
-                    <td>PHP ${fmt(item.estimatedUnitCost)}</td>
+                    <td><strong>${esc(item.description)}</strong></td>
+                    <td>${esc(item.projectType || 'Goods')}</td>
+                    <td>${esc(item.quantity)} ${esc(item.unit)}</td>
+                    <td>${esc(item.procurementMode || '')}</td>
+                    <td>${item.preProcurementConference ? 'Yes' : 'No'}</td>
+                    <td>${esc(item.procurementStartDate || '')}</td>
+                    <td>—</td>
+                    <td>${esc(item.dateNeeded || '')}</td>
+                    <td>${esc(item.sourceOfFund || '')}</td>
                     <td><strong>PHP ${fmt(item.totalCost)}</strong></td>
-                    <td>${esc(item.targetQuarter)}</td>
-                    <td>${srcCell}</td>
+                    <td>${attachCell}</td>
+                    <td>${esc(item.justification || '')}</td>
                 </tr>`;
             }).join('');
         }

@@ -84,7 +84,7 @@ class RealUsersSeeder extends Seeder
             ['name' => 'Dr. Lorissa Joana E. Buenas',      'email' => 'ljbuenas@bsu.edu.ph',     'position_title' => 'Vice Chancellor for Academic Affairs / Dean, CICS',   'office' => 'CICS',   'role' => 'vice-chancellor'],
             ['name' => 'Dr. Froilan G. Destreza',           'email' => 'fdestreza@bsu.edu.ph',    'position_title' => 'Vice Chancellor for Research, Development and Extension Services', 'office' => 'OVC', 'role' => 'vice-chancellor'],
             ['name' => 'Mrs. Josephine D. Vergara',         'email' => 'jvergara@bsu.edu.ph',     'position_title' => 'Vice Chancellor for Administration and Finance',      'office' => 'OVC',    'role' => 'vice-chancellor'],
-            ['name' => 'Asst. Prof. Lorenjane E. Balan',   'email' => 'lbalan@bsu.edu.ph',       'position_title' => 'Vice Chancellor for Development and External Affairs', 'office' => 'OVC',    'role' => 'vice-chancellor'],
+            ['name' => 'Asst. Prof. Lorenjane E. Balan',   'email' => 'lbalan@bsu.edu.ph',       'position_title' => 'Vice Chancellor for Development and External Affairs / Head, Sustainable Development', 'office' => 'OVC',    'role' => 'vice-chancellor'],
 
             // Office Heads — Deans
             ['name' => 'Dr. Marvin C. Hernandez',           'email' => 'mhernandez@bsu.edu.ph',   'position_title' => 'Dean, College of Accountancy, Business, Economics and International Hospitality Management', 'office' => 'CBA',    'role' => 'office-head'],

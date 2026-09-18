@@ -152,15 +152,28 @@ class DocumentValidationService
 
             if (!$ppmpItem) {
                 $failed++;
+
+                // The matcher pairs each PPMP line to at most one PR row, so a
+                // second row for the same item comes back unmatched even
+                // though it strongly resembles a PPMP line — it's just that an
+                // earlier row already claimed it. The matcher still reports
+                // the best score it *would* have gotten in that case (see
+                // microservice/app.py's match_items()), so a high score here
+                // means "already claimed", not "never approved" — worth a
+                // different message so the reason isn't misleading.
+                $reason = $score >= ItemMatchingService::DEFAULT_THRESHOLD
+                    ? '"' . $this->shorten($name) . '" was already matched to another row on this PR — combine them into a single line instead of repeating the item.'
+                    // No qualifier about the quarter here: by this point the
+                    // item was looked for across the whole PPMP, not just the
+                    // selected quarter.
+                    : '"' . $this->shorten($name) . '" is not in the approved PPMP.';
+
                 $items[] = [
                     'name'     => $name,
                     'quantity' => $qty,
                     'unit'     => $item['unit'] ?? '',
                     'verdict'  => DocumentValidation::FAILED,
-                    // No qualifier about the quarter here: by this point the
-                    // item was looked for across the whole PPMP, not just the
-                    // selected quarter.
-                    'reason'   => '"' . $this->shorten($name) . '" is not in the approved PPMP.',
+                    'reason'   => $reason,
                     'score'    => round($score, 3),
                 ];
                 continue;
