@@ -9,7 +9,7 @@
 <style>
     .content {
         padding: 28px 32px 56px; flex: 1; display: flex; flex-direction: column; gap: 20px;
-        --m: var(--crimson); --gold: #c9a84c; --white: #ffffff;
+        --m: var(--crimson); --white: #ffffff;
         --s50: #f8fafc; --s100: #f1f5f9; --s200: #e2e8f0; --s300: #cbd5e1;
         --s400: #94a3b8; --s500: #64748b; --s600: #475569; --s700: #334155; --s900: #0f172a;
         --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
@@ -32,12 +32,12 @@
         border-radius: 18px; padding: 20px 20px 20px 24px;
         box-shadow: var(--sh-sm); transition: border-color .2s, box-shadow .2s;
     }
-    .stat-card:hover { border-color: rgba(201,168,76,.5); box-shadow: 0 12px 28px rgba(15,23,42,.07); }
-    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: var(--gold); }
-    .stat-icon { position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--crimson-border); background: var(--crimson-mid); display: flex; align-items: center; justify-content: center; }
-    .stat-icon svg { width: 17px; height: 17px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-card:hover { border-color: rgba(104,16,18,.2); box-shadow: 0 12px 28px rgba(15,23,42,.07); }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: #681012; }
+    .stat-icon { position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 10px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
+    .stat-icon svg { width: 17px; height: 17px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
-    .stat-value { font-size: 1.55rem; font-weight: 800; color: var(--m); margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
+    .stat-value { font-size: 1.55rem; font-weight: 800; color: #681012; margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
     .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
 
     .highlight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -111,12 +111,11 @@
 <div class="content">
 
     <div class="page-hdr">
-        <div class="page-hdr-icon"><i class="ti ti-chart-no-axes-combined"></i></div>
+        <div class="page-hdr-icon"><i class="ti ti-report-analytics"></i></div>
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Vice Chancellor</p>
             <h1 class="page-hdr-title">Division Performance Report</h1>
             <p class="page-hdr-sub">Review APP item accomplishment, budget utilization, and procurement completion rates across division offices.</p>
-            <p style="font-size:11px;color:var(--s400);margin-top:2px;">Generated {{ $generatedAt }}</p>
         </div>
         <button class="btn-print" type="button" onclick="window.print()">
             <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>

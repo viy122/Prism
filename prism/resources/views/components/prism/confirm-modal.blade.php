@@ -180,10 +180,13 @@
         options = options || {};
         infoTitleEl.textContent = options.title || 'Details';
         infoBodyEl.innerHTML    = options.bodyHtml || '';
+        // Optional: hide the bottom "Close" button when the top-right × is
+        // enough (avoids a redundant close affordance) — default keeps it.
+        infoCloseBtn.style.display = options.hideCloseButton ? 'none' : '';
 
         infoOverlay.classList.add('open');
         infoOverlay.setAttribute('aria-hidden', 'false');
-        infoCloseBtn.focus();
+        (options.hideCloseButton ? infoCloseX : infoCloseBtn).focus();
     };
 
     // ── Success modal (one-way transitions the user must acknowledge) ──────

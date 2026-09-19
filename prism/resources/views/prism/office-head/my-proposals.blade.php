@@ -304,6 +304,30 @@
         }
         .proposal-stat-item dd.danger { color: #991b1b; }
 
+        /* ─── Proposal queue empty state ─── */
+        .proposal-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 200px;
+            border: 1.5px dashed var(--s300);
+            border-radius: 14px;
+            background: var(--s50);
+            padding: 32px;
+            text-align: center;
+            color: var(--s500);
+            font-size: 13px;
+            line-height: 1.65;
+        }
+        .proposal-empty svg {
+            width: 36px; height: 36px;
+            stroke: rgba(104,16,18,.4); fill: none;
+            stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .proposal-empty strong { color: var(--s700); }
+
         /* ─── Timeline panel ─── */
         .timeline-meta-grid {
             display: grid;
@@ -337,21 +361,39 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            min-height: 200px;
+            gap: 14px;
+            min-height: 220px;
             border: 1.5px dashed var(--s300);
-            border-radius: 14px;
+            border-radius: 16px;
             background: var(--s50);
-            padding: 32px;
+            padding: 36px 28px;
             text-align: center;
-            color: var(--s500);
-            font-size: 13px;
-            line-height: 1.65;
         }
-        .timeline-empty svg {
-            width: 40px; height: 40px;
-            stroke: rgba(104,16,18,.5); fill: none;
-            stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+        .timeline-empty-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: rgba(104,16,18,.08);
+            border: 1px solid rgba(104,16,18,.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .timeline-empty-icon i {
+            font-size: 24px;
+            color: var(--m);
+        }
+        .timeline-empty-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--s700);
+        }
+        .timeline-empty-sub {
+            font-size: 12.5px;
+            color: var(--s500);
+            line-height: 1.6;
+            max-width: 240px;
         }
 
         /* ─── Responsive ─── */
@@ -494,6 +536,11 @@
                         </article>
                     @endforeach
                 </div>
+
+                <div class="proposal-empty" id="proposalEmptyState" style="display:none;">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <p><strong>No matching PPMPs found.</strong><br>Try a different status or fiscal year filter.</p>
+                </div>
             </div>
 
             {{-- Timeline panel --}}
@@ -519,8 +566,9 @@
                 </div>
 
                 <div id="timelineContent" class="timeline-empty">
-                    <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" rx="2" /><path d="M9 9h6M9 12h6M9 15h4"/><circle cx="17" cy="17" r="3"/><path d="M19.5 19.5L21 21"/></svg>
-                    <p>Select a proposal to view timestamps, remarks, and revision status.</p>
+                    <div class="timeline-empty-icon"><i class="ti ti-click"></i></div>
+                    <p class="timeline-empty-title">No proposal selected</p>
+                    <p class="timeline-empty-sub">Select a proposal from the queue to view its timestamps, remarks, and revision status.</p>
                 </div>
             </div>
 

@@ -102,7 +102,7 @@
     @endphp
 
     <div class="page-hdr">
-        <div class="page-hdr-icon"><i class="ti ti-chart-no-axes-combined"></i></div>
+        <div class="page-hdr-icon"><i class="ti ti-report-analytics"></i></div>
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Procurement Reports</h1>

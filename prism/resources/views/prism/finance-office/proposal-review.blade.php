@@ -49,6 +49,18 @@
     }
     .btn-outline:hover { background: var(--crimson-mid); border-color: var(--crimson); }
 
+    .btn-ghost {
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 6px; height: 32px; padding: 0 14px; border-radius: 8px;
+        background: var(--white); color: var(--s600);
+        font-size: 12px; font-weight: 700; cursor: pointer;
+        font-family: 'Poppins', sans-serif;
+        border: 1px solid var(--s200);
+        transition: background .15s, border-color .15s, color .15s; white-space: nowrap;
+    }
+    .btn-ghost:hover { border-color: var(--crimson); color: var(--crimson); background: var(--crimson-mid); }
+    .btn-ghost i { font-size: 14px; }
+
     .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
     .field-select {
         height: 44px; width: 100%; border-radius: 10px;
@@ -139,6 +151,19 @@
     .verdict-status.ok { color: #166534; }
     .verdict-status.err { color: #991b1b; }
     .remark-display { display: flex; flex-direction: column; gap: 6px; background: var(--s50); border: 1px solid var(--s200); border-radius: 8px; padding: 10px 12px; }
+    .verdict-remark-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .verdict-remark-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--s500); }
+    .btn-cancel-remark { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--s200); background: var(--white); color: var(--s500); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; flex-shrink: 0; transition: background .15s, border-color .15s, color .15s; }
+    .btn-cancel-remark:hover { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+    .pill-awaiting {
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        height: 28px; padding: 0 14px;
+        background: #fef2f2; border: 1px solid #fecaca; border-radius: 999px;
+        flex-shrink: 0;
+    }
+    .pill-awaiting i { font-size: 13px; color: #991b1b; }
+    .pill-awaiting-text { font-size: 11px; font-weight: 700; color: #991b1b; white-space: nowrap; }
     .remark-text { font-size: 12px; color: var(--s700); line-height: 1.5; white-space: pre-wrap; }
     .btn-edit-remark { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--crimson); background: none; border: none; cursor: pointer; padding: 0; font-family: 'Poppins', sans-serif; }
     .btn-edit-remark:hover { text-decoration: underline; }
@@ -177,14 +202,15 @@
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">Budget Office</p>
-                <h2 class="card-title">
-                    Proposal Review
-                    @if($pendingCount > 0)
-                        <span class="badge" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:11px;vertical-align:middle;margin-left:6px;">{{ $pendingCount }} awaiting endorsement</span>
-                    @endif
-                </h2>
+                <h2 class="card-title">Proposal Review</h2>
                 <p class="card-sub">Review office details, encoded procurement items, justifications, target quarters, and AI market scoping references.</p>
             </div>
+            @if($pendingCount > 0)
+            <span class="pill-awaiting">
+                <i class="ti ti-clock"></i>
+                <span class="pill-awaiting-text">{{ $pendingCount }} Awaiting Endorsement</span>
+            </span>
+            @endif
         </div>
         <div style="max-width:100%;">
             <label class="field-label" for="financeProposalSelector">Select Proposal</label>
@@ -235,7 +261,14 @@
                 <p class="card-eyebrow">Full proposal details — {{ $selectedProposal['code'] ?? '—' }}</p>
                 <h2 class="card-title">{{ $selectedProposal['title'] }}</h2>
             </div>
-            <x-prism.status-badge :status="$selectedProposal['status']" />
+            <div style="display:flex;align-items:center;gap:8px;">
+                @if(count($selectedProposal['reviewHistory']) > 0)
+                <button type="button" class="btn-ghost" id="btnViewReviewHistory">
+                    <i class="ti ti-history"></i> Review History
+                </button>
+                @endif
+                <x-prism.status-badge :status="$selectedProposal['status']" />
+            </div>
         </div>
         <dl class="meta-grid">
             <div class="meta-box">
@@ -269,8 +302,7 @@
         </dl>
 
         @if(count($selectedProposal['reviewHistory']) > 0)
-        <div style="margin-top:18px;">
-            <p class="card-eyebrow" style="margin-bottom:10px;">Review history</p>
+        <template id="reviewHistoryTemplate">
             <div style="display:flex;flex-direction:column;gap:1px;">
                 @foreach ($selectedProposal['reviewHistory'] as $event)
                     <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--s100);">
@@ -283,12 +315,14 @@
                             <p style="font-size:11px;color:var(--s400);margin-top:2px;">{{ $event['date'] }}</p>
                             @if($event['remarks'])
                                 <p style="font-size:12px;color:var(--s600);margin-top:4px;line-height:1.5;white-space:pre-wrap;">{{ $event['remarks'] }}</p>
+                            @else
+                                <p style="font-size:11.5px;font-style:italic;color:var(--s400);margin-top:4px;">No remarks</p>
                             @endif
                         </div>
                     </div>
                 @endforeach
             </div>
-        </div>
+        </template>
         @endif
     </div>
 
@@ -386,6 +420,10 @@
                                     @endif
                                     @if($selectedProposal['actionable'])
                                     <div class="verdict-remark" style="display:none;">
+                                        <div class="verdict-remark-head">
+                                            <span class="verdict-remark-label">Add remark for issued item</span>
+                                            <button type="button" class="btn-cancel-remark" title="Cancel — no issue after all"><i class="ti ti-x"></i></button>
+                                        </div>
                                         <textarea class="field-textarea remark-input" rows="3"
                                             placeholder="Add remarks for this item (required)">{{ $item['financeRemark'] }}</textarea>
                                         <button type="button" class="btn-save-remark">
@@ -465,6 +503,12 @@
 <script>
 document.getElementById('financeProposalSelector')?.addEventListener('change', function () {
     if (this.value) window.location.href = this.value;
+});
+
+document.getElementById('btnViewReviewHistory')?.addEventListener('click', function () {
+    const tpl = document.getElementById('reviewHistoryTemplate');
+    if (!tpl || !window.prismInfoModal) return;
+    window.prismInfoModal({ title: 'Review History', bodyHtml: tpl.innerHTML, hideCloseButton: true });
 });
 
 window.toggleScope = function (btn) {
@@ -547,10 +591,24 @@ function submitFinanceReturn(btn) {
         const input      = box.querySelector('.remark-input');
         const btnSave    = box.querySelector('.btn-save-remark');
         const btnEdit    = box.querySelector('.btn-edit-remark');
+        const btnCancel  = box.querySelector('.btn-cancel-remark');
 
         // Not actionable (e.g. the proposal is with the Chancellor, or already
         // approved) — verdict controls aren't rendered here at all; nothing to wire.
         if (!btnOk || !btnFlag) return;
+
+        // Snapshot of the verdict UI right before opening the remark box (from
+        // either "Issue" or "Edit"), so Cancel can put everything back exactly
+        // as it was — nothing gets saved just from an accidental Issue click.
+        let preRemarkState = null;
+        function snapshotBeforeRemark() {
+            preRemarkState = {
+                okActive: btnOk.classList.contains('active'),
+                flagActive: btnFlag.classList.contains('active'),
+                displayVisible: display.style.display !== 'none',
+                remarkText: remarkText.textContent,
+            };
+        }
 
         btnOk.addEventListener('click', async () => {
             const wasActive = btnOk.classList.contains('active');
@@ -566,6 +624,7 @@ function submitFinanceReturn(btn) {
         });
 
         btnFlag.addEventListener('click', () => {
+            snapshotBeforeRemark();
             btnFlag.classList.add('active');
             btnOk.classList.remove('active');
             display.style.display = 'none';
@@ -575,9 +634,22 @@ function submitFinanceReturn(btn) {
         });
 
         btnEdit?.addEventListener('click', () => {
+            snapshotBeforeRemark();
             display.style.display = 'none';
             remarkEl.style.display = '';
             input.focus();
+        });
+
+        btnCancel?.addEventListener('click', () => {
+            remarkEl.style.display = 'none';
+            input.style.borderColor = '';
+            if (preRemarkState) {
+                input.value = preRemarkState.remarkText;
+                btnOk.classList.toggle('active', preRemarkState.okActive);
+                btnFlag.classList.toggle('active', preRemarkState.flagActive);
+                display.style.display = preRemarkState.displayVisible ? '' : 'none';
+            }
+            updateEndorseGate();
         });
 
         btnSave.addEventListener('click', async () => {

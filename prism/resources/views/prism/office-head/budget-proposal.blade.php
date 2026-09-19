@@ -6,9 +6,9 @@
     $itemsLocked           = $itemsLocked ?? $isReadOnly;
     $proposalStatus        = $proposalStatus ?? 'draft';
     $itemCount             = count($encodedItems);
-    $scopingReferenceCount = collect($encodedItems)->sum(fn ($item) => count($item['scoping']));
-    $missingScopingCount   = collect($encodedItems)->filter(fn ($item) => empty($item['scoping']))->count();
-    $proposalTotal         = collect($encodedItems)->sum('totalCost');
+    $scopingReferenceCount = $scopingReferenceCount ?? collect($encodedItems)->sum(fn ($item) => count($item['scoping']));
+    $missingScopingCount   = $missingScopingCount ?? collect($encodedItems)->filter(fn ($item) => empty($item['scoping']) && empty($item['attachments']))->count();
+    $proposalTotal         = $proposalTotal ?? collect($encodedItems)->sum('totalCost');
     $needsRevisionCount    = collect($encodedItems)->filter(fn ($item) => $item['financeOk'] === false)->count();
 @endphp
 
@@ -163,7 +163,9 @@
             font-family: 'Poppins', sans-serif;
             box-shadow: 0 4px 16px rgba(139,26,28,.30); transition: all .2s;
         }
-        .btn-submit:hover { background: var(--crimson-dark); transform: translateY(-1px); }
+        .btn-submit:hover:not(:disabled) { background: var(--crimson-dark); transform: translateY(-1px); }
+        .btn-submit:disabled { background: var(--s300); color: var(--s500); cursor: not-allowed; box-shadow: none; }
+        .btn-submit.needs-source { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; box-shadow: none; }
         .btn-submit i { font-size: 17px; }
 
         /* ══ TABLE ══ */
@@ -243,6 +245,7 @@
         .summary-stat dt { font-size: 8.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--txt3); margin-bottom: 6px; }
         .summary-stat dd { font-size: 24px; font-weight: 800; color: var(--txt); line-height: 1; }
         .summary-stat dd.crimson { color: var(--crimson); }
+        .summary-stat dd.red { color: #991B1B; }
         .summary-stat dd.sm { font-size: 14px; font-weight: 700; }
 
         .submit-wrap { padding: 0 22px 18px; margin-top: auto; }
@@ -340,6 +343,9 @@
         /* Print: show only the PPMP document */
         @media print {
             @page { size: landscape; margin: 10mm; }
+            /* Without this, browsers drop background colors when printing to save ink —
+               that silently erases the black fill on the checked INDICATIVE/FINAL box. */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
             body * { visibility: hidden !important; }
             #ppmpPreviewDoc, #ppmpPreviewDoc * { visibility: visible !important; }
             #ppmpPreviewDoc { position: absolute; left: 0; top: 0; width: 100%; border: none; }
@@ -532,7 +538,7 @@
                         </div>
                         <div class="summary-stat">
                             <dt>Missing Scoping</dt>
-                            <dd id="proposalSummaryMissing">{{ $missingScopingCount }}</dd>
+                            <dd id="proposalSummaryMissing" class="{{ $missingScopingCount > 0 ? 'red' : '' }}">{{ $missingScopingCount }}</dd>
                         </div>
                         <div class="summary-stat">
                             <dt>Total Amount</dt>
@@ -542,8 +548,14 @@
                     @if(!$isReadOnly)
                     <div class="submit-wrap">
                         <p id="submitMsg" class="submit-msg"></p>
-                        <button id="submitProposalButton" type="button" class="btn-submit">
-                            <i class="ti ti-send"></i>Submit PPMP to Budget Office
+                        <button id="submitProposalButton" type="button" class="btn-submit{{ $missingScopingCount > 0 ? ' needs-source' : '' }}" {{ ($itemCount === 0 || $missingScopingCount > 0) ? 'disabled' : '' }}>
+                            @if($itemCount === 0)
+                                <i class="ti ti-send"></i>Submit PPMP
+                            @elseif($missingScopingCount > 0)
+                                <i class="ti ti-alert-triangle"></i>{{ $missingScopingCount }} item{{ $missingScopingCount > 1 ? 's' : '' }} need{{ $missingScopingCount > 1 ? '' : 's' }} a source
+                            @else
+                                <i class="ti ti-send"></i>Submit PPMP to Budget Office
+                            @endif
                         </button>
                     </div>
                     @endif
@@ -1158,7 +1170,9 @@
 
         document.getElementById('proposalItemCount').textContent        = items.length;
         document.getElementById('proposalSummaryItems').textContent     = items.length;
-        document.getElementById('proposalSummaryMissing').textContent   = missing;
+        const missingEl = document.getElementById('proposalSummaryMissing');
+        missingEl.textContent = missing;
+        missingEl.classList.toggle('red', missing > 0);
 
         const totalEl = document.getElementById('proposalSummaryTotal');
         if (totalEl) { totalEl.textContent = 'PHP ' + fmt(total); applyBudgetColor(totalEl, total); }
@@ -1183,14 +1197,17 @@
         if (submitBtn) {
             if (items.length === 0) {
                 submitBtn.disabled = true;
+                submitBtn.classList.remove('needs-source');
                 submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP';
                 if (msgEl) { msgEl.textContent = 'Add at least one item to submit.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
             } else if (missing > 0) {
                 submitBtn.disabled = true;
+                submitBtn.classList.add('needs-source');
                 submitBtn.innerHTML = '<i class="ti ti-alert-triangle"></i>' + missing + ' item' + (missing > 1 ? 's' : '') + ' need' + (missing > 1 ? '' : 's') + ' a source';
                 if (msgEl) { msgEl.textContent = 'Run market scoping or attach a source file on all items before submitting the PPMP.'; msgEl.className = 'submit-msg warn'; msgEl.style.display = ''; }
             } else {
                 submitBtn.disabled = false;
+                submitBtn.classList.remove('needs-source');
                 submitBtn.innerHTML = '<i class="ti ti-send"></i>Submit PPMP to Budget Office';
                 if (msgEl) { msgEl.style.display = 'none'; }
             }

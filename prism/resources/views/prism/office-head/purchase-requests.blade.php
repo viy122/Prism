@@ -90,6 +90,11 @@
         .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
         @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
+        .pr-no-results { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 32px; text-align: center; }
+        .pr-no-results.visible { display: flex; }
+        .pr-no-results i { font-size: 34px; color: var(--s300); }
+        .pr-no-results p { font-size: 13px; color: var(--s400); max-width: 260px; line-height: 1.6; }
+
         /* ─── PR list ─── */
         .pr-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -357,6 +362,12 @@
                     </div>
                     @endforelse
                 </div>
+                @if(count($purchaseItems) > 0)
+                <div class="pr-no-results" id="prNoResults">
+                    <i class="ti ti-search-off"></i>
+                    <p>No purchase requests found. Try adjusting your search or filter.</p>
+                </div>
+                @endif
             </div>
 
             {{-- Sidebar --}}
@@ -448,15 +459,20 @@
     const searchInput    = document.getElementById('prSearch');
     const statusFilter    = document.getElementById('prStatusFilter');
     const sortOrderSelect = document.getElementById('prSortOrder');
+    const prNoResults     = document.getElementById('prNoResults');
 
     function applyPrFilter() {
         const q      = (searchInput?.value || '').toLowerCase();
         const status = statusFilter ? statusFilter.value : '';
+        let visible  = 0;
         prList?.querySelectorAll('.pr-card').forEach(function (card) {
             const matchesSearch = !q || (card.dataset.search ?? '').includes(q);
             const matchesStatus = !status || card.dataset.statusBucket === status;
-            card.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+            const match = matchesSearch && matchesStatus;
+            card.style.display = match ? '' : 'none';
+            if (match) visible++;
         });
+        if (prNoResults) prNoResults.classList.toggle('visible', visible === 0);
     }
     searchInput?.addEventListener('input', applyPrFilter);
     statusFilter?.addEventListener('change', applyPrFilter);

@@ -223,7 +223,6 @@ const timelineItemMarkup = (event, isLast) => {
         </li>
     `;
 };
-const timelineEmptyClass = 'flex min-h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-base leading-7 text-slate-500 [&_svg]:h-10 [&_svg]:w-10 [&_svg]:text-bsu-maroon/70';
 const returnedBoxClass = 'grid gap-2 justify-items-start rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800 shadow-sm [&_p]:m-0';
 const panelHeaderClass = 'mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between [&_h2]:mt-1.5 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:tracking-tight [&_h2]:text-slate-950';
 const eyebrowClass = 'text-xs font-extrabold uppercase tracking-[0.12em] text-bsu-maroon';
@@ -395,9 +394,8 @@ const initProposalTimeline = () => {
             action.className = 'mt-1 text-sm font-bold text-slate-950';
         }
 
-        content.className = timelineEmptyClass;
-        content.innerHTML = '<i data-lucide="mouse-pointer-click" aria-hidden="true"></i><p>Select a proposal to view timestamps, remarks, and revision status.</p>';
-        refreshIcons();
+        content.className = 'timeline-empty';
+        content.innerHTML = '<div class="timeline-empty-icon"><i class="ti ti-click"></i></div><p class="timeline-empty-title">No proposal selected</p><p class="timeline-empty-sub">Select a proposal from the queue to view its timestamps, remarks, and revision status.</p>';
     };
 
     const renderTimeline = (proposalId) => {
@@ -452,6 +450,7 @@ const initProposalTimeline = () => {
     const kpiApprovedCount  = document.getElementById('kpiApprovedCount');
     const kpiReturnedCount  = document.getElementById('kpiReturnedCount');
     const kpiApprovedAmount = document.getElementById('kpiApprovedAmount');
+    const emptyState        = document.getElementById('proposalEmptyState');
 
     const applyFilters = () => {
         const selectedStatus = statusFilter.value;
@@ -485,6 +484,7 @@ const initProposalTimeline = () => {
         if (kpiApprovedCount) kpiApprovedCount.textContent = approvedCount;
         if (kpiReturnedCount) kpiReturnedCount.textContent = returnedCount;
         if (kpiApprovedAmount) kpiApprovedAmount.textContent = money(approvedAmount).replace('PHP', '₱');
+        if (emptyState) emptyState.style.display = count === 0 ? 'flex' : 'none';
 
         const selectedRow = rows.find((row) => row.dataset.proposalId === selectedProposalId);
         const firstVisibleRow = rows.find((row) => !row.hidden);

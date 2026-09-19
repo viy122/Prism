@@ -47,16 +47,33 @@
     .doc-po  { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
 
     .search-wrap { position: relative; }
-    .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-    .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
+    .search-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+    .search-input { height: 46px; width: 100%; border-radius: 14px; border: 1px solid var(--s200); background: var(--white); padding: 0 40px 0 40px; font-size: 13.5px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
     .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     .search-input::placeholder { color: var(--s400); }
+    .search-input::-webkit-search-cancel-button { display: none; }
+    .search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; border: none; background: var(--s200); color: var(--s500); display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 12px; line-height: 1; transition: background .15s, color .15s; }
+    .search-clear:hover { background: var(--s300); color: var(--s700); }
+    .search-clear.visible { display: flex; }
 
-    .search-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-    .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
-    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .search-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .search-toolbar .search-wrap { width: 100%; margin-bottom: 0; }
+    .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .filter-wrap { position: relative; display: inline-flex; align-items: center; flex: 1 1 0; min-width: 150px; }
+    .filter-wrap.sort { flex: 1.3 1 0; min-width: 190px; }
+    .filter-wrap i.ficon { position: absolute; left: 13px; font-size: 15px; pointer-events: none; z-index: 1; }
+    .filter-wrap i.fchev { position: absolute; right: 12px; font-size: 13px; color: var(--s400); pointer-events: none; }
+    .filter-wrap.type i.ficon   { color: #a855f7; }
+    .filter-wrap.office i.ficon { color: #16a34a; }
+    .filter-wrap.status i.ficon { color: #9333ea; }
+    .filter-wrap.sort i.ficon   { color: #f59e0b; }
+    .filter-select { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--s200); background: var(--white); padding: 0 30px 0 36px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; appearance: none; -webkit-appearance: none; -moz-appearance: none; }
     .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
-    @media (max-width: 560px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
+    .filter-select::-ms-expand { display: none; }
+    .doc-no-results { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 32px; text-align: center; }
+    .doc-no-results.visible { display: flex; }
+    .doc-no-results i { font-size: 34px; color: var(--s300); }
+    .doc-no-results p { font-size: 13px; color: var(--s400); max-width: 260px; line-height: 1.6; }
 
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
 
@@ -189,27 +206,46 @@
                 <div class="search-toolbar">
                     <div class="search-wrap">
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input class="search-input" type="search" id="docSearch" placeholder="Search by number, office, or title">
+                        <input class="search-input" type="search" id="docSearch" placeholder="Search by document number, title, or office…">
+                        <button type="button" class="search-clear" id="docSearchClear" aria-label="Clear search"><i class="ti ti-x"></i></button>
                     </div>
-                    <select class="filter-select" id="docTypeFilter" title="Filter by document type">
-                        <option value="">All Types</option>
-                        <option value="pr">PR</option>
-                        <option value="aoc">AOC</option>
-                        <option value="po">PO</option>
-                    </select>
-                    <select class="filter-select" id="docOfficeFilter" title="Filter by office/college">
-                        <option value="">All Offices</option>
-                    </select>
-                    <select class="filter-select" id="docStatusFilter" title="Filter by status">
-                        <option value="">All Statuses</option>
-                        <option value="fully_signed">Fully Signed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="pending">Pending</option>
-                    </select>
-                    <select class="filter-select" id="docSortOrder" title="Sort by last updated">
-                        <option value="desc">Newest → Oldest</option>
-                        <option value="asc">Oldest → Newest</option>
-                    </select>
+                    <div class="filter-row">
+                        <div class="filter-wrap type">
+                            <i class="ti ti-tag ficon"></i>
+                            <select class="filter-select" id="docTypeFilter" title="Filter by document type">
+                                <option value="">All Types</option>
+                                <option value="pr">PR</option>
+                                <option value="aoc">AOC</option>
+                                <option value="po">PO</option>
+                            </select>
+                            <i class="ti ti-chevron-down fchev"></i>
+                        </div>
+                        <div class="filter-wrap office">
+                            <i class="ti ti-building ficon"></i>
+                            <select class="filter-select" id="docOfficeFilter" title="Filter by office/college">
+                                <option value="">All Offices</option>
+                            </select>
+                            <i class="ti ti-chevron-down fchev"></i>
+                        </div>
+                        <div class="filter-wrap status">
+                            <i class="ti ti-flag ficon"></i>
+                            <select class="filter-select" id="docStatusFilter" title="Filter by status">
+                                <option value="">All Statuses</option>
+                                <option value="fully_signed">Fully Signed</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                            <i class="ti ti-chevron-down fchev"></i>
+                        </div>
+                        <div class="filter-wrap sort">
+                            <i class="ti ti-calendar ficon"></i>
+                            <select class="filter-select" id="docSortOrder" title="Sort by last updated">
+                                <option value="desc">Newest → Oldest</option>
+                                <option value="asc">Oldest → Newest</option>
+                            </select>
+                            <i class="ti ti-chevron-down fchev"></i>
+                        </div>
+                    </div>
                 </div>
             @endif
 
@@ -219,7 +255,11 @@
                     <p style="font-size:13px;color:var(--s400);max-width:240px;line-height:1.6;">No documents yet.</p>
                 </div>
             @else
-            <div class="table-wrap">
+            <div class="doc-no-results" id="docNoResults">
+                <i class="ti ti-search-off"></i>
+                <p>No documents found. Try adjusting your search or filters.</p>
+            </div>
+            <div class="table-wrap" id="docTableWrap">
                 <table>
                     <thead>
                         <tr>
@@ -374,11 +414,14 @@
     const waitingNote    = document.getElementById('sigWaitingNote');
     const csrfToken       = document.querySelector('meta[name="csrf-token"]').content;
     const docSearch       = document.getElementById('docSearch');
+    const docSearchClear  = document.getElementById('docSearchClear');
     const docCount        = document.getElementById('docVisibleCount');
     const docTypeFilter   = document.getElementById('docTypeFilter');
     const docOfficeFilter = document.getElementById('docOfficeFilter');
     const docStatusFilter = document.getElementById('docStatusFilter');
     const docSortOrder    = document.getElementById('docSortOrder');
+    const docNoResults    = document.getElementById('docNoResults');
+    const docTableWrap    = document.getElementById('docTableWrap');
     const previewSection  = document.getElementById('previewSection');
     const previewToggle   = document.getElementById('previewToggle');
     const previewBody     = document.getElementById('previewBody');
@@ -629,6 +672,7 @@
 
     function applyDocSearchFilter() {
         if (!docSearch) return;
+        if (docSearchClear) docSearchClear.classList.toggle('visible', docSearch.value.length > 0);
         const q      = docSearch.value.trim().toLowerCase();
         const type   = docTypeFilter ? docTypeFilter.value : '';
         const office = docOfficeFilter ? docOfficeFilter.value : '';
@@ -644,8 +688,15 @@
             if (match) visible++;
         });
         if (docCount) docCount.textContent = visible + (visible === 1 ? ' document' : ' documents');
+        if (docNoResults) docNoResults.classList.toggle('visible', visible === 0);
+        if (docTableWrap) docTableWrap.style.display = visible === 0 ? 'none' : '';
     }
     docSearch?.addEventListener('input', applyDocSearchFilter);
+    docSearchClear?.addEventListener('click', () => {
+        docSearch.value = '';
+        applyDocSearchFilter();
+        docSearch.focus();
+    });
     docTypeFilter?.addEventListener('change', applyDocSearchFilter);
     docOfficeFilter?.addEventListener('change', applyDocSearchFilter);
     docStatusFilter?.addEventListener('change', applyDocSearchFilter);
@@ -668,7 +719,7 @@
     function applySortOrder() {
         if (!tbody) return;
         const order = docSortOrder ? docSortOrder.value : 'desc';
-        const rows = getRows().slice().sort((a, b) => {
+        const rows = Array.from(getRows()).sort((a, b) => {
             const ta = new Date(a.dataset.updatedAt).getTime();
             const tb = new Date(b.dataset.updatedAt).getTime();
             return order === 'asc' ? ta - tb : tb - ta;

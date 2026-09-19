@@ -28,13 +28,19 @@
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
     .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
-    .stat-card { background: var(--s50); border: 1px solid var(--s200); border-radius: 14px; padding: 18px 20px; }
-    .stat-card.action { border-color: #fac775; background: #fdf7ec; }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--s500); margin-bottom: 6px; }
-    .stat-value { font-size: 26px; font-weight: 900; color: var(--s900); letter-spacing: -.5px; }
-    .stat-value.crimson { color: var(--m); }
-    .stat-value.green { color: #3b6d11; }
-    .stat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--m); text-decoration: none; }
+    .stat-card {
+        position: relative; overflow: hidden;
+        background: var(--white); border: 1px solid var(--s200);
+        border-radius: 15px; padding: 18px 20px 16px;
+        box-shadow: var(--sh-sm); transition: box-shadow .25s, border-color .25s, transform .2s;
+    }
+    .stat-card:hover { box-shadow: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 16px; width: 4px; height: 38px; border-radius: 0 4px 4px 0; background: #681012; }
+    .stat-icon { position: absolute; right: 14px; top: 16px; width: 34px; height: 34px; border-radius: 10px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
+    .stat-icon svg { width: 17px; height: 17px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); margin-bottom: 9px; padding-right: 40px; }
+    .stat-value { font-size: 26px; font-weight: 800; color: #681012; letter-spacing: -.5px; line-height: 1; }
+    .stat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; color: #681012; text-decoration: none; }
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
@@ -76,26 +82,31 @@
     </div>
 
     <div class="stat-grid">
-        <div class="stat-card action">
+        <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
             <p class="stat-label">Awaiting My Signature</p>
-            <p class="stat-value crimson">{{ $summary['awaitingMySignature'] }}</p>
+            <p class="stat-value">{{ $summary['awaitingMySignature'] }}</p>
             <a class="stat-link" href="{{ route('bac.for-my-signature') }}">Open queue <i class="ti ti-arrow-right"></i></a>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
             <p class="stat-label">AOCs In BAC Stages</p>
             <p class="stat-value">{{ $summary['aocsInBacStages'] }}</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
             <p class="stat-label">Total Value Pending</p>
             <p class="stat-value">₱{{ number_format($summary['totalValuePending'], 0) }}</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
             <p class="stat-label">Avg. Days Pending</p>
             <p class="stat-value">{{ $summary['avgDaysPending'] }}</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <p class="stat-label">AOCs Fully Signed</p>
-            <p class="stat-value green">{{ $summary['aocsFullySigned'] }}</p>
+            <p class="stat-value">{{ $summary['aocsFullySigned'] }}</p>
         </div>
     </div>
 

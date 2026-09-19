@@ -186,12 +186,6 @@ class PrismFinanceOfficeController extends Controller
 
     public function budgetUtilizationReport(): View
     {
-        // "Approved allocation" — the official, endorsed-or-better figure.
-        // Deliberately narrower than the per-office table below, which needs
-        // every office's real spending visible regardless of where their PPMP
-        // currently sits in the approval pipeline (see campusBudgetByOffice()).
-        $campusBudget = BudgetProposal::whereIn('status', ['endorsed', 'approved'])->sum('total_estimated_cost');
-
         // "Utilized" = real, non-cancelled procurement activity (in progress or
         // fully paid) — derived from the always-accurate tracking chain
         // (PurchaseRequest::lifecycleBucket()), not the raw `status` column.
@@ -200,11 +194,7 @@ class PrismFinanceOfficeController extends Controller
         // this report used to filter on ('approved', 'completed') are never
         // actually written by any real code path — only 2 hand-seeded demo
         // rows ever had them, so utilization was silently ~93% undercounted.
-        $allPrs = PurchaseRequest::with('office')->get();
         $isUtilized = fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true);
-
-        $totalUtilized  = $allPrs->filter($isUtilized)->sum('total_amount');
-        $utilizationPct = $campusBudget > 0 ? round(($totalUtilized / $campusBudget) * 100) : 0;
 
         $utilizationRows = Office::has('budgetProposals')
             ->with(['budgetProposals.items', 'purchaseRequests'])
@@ -250,6 +240,18 @@ class PrismFinanceOfficeController extends Controller
 
         $offices  = collect($utilizationRows)->pluck('office')->unique()->values()->all();
         $quarters = collect($utilizationRows)->pluck('quarter')->unique()->sort()->values()->all();
+
+        // The 4 summary cards are derived straight from $utilizationRows (the
+        // exact same rows the bar chart, donut chart, and table below sum from)
+        // instead of separate, differently-scoped queries — previously "Total
+        // campus budget" only counted endorsed/approved proposals while the
+        // chart/table counted every proposal status, and "Total utilized"
+        // summed every PR campus-wide while the chart/table only covered
+        // offices with a budget proposal. That made the KPI cards silently
+        // diverge from what the charts underneath them visually add up to.
+        $campusBudget   = collect($utilizationRows)->sum('budget');
+        $totalUtilized  = collect($utilizationRows)->sum('utilized');
+        $utilizationPct = $campusBudget > 0 ? round(($totalUtilized / $campusBudget) * 100) : 0;
 
         return view('prism.finance-office.budget-utilization-report', $this->withCommon('budget-utilization-report', [
             'pageTitle' => 'Budget Utilization Report',

@@ -80,12 +80,45 @@
     .risk-badge { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .risk-badge.at-risk  { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
     .risk-badge.on-track { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
-    .risk-badge.moderate { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+    .risk-badge.watch    { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
     .charts-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 240px; }
+
+    .chart-card-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+    .chart-icon-badge {
+        width: 44px; height: 44px; border-radius: 12px;
+        background: var(--crimson-mid); border: 1px solid var(--crimson-border);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .chart-icon-badge i { font-size: 20px; color: var(--crimson); }
+    .chart-card-head-text { flex: 1; min-width: 180px; }
+    .chart-chip {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--crimson-mid); border: 1px solid var(--crimson-border);
+        border-radius: 14px; padding: 10px 16px; margin-left: auto;
+    }
+    .chart-chip-icon {
+        width: 32px; height: 32px; border-radius: 9px;
+        background: rgba(255,255,255,.55);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .chart-chip-icon i { font-size: 16px; color: var(--crimson); }
+    .chart-chip-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--crimson); }
+    .chart-chip-value { font-size: 14px; font-weight: 800; color: var(--s900); margin-top: 2px; }
+
+    .risk-chart-wrap { position: relative; }
+    .risk-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+    .risk-center-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s400); }
+    .risk-center-value { font-size: 26px; font-weight: 800; color: var(--s900); margin-top: 2px; }
+
+    .risk-legend { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--s100); }
+    .risk-legend-item { display: flex; align-items: center; gap: 8px; }
+    .risk-legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .risk-legend-label { font-size: 12.5px; font-weight: 700; color: var(--s900); }
+    .risk-legend-count { font-size: 12px; color: var(--s500); margin-top: 1px; }
 
     .btn-print {
         display: inline-flex; align-items: center; gap: 6px;
@@ -102,6 +135,7 @@
     @media (max-width: 640px) {
         .stats-grid { grid-template-columns: 1fr; }
         .filters-grid { grid-template-columns: 1fr; }
+        .chart-chip { margin-left: 0; width: 100%; }
     }
 
     @media print {
@@ -128,23 +162,6 @@
         <button class="btn-print" type="button" onclick="window.print()">
             <i class="ti ti-printer"></i> Print / Export
         </button>
-    </div>
-
-    <div class="charts-grid">
-        <article class="card">
-            <p class="card-eyebrow">Per office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Budget vs. Utilized</h2>
-            <div class="chart-wrap">
-                <canvas id="officeChart" data-offices="{{ json_encode($utilByOfficeChart) }}"></canvas>
-            </div>
-        </article>
-        <article class="card">
-            <p class="card-eyebrow">Across all offices/quarters</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Risk Distribution</h2>
-            <div class="chart-wrap">
-                <canvas id="riskChart" data-risk="{{ json_encode($riskDistribution) }}"></canvas>
-            </div>
-        </article>
     </div>
 
     <div class="stats-grid">
@@ -195,6 +212,75 @@
                 </select>
             </div>
         </div>
+    </div>
+
+    @php
+        $riskTotalItems = array_sum($riskDistribution);
+        $riskLegendData = collect(['On Track', 'Watch', 'At Risk'])->map(function ($label) use ($riskDistribution, $riskTotalItems) {
+            $count = $riskDistribution[$label] ?? 0;
+            return [
+                'label' => $label,
+                'count' => $count,
+                'pct'   => $riskTotalItems > 0 ? round($count / $riskTotalItems * 100) : 0,
+                'color' => match ($label) {
+                    'On Track' => '#16a34a',
+                    'Watch'    => '#d97706',
+                    'At Risk'  => '#dc2626',
+                    default    => '#94a3b8',
+                },
+            ];
+        });
+    @endphp
+
+    <div class="charts-grid">
+        <article class="card chart-card">
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-coin"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Per office</p>
+                    <h2 class="card-title">Budget vs. Utilized</h2>
+                    <p class="card-sub">Comparison of allocated budget and actual utilization per office.</p>
+                </div>
+                <div class="chart-chip">
+                    <div class="chart-chip-icon"><i class="ti ti-chart-bar"></i></div>
+                    <div>
+                        <p class="chart-chip-label">Total Budget</p>
+                        <p class="chart-chip-value">₱ {{ number_format($summary['campusBudget']) }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-wrap" style="margin-top:18px;">
+                <canvas id="officeChart" data-offices="{{ json_encode($utilByOfficeChart) }}"></canvas>
+            </div>
+        </article>
+        <article class="card chart-card">
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-shield-exclamation"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Across all offices/quarters</p>
+                    <h2 class="card-title">Risk Distribution</h2>
+                    <p class="card-sub">Overview of procurement risks across all offices and quarters.</p>
+                </div>
+            </div>
+            <div class="chart-wrap risk-chart-wrap" style="margin-top:18px;">
+                <canvas id="riskChart" data-risk="{{ json_encode($riskDistribution) }}"></canvas>
+                <div class="risk-center">
+                    <p class="risk-center-label">Total items</p>
+                    <p class="risk-center-value">{{ $riskTotalItems }}</p>
+                </div>
+            </div>
+            <div class="risk-legend">
+                @foreach ($riskLegendData as $item)
+                    <div class="risk-legend-item">
+                        <span class="risk-legend-dot" style="background:{{ $item['color'] }};"></span>
+                        <div>
+                            <p class="risk-legend-label">{{ $item['label'] }}</p>
+                            <p class="risk-legend-count">{{ $item['count'] }} ({{ $item['pct'] }}%)</p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </article>
     </div>
 
     <div class="card">
@@ -318,7 +404,10 @@
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                cutout: '72%',
+                // Legend is rendered as a custom HTML row below the chart instead
+                // (with counts + percentages), so the built-in one is redundant here.
+                plugins: { legend: { display: false } },
             },
         });
     }

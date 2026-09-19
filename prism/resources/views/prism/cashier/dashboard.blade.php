@@ -24,11 +24,20 @@
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
     .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-    .stat-card { background: var(--s50); border: 1px solid var(--s200); border-radius: 14px; padding: 18px 20px; }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--s500); margin-bottom: 6px; }
-    .stat-value { font-size: 26px; font-weight: 900; color: var(--s900); letter-spacing: -.5px; }
-    .stat-value.green { color: #3b6d11; }
-    .stat-value.crimson { color: var(--m); }
+    .stat-card {
+        position: relative; overflow: hidden;
+        background: var(--white); border: 1px solid var(--s200);
+        border-radius: 15px; padding: 18px 20px 16px;
+        box-shadow: var(--sh-sm); transition: box-shadow .25s, border-color .25s, transform .2s;
+    }
+    .stat-card:hover { box-shadow: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 16px; width: 4px; height: 38px; border-radius: 0 4px 4px 0; background: #681012; }
+    .stat-icon { position: absolute; right: 16px; top: 16px; width: 38px; height: 38px; border-radius: 11px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
+    .stat-icon svg { width: 19px; height: 19px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); margin-bottom: 9px; padding-right: 46px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: #681012; letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
+    .stat-value.sm { font-size: 18px; letter-spacing: -.3px; }
+    .stat-hint { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; background: var(--white); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
@@ -121,16 +130,22 @@
     {{-- ── Summary stats ── --}}
     <div class="stat-grid">
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
             <p class="stat-label">Processing — For Payment</p>
-            <p class="stat-value crimson">{{ $summary['forPayment'] }}</p>
+            <p class="stat-value">{{ $summary['forPayment'] }}</p>
+            <p class="stat-hint">Awaiting receipt upload</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <p class="stat-label">Payments Made</p>
-            <p class="stat-value green">{{ $summary['totalPaid'] }}</p>
+            <p class="stat-value">{{ $summary['totalPaid'] }}</p>
+            <p class="stat-hint">Fully released and completed</p>
         </div>
         <div class="stat-card">
+            <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
             <p class="stat-label">Total Amount Released</p>
-            <p class="stat-value">₱{{ number_format($summary['totalAmount'], 0) }}</p>
+            <p class="stat-value sm">₱{{ number_format($summary['totalAmount'], 0) }}</p>
+            <p class="stat-hint">Across all paid Purchase Orders</p>
         </div>
     </div>
 
