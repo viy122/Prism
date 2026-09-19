@@ -215,7 +215,7 @@
                 <thead>
                     <tr>
                         <th>End User / Implementing Unit</th>
-                        <th>Project Title</th>
+                        <th>Item</th>
                         <th>Qty</th>
                         <th>Estimated Budget</th>
                         <th>Quarter</th>

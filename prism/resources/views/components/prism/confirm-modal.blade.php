@@ -69,7 +69,7 @@
         <p class="prism-confirm-title" id="prismSuccessTitle">Success</p>
         <p class="prism-confirm-message" id="prismSuccessMessage"></p>
         <div class="prism-confirm-actions">
-            <button type="button" class="prism-confirm-btn prism-confirm-ok neutral" id="prismSuccessOkBtn">OK</button>
+            <button type="button" class="prism-confirm-btn prism-confirm-ok" id="prismSuccessOkBtn">OK</button>
         </div>
     </div>
 </div>
@@ -116,6 +116,13 @@
     .prism-success-card .prism-confirm-title,
     .prism-success-card .prism-confirm-message { text-align: center; }
     .prism-success-card .prism-confirm-actions { justify-content: center; }
+
+    /* Shared print button, for any bodyHtml (prismInfoModal) or dedicated
+       preview panel that embeds an uploaded document's <iframe>. Wrap the
+       iframe in a position:relative container and place this as its
+       previous sibling; see window.prismPrintFrame above. */
+    .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200, #e2e8f0); background: #fff; color: var(--s700, #334155); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
+    .pdf-print-btn:hover { background: var(--crimson, #8B1A1C); color: #fff; border-color: var(--crimson, #8B1A1C); }
 </style>
 
 <script>
@@ -218,6 +225,24 @@
         successOkBtn.focus();
 
         return new Promise((resolve) => { resolveSuccessPromise = resolve; });
+    };
+
+    // ── Print helper (shared by every uploaded-document preview: PR/AOC/PO,
+    // whether shown in a dedicated panel or inside prismInfoModal) ─────────
+    // Prints the PDF an <iframe> already has loaded, so it comes out as the
+    // real uploaded document rather than a reconstruction. Same-origin
+    // (/storage/...), so contentWindow is reachable directly.
+    window.prismPrintFrame = function (iframeOrSelector) {
+        const frame = typeof iframeOrSelector === 'string'
+            ? document.querySelector(iframeOrSelector)
+            : iframeOrSelector;
+        if (!frame || !frame.contentWindow) return;
+        try {
+            frame.contentWindow.focus();
+            frame.contentWindow.print();
+        } catch (e) {
+            window.open(frame.src, '_blank');
+        }
     };
 })();
 </script>

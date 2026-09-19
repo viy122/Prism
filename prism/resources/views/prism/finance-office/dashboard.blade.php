@@ -93,6 +93,23 @@
     .badge-default   { background: var(--s100); color: var(--s700); }
 
     .pd-chart-wrap { position: relative; width: 100%; }
+    /* Office-budget chart grows with however many offices have active
+       submissions — left uncapped, that stretched the WHOLE grid row (grid
+       items stretch to the tallest sibling by default), leaving the other
+       two charts with a lot of dead blank space underneath their own,
+       much-shorter content. Capped + scrollable now, with an explicit
+       expand toggle for when you actually want to see every office at once. */
+    .pd-chart-wrap.collapsible { max-height: 220px; overflow-y: auto; transition: max-height .25s ease; }
+    .pd-chart-wrap.collapsible.expanded { max-height: 2000px; }
+    .pd-chart-expand-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: none; border: none; cursor: pointer;
+        font-size: 11px; font-weight: 700; color: var(--crimson);
+        font-family: 'Poppins', sans-serif; padding: 0; margin-left: auto;
+    }
+    .pd-chart-expand-btn:hover { text-decoration: underline; }
+    .pd-card-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .pd-card-head-row .pd-card-title { margin-bottom: 0; }
     .pd-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: var(--s600); }
     .pd-legend-item { display: flex; align-items: center; gap: 6px; }
     .pd-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
@@ -164,8 +181,13 @@
         </article>
         <article class="pd-card">
             <p class="pd-card-eyebrow">Active submissions</p>
-            <h2 class="pd-card-title">Proposed Budget by Office</h2>
-            <div class="pd-chart-wrap" style="height:220px;">
+            <div class="pd-card-head-row">
+                <h2 class="pd-card-title">Proposed Budget by Office</h2>
+                <button type="button" class="pd-chart-expand-btn" id="officeBudgetExpandBtn" style="display:none;">
+                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                </button>
+            </div>
+            <div class="pd-chart-wrap collapsible" id="officeBudgetWrap">
                 <canvas id="officeBudgetChart" data-offices="{{ json_encode($budgetByOffice) }}"></canvas>
             </div>
         </article>
@@ -292,9 +314,21 @@
     const officeEl = document.getElementById('officeBudgetChart');
     if (officeEl) {
         const offices = JSON.parse(officeEl.dataset.offices || '[]');
-        // Row height grows with office count instead of squeezing many bars
-        // into a fixed box — this campus has dozens of offices.
+        // The canvas itself keeps growing with office count instead of
+        // squeezing many bars into a fixed box — this campus has dozens of
+        // offices — but the outer wrap caps/scrolls that at 220px (matching
+        // the other two charts) until "Expand" is clicked, instead of
+        // stretching the whole grid row's height.
         officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        const expandBtn = document.getElementById('officeBudgetExpandBtn');
+        if (expandBtn && offices.length * 34 > 220) {
+            expandBtn.style.display = '';
+            expandBtn.addEventListener('click', () => {
+                const wrap = document.getElementById('officeBudgetWrap');
+                const expanded = wrap.classList.toggle('expanded');
+                expandBtn.querySelector('span').textContent = expanded ? 'Collapse' : 'Expand';
+            });
+        }
         new Chart(officeEl, {
             type: 'bar',
             data: {

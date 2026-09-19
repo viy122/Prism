@@ -112,14 +112,15 @@
         .form-grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
         .item-row1   { display: grid; grid-template-columns: 3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
         /* align-items: start (not end) — Target Quarter carries an extra
-           hint line under its select that Purpose/Justification and the
-           button don't have, so bottom-aligning the row pushed each
-           field's label to a different height. Top-aligning instead keeps
-           every label on the same line; the button gets its own invisible
-           label below (next to it) purely to match that same offset, so
-           it still lines up with the actual input/select controls. */
-        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 14px; align-items: start; margin-bottom: 14px; }
-        .item-row3   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 14px; }
+           hint line under its select that Purpose/Justification doesn't
+           have, so bottom-aligning the row pushed each field's label to a
+           different height. Top-aligning instead keeps every label on the
+           same line. */
+        .item-row2   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; align-items: start; margin-bottom: 14px; }
+        /* Same top-alignment reasoning as row2 above — Procurement Mode's
+           hint line would otherwise throw off the Add/Update Item button's
+           invisible label offset next to it. */
+        .item-row3   { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 14px; align-items: start; }
 
         /* ── Buttons ── */
         .btn-primary {
@@ -307,8 +308,10 @@
         .ppmp-doc-sub { font-size: 12px; font-weight: 600; color: var(--txt2); margin-top: 2px; }
         /* INDICATIVE / FINAL checkboxes */
         .ppmp-checkbox-row { display: flex; justify-content: center; gap: 32px; margin-top: 10px; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
-        .ppmp-checkbox { display: inline-block; width: 12px; height: 12px; border: 1.5px solid #000; margin-right: 6px; vertical-align: middle; position: relative; top: -1px; }
-        .ppmp-checkbox.checked { background: #000; }
+        /* A filled square glyph (not background-color) marks "checked" — text
+           color prints reliably everywhere, including PDF/print engines (e.g.
+           WPS) that drop CSS background fills regardless of print-color-adjust. */
+        .ppmp-checkbox { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border: 1.5px solid #000; margin-right: 6px; vertical-align: middle; position: relative; top: -1px; font-size: 9px; line-height: 1; color: #000; }
         /* Fiscal Year / End-User fields */
         .ppmp-meta-row { padding: 10px 20px; font-size: 12px; border-bottom: 1px solid var(--border2); }
         .ppmp-meta-row div { margin-bottom: 3px; color: var(--txt2); }
@@ -354,7 +357,12 @@
                the page. Let the table reflow to the full (landscape) print width instead. */
             .table-scroll { overflow: visible !important; }
             .ppmp-preview-table { width: 100% !important; table-layout: fixed; font-size: 10px; }
-            .ppmp-preview-table th, .ppmp-preview-table td { white-space: normal !important; word-break: break-word; padding: 6px 8px; }
+            /* overflow-wrap (not word-break) — wraps at spaces between words
+               first, only breaking mid-word as a last resort for a single
+               word too long to fit. word-break: break-word was chopping
+               ordinary multi-word headers ("Recommended Mode of...") at
+               arbitrary letters instead of at the natural word gaps. */
+            .ppmp-preview-table th, .ppmp-preview-table td { white-space: normal !important; overflow-wrap: break-word; word-break: normal; padding: 6px 8px; }
         }
 </style>
 @endpush
@@ -595,7 +603,7 @@
                             <label class="field-label" for="itemUnit">Unit</label>
                             <select id="itemUnit" name="unit" class="field-select">
                                 <option>unit</option><option>set</option>
-                                <option>lot</option><option>piece</option>
+                                <option title="A group of items procured/counted together as a single batch">lot</option><option>piece</option>
                             </select>
                         </div>
                         <div class="field-group">
@@ -603,7 +611,7 @@
                             <input id="itemQuantity" name="quantity" class="field-input" type="number" min="1" value="1" required>
                         </div>
                         <div class="field-group">
-                            <label class="field-label" for="itemUnitCost">Budget</label>
+                            <label class="field-label" for="itemUnitCost">Budget per Quantity</label>
                             <input id="itemUnitCost" name="estimatedUnitCost" class="field-input" type="number" min="0" value="0" required>
                         </div>
                     </div>
@@ -622,21 +630,31 @@
                             </select>
                         </div>
                         <div class="field-group">
-                            {{-- Invisible label matching the real ones' height, so this
-                                 button lines up with the actual input/select boxes next
-                                 to it (row is top-aligned now) rather than sitting up at
-                                 label height. --}}
-                            <label class="field-label" aria-hidden="true" style="visibility:hidden;">Action</label>
-                            <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
-                                <i class="ti ti-plus"></i>Add Item
-                            </button>
+                            <label class="field-label" for="itemPrePpmpConference">Pre-Procurement Conference</label>
+                            <select id="itemPrePpmpConference" name="preProcurementConference" class="field-select">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
                         </div>
                     </div>
                     <div class="item-row3">
+                        {{-- Not collected on Market Scoping's "Add Item" modal
+                             (removed from there to avoid asking twice) — set
+                             or fixed up here instead. Feeds the Dashboard's
+                             "Spend by Category" breakdown. --}}
+                        <div class="field-group">
+                            <label class="field-label" for="itemCategory">Category</label>
+                            <select id="itemCategory" name="category" class="field-select">
+                                <option value="Sched 9 - Supplies">Sched 9 — Supplies and Materials</option>
+                                <option value="Sched 16 - Capital Outlay">Sched 16 — Capital Outlay</option>
+                                <option value="ICT Equipment">ICT Equipment</option>
+                                <option value="Office Equipment">Office Equipment</option>
+                                <option value="Laboratory Equipment">Laboratory Equipment</option>
+                            </select>
+                        </div>
                         <div class="field-group">
                             <label class="field-label" for="itemSourceOfFund">Source of Fund</label>
                             <select id="itemSourceOfFund" name="sourceOfFund" class="field-select">
-                                <option value="">— Select —</option>
                                 <option value="General Fund">General Fund</option>
                                 <option value="Special Trust Fund">Special Trust Fund</option>
                                 <option value="Income">Income</option>
@@ -653,23 +671,17 @@
                             </select>
                             <input id="itemClassificationOther" class="field-input" placeholder="Specify classification…" style="display:none;margin-top:8px;">
                         </div>
-                        {{-- PPMP Column 2 (Type of the Project) and Column 5
-                             (Pre-Procurement Conference) — the encoding office's
-                             own call, so these get input fields here. --}}
+                        {{-- PPMP Column 2 (Type of the Project) — the encoding
+                             office's own call, so this gets an input field here. --}}
                         <div class="field-group">
                             <label class="field-label" for="itemProjectType">Type of Project</label>
                             <select id="itemProjectType" name="projectType" class="field-select">
                                 <option value="Goods">Goods</option>
                                 <option value="Infrastructure">Infrastructure</option>
                                 <option value="Consulting Services">Consulting Services</option>
+                                <option value="Other">Other</option>
                             </select>
-                        </div>
-                        <div class="field-group">
-                            <label class="field-label" for="itemPrePpmpConference">Pre-Procurement Conference</label>
-                            <select id="itemPrePpmpConference" name="preProcurementConference" class="field-select">
-                                <option value="0">No</option>
-                                <option value="1">Yes</option>
-                            </select>
+                            <input id="itemProjectTypeOther" class="field-input" placeholder="Specify type of project…" style="display:none;margin-top:8px;">
                         </div>
                         {{-- PPMP Column 4 (Recommended Mode of Procurement) — same
                              RA 9184 cost-threshold suggestion the Procurement Office's
@@ -688,6 +700,16 @@
                                 <option value="Direct Contracting">Direct Contracting</option>
                             </select>
                             <p class="field-hint" id="itemProcurementModeHint"></p>
+                        </div>
+                        <div class="field-group">
+                            {{-- Invisible label matching the real ones' height, so this
+                                 button lines up with the actual input/select boxes next
+                                 to it (row is top-aligned now) rather than sitting up at
+                                 label height. --}}
+                            <label class="field-label" aria-hidden="true" style="visibility:hidden;">Action</label>
+                            <button id="saveItemButton" type="submit" class="btn-outline" style="width:100%;">
+                                <i class="ti ti-plus"></i>Add Item
+                            </button>
                         </div>
                     </div>
                     <p id="itemFormMsg" class="submit-msg"></p>
@@ -743,8 +765,8 @@
                     <div class="ppmp-doc-head">
                         <p class="ppmp-doc-title">PROJECT PROCUREMENT MANAGEMENT PLAN (PPMP) NO. {{ $proposalForm['code'] ?: '___' }}</p>
                         <div class="ppmp-checkbox-row">
-                            <span><span class="ppmp-checkbox{{ $proposalForm['isFinal'] ? '' : ' checked' }}"></span>INDICATIVE</span>
-                            <span><span class="ppmp-checkbox{{ $proposalForm['isFinal'] ? ' checked' : '' }}"></span>FINAL</span>
+                            <span><span class="ppmp-checkbox">{{ $proposalForm['isFinal'] ? '' : '■' }}</span>INDICATIVE</span>
+                            <span><span class="ppmp-checkbox">{{ $proposalForm['isFinal'] ? '■' : '' }}</span>FINAL</span>
                         </div>
                     </div>
 
@@ -1256,6 +1278,18 @@
             : classificationSelect.value;
     }
 
+    const projectTypeSelect = document.getElementById('itemProjectType');
+    const projectTypeOther  = document.getElementById('itemProjectTypeOther');
+    projectTypeSelect?.addEventListener('change', function () {
+        projectTypeOther.style.display = this.value === 'Other' ? '' : 'none';
+        if (this.value !== 'Other') projectTypeOther.value = '';
+    });
+    function resolvedProjectType() {
+        return projectTypeSelect.value === 'Other'
+            ? projectTypeOther.value.trim()
+            : projectTypeSelect.value;
+    }
+
     // ── Procurement Mode — same RA 9184 cost thresholds as ProcurementModeService
     //    (Direct Contracting is never auto-suggested, matching the PHP side) ──────
     function recommendProcurementMode(quantity, unitCost) {
@@ -1301,6 +1335,8 @@
         sourceOfFundOther.value = '';
         classificationOther.style.display = 'none';
         classificationOther.value = '';
+        projectTypeOther.style.display = 'none';
+        projectTypeOther.value = '';
         procurementModeTouched = false;
         refreshProcurementModeSuggestion();
         editingId = null;
@@ -1330,9 +1366,10 @@
             estimatedUnitCost: parseFloat(f.estimatedUnitCost.value),
             justification:     f.justification.value.trim(),
             targetQuarter:     f.targetQuarter.value,
+            category:           f.category.value,
             sourceOfFund:       resolvedSourceOfFund() || null,
             itemClassification: resolvedClassification() || null,
-            projectType:              f.projectType.value,
+            projectType:              resolvedProjectType(),
             preProcurementConference: f.preProcurementConference.value === '1',
             procurementMode:          f.procurementMode.value,
         };
@@ -1486,7 +1523,18 @@
         f.estimatedUnitCost.value    = item.estimatedUnitCost;
         f.justification.value        = item.justification || '';
         f.targetQuarter.value        = item.targetQuarter;
-        f.projectType.value          = item.projectType || 'Goods';
+        f.category.value             = item.category || 'Sched 9 - Supplies';
+        const knownProjectTypes = ['Goods', 'Infrastructure', 'Consulting Services'];
+        const projectType = item.projectType || 'Goods';
+        if (!knownProjectTypes.includes(projectType)) {
+            f.projectType.value = 'Other';
+            projectTypeOther.value = projectType;
+            projectTypeOther.style.display = '';
+        } else {
+            f.projectType.value = projectType;
+            projectTypeOther.value = '';
+            projectTypeOther.style.display = 'none';
+        }
         f.preProcurementConference.value = item.preProcurementConference ? '1' : '0';
         f.procurementMode.value      = item.procurementMode || recommendProcurementMode(item.quantity, item.estimatedUnitCost);
         procurementModeTouched = true; // loaded value stands until the user actually changes it

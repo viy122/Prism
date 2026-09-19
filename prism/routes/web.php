@@ -84,6 +84,8 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/proposal-review/item/{item}/remark', 'saveItemRemark')->name('proposal-review.item-remark');
         Route::post('/proposal-review/{proposal}/endorse', 'endorse')->name('proposal-review.endorse');
         Route::post('/proposal-review/{proposal}/return', 'returnProposal')->name('proposal-review.return');
+        Route::get('/proposal-review/{proposal}/document', 'ppmpDocument')->name('proposal-review.document');
+        Route::get('/proposal-archive', 'proposalArchive')->name('proposal-archive');
         Route::get('/budget-utilization-report', 'budgetUtilizationReport')->name('budget-utilization-report');
     });
 
@@ -107,12 +109,14 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/purchase-request/{pr}/advance', 'advancePrStage')->name('purchase-request.advance');
         Route::post('/purchase-request/{pr}/return-pr', 'returnPr')->name('purchase-request.return');
         Route::post('/purchase-request/{pr}/upload', 'uploadPurchaseRequest')->name('purchase-request.upload');
+        Route::post('/purchase-request/{pr}/reupload', 'reuploadPurchaseRequestFromApp')->name('purchase-request.reupload');
         Route::get('/abstract-of-canvass', 'abstractOfCanvass')->name('abstract-of-canvass');
         Route::get('/abstract-of-canvass/refresh', 'abstractOfCanvassRefresh')->name('abstract-of-canvass.refresh');
         Route::post('/purchase-request/{pr}/create-aoc', 'createAoc')->name('aoc.create');
         Route::post('/aoc/{aoc}/advance', 'advanceAocStage')->name('aoc.advance');
         Route::post('/aoc/{aoc}/return-aoc', 'returnAoc')->name('aoc.return');
         Route::post('/aoc/{aoc}/upload', 'uploadAbstractOfCanvass')->name('aoc.upload');
+        Route::post('/aoc/{aoc}/extract', 'extractAocValidation')->name('aoc.extract');
         Route::get('/purchase-orders', 'purchaseOrders')->name('purchase-orders');
         Route::get('/purchase-orders/refresh', 'purchaseOrdersRefresh')->name('purchase-orders.refresh');
         Route::post('/aoc/{aoc}/issue-po', 'issuePo')->name('po.issue');
@@ -120,7 +124,9 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::post('/purchase-order/{po}/advance', 'advancePoStage')->name('po.advance');
         Route::post('/purchase-order/{po}/return-po', 'returnPo')->name('po.return');
         Route::post('/purchase-order/{po}/upload', 'uploadPurchaseOrder')->name('po.upload');
+        Route::post('/purchase-order/{po}/extract', 'extractPoValidation')->name('po.extract');
         Route::get('/procurement-reports', 'procurementReports')->name('procurement-reports');
+        Route::get('/procurement-reports/export', 'exportProcurementReportsCsv')->name('procurement-reports.export');
         Route::post('/signature-photo/{docType}/{logId}/reprocess', 'reprocessSignaturePhoto')->name('signature-photo.reprocess')->whereIn('docType', ['pr', 'aoc', 'po']);
     });
 
@@ -129,6 +135,7 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::get('/budget-approval', 'budgetApproval')->name('budget-approval');
         Route::post('/budget-approval/{proposal}/approve', 'approve')->name('budget-approval.approve');
         Route::post('/budget-approval/{proposal}/return', 'returnProposal')->name('budget-approval.return');
+        Route::get('/budget-approval/{proposal}/document', 'ppmpDocument')->name('budget-approval.document');
         Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
         Route::get('/for-my-signature/refresh', 'forMySignatureRefresh')->name('for-my-signature.refresh');
         Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);

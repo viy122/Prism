@@ -238,7 +238,9 @@ class PrismViceChancellorController extends Controller
                     'currentStatus'      => $currentStatus,
                     'remarks'            => $pr->remarks ?? '—',
                     'procurementRemarks' => $pr->statusUpdates->first()?->remarks ?: '—',
-                    'timeline'           => $timeline->sortBy('sortKey')->map(fn ($t) => collect($t)->except('sortKey')->all())->values()->all(),
+                    // Most recent first — oldest at the bottom, matching every
+                    // other activity/history log in the system.
+                    'timeline'           => $timeline->sortByDesc('sortKey')->map(fn ($t) => collect($t)->except('sortKey')->all())->values()->all(),
                 ];
             })
             ->all();

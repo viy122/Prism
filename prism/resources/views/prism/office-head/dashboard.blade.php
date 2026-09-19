@@ -40,7 +40,18 @@
         .pd-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
         .pd-header h1 { font-size: 26px; font-weight: 800; color: var(--s900); letter-spacing: -.5px; margin-bottom: 5px; line-height: 1.15; }
         .pd-header-sub { font-size: 13px; color: var(--s600); line-height: 1.65; max-width: 500px; }
-        .pd-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .pd-header-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        .pd-year-filter { display: flex; align-items: center; gap: 8px; }
+        .pd-year-filter label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); }
+        .pd-year-select {
+            height: 38px; border-radius: 10px; border: 1.5px solid var(--s200);
+            background: var(--white); padding: 0 30px 0 14px;
+            font-size: 12.5px; font-weight: 700; color: var(--s700);
+            font-family: 'Poppins', sans-serif; outline: none; cursor: pointer;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .pd-year-select:hover, .pd-year-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
 
         .pd-btn-primary {
             display: inline-flex; align-items: center; gap: 8px;
@@ -162,6 +173,12 @@
         /* Chart */
         .pd-chart-wrap { position: relative; width: 100%; }
 
+        /* Always-visible chart legend (labels shouldn't require a hover to
+           read) — kept compact so it doesn't get crowded with many slices. */
+        .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; max-height: 52px; overflow-y: auto; }
+        .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: var(--s600); white-space: nowrap; }
+        .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
         /* Mobile */
         @media (max-width: 1024px) {
             .dash { padding: 16px 16px 40px; }
@@ -189,6 +206,15 @@
                     <p class="pd-header-sub">Track proposed budgets, approvals, procurement movement, and PR readiness for your office.</p>
                 </div>
                 <div class="pd-header-actions">
+                    <form method="GET" action="{{ route('office-head.dashboard') }}" class="pd-year-filter">
+                        <label for="pdYearSelect">Year</label>
+                        <select name="year" id="pdYearSelect" class="pd-year-select" onchange="this.form.submit()">
+                            <option value="all" {{ is_null($selectedYear) ? 'selected' : '' }}>Overall</option>
+                            @foreach($availableYears as $y)
+                                <option value="{{ $y }}" {{ $selectedYear === $y ? 'selected' : '' }}>FY {{ $y }}</option>
+                            @endforeach
+                        </select>
+                    </form>
                     <a href="{{ route('office-head.budget-proposal') }}" class="pd-btn-primary">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                         New PPMP
@@ -255,11 +281,12 @@
                     <div class="pd-legend">
                         <span class="pd-legend-item">Across all your office's PPMPs, any status</span>
                     </div>
-                    <div class="pd-chart-wrap" style="height:196px;">
+                    <div class="pd-chart-wrap" style="height:150px;">
                         <canvas id="categoryChart" role="img" aria-label="Spend by category doughnut chart"
                             data-categories="{{ json_encode($summary['categoryBreakdown']) }}">
                         </canvas>
                     </div>
+                    <div class="pd-chart-legend" id="categoryChartLegend"></div>
                 </article>
 
                 {{-- Budget by quarter --}}
@@ -298,7 +325,7 @@
                                     default                                      => 'pd-badge-info',
                                 };
                             @endphp
-                            <div class="pd-update">
+                            <a class="pd-update" href="{{ route('office-head.budget-proposal', ['proposal' => $update['proposalId']]) }}" style="text-decoration:none;cursor:pointer;">
                                 <div>
                                     <div class="pd-update-title">{{ $update['title'] }}</div>
                                     <div class="pd-update-detail">{{ $update['details'] }}</div>
@@ -307,7 +334,7 @@
                                     <span class="pd-badge {{ $sc }}">{{ $update['status'] }}</span>
                                     <span class="pd-update-time">{{ $update['time'] }}</span>
                                 </div>
-                            </div>
+                            </a>
                         @empty
                             <p style="font-size:13px;color:#94a3b8;text-align:center;padding:20px 0;">No recent updates.</p>
                         @endforelse
@@ -473,13 +500,15 @@
     if (cEl) {
         const categories = JSON.parse(cEl.dataset.categories || '{}');
         const palette = ['#681012','#0369a1','#854f0b','#5b21b6','#166534','#991b1b','#334155','#c9a84c'];
+        const labels = Object.keys(categories);
+        const colors = labels.map((_, i) => palette[i % palette.length]);
         new Chart(cEl, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(categories),
+                labels,
                 datasets: [{
                     data: Object.values(categories),
-                    backgroundColor: Object.keys(categories).map((_, i) => palette[i % palette.length]),
+                    backgroundColor: colors,
                     borderWidth: 0, borderRadius: 4, hoverOffset: 6
                 }]
             },
@@ -491,6 +520,18 @@
                 }
             }
         });
+
+        // Always-visible labels (not just on hover) — a compact legend below
+        // the doughnut instead of on-slice text, which gets unreadable fast
+        // once there are more than 2-3 thin slices.
+        const legendEl = document.getElementById('categoryChartLegend');
+        if (legendEl) {
+            legendEl.innerHTML = labels.map((label, i) => `
+                <span class="pd-chart-legend-item">
+                    <span class="pd-chart-legend-dot" style="background:${colors[i]}"></span>${label}
+                </span>
+            `).join('');
+        }
     }
 
     /* BAR — Budget by quarter */

@@ -166,6 +166,14 @@ const timelineDotColor = (step) => {
 
     return colors[slugStatus(step)] ?? '#64748B';
 };
+// Quantities come back from the DB as decimal-typed strings ("1.00") —
+// parseFloat/String round-trips that down to "1", dropping the trailing
+// zeros a fractional DB column adds but a PPMP quantity never needs.
+const formatQty = (q) => {
+    const n = parseFloat(q);
+    return Number.isNaN(n) ? (q ?? '—') : String(n);
+};
+
 const versionItemsTableHtml = (items) => {
     if (!Array.isArray(items) || !items.length) {
         return '<p style="font-size:13px;color:#64748b;">No items recorded for this version.</p>';
@@ -174,7 +182,7 @@ const versionItemsTableHtml = (items) => {
     const rows = items.map((item) => `
         <tr>
             <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#0f172a;">${escapeHtml(item.name ?? '—')}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${escapeHtml(item.quantity ?? '—')} ${escapeHtml(item.unit ?? '')}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${escapeHtml(formatQty(item.quantity))} ${escapeHtml(item.unit ?? '')}</td>
             <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${money(item.estimated_total_cost ?? 0)}</td>
             <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12.5px;color:#334155;white-space:nowrap;">${escapeHtml(item.target_quarter ?? '—')}</td>
         </tr>

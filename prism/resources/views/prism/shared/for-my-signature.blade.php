@@ -104,6 +104,8 @@
     .preview-body.open { display: block; }
     .pdf-preview { border-radius: 12px; border: 1px solid var(--s200); background: var(--s50); overflow: hidden; aspect-ratio: 8.5 / 11; display: flex; align-items: center; justify-content: center; position: relative; }
     .pdf-preview iframe { width: 100%; height: 100%; border: none; }
+    .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200); background: #fff; color: var(--s700); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
+    .pdf-print-btn:hover { background: var(--crimson); color: #fff; border-color: var(--crimson); }
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 34px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
@@ -112,10 +114,11 @@
     .preview-items-table td { padding: 6px 8px; border-bottom: 1px solid var(--s100); }
     .preview-items-table tfoot td { font-weight: 800; color: var(--m); border-top: 2px solid var(--s200); border-bottom: none; }
     .preview-quotes { display: flex; flex-direction: column; gap: 6px; }
-    .preview-quote-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--s200); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; background: var(--s50); }
+    .preview-quote-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--s200); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; background: var(--s50); cursor: pointer; transition: background .12s, border-color .12s; }
+    .preview-quote-row:hover { background: var(--s100); border-color: var(--s300); }
     .preview-quote-row .qs { font-weight: 700; color: var(--s700); }
-    .preview-quote-row .qf { color: var(--s500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .preview-quote-row a { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
+    .preview-quote-row .qf { color: #1d4ed8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .preview-quote-row:hover .qf { text-decoration: underline; }
     .preview-empty-note { font-size: 12px; color: var(--s400); }
 
     .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
@@ -509,9 +512,27 @@
         const name = link.dataset.previewName;
         const body = link.dataset.previewImage === '1'
             ? `<img src="${url}" alt="${escapeHtml(name)}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
-            : `<iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe>`;
+            : `<div style="position:relative;"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="${url}" style="width:100%;height:60vh;border:none;border-radius:8px;"></iframe></div>`;
         window.prismInfoModal({
             title: name,
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    });
+
+    // Same in-app preview, for an already-attached canvass quotation row —
+    // previewBody's contents are rebuilt wholesale on every renderPreview(),
+    // so the listener is delegated on the container itself, wired once, here.
+    previewBody.addEventListener('click', e => {
+        const row = e.target.closest('.preview-quote-row');
+        if (!row) return;
+        const url  = row.dataset.previewUrl;
+        const name = row.dataset.previewName;
+        const isImage = /\.(png|jpe?g)$/i.test(name || url);
+        const body = isImage
+            ? `<img src="${url}" alt="${escapeHtml(name || '')}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<div style="position:relative;"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="${url}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe></div>`;
+        window.prismInfoModal({
+            title: name || 'Quotation',
             bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
         });
     });
@@ -530,7 +551,7 @@
         if (doc.docType === 'pr') {
             previewSection.style.display = '';
             previewBody.innerHTML = doc.pdfFile
-                ? `<div class="pdf-preview"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PR Document"></iframe></div>`
+                ? `<div class="pdf-preview"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PR Document"></iframe></div>`
                 : `<div class="pdf-preview"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this PR</span></div></div>`;
             return;
         }
@@ -538,7 +559,7 @@
         if (doc.docType === 'po') {
             previewSection.style.display = '';
             previewBody.innerHTML = doc.pdfFile
-                ? `<div class="pdf-preview"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PO Document"></iframe></div>`
+                ? `<div class="pdf-preview"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PO Document"></iframe></div>`
                 : `<div class="pdf-preview"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this PO</span></div></div>`;
             return;
         }
@@ -558,15 +579,14 @@
             let quotesHtml = '<p class="preview-empty-note">No canvass quotations uploaded yet.</p>';
             if (quotes.length) {
                 quotesHtml = `<div class="preview-quotes">` + quotes.map(q => `
-                    <div class="preview-quote-row">
+                    <div class="preview-quote-row" data-preview-url="${q.url}" data-preview-name="${escapeHtml(q.filename)}" title="Click to preview ${escapeHtml(q.filename)}">
                         <span class="qs">${escapeHtml(q.supplier)}</span>
                         <span class="qf">${escapeHtml(q.filename)}</span>
-                        <a href="${q.url}" target="_blank" rel="noopener">View</a>
                     </div>`).join('') + `</div>`;
             }
 
             const pdfHtml = doc.pdfFile
-                ? `<div class="pdf-preview" style="margin-bottom:12px;"><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="AOC Document"></iframe></div>`
+                ? `<div class="pdf-preview" style="margin-bottom:12px;"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="AOC Document"></iframe></div>`
                 : `<div class="pdf-preview" style="margin-bottom:12px;"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this AOC</span></div></div>`;
 
             previewBody.innerHTML = `
@@ -726,7 +746,14 @@
         });
         rows.forEach(r => tbody.appendChild(r));
     }
-    docSortOrder?.addEventListener('change', applySortOrder);
+    // The list scrolls independently (max-height + overflow:auto) — without
+    // resetting scroll position, picking a new sort order re-shuffles rows
+    // below/above the still-scrolled viewport, so it can look like nothing
+    // happened even though it did.
+    docSortOrder?.addEventListener('change', () => {
+        applySortOrder();
+        if (docTableWrap) docTableWrap.scrollTop = 0;
+    });
 
     /* ── Mark Signed / Forward (no photo — matches the Procurement page's simple flow) ── */
     async function markSigned() {

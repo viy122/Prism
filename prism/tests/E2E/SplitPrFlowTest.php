@@ -212,10 +212,16 @@ class SplitPrFlowTest extends TestCase
         $poB = $this->issuePo($aocB, 'TechnoWorld Computer Center',  (float) $prB->total_amount);
 
         $this->assertNotSame($poA->id, $poB->id);
-        $this->assertNotSame($poA->po_number, $poB->po_number);
+        // po_number is deliberately left unset at issuance now — it's only
+        // known once the actual signed PO is uploaded and read (see
+        // PrismProcurementOfficeController::uploadPurchaseOrder()) — so
+        // there's nothing to compare here yet; the id/AOC-link checks above
+        // and below already prove these are two genuinely separate records.
+        $this->assertNull($poA->po_number);
+        $this->assertNull($poB->po_number);
         $this->assertSame($aocA->id, $poA->abstract_of_canvass_id);
         $this->assertSame($aocB->id, $poB->abstract_of_canvass_id);
-        $this->step("STEP 14 Two separate POs issued: {$poA->po_number} (" . number_format((float) $poA->total_amount, 2) . ") and {$poB->po_number} (" . number_format((float) $poB->total_amount, 2) . ')');
+        $this->step("STEP 14 Two separate POs issued for PO-{$poA->id} (" . number_format((float) $poA->total_amount, 2) . ") and PO-{$poB->id} (" . number_format((float) $poB->total_amount, 2) . ')');
 
         $this->signPoChain($poA);
         $this->signPoChain($poB);

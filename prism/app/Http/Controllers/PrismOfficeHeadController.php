@@ -66,9 +66,28 @@ class PrismOfficeHeadController extends Controller
 
     // ── Pages ─────────────────────────────────────────────────────────────────
 
-    public function dashboard(): View
+    public function dashboard(Request $request): View
     {
         $officeId = $this->officeId();
+
+        // "Overall" (no year picked) means every fiscal year combined — null
+        // is the sentinel for that throughout the helpers below, rather than
+        // defaulting to the current year, so the KPIs actually reflect the
+        // office's full history until a specific year is chosen.
+        $availableYears = BudgetProposal::where('office_id', $officeId)
+            ->whereNotNull('fiscal_year')
+            ->distinct()
+            ->orderByDesc('fiscal_year')
+            ->pluck('fiscal_year')
+            ->all();
+        if (!in_array(now()->year, $availableYears, true)) {
+            $availableYears[] = now()->year;
+            rsort($availableYears);
+        }
+
+        $selectedYear = ($request->filled('year') && $request->query('year') !== 'all')
+            ? (int) $request->query('year')
+            : null;
 
         // budget_proposal_items.status is a vestigial column — nothing in the
         // app ever writes to it after creation, so every item sits at its
@@ -77,6 +96,7 @@ class PrismOfficeHeadController extends Controller
         // BudgetProposal's own status (draft/submitted/endorsed/returned/approved),
         // so item counts below are bucketed by that instead.
         $proposals = BudgetProposal::where('office_id', $officeId)
+            ->when($selectedYear, fn ($q) => $q->where('fiscal_year', $selectedYear))
             ->withCount('items')
             ->withSum('items', 'estimated_total_cost')
             ->get();
@@ -90,10 +110,10 @@ class PrismOfficeHeadController extends Controller
             'pendingItems'           => $itemCountByProposalStatus->get('submitted', 0) + $itemCountByProposalStatus->get('endorsed', 0),
             'returnedItems'          => $itemCountByProposalStatus->get('returned', 0),
             'draftItems'             => $itemCountByProposalStatus->get('draft', 0),
-            'monthlyBudgetUsage'     => $this->monthlyBudgetUsage($officeId),
-            'funnelStages'           => $this->prFunnelStages($officeId),
-            'categoryBreakdown'      => $this->itemCategoryBreakdown($officeId),
-            'budgetByQuarter'        => $this->itemBudgetByQuarter($officeId),
+            'monthlyBudgetUsage'     => $this->monthlyBudgetUsage($officeId, $selectedYear),
+            'funnelStages'           => $this->prFunnelStages($officeId, $selectedYear),
+            'categoryBreakdown'      => $this->itemCategoryBreakdown($officeId, $selectedYear),
+            'budgetByQuarter'        => $this->itemBudgetByQuarter($officeId, $selectedYear),
         ];
 
         $recentUpdates = BudgetProposalReview::with('budgetProposal')
@@ -102,17 +122,20 @@ class PrismOfficeHeadController extends Controller
             ->take(5)
             ->get()
             ->map(fn ($r) => [
+                'proposalId' => $r->budget_proposal_id,
                 'title'   => $r->budgetProposal?->title ?? 'PPMP',
-                'status'  => ucfirst(str_replace('_', ' ', $r->status_to ?? $r->action)),
+                'status'  => \App\Support\ActionVerb::label($r->status_to ?? $r->action),
                 'time'    => ($r->reviewed_at ?? $r->created_at)->format('M d, Y, g:i A'),
                 'details' => $r->remarks ?? '—',
             ])
             ->all();
 
         return view('prism.office-head.dashboard', $this->withCommon('office-head', 'dashboard', [
-            'pageTitle'     => 'Office Head / Dean Dashboard',
-            'summary'       => $summary,
-            'recentUpdates' => $recentUpdates,
+            'pageTitle'      => 'Office Head / Dean Dashboard',
+            'summary'        => $summary,
+            'recentUpdates'  => $recentUpdates,
+            'availableYears' => $availableYears,
+            'selectedYear'   => $selectedYear,
         ]));
     }
 
@@ -578,9 +601,14 @@ class PrismOfficeHeadController extends Controller
                     'totalAmount'     => (float) $proposal->total_estimated_cost,
                     'status'          => ucwords(str_replace('_', ' ', $proposal->status)),
                     'returnedRemarks' => $proposal->status === 'returned' ? $proposal->remarks : null,
+                    // Most recent action first — oldest at the bottom, so what
+                    // just happened doesn't require scrolling past the whole
+                    // history to find.
                     'timeline'        => $proposal->reviews
+                        ->sortByDesc(fn ($r) => $r->reviewed_at ?? $r->created_at)
+                        ->values()
                         ->map(fn ($r) => [
-                            'step'          => ucwords(str_replace('_', ' ', $r->action)),
+                            'step'          => \App\Support\ActionVerb::label($r->action),
                             'timestamp'     => ($r->reviewed_at ?? $r->created_at)->format('M d, Y g:i A'),
                             'remarks'       => $r->remarks ?? '—',
                             'version'       => $versionByReviewId->get($r->id),
@@ -678,10 +706,10 @@ class PrismOfficeHeadController extends Controller
     }
 
     /** Sum of this office's PR totals per calendar month, current year, for the dashboard's bar chart. */
-    private function monthlyBudgetUsage(int $officeId): array
+    private function monthlyBudgetUsage(int $officeId, ?int $year): array
     {
         $totalsByMonth = PurchaseRequest::where('office_id', $officeId)
-            ->whereYear('created_at', now()->year)
+            ->when($year, fn ($q) => $q->whereYear('created_at', $year))
             ->selectRaw('MONTH(created_at) as month, SUM(total_amount) as total')
             ->groupBy('month')
             ->pluck('total', 'month');
@@ -698,7 +726,7 @@ class PrismOfficeHeadController extends Controller
      * (cancelled/denied) aren't "at" a pipeline stage, so they're tallied
      * separately instead of silently padding one of the 5 buckets.
      */
-    private function prFunnelStages(int $officeId): array
+    private function prFunnelStages(int $officeId, ?int $year): array
     {
         $buckets = [
             'PR Signing'         => 0,
@@ -711,6 +739,7 @@ class PrismOfficeHeadController extends Controller
 
         PurchaseRequest::with('abstractOfCanvass.purchaseOrder')
             ->where('office_id', $officeId)
+            ->when($year, fn ($q) => $q->whereYear('created_at', $year))
             ->get()
             ->each(function ($pr) use (&$buckets, &$halted) {
                 $key = $pr->currentTrackingStage()['key'];
@@ -740,9 +769,14 @@ class PrismOfficeHeadController extends Controller
      * fallback chain already used elsewhere in this controller (lines ~241,
      * 437, 712) that prefers the free-text `category` field first.
      */
-    private function itemCategoryBreakdown(int $officeId): array
+    private function itemCategoryBreakdown(int $officeId, ?int $year): array
     {
-        return BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+        return BudgetProposalItem::whereHas('budgetProposal', function ($q) use ($officeId, $year) {
+                $q->where('office_id', $officeId);
+                if ($year) {
+                    $q->where('fiscal_year', $year);
+                }
+            })
             ->get(['category', 'ppmp_category', 'estimated_total_cost'])
             ->groupBy(fn ($item) => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'))
             ->map(fn ($group) => (float) $group->sum('estimated_total_cost'))
@@ -751,9 +785,14 @@ class PrismOfficeHeadController extends Controller
     }
 
     /** Planned spend per quarter at the PPMP stage — distinct from monthlyBudgetUsage(), which is actual PR spend by calendar month. */
-    private function itemBudgetByQuarter(int $officeId): array
+    private function itemBudgetByQuarter(int $officeId, ?int $year): array
     {
-        $sums = BudgetProposalItem::whereHas('budgetProposal', fn ($q) => $q->where('office_id', $officeId))
+        $sums = BudgetProposalItem::whereHas('budgetProposal', function ($q) use ($officeId, $year) {
+                $q->where('office_id', $officeId);
+                if ($year) {
+                    $q->where('fiscal_year', $year);
+                }
+            })
             ->selectRaw('target_quarter, SUM(estimated_total_cost) as total')
             ->groupBy('target_quarter')
             ->pluck('total', 'target_quarter');
@@ -776,7 +815,8 @@ class PrismOfficeHeadController extends Controller
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'sourceOfFund'      => 'nullable|string|max:100',
             'itemClassification' => 'nullable|string|max:50',
-            'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
+            'projectType'       => 'nullable|string|max:100',
+            'category'          => 'nullable|string|max:200',
             'preProcurementConference' => 'nullable|boolean',
             'procurementMode'   => 'nullable|in:' . implode(',', ProcurementModeService::MODES),
             'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
@@ -837,6 +877,7 @@ class PrismOfficeHeadController extends Controller
             'source_of_fund'       => $validated['sourceOfFund'] ?? null,
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
+            'category'             => $validated['category'] ?? null,
             'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
             'recommended_mode'     => $recommendedMode,
             'procurement_mode'     => $procurementMode,
@@ -891,7 +932,8 @@ class PrismOfficeHeadController extends Controller
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'sourceOfFund'      => 'nullable|string|max:100',
             'itemClassification' => 'nullable|string|max:50',
-            'projectType'       => 'nullable|in:Goods,Infrastructure,Consulting Services',
+            'projectType'       => 'nullable|string|max:100',
+            'category'          => 'nullable|string|max:200',
             'preProcurementConference' => 'nullable|boolean',
             'procurementMode'   => 'nullable|in:' . implode(',', ProcurementModeService::MODES),
         ]);
@@ -912,6 +954,7 @@ class PrismOfficeHeadController extends Controller
             'source_of_fund'       => $validated['sourceOfFund'] ?? null,
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
+            'category'             => $validated['category'] ?? null,
             'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
             'recommended_mode'     => $recommendedMode,
             'procurement_mode'     => $procurementMode,
@@ -933,6 +976,7 @@ class PrismOfficeHeadController extends Controller
                 'totalCost'         => (float) $item->estimated_total_cost,
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
+                'category'          => $item->category ?? 'General',
                 'sourceOfFund'      => $item->source_of_fund,
                 'itemClassification' => $item->item_classification,
                 'projectType'       => $item->project_type,
@@ -1213,6 +1257,24 @@ class PrismOfficeHeadController extends Controller
     {
         // Strip unwanted characters before matching so "bond@@ paper!!" still suggests
         $q = $this->sanitizeSearchQuery((string) $request->query('q', ''));
+
+        // Nothing typed yet (e.g. just focused the search box) — surface the
+        // most recent past searches instead of nothing, so returning to this
+        // page doesn't mean re-typing a search from scratch.
+        if ($q === '') {
+            $recent = DB::table('market_price_snapshots')
+                ->select('query_used')
+                ->selectRaw('MAX(created_at) as last_used')
+                ->groupBy('query_used')
+                ->orderByDesc('last_used')
+                ->limit(6)
+                ->pluck('query_used')
+                ->map(fn ($s) => ['text' => $s, 'type' => 'search', 'recent' => true])
+                ->all();
+
+            return response()->json(['suggestions' => $recent]);
+        }
+
         if (mb_strlen($q) < 2) {
             return response()->json(['suggestions' => []]);
         }

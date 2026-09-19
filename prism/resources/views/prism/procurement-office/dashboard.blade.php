@@ -3,6 +3,7 @@
 
 @push('head-extras')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 @endpush
 
 @push('page-css')
@@ -28,17 +29,19 @@
     .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
-    .btn-outline {
-        display: inline-flex; align-items: center; justify-content: center;
-        gap: 8px; height: 42px; padding: 0 18px; border-radius: 10px;
-        background: var(--white); color: var(--m);
-        font-size: 13px; font-weight: 700; cursor: pointer;
-        font-family: 'Poppins', sans-serif;
-        border: 1px solid rgba(139,26,28,.3);
-        transition: background .2s, border-color .2s; white-space: nowrap;
+    /* ── Filter bar ── */
+    .filter-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .filter-field { display: flex; flex-direction: column; gap: 4px; }
+    .filter-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
+    .filter-select {
+        height: 38px; padding: 0 34px 0 12px; border-radius: 9px; border: 1px solid var(--s200);
+        background: var(--white); color: var(--s700); font-size: 13px; font-weight: 600;
+        font-family: 'Poppins', sans-serif; cursor: pointer; min-width: 170px;
     }
-    .btn-outline:hover { background: rgba(139,26,28,.05); border-color: var(--m); }
-    .btn-outline svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .filter-select:focus { outline: none; border-color: var(--crimson); }
+    .filter-reset { font-size: 12px; font-weight: 700; color: var(--m); text-decoration: none; margin-top: 18px; }
+    .filter-reset:hover { text-decoration: underline; }
+    .filter-active-note { font-size: 11.5px; color: var(--s500); margin-left: auto; margin-top: 18px; }
 
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .stat-card {
@@ -68,11 +71,33 @@
     .badge-in-progress { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
     .badge-pending     { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
     .badge-overdue     { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+    .badge-doc-pr      { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .badge-doc-aoc     { background: #f3e8ff; color: #6b21a8; border: 1px solid #e0c3fb; }
+    .badge-doc-po      { background: #fff1e6; color: #9a4a09; border: 1px solid #fbd9b8; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
-    .charts-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
-    .chart-wrap  { position: relative; width: 100%; height: 230px; }
+    /* ── Both cards in this row are pinned to the SAME fixed height, so one
+         chart can never dwarf the other — the office-volume chart (which can
+         hold a couple dozen offices) scrolls internally instead of growing
+         the card. ── */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-card  { display: flex; flex-direction: column; height: 360px; }
+    .chart-wrap  { position: relative; width: 100%; flex: 1; min-height: 0; }
+
+    /* Fixed height by default (top offices only) so the x-axis stays visible
+       without scrolling — "Show all" grows the canvas to fit every office at
+       once instead, which only needs a scrollbar past a couple dozen rows. */
+    .volume-card { display: flex; flex-direction: column; }
+    .volume-scroll { overflow-y: auto; position: relative; max-height: 640px; }
+    .volume-scroll .chart-wrap { position: static; height: 380px; }
+    .volume-toggle { display: flex; justify-content: center; margin-top: 12px; }
+    .volume-toggle button {
+        background: none; border: 1px solid var(--s200); border-radius: 20px;
+        padding: 7px 16px; font-size: 12px; font-weight: 700; color: var(--m);
+        font-family: 'Poppins', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .volume-toggle button:hover { background: var(--crimson-mid); }
 
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } .charts-grid { grid-template-columns: 1fr; } }
@@ -89,8 +114,37 @@
         <div style="flex:1;">
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Dashboard</h1>
-            <p class="page-hdr-sub">Track received purchase requests, current processing status, and the PRs that have been waiting longest for action.</p>
+            <p class="page-hdr-sub">Purchase Requests, Abstracts of Canvass, and Purchase Orders — status, volume, and what's been waiting longest.</p>
         </div>
+    </div>
+
+    <div class="card">
+        <form class="filter-bar" method="GET" action="{{ route('procurement-office.dashboard') }}" id="dashFilterForm">
+            <div class="filter-field">
+                <label class="filter-label" for="filterOffice">Office</label>
+                <select class="filter-select" id="filterOffice" name="office" onchange="document.getElementById('dashFilterForm').submit()">
+                    <option value="">All Offices</option>
+                    @foreach ($filters['officeOptions'] as $o)
+                        <option value="{{ $o->id }}" @selected($filters['selectedOffice'] == $o->id)>{{ $o->code }} — {{ $o->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="filter-field">
+                <label class="filter-label" for="filterYear">Fiscal Year</label>
+                <select class="filter-select" id="filterYear" name="year" onchange="document.getElementById('dashFilterForm').submit()">
+                    <option value="">All Years</option>
+                    @foreach ($filters['yearOptions'] as $y)
+                        <option value="{{ $y }}" @selected($filters['selectedYear'] == $y)>FY {{ $y }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @if ($filters['selectedOffice'] || $filters['selectedYear'])
+                <a href="{{ route('procurement-office.dashboard') }}" class="filter-reset"><i class="ti ti-x"></i> Clear filters</a>
+                <span class="filter-active-note">Showing filtered results — everything below updates to match.</span>
+            @else
+                <span class="filter-active-note">Showing all offices, all years.</span>
+            @endif
+        </form>
     </div>
 
     <div class="stats-grid">
@@ -98,51 +152,66 @@
             <div class="stat-icon">
                 <svg viewBox="0 0 24 24"><path d="M9 17H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v3"/><path d="M9 11h4m-4 4h2"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M17 13v-2"/></svg>
             </div>
-            <p class="stat-label">Total PRs received</p>
-            <strong class="stat-value">{{ number_format($summary['totalPrsReceived']) }}</strong>
+            <p class="stat-label">Purchase Requests</p>
+            <strong class="stat-value">{{ number_format($summary['totalPrs']) }}</strong>
             <p class="stat-desc">Uploaded and routed to Procurement Office</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M8 8h5M8 16h4"/></svg>
             </div>
-            <p class="stat-label">PRs in progress</p>
-            <strong class="stat-value">{{ number_format($summary['prsInProgress']) }}</strong>
-            <p class="stat-desc">Signature routing has started, not yet fully signed</p>
+            <p class="stat-label">Abstracts of Canvass</p>
+            <strong class="stat-value">{{ number_format($summary['totalAocs']) }}</strong>
+            <p class="stat-desc">Created from fully-canvassed PRs</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M6 2l1 4h10l1-4"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M9 11h6M9 15h6"/></svg>
             </div>
-            <p class="stat-label">Completed</p>
-            <strong class="stat-value">{{ number_format($summary['prsCompleted']) }}</strong>
-            <p class="stat-desc">Fully signed PRs, all time</p>
+            <p class="stat-label">Purchase Orders</p>
+            <strong class="stat-value">{{ number_format($summary['totalPos']) }}</strong>
+            <p class="stat-desc">Issued to suppliers, all statuses</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </div>
-            <p class="stat-label">Overdue PRs</p>
-            <strong class="stat-value">{{ number_format($summary['overduePrs']) }}</strong>
-            <p class="stat-desc">Not yet fully signed, {{ $summary['overdueThresholdDays'] }}+ days since submission</p>
+            <p class="stat-label">Needs Attention</p>
+            <strong class="stat-value">{{ number_format($summary['overdueCount']) }}</strong>
+            <p class="stat-desc">PR/AOC/PO not yet fully signed, {{ $summary['overdueThresholdDays'] }}+ days since the PR was submitted</p>
         </div>
     </div>
 
     <div class="charts-grid">
-        <article class="card">
-            <p class="card-eyebrow">Campus-wide</p>
-            <h2 class="card-title" style="margin-bottom:16px;">PR Status</h2>
+        <article class="card chart-card">
+            <p class="card-eyebrow">By document type</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Status — PR vs AOC vs PO</h2>
             <div class="chart-wrap">
-                <canvas id="statusChart" data-status="{{ json_encode($statusChart) }}"></canvas>
+                <canvas id="docStatusChart" data-status="{{ json_encode($docStatusChart) }}"></canvas>
             </div>
         </article>
-        <article class="card">
-            <p class="card-eyebrow">By office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">PR Volume</h2>
+        <article class="card chart-card">
+            <p class="card-eyebrow">Pipeline share</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Document Mix</h2>
             <div class="chart-wrap">
+                <canvas id="docMixChart" data-mix="{{ json_encode($docMixChart) }}"></canvas>
+            </div>
+        </article>
+    </div>
+
+    <div class="card volume-card">
+        <p class="card-eyebrow">By office</p>
+        <h2 class="card-title" style="margin-bottom:16px;">Volume — PR / AOC / PO per Office</h2>
+        <div class="volume-scroll">
+            <div class="chart-wrap" id="officeVolumeWrap">
                 <canvas id="officeVolumeChart" data-offices="{{ json_encode($officeVolumeChart) }}"></canvas>
             </div>
-        </article>
+        </div>
+        @if (count($officeVolumeChart) > 10)
+        <div class="volume-toggle">
+            <button type="button" id="officeVolumeToggle"><i class="ti ti-chevron-down"></i> Show all {{ count($officeVolumeChart) }} offices</button>
+        </div>
+        @endif
     </div>
 
     <div class="card">
@@ -163,14 +232,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($officeStatusGroups as $office)
+                    @forelse ($officeStatusGroups as $office)
                         <tr>
                             <td style="font-size:13px;font-weight:600;color:var(--s600);">{{ $office['office'] }}</td>
                             <td><span class="badge badge-completed">{{ $office['completed'] }}</span></td>
                             <td><span class="badge badge-in-progress">{{ $office['inProgress'] }}</span></td>
                             <td><span class="badge badge-pending">{{ $office['pending'] }}</span></td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--s500);">No purchase requests match the current filter.</td></tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -180,42 +251,45 @@
         <div class="card-head">
             <div>
                 <p class="card-eyebrow">Longest waiting</p>
-                <h2 class="card-title">Urgent PRs</h2>
-                <p class="card-sub">Not yet fully signed, oldest submission first. No due-date field exists on a PR — this is how long each has genuinely been waiting for action.</p>
+                <h2 class="card-title">Needs Attention — PR, AOC &amp; PO</h2>
+                <p class="card-sub">Not yet fully signed, oldest submission first, across all three document types. No due-date field exists on any of them — this is how long each has genuinely been waiting for action.</p>
             </div>
-            <span class="count-chip" id="urgentPrVisibleCount">{{ count($urgentPrs) }} shown</span>
+            <span class="count-chip" id="urgentVisibleCount">{{ count($urgentDocs) }} shown</span>
         </div>
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
+                        <th>Type</th>
                         <th>Office</th>
-                        <th>PR No.</th>
-                        <th>Item</th>
-                        <th>Quarter</th>
+                        <th>No.</th>
+                        <th>Item / Title</th>
                         <th>Days Pending</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($urgentPrs as $pr)
+                    @forelse ($urgentDocs as $d)
                         @php
-                            $statusSlug = match(strtolower($pr['status'])) {
+                            $statusSlug = match(strtolower($d['status'])) {
                                 'completed'   => 'badge-completed',
                                 'in progress' => 'badge-in-progress',
                                 'pending'     => 'badge-pending',
                                 default       => 'badge-overdue',
                             };
+                            $docSlug = match($d['docType']) { 'AOC' => 'badge-doc-aoc', 'PO' => 'badge-doc-po', default => 'badge-doc-pr' };
                         @endphp
                         <tr>
-                            <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $pr['office'] }}</td>
-                            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $pr['prNumber'] }}</td>
-                            <td style="font-size:13px;color:var(--s900);font-weight:600;">{{ $pr['item'] }}</td>
-                            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['targetQuarter'] }}</td>
-                            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $pr['daysPending'] }} days</td>
-                            <td><span class="badge {{ $statusSlug }}">{{ $pr['status'] }}</span></td>
+                            <td><span class="badge {{ $docSlug }}">{{ $d['docType'] }}</span></td>
+                            <td style="font-size:13px;font-weight:600;color:var(--s600);white-space:nowrap;">{{ $d['office'] }}</td>
+                            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $d['number'] }}</td>
+                            <td style="font-size:13px;color:var(--s900);font-weight:600;">{{ $d['item'] }}</td>
+                            <td style="font-size:12px;color:var(--s500);white-space:nowrap;">{{ $d['daysPending'] }} days</td>
+                            <td><span class="badge {{ $statusSlug }}">{{ $d['status'] }}</span></td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--s500);">Nothing waiting — everything in scope is fully signed.</td></tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -227,44 +301,121 @@
 @push('scripts')
 <script>
 (function () {
-    const statusEl = document.getElementById('statusChart');
+    const STATUS_COLORS = { pending: '#c9862b', in_progress: '#2f7fc4', completed: '#4f8a1f' };
+    const DOC_COLORS     = { pr: '#681012', aoc: '#8b3fb8', po: '#c4720f' };
+
+    // ── Status — PR vs AOC vs PO (stacked horizontal bar) ───────────────────
+    // A stacked bar reads three documents' status mix at a glance and lets
+    // segments be compared by length — three separate pies would ask the eye
+    // to compare angles/areas across charts instead, which is a much harder
+    // comparison for the same information.
+    const statusEl = document.getElementById('docStatusChart');
     if (statusEl) {
-        const s = JSON.parse(statusEl.dataset.status || '{}');
+        const rows = JSON.parse(statusEl.dataset.status || '[]');
         new Chart(statusEl, {
+            type: 'bar',
+            data: {
+                labels: rows.map(r => r.doc),
+                datasets: [
+                    { label: 'Pending',     data: rows.map(r => r.pending),     backgroundColor: STATUS_COLORS.pending },
+                    { label: 'In Progress', data: rows.map(r => r.in_progress), backgroundColor: STATUS_COLORS.in_progress },
+                    { label: 'Completed',   data: rows.map(r => r.completed),   backgroundColor: STATUS_COLORS.completed },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                    datalabels: {
+                        color: '#fff', font: { size: 11, weight: '700' },
+                        formatter: (v) => v > 0 ? v : '',
+                    },
+                },
+            },
+            plugins: [ChartDataLabels],
+        });
+    }
+
+    // ── Document Mix (donut, with initial minimal labels) ──────────────────
+    // Pie/donut is the right call here: 3 categories, and the question is
+    // genuinely part-to-whole ("what share of the pipeline is each document
+    // type"), not a precise pairwise comparison — that's what the stacked
+    // bar above is for. Counts are printed on the slices up front instead of
+    // requiring a hover, per the "minimal initial labels" ask.
+    const mixEl = document.getElementById('docMixChart');
+    if (mixEl) {
+        const m = JSON.parse(mixEl.dataset.mix || '{}');
+        new Chart(mixEl, {
             type: 'doughnut',
             data: {
-                labels: ['Pending', 'In Progress', 'Completed'],
+                labels: ['Purchase Requests', 'Abstracts of Canvass', 'Purchase Orders'],
                 datasets: [{
-                    data: [s.pending || 0, s.in_progress || 0, s.completed || 0],
-                    backgroundColor: ['#854f0b', '#185fa5', '#3b6d11'],
+                    data: [m.pr || 0, m.aoc || 0, m.po || 0],
+                    backgroundColor: [DOC_COLORS.pr, DOC_COLORS.aoc, DOC_COLORS.po],
                     borderWidth: 0,
                 }],
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                    datalabels: {
+                        color: '#fff', font: { size: 12, weight: '700' },
+                        formatter: (v) => v > 0 ? v : '',
+                    },
+                },
             },
+            plugins: [ChartDataLabels],
         });
     }
 
+    // ── Volume per office — grouped bar, PR/AOC/PO side by side ─────────────
+    // Defaults to the top 10 offices (already sorted desc by total volume
+    // server-side) at a fixed height matching its sibling cards, so the
+    // x-axis is always visible without scrolling — "Show all" swaps in the
+    // full list and grows the canvas to fit every office at once (only that
+    // expanded view scrolls, which is expected once you've asked to see all
+    // of them, rather than by default whenever the office count grows).
     const officeEl = document.getElementById('officeVolumeChart');
     if (officeEl) {
-        const offices = JSON.parse(officeEl.dataset.offices || '[]');
-        // Horizontal, not vertical — dozens of offices campus-wide means a
-        // vertical bar chart's x-axis labels collide past a handful of bars.
-        officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
-        new Chart(officeEl, {
-            type: 'bar',
-            data: {
-                labels: offices.map(o => o.office),
-                datasets: [{ label: 'Purchase Requests', data: offices.map(o => o.count), backgroundColor: '#681012', borderRadius: 4 }],
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
-            },
+        const allOffices = JSON.parse(officeEl.dataset.offices || '[]');
+        const topOffices  = allOffices.slice(0, 10);
+        const wrap        = document.getElementById('officeVolumeWrap');
+        const toggleBtn    = document.getElementById('officeVolumeToggle');
+        let officeChart, expanded = false;
+
+        function renderOfficeChart(offices) {
+            if (officeChart) officeChart.destroy();
+            officeChart = new Chart(officeEl, {
+                type: 'bar',
+                data: {
+                    labels: offices.map(o => o.office),
+                    datasets: [
+                        { label: 'PR',  data: offices.map(o => o.pr),  backgroundColor: DOC_COLORS.pr,  borderRadius: 3 },
+                        { label: 'AOC', data: offices.map(o => o.aoc), backgroundColor: DOC_COLORS.aoc, borderRadius: 3 },
+                        { label: 'PO',  data: offices.map(o => o.po),  backgroundColor: DOC_COLORS.po,  borderRadius: 3 },
+                    ],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+                    scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                },
+            });
+        }
+
+        renderOfficeChart(topOffices);
+
+        toggleBtn?.addEventListener('click', () => {
+            expanded = !expanded;
+            wrap.style.height = expanded ? Math.max(380, allOffices.length * 46) + 'px' : '380px';
+            renderOfficeChart(expanded ? allOffices : topOffices);
+            toggleBtn.innerHTML = expanded
+                ? '<i class="ti ti-chevron-up"></i> Show top 10 only'
+                : `<i class="ti ti-chevron-down"></i> Show all ${allOffices.length} offices`;
         });
     }
 })();

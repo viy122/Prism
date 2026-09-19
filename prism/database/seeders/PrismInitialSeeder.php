@@ -102,7 +102,7 @@ class PrismInitialSeeder extends Seeder
             'CICS' => ['name' => 'College of Informatics and Computing Sciences', 'office_type' => 'college'],
             'COE'  => ['name' => 'College of Engineering',                          'office_type' => 'college'],
             'CBA'  => ['name' => 'College of Business Administration',               'office_type' => 'college'],
-            'FIN'  => ['name' => 'Finance Office',                                   'office_type' => 'administrative'],
+            'FIN'  => ['name' => 'Budget Office',                                    'office_type' => 'administrative'],
             'PROC' => ['name' => 'Procurement Office',                               'office_type' => 'administrative'],
             'OC'   => ['name' => 'Office of the Chancellor',                         'office_type' => 'executive'],
             'OVC'  => ['name' => 'Office of the Vice Chancellor',                    'office_type' => 'executive'],
@@ -139,7 +139,7 @@ class PrismInitialSeeder extends Seeder
                 'role' => 'office-head',
             ],
             [
-                'name' => 'Finance Office Demo',
+                'name' => 'Budget Office Demo',
                 'username' => 'finance',
                 'email' => 'finance.office@prism.test',
                 'position_title' => 'Finance Reviewer',

@@ -279,13 +279,6 @@
                     @forelse ($purchaseItems as $pr)
                     @php
                         $q      = strtolower($pr['quarter'] ?: 'pr');
-                        $badgeCls = match($pr['statusBucket']) {
-                            'pending'     => 'badge-pending',
-                            'in_progress' => 'badge-progress',
-                            'completed'   => 'badge-completed',
-                            'delayed'     => 'badge-delayed',
-                            default       => 'badge-default',
-                        };
                         $trackingKey = $pr['trackingStatus']['key'] ?? null;
                         $trackingBadgeCls = match(true) {
                             $trackingKey === 'paid' => 'badge-completed',
@@ -308,10 +301,11 @@
                                 </p>
                             </div>
                             <div class="pr-card-right">
-                                <span class="badge {{ $badgeCls }}">{{ $pr['statusLabel'] }}</span>
-                                @if($trackingKey)
-                                    <span class="badge {{ $trackingBadgeCls }}" title="Tracking Status">{{ $pr['trackingStatus']['label'] }}</span>
-                                @endif
+                                {{-- Only the specific tracking status shows now — the
+                                     general status (Pending/In Progress/Completed/Delayed)
+                                     was redundant with the filter above, which already
+                                     buckets by it (see data-status-bucket on this card). --}}
+                                <span class="badge {{ $trackingBadgeCls }}">{{ $pr['trackingStatus']['label'] ?? $pr['statusLabel'] }}</span>
                                 <button type="button" class="btn-view-pr" data-pdf="{{ $pr['pdfFile'] ?? '' }}" data-number="{{ $pr['number'] }}" onclick="event.stopPropagation(); window.viewPrDocument(this);">
                                     <i class="ti ti-file-text"></i> View PR
                                 </button>
@@ -494,7 +488,10 @@
         const pdf    = btn.dataset.pdf;
         const number = btn.dataset.number;
         const body   = pdf
-            ? `<iframe src="/storage/${pdf}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>
+            ? `<div style="position:relative;">
+                 <button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button>
+                 <iframe src="/storage/${pdf}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>
+               </div>
                <p style="margin-top:10px;font-size:11px;"><a href="/storage/${pdf}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`
             : `<p style="font-size:13px;color:var(--s500,#64748b);padding:20px 0;text-align:center;">No PDF has been uploaded for this Purchase Request yet.</p>`;
         window.prismInfoModal({ title: number, bodyHtml: body });

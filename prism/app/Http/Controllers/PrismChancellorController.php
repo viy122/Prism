@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HandlesSignatureQueue;
+use App\Http\Controllers\Concerns\RendersPpmpDocument;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
@@ -17,6 +18,12 @@ use Illuminate\View\View;
 class PrismChancellorController extends Controller
 {
     use HandlesSignatureQueue;
+    use RendersPpmpDocument;
+
+    public function ppmpDocument(BudgetProposal $proposal): View
+    {
+        return $this->ppmpDocumentView($proposal);
+    }
 
     protected function queueRoleCode(): string
     {
@@ -313,9 +320,12 @@ class PrismChancellorController extends Controller
      * still-open and past a reasonable turnaround, not the raw `status`
      * column (which never actually holds the literal value 'delayed').
      */
-    public function procurementReports(): View
+    public function procurementReports(Request $request): View
     {
+        $selectedOffice = $request->query('office', '');
+
         $offices = Office::has('budgetProposals')
+            ->when($selectedOffice, fn ($q) => $q->where('code', $selectedOffice))
             ->with([
                 'budgetProposals' => fn ($q) => $q->whereIn('status', ['endorsed', 'approved'])->with('items'),
                 'purchaseRequests',
@@ -326,7 +336,12 @@ class PrismChancellorController extends Controller
         $currentQNumber = (int) ltrim($currentQ, 'Q');
 
         $allItems = BudgetProposalItem::with('budgetProposal.office')
-            ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->whereHas('budgetProposal', function ($q) use ($selectedOffice) {
+                $q->whereIn('status', ['endorsed', 'approved']);
+                if ($selectedOffice) {
+                    $q->whereHas('office', fn ($q2) => $q2->where('code', $selectedOffice));
+                }
+            })
             ->get();
         $officeIds     = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
         $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
@@ -380,6 +395,7 @@ class PrismChancellorController extends Controller
 
         $overdueThresholdDays = 30;
         $delayedByOffice = PurchaseRequest::with('office')
+            ->when($selectedOffice, fn ($q) => $q->whereHas('office', fn ($q2) => $q2->where('code', $selectedOffice)))
             ->get()
             ->filter(fn ($pr) =>
                 $pr->signingStatusBucket() !== 'completed'
@@ -398,16 +414,26 @@ class PrismChancellorController extends Controller
         return view('prism.chancellor.procurement-reports', $this->withCommon('procurement-reports', [
             'pageTitle'          => 'Chancellor Procurement Reports',
             'generatedAt'        => now()->format('M d, Y g:i A'),
+            'offices'            => Office::has('budgetProposals')->select('id', 'code', 'name')->orderBy('code')->get(),
+            'selectedOffice'     => $selectedOffice,
             'accomplishmentRows' => $accomplishmentRows,
             'quarterlyRows'      => $quarterlyRows,
             'utilizationSummary' => $utilizationSummary,
             'delayedByOffice'    => $delayedByOffice,
-            'accomplishmentChart' => collect($accomplishmentRows)->map(fn ($r) => [
-                'office' => $r['office'], 'targeted' => $r['targeted'], 'procured' => $r['procured'],
-            ])->values()->all(),
-            'utilizationChart' => collect($utilizationSummary)->map(fn ($r) => [
-                'office' => $r['office'], 'budget' => round($r['budget']), 'utilized' => round($r['utilized']),
-            ])->values()->all(),
+            // Campus-wide totals only — NOT broken down per office, since the
+            // tables right below already show that breakdown in full detail
+            // (office, targeted/procured, completion%, budget/utilized/
+            // forecast/risk). A per-office chart here just repeated the same
+            // numbers as bars instead of rows; these two give the Chancellor
+            // an at-a-glance overall picture the tables don't state outright.
+            'accomplishmentChart' => [
+                'procured'  => collect($accomplishmentRows)->sum('procured'),
+                'remaining' => max(0, collect($accomplishmentRows)->sum('targeted') - collect($accomplishmentRows)->sum('procured')),
+            ],
+            'utilizationChart' => [
+                'utilized'   => round(collect($utilizationSummary)->sum('utilized')),
+                'unutilized' => max(0, round(collect($utilizationSummary)->sum('budget') - collect($utilizationSummary)->sum('utilized'))),
+            ],
         ]));
     }
 
@@ -440,6 +466,7 @@ class PrismChancellorController extends Controller
             'marketScoping'  => $p->items->flatMap->marketReferences->count() . ' market references attached',
             'approveUrl'     => route('chancellor.budget-approval.approve', $p->id),
             'returnUrl'      => route('chancellor.budget-approval.return', $p->id),
+            'documentUrl'    => route('chancellor.budget-approval.document', $p->id),
             'items'          => $p->items->map(fn ($item) => [
                 'name'           => $item->name,
                 'quantity'       => (int) $item->quantity,
@@ -455,7 +482,7 @@ class PrismChancellorController extends Controller
             // same as the PR/AOC/PO signature history elsewhere in the app.
             'approvalTrail' => $p->reviews->sortBy('reviewed_at')
                 ->map(fn ($r) => [
-                    'text' => ucfirst($r->action) . ' by ' . ($r->reviewedBy?->name ?? 'System') . ($r->remarks ? ' — ' . $r->remarks : ''),
+                    'text' => \App\Support\ActionVerb::label($r->action) . ' by ' . ($r->reviewedBy?->name ?? 'System') . ($r->remarks ? ' — ' . $r->remarks : ''),
                     'time' => $r->reviewed_at?->format('M d, Y g:i A') ?? '—',
                 ])
                 ->values()->all(),

@@ -273,7 +273,6 @@
                 <label>Sort</label>
                 <select id="sortSel" class="filter-sel">
                     <option value="match">Best Match</option>
-                    <option value="score_desc">Match Score: High → Low</option>
                     <option value="price_asc">Price: Low → High</option>
                     <option value="price_desc">Price: High → Low</option>
                     <option value="store_az">Store: A → Z</option>
@@ -385,16 +384,6 @@
                         <option value="Q4">Q4 (Oct–Dec)</option>
                     </select>
                 </div>
-            </div>
-            <div class="modal-field">
-                <label class="modal-label">Category <span class="modal-req">*</span></label>
-                <select id="modalCategory" class="modal-input">
-                    <option value="Sched 9 - Supplies">Sched 9 — Supplies and Materials</option>
-                    <option value="Sched 16 - Capital Outlay">Sched 16 — Capital Outlay</option>
-                    <option value="ICT Equipment">ICT Equipment</option>
-                    <option value="Office Equipment">Office Equipment</option>
-                    <option value="Laboratory Equipment">Laboratory Equipment</option>
-                </select>
             </div>
         </div>
         <div class="modal-footer">
@@ -640,7 +629,6 @@
         document.getElementById('modalUnit').value     = 'unit';
         document.getElementById('modalQty').value      = '';
         document.getElementById('modalQuarter').value  = 'Q1';
-        document.getElementById('modalCategory').value = 'Sched 9 - Supplies';
         document.getElementById('modalError').style.display = 'none';
         document.getElementById('addItemModal').style.display = 'flex';
         setTimeout(() => document.getElementById('modalQty').focus(), 80);
@@ -712,10 +700,9 @@
         const qty     = parseFloat(document.getElementById('modalQty').value);
         const cost    = parseFloat(document.getElementById('modalCost').value);
         const quarter = document.getElementById('modalQuarter').value;
-        const cat     = document.getElementById('modalCategory').value;
         const errEl   = document.getElementById('modalError');
 
-        if (!name || !qty || isNaN(qty) || !cost || isNaN(cost) || !quarter || !cat) {
+        if (!name || !qty || isNaN(qty) || !cost || isNaN(cost) || !quarter) {
             errEl.textContent = 'Please fill in all required fields.';
             errEl.style.display = '';
             return;
@@ -729,7 +716,9 @@
             const res  = await fetch('{{ route("office-head.market-scoping.add-item-with-refs") }}', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: cat, refs: pendingRefsData, proposal_id: proposalId }),
+                // Category isn't collected here anymore — same default as the
+                // auto-add path below, editable afterward on the PPMP tab.
+                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: 'Sched 9 - Supplies', refs: pendingRefsData, proposal_id: proposalId }),
             });
             const json = await res.json();
             if (json.success) {
@@ -1068,7 +1057,6 @@
 
         if (sortBy === 'price_asc')   list = list.slice().sort((a, b) => (a.price || 0) - (b.price || 0));
         if (sortBy === 'price_desc')  list = list.slice().sort((a, b) => (b.price || 0) - (a.price || 0));
-        if (sortBy === 'score_desc')  list = list.slice().sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
         if (sortBy === 'store_az')    list = list.slice().sort((a, b) => (a.source || '').localeCompare(b.source || ''));
         if (sortBy === 'reviews_desc') list = list.slice().sort((a, b) => (parseFloat(b.reviews) || 0) - (parseFloat(a.reviews) || 0));
         if (sortBy === 'rating_desc')  list = list.slice().sort((a, b) => (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0));
@@ -1107,7 +1095,7 @@
             '<div class="suggest-item" data-idx="' + i + '" data-text="' + esc(s.text) + '">' +
             '<i class="ti ' + (s.fuzzy ? 'ti-sparkles' : (s.type === 'item' ? 'ti-clipboard-list' : 'ti-history')) + '"></i>' +
             esc(s.text) +
-            '<span class="sg-type">' + (s.fuzzy ? 'Did you mean?' : (s.type === 'item' ? 'My item' : 'Past search')) + '</span>' +
+            '<span class="sg-type">' + (s.fuzzy ? 'Did you mean?' : (s.recent ? 'Recent search' : (s.type === 'item' ? 'My item' : 'Past search'))) + '</span>' +
             '</div>').join('');
         dropdown.classList.add('open');
         activeIdx = -1;
@@ -1122,17 +1110,26 @@
         });
     }
 
+    async function fetchSuggestions(q) {
+        try {
+            const res  = await fetch(suggestUrl + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
+            const json = await res.json();
+            renderSuggest(json.suggestions || []);
+        } catch { closeSuggest(); }
+    }
+
     queryInput && queryInput.addEventListener('input', function () {
         clearTimeout(suggestTimer);
         const q = this.value.trim();
         if (q.length < 2) { closeSuggest(); return; }
-        suggestTimer = setTimeout(async () => {
-            try {
-                const res  = await fetch(suggestUrl + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } });
-                const json = await res.json();
-                renderSuggest(json.suggestions || []);
-            } catch { closeSuggest(); }
-        }, 250);
+        suggestTimer = setTimeout(() => fetchSuggestions(q), 250);
+    });
+
+    // Focusing an empty search box (e.g. coming back to this page) shows
+    // recent past searches right away, instead of only ever suggesting
+    // once 2+ characters are typed.
+    queryInput && queryInput.addEventListener('focus', function () {
+        if (this.value.trim() === '') fetchSuggestions('');
     });
 
     queryInput && queryInput.addEventListener('keydown', e => {

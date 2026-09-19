@@ -83,7 +83,8 @@
     .item-tags { font-size: 11px; color: var(--s400); margin-top: 3px; }
     .item-cost { font-size: 13px; font-weight: 700; color: var(--m); white-space: nowrap; }
 
-    .btn-view-doc { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 40px; padding: 0 16px; border-radius: 9px; font-size: 12.5px; font-weight: 700; border: 1.5px dashed var(--s300); background: var(--s50); color: var(--s500); cursor: not-allowed; font-family: 'Poppins', sans-serif; }
+    .btn-view-doc { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 40px; padding: 0 16px; border-radius: 9px; font-size: 12.5px; font-weight: 700; border: 1.5px solid var(--crimson-border); background: #fff; color: var(--crimson); cursor: pointer; font-family: 'Poppins', sans-serif; text-decoration: none; transition: background .15s, border-color .15s; }
+    .btn-view-doc:hover { background: var(--crimson-mid); border-color: var(--crimson); }
 
     .action-row { display: flex; gap: 10px; }
     .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: opacity .2s, transform .1s; }
@@ -354,9 +355,9 @@
                     <div class="meta-item"><p class="meta-label">Status</p><p class="meta-value"><span class="badge ${badgeClass(proposal.status)}">${escapeHtml(proposal.status ?? 'Endorsed')}</span></p></div>
                 </div>
 
-                <button class="btn-view-doc" type="button" disabled title="No PPMP document template exists yet — coming soon.">
+                <a class="btn-view-doc" href="${escapeHtml(proposal.documentUrl)}" target="_blank" rel="noopener">
                     <i class="ti ti-file-text"></i> View Document
-                </button>
+                </a>
 
                 <div class="remark-box">
                     <p class="remark-label">Budget Remarks</p>

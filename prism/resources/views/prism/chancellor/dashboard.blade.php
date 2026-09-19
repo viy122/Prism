@@ -80,6 +80,28 @@
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
+    /* Office-utilization chart grows with office count instead of squeezing
+       many bars into a fixed box — left uncapped, that stretched the WHOLE
+       grid row (grid items stretch to the tallest sibling by default),
+       leaving the item-status doughnut with a lot of dead blank space below
+       its own much-shorter content. Capped + scrollable now, with an
+       explicit expand toggle for when every office is actually needed. */
+    .chart-wrap.collapsible { max-height: 230px; overflow-y: auto; transition: max-height .25s ease; }
+    .chart-wrap.collapsible.expanded { max-height: 2000px; }
+    .chart-expand-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: none; border: none; cursor: pointer;
+        font-size: 11px; font-weight: 700; color: var(--m);
+        font-family: 'Poppins', sans-serif; padding: 0; margin-left: auto;
+    }
+    .chart-expand-btn:hover { text-decoration: underline; }
+    .card-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .card-head-row .card-title { margin-bottom: 0; }
+    /* Always-visible chart legend (labels shouldn't require a hover to
+       read) — kept compact so it doesn't get crowded with many slices. */
+    .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
+    .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
     @media (max-width: 1400px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
@@ -152,11 +174,17 @@
             <div class="chart-wrap">
                 <canvas id="itemStatusChart" data-status="{{ json_encode($itemStatusChart) }}"></canvas>
             </div>
+            <div class="pd-chart-legend" id="itemStatusLegend"></div>
         </div>
         <div class="card">
             <p class="card-eyebrow">Budget vs. Utilized</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Utilization by Office</h2>
-            <div class="chart-wrap">
+            <div class="card-head-row">
+                <h2 class="card-title">Utilization by Office</h2>
+                <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
+                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                </button>
+            </div>
+            <div class="chart-wrap collapsible" id="officeUtilWrap">
                 <canvas id="officeUtilizationChart" data-offices="{{ json_encode($officeUtilizationChart) }}"></canvas>
             </div>
         </div>
@@ -323,32 +351,55 @@
     const statusEl = document.getElementById('itemStatusChart');
     if (statusEl) {
         const s = JSON.parse(statusEl.dataset.status || '{}');
+        const labels = ['Procured', 'Pending', 'Overdue'];
+        const colors = ['#3b6d11', '#185fa5', '#a32d2d'];
         new Chart(statusEl, {
             type: 'doughnut',
             data: {
-                labels: ['Procured', 'Pending', 'Overdue'],
+                labels,
                 datasets: [{
                     data: [s.procured || 0, s.pending || 0, s.overdue || 0],
-                    backgroundColor: ['#3b6d11', '#185fa5', '#a32d2d'],
+                    backgroundColor: colors,
                     borderWidth: 0,
                 }],
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                plugins: { legend: { display: false } },
             },
         });
+        // Always-visible labels (not just on hover) — a compact legend below
+        // the doughnut instead of the default one, which needs a hover to
+        // read counts and takes noticeably more vertical space.
+        const legendEl = document.getElementById('itemStatusLegend');
+        if (legendEl) {
+            const counts = [s.procured || 0, s.pending || 0, s.overdue || 0];
+            legendEl.innerHTML = labels.map((label, i) => `
+                <span class="pd-chart-legend-item">
+                    <span class="pd-chart-legend-dot" style="background:${colors[i]}"></span>${label} (${counts[i]})
+                </span>
+            `).join('');
+        }
     }
 
     const officeEl = document.getElementById('officeUtilizationChart');
     if (officeEl) {
         const offices = JSON.parse(officeEl.dataset.offices || '[]');
-        // Horizontal, not vertical — this campus has dozens of offices (many
-        // with long codes), so a vertical bar chart's x-axis labels collide
-        // once more than a handful show up. Horizontal bars read one office
-        // per row regardless of count, and the row height below grows with
-        // the data instead of squeezing bars to fit a fixed box.
+        // The canvas itself keeps growing with office count instead of
+        // squeezing many bars into a fixed box — this campus has dozens of
+        // offices — but the outer wrap caps/scrolls that at 230px (matching
+        // the item-status card) until "Expand" is clicked, instead of
+        // stretching the whole grid row's height.
         officeEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
+        const expandBtn = document.getElementById('officeUtilExpandBtn');
+        if (expandBtn && offices.length * 34 > 230) {
+            expandBtn.style.display = '';
+            expandBtn.addEventListener('click', () => {
+                const wrap = document.getElementById('officeUtilWrap');
+                const expanded = wrap.classList.toggle('expanded');
+                expandBtn.querySelector('span').textContent = expanded ? 'Collapse' : 'Expand';
+            });
+        }
         new Chart(officeEl, {
             type: 'bar',
             data: {

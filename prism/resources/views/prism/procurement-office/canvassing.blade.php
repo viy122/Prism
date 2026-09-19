@@ -29,10 +29,12 @@
     .badge-completed   { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 
     .quote-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-    .quote-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--s200); border-radius: 10px; padding: 8px 14px; font-size: 12px; background: var(--s50); }
+    .quote-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--s200); border-radius: 10px; padding: 8px 14px; font-size: 12px; background: var(--s50); cursor: pointer; transition: background .12s, border-color .12s; }
+    .quote-row:hover { background: var(--s100); border-color: var(--s300); }
     .quote-row i { color: var(--s400); }
     .quote-supplier { font-weight: 700; color: var(--s700); }
-    .quote-file { color: var(--s500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .quote-file { color: #1d4ed8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .quote-row:hover .quote-file { text-decoration: underline; }
     .quote-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
     .quote-link { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
     .quote-del { border: none; background: none; color: #b91c1c; cursor: pointer; font-size: 14px; }
@@ -81,6 +83,41 @@
     .items-table .item-name-cell { font-weight: 600; color: var(--s900); }
     .items-table .num-cell   { font-weight: 700; color: var(--s700); text-align: right; }
     .items-table .total-cell { font-weight: 700; color: var(--m); text-align: right; }
+
+    /* Review Quotation modal */
+    .quote-modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(28,16,16,.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .quote-modal-overlay.open { display: flex; }
+    .quote-modal { position: relative; background: #fff; border-radius: 18px; box-shadow: 0 6px 24px rgba(0,0,0,.18); width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; padding: 26px 28px; font-family: 'Poppins', sans-serif; }
+    .quote-modal-close { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 22px; line-height: 1; color: var(--s400); cursor: pointer; }
+    .quote-modal-close:hover { color: var(--s700); }
+    .quote-modal-title { font-size: 16px; font-weight: 800; color: var(--s900); padding-right: 30px; }
+    .quote-modal-sub { font-size: 12px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
+
+    .quote-review-field { margin-top: 16px; }
+    .quote-review-field label { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--s500); margin-bottom: 6px; }
+    .quote-review-field input { width: 100%; height: 38px; border: 1px solid var(--s300); border-radius: 9px; padding: 0 12px; font-size: 13px; font-family: inherit; }
+    .quote-review-file { font-size: 11.5px; color: var(--s400); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .quote-validation { margin-top: 14px; border-radius: 10px; padding: 10px 14px; }
+    .quote-validation.pass { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .quote-validation.fail { background: #fee2e2; border: 1px solid #fecaca; }
+    .quote-validation-summary { font-size: 12.5px; font-weight: 700; }
+    .quote-validation.pass .quote-validation-summary { color: #166534; }
+    .quote-validation.fail .quote-validation-summary { color: #b91c1c; }
+
+    .quote-review-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+    .quote-review-table th { text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s400); padding: 8px 10px; border-bottom: 1px solid var(--s200); }
+    .quote-review-table td { padding: 9px 10px; border-bottom: 1px solid var(--s200); color: var(--s700); vertical-align: top; }
+    .quote-review-table tbody tr:last-child td { border-bottom: none; }
+    .quote-review-table tr.row-fail td { background: #fef2f2; }
+    .quote-review-item-note { display: block; font-size: 10.5px; margin-top: 3px; font-weight: 600; }
+    .quote-review-item-note.ok { color: #166534; }
+    .quote-review-item-note.bad { color: #b91c1c; }
+    .quote-review-note { font-size: 12px; color: var(--s500); margin-top: 14px; line-height: 1.6; }
+
+    .quote-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+    .btn-cancel-quote { height: 36px; padding: 0 16px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: 1px solid var(--s300); background: #fff; color: var(--s500); }
+    .btn-cancel-quote:hover { border-color: var(--s400); color: var(--s700); }
 </style>
 @endpush
 
@@ -166,13 +203,12 @@
         {{-- Quotations --}}
         <div class="quote-list" data-quote-list="{{ $pr['id'] }}">
             @foreach($pr['quotations'] as $q)
-            <div class="quote-row" id="quote-{{ $q['id'] }}">
+            <div class="quote-row" id="quote-{{ $q['id'] }}" data-preview-url="{{ $q['url'] }}" data-preview-name="{{ $q['filename'] }}" title="Click to preview {{ $q['filename'] }}">
                 <i class="ti ti-file-invoice"></i>
                 <span class="quote-supplier">{{ $q['supplier'] }}</span>
                 <span class="quote-file">{{ $q['filename'] }}</span>
                 <span style="font-size:11px;color:var(--s400);">{{ $q['uploadedAt'] }}</span>
                 <span class="quote-actions">
-                    <a class="quote-link" href="{{ $q['url'] }}" target="_blank" rel="noopener">View</a>
                     @if(!$pr['quotationsLocked'])
                     <button class="quote-del btn-delete-quote" data-url="{{ $q['deleteUrl'] }}" data-quote-id="{{ $q['id'] }}" title="Remove quotation" type="button"><i class="ti ti-trash"></i></button>
                     @endif
@@ -203,6 +239,41 @@
 
 <div class="pr-toast" id="cvToast"></div>
 
+{{-- Review Quotation modal — shows what was actually read off the document
+     (supplier + items, each checked against this PR's own items) before the
+     file is attached for real, the same way the PR upload wizard reviews an
+     extraction before creating the PR. --}}
+<div class="quote-modal-overlay" id="quoteReviewOverlay">
+    <div class="quote-modal">
+        <button type="button" class="quote-modal-close" id="quoteReviewCloseBtn" aria-label="Close">&times;</button>
+        <p class="quote-modal-title">Review Quotation</p>
+        <p class="quote-modal-sub">Confirm the supplier and the items read from this document before attaching it.</p>
+
+        <div class="quote-review-field">
+            <label>Supplier Name</label>
+            <input type="text" id="quoteReviewSupplier">
+        </div>
+        <p class="quote-review-file" id="quoteReviewFileName"></p>
+
+        <div class="quote-validation" id="quoteReviewValidation" style="display:none;">
+            <p class="quote-validation-summary" id="quoteReviewValidationSummary"></p>
+        </div>
+
+        <table class="quote-review-table" id="quoteReviewTable" style="display:none;">
+            <thead>
+                <tr><th>Item</th><th>Qty</th><th>Unit</th><th>Unit Price</th></tr>
+            </thead>
+            <tbody id="quoteReviewItemsBody"></tbody>
+        </table>
+        <p class="quote-review-note" id="quoteReviewNote" style="display:none;"></p>
+
+        <div class="quote-modal-actions">
+            <button type="button" class="btn-cancel-quote" id="quoteReviewCancelBtn">Cancel</button>
+            <button type="button" class="btn btn-upload" id="quoteReviewConfirmBtn" disabled><i class="ti ti-check"></i> Confirm &amp; Attach</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -231,6 +302,136 @@
         return div.innerHTML;
     }
 
+    function money(n) {
+        return '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ── Attached-quotation preview ──────────────────────────────────────
+    // Clicking an already-attached quotation's row opens the actual file
+    // in a modal (print button included for a PDF) instead of navigating
+    // away to a new tab — same pattern as every other uploaded-document
+    // preview in the system.
+    function openDocPreview(url, filename) {
+        const isImage = /\.(png|jpe?g)$/i.test(filename || url);
+        const body = isImage
+            ? `<img src="${url}" alt="${escapeHtml(filename || '')}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<div style="position:relative;">
+                 <button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button>
+                 <iframe src="${url}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>
+               </div>`;
+        window.prismInfoModal({
+            title: filename || 'Quotation',
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    }
+
+    function wireQuoteRowPreview(row) {
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('.quote-actions')) return;
+            openDocPreview(row.dataset.previewUrl, row.dataset.previewName);
+        });
+    }
+
+    document.querySelectorAll('.quote-row').forEach(wireQuoteRowPreview);
+
+    // ── Review Quotation modal ──────────────────────────────────────────
+    // Shows what was actually read off the document — supplier name and
+    // items, each checked against this PR's own items — before the file is
+    // attached for real, the same way the PR upload wizard's Step 3 reviews
+    // an extraction before Step 2's file is turned into an actual PR.
+    const quoteOverlay      = document.getElementById('quoteReviewOverlay');
+    const quoteSupplierIn   = document.getElementById('quoteReviewSupplier');
+    const quoteFileNameEl   = document.getElementById('quoteReviewFileName');
+    const quoteValidationEl = document.getElementById('quoteReviewValidation');
+    const quoteValidationSummaryEl = document.getElementById('quoteReviewValidationSummary');
+    const quoteTableEl      = document.getElementById('quoteReviewTable');
+    const quoteItemsBodyEl  = document.getElementById('quoteReviewItemsBody');
+    const quoteNoteEl       = document.getElementById('quoteReviewNote');
+    const quoteConfirmBtn   = document.getElementById('quoteReviewConfirmBtn');
+    const quoteCancelBtn    = document.getElementById('quoteReviewCancelBtn');
+    const quoteCloseBtn     = document.getElementById('quoteReviewCloseBtn');
+
+    let quoteReviewState = null;
+
+    function closeQuoteReview() {
+        quoteOverlay.classList.remove('open');
+        if (quoteReviewState && quoteReviewState.onCancel) quoteReviewState.onCancel();
+        quoteReviewState = null;
+    }
+
+    quoteCancelBtn.addEventListener('click', closeQuoteReview);
+    quoteCloseBtn.addEventListener('click', closeQuoteReview);
+    quoteOverlay.addEventListener('click', (e) => { if (e.target === quoteOverlay) closeQuoteReview(); });
+
+    quoteConfirmBtn.addEventListener('click', () => {
+        if (quoteConfirmBtn.disabled || !quoteReviewState) return;
+        const onConfirm = quoteReviewState.onConfirm;
+        const supplierName = quoteSupplierIn.value.trim() || quoteReviewState.supplierName;
+        quoteReviewState = null; // cleared before close so closeQuoteReview()'s onCancel doesn't also fire
+        quoteOverlay.classList.remove('open');
+        onConfirm(supplierName);
+    });
+
+    /**
+     * Opens the review modal for one just-selected quotation file.
+     * @param {object} opts
+     * @param {string} opts.fileName
+     * @param {string} opts.supplierName
+     * @param {Array}  opts.items       Items read from the document (empty if none/unreadable).
+     * @param {object|null} opts.validation  Result of validateQuotationAgainstPr(), or null if not run (image file, or the read failed before validation).
+     * @param {boolean} opts.isPdf
+     * @param {(supplierName: string) => void} opts.onConfirm  Called once, only when Confirm & Attach is clicked.
+     * @param {() => void} opts.onCancel  Called on Cancel/×/backdrop/Escape-equivalent dismissal.
+     */
+    function openQuoteReviewModal(opts) {
+        quoteReviewState = opts;
+        quoteSupplierIn.value = opts.supplierName || '';
+        quoteFileNameEl.textContent = opts.fileName;
+
+        const items = opts.items || [];
+        const validation = opts.validation;
+
+        if (validation) {
+            const passed = validation.verdict === 'passed';
+            quoteValidationEl.style.display = '';
+            quoteValidationEl.className = 'quote-validation ' + (passed ? 'pass' : 'fail');
+            quoteValidationSummaryEl.textContent = (passed ? '✓ ' : '✕ ') + (validation.summary || '');
+        } else {
+            quoteValidationEl.style.display = 'none';
+        }
+
+        if (items.length) {
+            quoteTableEl.style.display = '';
+            quoteNoteEl.style.display = 'none';
+            const verdictByIndex = (validation?.items || []);
+            quoteItemsBodyEl.innerHTML = items.map((it, i) => {
+                const v = verdictByIndex[i];
+                const ok = !v || v.verdict === 'passed';
+                const note = v ? `<span class="quote-review-item-note ${ok ? 'ok' : 'bad'}">${ok ? '✓ ' : '✕ '}${escapeHtml(v.reason || '')}</span>` : '';
+                return `<tr class="${ok ? '' : 'row-fail'}">
+                    <td>${escapeHtml(it.name)}${note}</td>
+                    <td>${escapeHtml(String(it.quantity ?? ''))}</td>
+                    <td>${escapeHtml(it.unit || '')}</td>
+                    <td>${it.unitPrice != null ? money(it.unitPrice) : ''}</td>
+                </tr>`;
+            }).join('');
+        } else {
+            quoteTableEl.style.display = 'none';
+            quoteNoteEl.style.display = '';
+            quoteNoteEl.textContent = opts.isPdf
+                ? 'Could not read item rows from this document automatically — it will be attached without an item check.'
+                : "Item rows can't be read from an image file — this quotation will be attached without an item check.";
+        }
+
+        // Same gate as the PR wizard: a document that was read and found to
+        // include an item not on this PR can't be confirmed. Nothing to
+        // check (image file, or the read failed) is allowed through instead
+        // of blocked — best-effort, not a hard requirement.
+        quoteConfirmBtn.disabled = !!(validation && validation.verdict !== 'passed');
+
+        quoteOverlay.classList.add('open');
+    }
+
     function updateStageUi(prId, stage, label, readyForAoc, hasQuotes) {
         const badge = document.querySelector(`[data-stage-badge="${prId}"]`);
         if (badge) {
@@ -257,18 +458,21 @@
         const row = document.createElement('div');
         row.className = 'quote-row';
         row.id = `quote-${q.documentId}`;
+        row.dataset.previewUrl = q.url;
+        row.dataset.previewName = q.filename;
+        row.title = `Click to preview ${q.filename}`;
         row.innerHTML = `
             <i class="ti ti-file-invoice"></i>
             <span class="quote-supplier">${escapeHtml(q.supplierName)}</span>
             <span class="quote-file">${escapeHtml(q.filename)}</span>
             <span style="font-size:11px;color:var(--s400);">${escapeHtml(q.uploadedAt)}</span>
             <span class="quote-actions">
-                <a class="quote-link" href="${q.url}" target="_blank" rel="noopener">View</a>
                 <button class="quote-del btn-delete-quote" data-url="${q.deleteUrl}" data-quote-id="${q.documentId}" title="Remove quotation" type="button"><i class="ti ti-trash"></i></button>
             </span>
         `;
         if (emptyP) list.insertBefore(row, emptyP); else list.appendChild(row);
         wireDeleteButton(row.querySelector('.btn-delete-quote'));
+        wireQuoteRowPreview(row);
     }
 
     function addUploadRow(prId, uploadUrl) {
@@ -297,6 +501,16 @@
 
         cancelBtn.addEventListener('click', () => row.remove());
 
+        function resetRow() {
+            fileInput.disabled = false;
+            cancelBtn.disabled = false;
+            filePick.style.pointerEvents = '';
+            filePick.style.opacity = '';
+            label.textContent = 'Choose file';
+            supplierInput.value = '';
+            fileInput.value = '';
+        }
+
         fileInput.addEventListener('change', async () => {
             const file = fileInput.files[0];
             if (!file) return;
@@ -309,61 +523,74 @@
             label.textContent = 'Reading document…';
 
             let supplierName = supplierInput.value;
-            if (file.type === 'application/pdf') {
+            let items = [];
+            let validation = null;
+            const isPdf = file.type === 'application/pdf';
+
+            if (isPdf) {
                 try {
                     const fd = new FormData();
                     fd.append('document', file);
+                    fd.append('purchase_request_id', prId);
                     const resp = await fetch(extractSupplierUrl, {
                         method:  'POST',
                         headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                         body:    fd,
                     });
                     const json = await resp.json();
-                    if (resp.ok && json.supplierName) {
-                        supplierName = json.supplierName;
-                        supplierInput.value = supplierName;
+                    if (resp.ok) {
+                        if (json.supplierName) { supplierName = json.supplierName; supplierInput.value = supplierName; }
+                        items      = json.items || [];
+                        validation = json.validation || null;
                     }
                 } catch {
-                    // best-effort only — filename-derived fallback stays in place
+                    // best-effort only — the review modal still opens below,
+                    // just without an item list or validation result
                 }
             }
 
-            label.textContent = 'Uploading…';
+            label.textContent = 'Choose file';
 
-            const fd = new FormData();
-            fd.append('document', file);
-            fd.append('supplier_name', supplierName);
+            // Nothing is uploaded yet — the review modal shows exactly what
+            // was read (supplier + items, each checked against this PR's own
+            // items) and only the Confirm & Attach button inside it actually
+            // sends the file, mirroring the PR upload wizard's Step 3.
+            openQuoteReviewModal({
+                fileName: file.name,
+                supplierName,
+                items,
+                validation,
+                isPdf,
+                onConfirm: async (finalSupplierName) => {
+                    label.textContent = 'Uploading…';
 
-            try {
-                const resp = await fetch(uploadUrl, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body: fd,
-                });
-                const json = await resp.json();
-                if (resp.ok && json.success) {
-                    showToast(`Quotation from ${supplierName} uploaded.`);
-                    addQuoteRow(prId, json);
-                    updateStageUi(prId, json.canvassingStage, json.canvassingLabel, json.readyForAoc, true);
-                    row.remove();
-                } else {
-                    showToast(json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Upload failed.'), true);
-                    fileInput.disabled = false;
-                    cancelBtn.disabled = false;
-                    filePick.style.pointerEvents = '';
-                    filePick.style.opacity = '';
-                    label.textContent = 'Choose file';
-                    supplierInput.value = '';
-                    fileInput.value = '';
-                }
-            } catch {
-                showToast('Network error — please try again.', true);
-                fileInput.disabled = false;
-                cancelBtn.disabled = false;
-                filePick.style.pointerEvents = '';
-                filePick.style.opacity = '';
-                label.textContent = 'Choose file';
-            }
+                    const fd = new FormData();
+                    fd.append('document', file);
+                    fd.append('supplier_name', finalSupplierName);
+
+                    try {
+                        const resp = await fetch(uploadUrl, {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                            body: fd,
+                        });
+                        const json = await resp.json();
+                        if (resp.ok && json.success) {
+                            showToast(`Quotation from ${finalSupplierName} uploaded.`);
+                            addQuoteRow(prId, json);
+                            updateStageUi(prId, json.canvassingStage, json.canvassingLabel, json.readyForAoc, true);
+                            row.remove();
+                        } else {
+                            showToast(json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Upload failed.'), true);
+                            resetRow();
+                        }
+                    } catch {
+                        showToast('Network error — please try again.', true);
+                        resetRow();
+                    }
+                },
+                onCancel: () => resetRow(),
+            });
         });
     }
 

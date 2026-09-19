@@ -40,6 +40,10 @@
     .btn-print:hover { opacity: .88; }
     .btn-print svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+    .report-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .office-filter-select { height: 42px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--s300); background: var(--white); font-size: 13px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; cursor: pointer; }
+    .print-only-filter-note { display: none; }
+
     .completion-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--crimson-mid); color: var(--crimson); border: 1px solid var(--crimson-border); white-space: nowrap; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; max-height: 52vh; background: var(--white); box-shadow: inset 0 1px 4px rgba(15,23,42,.04); }
@@ -85,7 +89,8 @@
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
 
     @media print {
-        .btn-print { display: none !important; }
+        .btn-print, .office-filter-select { display: none !important; }
+        .print-only-filter-note { display: block !important; font-size: 12px; font-weight: 700; color: var(--m); margin-top: 6px; }
         .content { padding: 0; }
         body { background: #fff; }
         .table-wrap { max-height: none; overflow: visible; }
@@ -111,11 +116,25 @@
             <h1 class="page-hdr-title">Procurement Reports</h1>
             <p class="page-hdr-sub">Review campus-wide procurement accomplishment, year-end utilization, and delayed items grouped by office.</p>
             <p class="report-meta">Generated {{ $generatedAt }}</p>
+            {{-- Hidden on screen (the dropdown already shows this); shown only
+                 when printed, since the dropdown itself is hidden there — a
+                 printed filtered report needs to say so on the page itself. --}}
+            @if($selectedOffice)
+            <p class="print-only-filter-note">Filtered to office: {{ $selectedOffice }}</p>
+            @endif
         </div>
-        <button class="btn-print" type="button" onclick="window.print()">
-            <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print
-        </button>
+        <div class="report-actions">
+            <select id="officeFilter" class="office-filter-select">
+                <option value="">All Offices</option>
+                @foreach ($offices as $office)
+                    <option value="{{ $office->code }}" {{ $selectedOffice === $office->code ? 'selected' : '' }}>{{ $office->code }}</option>
+                @endforeach
+            </select>
+            <button class="btn-print" type="button" onclick="window.print()">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                Print
+            </button>
+        </div>
     </div>
 
     <div class="stats-grid">
@@ -145,20 +164,25 @@
         </div>
     </div>
 
+    {{-- Campus-wide totals only, not per office — the two tables further
+         down already give the full per-office breakdown; a per-office chart
+         here would just repeat the same numbers as bars instead of rows. --}}
     <div class="charts-grid">
         <div class="card">
-            <p class="card-eyebrow">Per office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Targeted vs Procured</h2>
-            <div class="chart-wrap">
+            <p class="card-eyebrow">Campus-wide</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Accomplishment Rate</h2>
+            <div class="chart-wrap" style="height:180px;">
                 <canvas id="accomplishmentChart" data-rows="{{ json_encode($accomplishmentChart) }}"></canvas>
             </div>
+            <div class="pd-chart-legend" id="accomplishmentLegend"></div>
         </div>
         <div class="card">
-            <p class="card-eyebrow">Per office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Budget vs Utilized</h2>
-            <div class="chart-wrap">
+            <p class="card-eyebrow">Campus-wide</p>
+            <h2 class="card-title" style="margin-bottom:16px;">Budget Utilization Rate</h2>
+            <div class="chart-wrap" style="height:180px;">
                 <canvas id="utilizationChart" data-rows="{{ json_encode($utilizationChart) }}"></canvas>
             </div>
+            <div class="pd-chart-legend" id="utilizationLegend"></div>
         </div>
     </div>
 
@@ -291,53 +315,100 @@
 
 @push('scripts')
 <script>
+document.getElementById('officeFilter').addEventListener('change', function () {
+    const url = new URL(window.location.href);
+    if (this.value) {
+        url.searchParams.set('office', this.value);
+    } else {
+        url.searchParams.delete('office');
+    }
+    window.location.href = url.toString();
+});
+
 (function () {
-    // Horizontal, not vertical — dozens of offices campus-wide (many with
-    // long codes) means a vertical bar chart's x-axis labels collide past a
-    // handful of bars. Horizontal bars read one office per row regardless of
-    // count, with the row growing to fit the data instead of squeezing it.
+    // Always-visible labels (not just on hover) — a compact legend below
+    // each doughnut instead of Chart.js's own legend, which needs a hover
+    // to read exact counts and takes more vertical space.
+    function renderLegend(elId, entries) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.innerHTML = entries.map(([label, value, color]) => `
+            <span class="pd-chart-legend-item">
+                <span class="pd-chart-legend-dot" style="background:${color}"></span>${label}: ${value}
+            </span>
+        `).join('');
+    }
+
     const accEl = document.getElementById('accomplishmentChart');
     if (accEl) {
-        const rows = JSON.parse(accEl.dataset.rows || '[]');
-        accEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        const d = JSON.parse(accEl.dataset.rows || '{}');
+        const procured = d.procured || 0, remaining = d.remaining || 0;
+        const total = procured + remaining;
+        const pct = total > 0 ? Math.round((procured / total) * 100) : 0;
         new Chart(accEl, {
-            type: 'bar',
+            type: 'doughnut',
             data: {
-                labels: rows.map(r => r.office),
-                datasets: [
-                    { label: 'Targeted', data: rows.map(r => r.targeted), backgroundColor: '#c9a84c', borderRadius: 4 },
-                    { label: 'Procured', data: rows.map(r => r.procured), backgroundColor: '#681012', borderRadius: 4 },
-                ],
+                labels: ['Procured', 'Remaining'],
+                datasets: [{ data: [procured, remaining], backgroundColor: ['#681012', '#e2e8f0'], borderWidth: 0 }],
             },
             options: {
-                indexAxis: 'y',
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-                scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                plugins: { legend: { display: false } },
             },
+            plugins: [{
+                id: 'centerText',
+                afterDraw(chart) {
+                    const { ctx, chartArea: { left, top, width, height } } = chart;
+                    ctx.save();
+                    ctx.font = '700 20px Poppins, sans-serif';
+                    ctx.fillStyle = '#681012';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pct + '%', left + width / 2, top + height / 2);
+                    ctx.restore();
+                },
+            }],
         });
+        renderLegend('accomplishmentLegend', [
+            ['Procured', procured, '#681012'],
+            ['Remaining', remaining, '#e2e8f0'],
+        ]);
     }
 
     const utilEl = document.getElementById('utilizationChart');
     if (utilEl) {
-        const rows = JSON.parse(utilEl.dataset.rows || '[]');
-        utilEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        const d = JSON.parse(utilEl.dataset.rows || '{}');
+        const utilized = d.utilized || 0, unutilized = d.unutilized || 0;
+        const total = utilized + unutilized;
+        const pct = total > 0 ? Math.round((utilized / total) * 100) : 0;
         new Chart(utilEl, {
-            type: 'bar',
+            type: 'doughnut',
             data: {
-                labels: rows.map(r => r.office),
-                datasets: [
-                    { label: 'Budget', data: rows.map(r => r.budget), backgroundColor: '#c9a84c', borderRadius: 4 },
-                    { label: 'Utilized', data: rows.map(r => r.utilized), backgroundColor: '#681012', borderRadius: 4 },
-                ],
+                labels: ['Utilized', 'Unutilized'],
+                datasets: [{ data: [utilized, unutilized], backgroundColor: ['#c9a84c', '#e2e8f0'], borderWidth: 0 }],
             },
             options: {
-                indexAxis: 'y',
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-                scales: { x: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toLocaleString() } } },
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                plugins: { legend: { display: false } },
             },
+            plugins: [{
+                id: 'centerText',
+                afterDraw(chart) {
+                    const { ctx, chartArea: { left, top, width, height } } = chart;
+                    ctx.save();
+                    ctx.font = '700 20px Poppins, sans-serif';
+                    ctx.fillStyle = '#7a5a10';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pct + '%', left + width / 2, top + height / 2);
+                    ctx.restore();
+                },
+            }],
         });
+        renderLegend('utilizationLegend', [
+            ['Utilized', '₱' + utilized.toLocaleString(), '#c9a84c'],
+            ['Unutilized', '₱' + unutilized.toLocaleString(), '#e2e8f0'],
+        ]);
     }
 })();
 </script>

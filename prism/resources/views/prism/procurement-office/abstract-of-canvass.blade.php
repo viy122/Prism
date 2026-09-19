@@ -76,6 +76,8 @@
     /* Uploaded AOC PDF — the scanned, physically-signed document */
     .pdf-preview { border-radius: 12px; border: 1px solid var(--s200); background: var(--s50); overflow: hidden; aspect-ratio: 8.5 / 11; display: flex; align-items: center; justify-content: center; position: relative; }
     .pdf-preview iframe { width: 100%; height: 100%; border: none; }
+    .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200); background: #fff; color: var(--s700); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
+    .pdf-print-btn:hover { background: var(--crimson); color: #fff; border-color: var(--crimson); }
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 42px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
@@ -95,10 +97,11 @@
     .preview-items-table td { padding: 6px 8px; border-bottom: 1px solid var(--s100); }
     .preview-items-table tfoot td { font-weight: 800; color: var(--m); border-top: 2px solid var(--s200); border-bottom: none; }
     .preview-quotes { display: flex; flex-direction: column; gap: 6px; }
-    .preview-quote-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--s200); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; background: var(--s50); }
+    .preview-quote-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--s200); border-radius: 8px; padding: 7px 10px; font-size: 11.5px; background: var(--s50); cursor: pointer; transition: background .12s, border-color .12s; }
+    .preview-quote-row:hover { background: var(--s100); border-color: var(--s300); }
     .preview-quote-row .qs { font-weight: 700; color: var(--s700); }
-    .preview-quote-row .qf { color: var(--s500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .preview-quote-row a { font-size: 11px; font-weight: 700; color: #1d4ed8; text-decoration: none; }
+    .preview-quote-row .qf { color: #1d4ed8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .preview-quote-row:hover .qf { text-decoration: underline; }
     .preview-empty-note { font-size: 12px; color: var(--s400); }
 
     .sig-timeline { display: flex; align-items: flex-start; gap: 0; margin-bottom: 4px; flex-wrap: wrap; row-gap: 14px; }
@@ -166,6 +169,30 @@
 
     @media (max-width: 1200px) { .aoc-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
+
+    /* Review AOC Document modal */
+    .aoc-review-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(28,16,16,.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .aoc-review-overlay.open { display: flex; }
+    .aoc-review-modal { position: relative; background: #fff; border-radius: 18px; box-shadow: 0 6px 24px rgba(0,0,0,.18); width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; padding: 26px 28px; font-family: 'Poppins', sans-serif; }
+    .aoc-review-close { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 22px; line-height: 1; color: var(--s400); cursor: pointer; }
+    .aoc-review-close:hover { color: var(--s700); }
+    .aoc-review-title { font-size: 16px; font-weight: 800; color: var(--s900); padding-right: 30px; }
+    .aoc-review-sub { font-size: 12px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
+    .aoc-review-file { font-size: 11.5px; color: var(--s400); margin-top: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .aoc-review-validation { margin-top: 10px; border-radius: 10px; padding: 10px 14px; }
+    .aoc-review-validation.pass { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .aoc-review-validation.fail { background: #fee2e2; border: 1px solid #fecaca; }
+    .aoc-review-validation-summary { font-size: 12.5px; font-weight: 700; }
+    .aoc-review-validation.pass .aoc-review-validation-summary { color: #166534; }
+    .aoc-review-validation.fail .aoc-review-validation-summary { color: #b91c1c; }
+
+    .aoc-review-item-row { padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+    .aoc-review-item-row:last-child { border-bottom: none; }
+    .aoc-review-item-note { display: block; font-size: 11px; color: var(--s500); margin-top: 2px; }
+    .aoc-review-note { font-size: 12px; color: var(--s500); margin-top: 14px; line-height: 1.6; }
+
+    .aoc-review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 </style>
 @endpush
 
@@ -386,6 +413,33 @@
 
 <div class="pr-toast" id="aocToast"></div>
 
+{{-- Review AOC Document modal — shows what was actually read off the file
+     (Responsive Dealer + item prices, each checked against the supplier
+     quotations already on file) before it's attached for real, the same way
+     PR Step 2/3 reviews an extraction before Step 2's file becomes the PR.
+     Covers both the first upload and any re-upload — there is no separate,
+     unvalidated shortcut for either. --}}
+<div class="aoc-review-overlay" id="aocReviewOverlay">
+    <div class="aoc-review-modal">
+        <button type="button" class="aoc-review-close" id="aocReviewCloseBtn" aria-label="Close">&times;</button>
+        <p class="aoc-review-title">Review AOC Document</p>
+        <p class="aoc-review-sub">Confirm this document's prices and Responsive Dealer against the quotations on file before attaching it.</p>
+
+        <p class="aoc-review-file" id="aocReviewFileName"></p>
+
+        <div class="aoc-review-validation" id="aocReviewValidation" style="display:none;">
+            <p class="aoc-review-validation-summary" id="aocReviewValidationSummary"></p>
+        </div>
+        <div id="aocReviewItems"></div>
+        <p class="aoc-review-note" id="aocReviewNote" style="display:none;"></p>
+
+        <div class="aoc-review-actions">
+            <button type="button" class="btn-route btn-route-ret" id="aocReviewCancelBtn">Cancel</button>
+            <button type="button" class="btn-route btn-route-fwd" id="aocReviewConfirmBtn" disabled><i class="ti ti-check"></i> Confirm &amp; Attach</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 <script type="application/json" id="aocData">@json($aocs)</script>
@@ -447,6 +501,114 @@
         return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
+    // Clicking an attached quotation's row opens the actual file in a modal
+    // (print button included for a PDF) instead of navigating to a new tab.
+    // previewBody's contents are rebuilt wholesale on every renderPreview(),
+    // so the listener is delegated on the container itself, wired once, here.
+    function openDocPreview(url, filename) {
+        const isImage = /\.(png|jpe?g)$/i.test(filename || url);
+        const body = isImage
+            ? `<img src="${url}" alt="${escapeHtml(filename || '')}" style="max-width:100%;border-radius:10px;display:block;margin:0 auto;">`
+            : `<div style="position:relative;">
+                 <button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button>
+                 <iframe src="${url}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>
+               </div>`;
+        window.prismInfoModal({
+            title: filename || 'Quotation',
+            bodyHtml: body + `<p style="margin-top:10px;font-size:11px;"><a href="${url}" target="_blank" rel="noopener">Open in new tab ↗</a></p>`,
+        });
+    }
+
+    previewBody.addEventListener('click', (e) => {
+        const row = e.target.closest('.preview-quote-row');
+        if (!row) return;
+        openDocPreview(row.dataset.previewUrl, row.dataset.previewName);
+    });
+
+    // ── Review AOC Document modal ───────────────────────────────────────
+    // Shows what was actually read off a candidate AOC file — Responsive
+    // Dealer + item prices, each checked against the supplier quotations
+    // already on file — before it's attached for real. Covers the first
+    // upload and any re-upload alike; nothing is saved until Confirm &
+    // Attach is clicked here.
+    const aocReviewOverlay      = document.getElementById('aocReviewOverlay');
+    const aocReviewFileNameEl   = document.getElementById('aocReviewFileName');
+    const aocReviewValidationEl = document.getElementById('aocReviewValidation');
+    const aocReviewValidationSummaryEl = document.getElementById('aocReviewValidationSummary');
+    const aocReviewItemsEl      = document.getElementById('aocReviewItems');
+    const aocReviewNoteEl       = document.getElementById('aocReviewNote');
+    const aocReviewConfirmBtn   = document.getElementById('aocReviewConfirmBtn');
+    const aocReviewCancelBtn    = document.getElementById('aocReviewCancelBtn');
+    const aocReviewCloseBtn     = document.getElementById('aocReviewCloseBtn');
+
+    let aocReviewState = null;
+
+    function closeAocReview() {
+        aocReviewOverlay.classList.remove('open');
+        if (aocReviewState && aocReviewState.onCancel) aocReviewState.onCancel();
+        aocReviewState = null;
+    }
+
+    aocReviewCancelBtn.addEventListener('click', closeAocReview);
+    aocReviewCloseBtn.addEventListener('click', closeAocReview);
+    aocReviewOverlay.addEventListener('click', (e) => { if (e.target === aocReviewOverlay) closeAocReview(); });
+
+    aocReviewConfirmBtn.addEventListener('click', () => {
+        if (aocReviewConfirmBtn.disabled || !aocReviewState) return;
+        const onConfirm = aocReviewState.onConfirm;
+        aocReviewState = null; // cleared before close so closeAocReview()'s onCancel doesn't also fire
+        aocReviewOverlay.classList.remove('open');
+        onConfirm();
+    });
+
+    /**
+     * @param {object} opts
+     * @param {string} opts.fileName
+     * @param {object|null} opts.validation  Result of validateAocAgainstQuotations(), or null if not run (none of this PR's quotations were text-readable).
+     * @param {() => void} opts.onConfirm  Called once, only when Confirm & Attach is clicked.
+     * @param {() => void} opts.onCancel   Called on Cancel/×/backdrop dismissal.
+     */
+    function openAocReviewModal(opts) {
+        aocReviewState = opts;
+        aocReviewFileNameEl.textContent = opts.fileName;
+
+        const validation = opts.validation;
+        const money = n => '₱' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+        if (validation) {
+            const passed = validation.verdict === 'passed';
+            aocReviewValidationEl.style.display = '';
+            aocReviewValidationEl.className = 'aoc-review-validation ' + (passed ? 'pass' : 'fail');
+            aocReviewValidationSummaryEl.textContent = (passed ? '✓ ' : '✕ ') + (validation.summary || '');
+
+            const dealerHtml = (validation.dealerCheck && !validation.dealerCheck.ok)
+                ? `<div style="margin:10px 0;padding:9px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#b91c1c;">${escapeHtml(validation.dealerCheck.reason)}</div>`
+                : '';
+            const rows = (validation.items || []).map(it => {
+                const ok = it.verdict === 'passed';
+                return `<div class="aoc-review-item-row">
+                    <span style="font-weight:700;color:${ok ? '#166534' : '#b91c1c'};">${ok ? '✓' : '✕'}</span>
+                    ${escapeHtml(it.name)} — ${money(it.price)}
+                    <span class="aoc-review-item-note">${escapeHtml(it.reason || '')}</span>
+                </div>`;
+            }).join('');
+            aocReviewItemsEl.innerHTML = dealerHtml + rows;
+            aocReviewNoteEl.style.display = 'none';
+        } else {
+            aocReviewValidationEl.style.display = 'none';
+            aocReviewItemsEl.innerHTML = '';
+            aocReviewNoteEl.style.display = '';
+            aocReviewNoteEl.textContent = 'No supplier quotations on file could be read for comparison, so this document will be attached without a price check.';
+        }
+
+        // Same gate as everywhere else this pattern is used: a document that
+        // was read and found not to check out can't be confirmed. Nothing to
+        // check against is allowed through instead of blocked.
+        aocReviewConfirmBtn.disabled = !!(validation && validation.verdict !== 'passed');
+
+        aocReviewOverlay.classList.add('open');
+    }
+
     function renderPreview(aoc) {
         const items  = aoc.prItems || [];
         const quotes = aoc.quotations || [];
@@ -461,10 +623,9 @@
         let quotesHtml = '<p class="preview-empty-note">No canvass quotations uploaded yet.</p>';
         if (quotes.length) {
             quotesHtml = `<div class="preview-quotes">` + quotes.map(q => `
-                <div class="preview-quote-row">
+                <div class="preview-quote-row" data-preview-url="${q.url}" data-preview-name="${escapeHtml(q.filename)}" title="Click to preview ${escapeHtml(q.filename)}">
                     <span class="qs">${escapeHtml(q.supplier)}</span>
                     <span class="qf">${escapeHtml(q.filename)}</span>
-                    <a href="${q.url}" target="_blank" rel="noopener">View</a>
                 </div>`).join('') + `</div>`;
         }
 
@@ -486,9 +647,13 @@
         issuePoSection.style.display = '';
 
         if (aoc.hasPo) {
+            // aoc.poNumber reads "—" until the actual signed PO is uploaded
+            // (see issuePo()/uploadPurchaseOrder()) — worth saying so here
+            // rather than showing a bare dash next to "PO Issued".
+            const poLabel = (aoc.poNumber && aoc.poNumber !== '—') ? aoc.poNumber : 'not yet numbered — upload the signed PO to continue';
             issuePoSection.innerHTML = `
                 <div class="po-done-note">
-                    <i class="ti ti-circle-check"></i> PO Issued — ${escapeHtml(aoc.poNumber || '')}
+                    <i class="ti ti-circle-check"></i> PO Created — ${escapeHtml(poLabel)}
                     <a href="${poListUrl}${aoc.poId ? '?po=' + aoc.poId : ''}">View in Purchase Orders →</a>
                 </div>`;
             return;
@@ -508,7 +673,7 @@
                     </div>
                     <div>
                         <label>Total Amount (₱) *</label>
-                        <input type="number" class="issue-po-input" id="poAmount" step="0.01" min="0" value="${aoc.prTotal || ''}">
+                        <input type="number" class="issue-po-input" id="poAmount" step="0.01" min="0" value="${(aoc.winningTotal ?? aoc.prTotal) || ''}">
                     </div>
                     <div>
                         <label>Expected Delivery Date</label>
@@ -542,13 +707,14 @@
                 });
                 const json = await resp.json();
                 if (resp.ok && json.success) {
-                    aoc.hasPo    = true;
-                    aoc.poId     = json.po.id;
-                    aoc.poNumber = json.po.poNumber;
-                    const badge = document.querySelector(`[data-aoc-row][data-aoc-id="${aoc.id}"]`)?.querySelector('td:last-child');
-                    if (badge) badge.innerHTML = `<span class="badge badge-signed">${escapeHtml(json.po.poNumber || 'PO Issued')}</span>`;
-                    showToast('Purchase Order issued — routing continues on the PO.');
-                    renderIssuePo(aoc);
+                    // No document exists yet at this point (see issuePo() —
+                    // po_number is deliberately left unset until the actual
+                    // signed PO is uploaded), so there is nothing meaningful
+                    // to show inline here. Hand off to the Purchase Orders
+                    // tab instead, where that row is what happens next.
+                    showToast('Purchase Order record created — continue on the Purchase Orders tab.');
+                    window.location.href = `${poListUrl}?po=${json.po.id}`;
+                    return;
                 } else {
                     showToast(json.error || 'Failed to issue PO.', true);
                     btn.disabled = false;
@@ -678,7 +844,7 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = aoc.pdfFile
-            ? `<iframe src="/storage/${aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`
+            ? `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
         uploadAocText.textContent = aoc.pdfFile ? 'Re-upload PDF' : 'Upload AOC PDF';
 
@@ -874,37 +1040,72 @@
     uploadAocInput.addEventListener('change', async function () {
         const file = this.files[0];
         if (!file || !activeAoc) return;
+        const fileInput = this;
         const origText = uploadAocText.textContent;
-        uploadAocText.textContent = 'Uploading…';
-        this.disabled = true;
-        const fd = new FormData();
-        fd.append('file', file);
+        fileInput.disabled = true;
+        uploadAocText.textContent = 'Reading document…';
+
+        // Nothing is uploaded yet — the review modal shows exactly what was
+        // read (Responsive Dealer + item prices, each checked against the
+        // quotations on file) and only its Confirm & Attach button actually
+        // sends the file. Covers the first upload and any re-upload alike.
+        let validation = null;
         try {
-            const resp = await fetch(activeAoc.uploadUrl, {
+            const fd = new FormData();
+            fd.append('file', file);
+            const resp = await fetch(activeAoc.extractUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                 body: fd,
             });
             const json = await resp.json();
-            if (resp.ok && json.success) {
-                activeAoc.pdfFile         = json.aoc.pdfFile;
-                activeAoc.supplierName    = json.aoc.supplierName;
-                activeAoc.supplierAddress = json.aoc.supplierAddress;
-                document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`;
-                uploadAocText.textContent = 'Re-upload PDF';
-                showToast('AOC PDF uploaded successfully.' + (json.aoc.supplierName ? ' Responsive dealer detected: ' + json.aoc.supplierName + '.' : ''));
-                renderIssuePo(activeAoc);
-            } else {
-                uploadAocText.textContent = origText;
-                showToast(json.message || 'Upload failed.', true);
-            }
+            if (resp.ok) validation = json.validation || null;
         } catch {
-            uploadAocText.textContent = origText;
-            showToast('Network error during upload.', true);
+            // best-effort — the review modal still opens below, just without a validation result
         }
-        this.disabled = false;
-        this.value = '';
+
+        uploadAocText.textContent = origText;
+
+        openAocReviewModal({
+            fileName: file.name,
+            validation,
+            onConfirm: async () => {
+                uploadAocText.textContent = 'Uploading…';
+                const fd = new FormData();
+                fd.append('file', file);
+                try {
+                    const resp = await fetch(activeAoc.uploadUrl, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body: fd,
+                    });
+                    const json = await resp.json();
+                    if (resp.ok && json.success) {
+                        activeAoc.pdfFile         = json.aoc.pdfFile;
+                        activeAoc.supplierName    = json.aoc.supplierName;
+                        activeAoc.supplierAddress = json.aoc.supplierAddress;
+                        document.getElementById('pdfPreview').innerHTML =
+                            `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${json.aoc.pdfFile}#toolbar=0" title="AOC Document"></iframe>`;
+                        uploadAocText.textContent = 'Re-upload PDF';
+                        showToast('AOC PDF uploaded successfully.' + (json.aoc.supplierName ? ' Responsive dealer detected: ' + json.aoc.supplierName + '.' : ''));
+                        renderIssuePo(activeAoc);
+                    } else {
+                        uploadAocText.textContent = origText;
+                        showToast(json.error || json.message || 'Upload failed.', true);
+                    }
+                } catch {
+                    uploadAocText.textContent = origText;
+                    showToast('Network error during upload.', true);
+                }
+                fileInput.disabled = false;
+                fileInput.value = '';
+            },
+            onCancel: () => {
+                uploadAocText.textContent = origText;
+                fileInput.disabled = false;
+                fileInput.value = '';
+            },
+        });
     });
 
     if (!document.getElementById('spinStyle')) {

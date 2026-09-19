@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Smalot\PdfParser\Parser as PdfParser;
 
 class PrismCashierController extends Controller
 {
@@ -49,6 +50,20 @@ class PrismCashierController extends Controller
                     'pdfFile'              => $po->file_path,
                     'processingAttachment' => $processingDoc?->file_path,
                     'processingAttachmentName' => $processingDoc?->original_filename,
+                    // Every proof attached along the way: Accounting's own
+                    // payment-processing proof plus the Cashier's own
+                    // receipt, each opened in full in a new tab, not a
+                    // cramped preview.
+                    'attachments' => $po->documents
+                        ->whereIn('document_type', ['payment_processing_proof', 'payment_receipt'])
+                        ->sortBy('uploaded_at')
+                        ->map(fn ($d) => [
+                            'label'    => $d->document_type === 'payment_receipt' ? 'Receipt (Cashier)' : 'Processing Proof (Accounting)',
+                            'filename' => $d->original_filename,
+                            'url'      => Storage::url($d->file_path),
+                        ])
+                        ->values()
+                        ->all(),
                 ];
             });
 
@@ -77,6 +92,37 @@ class PrismCashierController extends Controller
         ]);
 
         $file = $request->file('receipt');
+
+        // No fixed receipt template exists (could be a formal OR, a bank
+        // slip, a photographed receipt, anything) — so item/price lines
+        // can't be reliably parsed. What can be checked for a PDF with a
+        // real text layer: the receipt should show a total that COVERS the
+        // PO's amount (more is fine — that's just change/sukli handed back
+        // — less means this isn't proof the full payment went through), and
+        // the supplier's name should actually appear on it. A scanned/image
+        // receipt (or a PDF with no text at all) is let through leniently,
+        // the same "can't validate what can't be read" rule applied
+        // everywhere else in this system.
+        $isPdf = $file->getClientMimeType() === 'application/pdf' || $file->getClientOriginalExtension() === 'pdf';
+        if ($isPdf) {
+            $text = $this->readPdfText($file);
+            if (trim($text) !== '') {
+                if (!$this->receiptCoversAmount($text, (float) $po->total_amount)) {
+                    return response()->json([
+                        'error' => 'This receipt doesn\'t appear to show a total covering the PO\'s amount (₱'
+                            . number_format((float) $po->total_amount, 2)
+                            . '). Attach the receipt for this PO\'s full payment.',
+                    ], 422);
+                }
+                if ($po->supplier_name && !$this->textMentionsSupplier($text, $po->supplier_name)) {
+                    return response()->json([
+                        'error' => 'This receipt doesn\'t appear to mention the supplier "' . $po->supplier_name
+                            . '". Attach the receipt issued by this PO\'s supplier.',
+                    ], 422);
+                }
+            }
+        }
+
         $path = $file->store('receipts/' . now()->year, 'public');
 
         DocumentUpload::create([
@@ -106,6 +152,76 @@ class PrismCashierController extends Controller
             'paidAt'     => now()->format('M d, Y'),
             'receiptUrl' => Storage::url($path),
         ]);
+    }
+
+    /** Best-effort PDF text-layer read — scanned/image-only uploads just yield ''. */
+    private function readPdfText(\Illuminate\Http\UploadedFile $file): string
+    {
+        try {
+            return (new PdfParser())->parseContent($file->get())->getText();
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
+     * Whether $text contains a currency figure >= $target (within a small
+     * rounding tolerance). Showing MORE than the PO's total is fine — that's
+     * just change/sukli handed back — showing less means this receipt isn't
+     * proof the full amount was actually paid.
+     */
+    private function receiptCoversAmount(string $text, float $target): bool
+    {
+        if (!preg_match_all('/(?:₱|Php|PHP)?\s*([\d,]{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})/u', $text, $matches)) {
+            return false;
+        }
+
+        foreach ($matches[1] as $raw) {
+            $amount = (float) str_replace(',', '', $raw);
+            if ($amount >= $target - 1.0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Supplier-name check: matches only if EVERY distinctive word (3+
+     * letters, excluding pure legal-entity suffixes like "corp"/"inc") from
+     * the supplier's name shows up somewhere in the receipt text.
+     *
+     * Matching on ANY single word was tried first but false-positived on an
+     * unrelated document that happened to share one common word — e.g. some
+     * other PO's paperwork mentioning "Accounting Office" was enough to
+     * "match" a supplier named "... Office Supplies Center" purely because
+     * both contain "office". Requiring ALL of the supplier's words closes
+     * that gap: dropping a word from the requirement only makes an accidental
+     * match easier, so words are kept in unless they're a generic suffix
+     * that's genuinely uninformative (adds no distinguishing power) —
+     * everything else stays required, even ordinary-sounding words like
+     * "office" or "center", because combined with the rest of the name they
+     * make coincidental collisions very unlikely.
+     */
+    private function textMentionsSupplier(string $text, string $supplierName): bool
+    {
+        $normalizedText = strtolower($text);
+        $stopWords = ['corp', 'corporation', 'incorporated', 'inc', 'ltd', 'llc', 'co', 'trading', 'enterprises', 'enterprise', 'company', 'general', 'merchandise', 'and', 'the'];
+
+        $words = preg_split('/[^a-z0-9]+/i', strtolower($supplierName), -1, PREG_SPLIT_NO_EMPTY);
+        $significant = array_filter($words, fn ($w) => strlen($w) >= 3 && !in_array($w, $stopWords, true));
+
+        if (empty($significant)) {
+            return true;
+        }
+
+        foreach ($significant as $word) {
+            if (!str_contains($normalizedText, $word)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function withCommon(string $activePage, array $data): array

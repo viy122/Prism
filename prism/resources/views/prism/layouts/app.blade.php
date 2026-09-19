@@ -184,6 +184,12 @@
         @media print {
             html, body { height: auto; overflow: visible; }
             .main { height: auto; overflow: visible; }
+            /* Without this, every page's own "Print" button also printed the
+               sidebar nav and the university banner/clock alongside (or
+               instead of) the actual report — neither belongs on a printed
+               page. A page can still override further in its own
+               @media print block (e.g. hiding its own filter controls). */
+            .sb, .univ-header { display: none !important; }
         }
     </style>
     @stack('page-css')

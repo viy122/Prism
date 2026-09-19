@@ -63,13 +63,37 @@
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
+    /* Office-utilization chart grows with office count instead of squeezing
+       many bars into a fixed box — left uncapped, that stretched the WHOLE
+       grid row (grid items stretch to the tallest sibling by default),
+       leaving the item-status doughnut with a lot of dead blank space below
+       its own much-shorter content. Capped + scrollable now, with an
+       explicit expand toggle for when every office is actually needed. */
+    .chart-wrap.collapsible { max-height: 230px; overflow-y: auto; transition: max-height .25s ease; }
+    .chart-wrap.collapsible.expanded { max-height: 2000px; }
+    .chart-expand-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: none; border: none; cursor: pointer;
+        font-size: 11px; font-weight: 700; color: var(--crimson);
+        font-family: 'Poppins', sans-serif; padding: 0; margin-left: auto;
+    }
+    .chart-expand-btn:hover { text-decoration: underline; }
+    .card-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .card-head-row .card-title { margin-bottom: 0; }
+    .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
+    .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
     @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
     @media print {
         body { background: #fff; }
         .content { padding: 0; }
         .table-wrap { max-height: none; overflow: visible; }
+        .btn-print { display: none !important; }
     }
+    .btn-print { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; background: var(--crimson); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: opacity .2s; white-space: nowrap; margin-left: auto; }
+    .btn-print:hover { opacity: .88; }
+    .btn-print svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
     .page-hdr-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .page-hdr-icon i { font-size: 22px; color: var(--crimson); }
@@ -92,6 +116,10 @@
             <h1 class="page-hdr-title">Division Dashboard</h1>
             <p class="page-hdr-sub">Monitor assigned division offices, APP item movement, utilization, delayed work, overdue items, and pending PRs.</p>
         </div>
+        <button class="btn-print" type="button" onclick="window.print()">
+            <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+        </button>
     </div>
 
     @if(($awaitingSignature ?? 0) > 0)
@@ -147,11 +175,17 @@
             <div class="chart-wrap">
                 <canvas id="itemStatusChart" data-status="{{ json_encode($itemStatusChart) }}"></canvas>
             </div>
+            <div class="pd-chart-legend" id="itemStatusLegend"></div>
         </div>
         <div class="card">
             <p class="card-eyebrow">Per office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Utilization Rate</h2>
-            <div class="chart-wrap">
+            <div class="card-head-row">
+                <h2 class="card-title">Utilization Rate</h2>
+                <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
+                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                </button>
+            </div>
+            <div class="chart-wrap collapsible" id="officeUtilWrap">
                 <canvas id="officeUtilizationChart" data-rows="{{ json_encode($officeUtilization) }}"></canvas>
             </div>
         </div>
@@ -249,25 +283,50 @@
     const statusEl = document.getElementById('itemStatusChart');
     if (statusEl) {
         const s = JSON.parse(statusEl.dataset.status || '{}');
+        const labels = ['Procured', 'Pending'];
+        const colors = ['#3b6d11', '#854f0b'];
+        const counts = [s.procured || 0, s.pending || 0];
         new Chart(statusEl, {
             type: 'doughnut',
             data: {
-                labels: ['Procured', 'Pending'],
-                datasets: [{ data: [s.procured || 0, s.pending || 0], backgroundColor: ['#3b6d11', '#854f0b'], borderWidth: 0 }],
+                labels,
+                datasets: [{ data: counts, backgroundColor: colors, borderWidth: 0 }],
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                plugins: { legend: { display: false } },
             },
         });
+        // Always-visible labels (not just on hover) — a compact legend below
+        // the doughnut instead of one that needs a hover to read counts.
+        const legendEl = document.getElementById('itemStatusLegend');
+        if (legendEl) {
+            legendEl.innerHTML = labels.map((label, i) => `
+                <span class="pd-chart-legend-item">
+                    <span class="pd-chart-legend-dot" style="background:${colors[i]}"></span>${label} (${counts[i]})
+                </span>
+            `).join('');
+        }
     }
 
     const officeEl = document.getElementById('officeUtilizationChart');
     if (officeEl) {
         const rows = JSON.parse(officeEl.dataset.rows || '[]');
         // Horizontal — a division can cover many offices, so a vertical bar
-        // chart's x-axis labels would collide past a handful of bars.
+        // chart's x-axis labels would collide past a handful of bars. The
+        // canvas itself keeps growing with office count, but the outer wrap
+        // caps/scrolls that at 230px (matching the item-status card) until
+        // "Expand" is clicked, instead of stretching the whole grid row.
         officeEl.parentElement.style.height = Math.max(230, rows.length * 34) + 'px';
+        const expandBtn = document.getElementById('officeUtilExpandBtn');
+        if (expandBtn && rows.length * 34 > 230) {
+            expandBtn.style.display = '';
+            expandBtn.addEventListener('click', () => {
+                const wrap = document.getElementById('officeUtilWrap');
+                const expanded = wrap.classList.toggle('expanded');
+                expandBtn.querySelector('span').textContent = expanded ? 'Collapse' : 'Expand';
+            });
+        }
         new Chart(officeEl, {
             type: 'bar',
             data: {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RendersPpmpDocument;
 use App\Models\BudgetProposal;
 use App\Models\BudgetProposalItem;
 use App\Models\BudgetProposalReview;
@@ -16,6 +17,8 @@ use Illuminate\View\View;
 
 class PrismFinanceOfficeController extends Controller
 {
+    use RendersPpmpDocument;
+
     public function dashboard(): View
     {
         $awaitingReview    = BudgetProposal::where('status', 'submitted')->count();
@@ -155,6 +158,58 @@ class PrismFinanceOfficeController extends Controller
             'proposals'        => $proposals,
             'selectedProposal' => $selectedProposal,
             'pendingCount'     => collect($proposals)->where('status', 'Submitted')->count(),
+        ]));
+    }
+
+    /**
+     * The exact templated PPMP form (letterhead, INDICATIVE/FINAL, the 12-col
+     * official table, Prepared/Reviewed/Approved by) an Office Head sees on
+     * their own Print/Export — read-only here, same document, so Budget
+     * Office can check the actual submitted form, not just the review-page
+     * item table. Only for a proposal that's actually reached Budget Office
+     * (never a still-drafting one no one submitted yet).
+     */
+    public function ppmpDocument(BudgetProposal $proposal): View
+    {
+        return $this->ppmpDocumentView($proposal);
+    }
+
+    /**
+     * Every proposal Budget Office has ever touched (endorsed, returned, or
+     * currently pending) — proposalReview() above only ever shows what's
+     * still actionable, so once something is endorsed/approved it vanishes
+     * from that queue with no way back to it. This is that missing archive.
+     */
+    public function proposalArchive(Request $request): View
+    {
+        $status = $request->query('status', 'all');
+        $query  = BudgetProposal::with(['office', 'submittedBy'])
+            ->whereIn('status', ['submitted', 'endorsed', 'returned', 'approved'])
+            ->whereHas('reviews', fn ($q) => $q->whereIn('action', ['submitted', 'endorse', 'endorsed', 'return']));
+
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $proposals = $query->latest('submitted_at')->get()
+            ->map(fn ($p) => [
+                'id'            => $p->id,
+                'code'          => $p->code,
+                'title'         => $p->title,
+                'status'        => ucfirst($p->status),
+                'office'        => $p->office?->code ?? '—',
+                'fiscalYear'    => (string) $p->fiscal_year,
+                'submittedDate' => $p->submitted_at?->format('M d, Y') ?? '—',
+                'totalAmount'   => (float) $p->total_estimated_cost,
+                'documentUrl'   => route('finance-office.proposal-review.document', $p->id),
+            ])
+            ->all();
+
+        return view('prism.finance-office.proposal-archive', $this->withCommon('proposal-archive', [
+            'pageTitle'  => 'Proposal Archive',
+            'proposals'  => $proposals,
+            'statuses'   => ['submitted' => 'Submitted', 'endorsed' => 'Endorsed', 'returned' => 'Returned', 'approved' => 'Approved'],
+            'selectedStatus' => $status,
         ]));
     }
 
@@ -422,7 +477,7 @@ class PrismFinanceOfficeController extends Controller
             // → resubmitted" story for a proposal, not just its most recent step.
             'reviewHistory' => $p->reviews()->with('reviewedBy')->orderBy('reviewed_at')->get()
                 ->map(fn ($r) => [
-                    'action'  => ucfirst($r->action),
+                    'action'  => \App\Support\ActionVerb::label($r->action),
                     'from'    => $r->status_from ? ucfirst($r->status_from) : null,
                     'to'      => $r->status_to ? ucfirst($r->status_to) : null,
                     'by'      => $r->reviewedBy?->name ?? '—',
@@ -484,6 +539,7 @@ class PrismFinanceOfficeController extends Controller
             'moduleNavigation' => [
                 ['slug' => 'dashboard',                 'label' => 'Dashboard',                 'href' => route('finance-office.dashboard'),                  'icon' => 'layout-dashboard'],
                 ['slug' => 'proposal-review',           'label' => 'Proposal Review',           'href' => route('finance-office.proposal-review'),            'icon' => 'clipboard-check'],
+                ['slug' => 'proposal-archive',          'label' => 'Proposal Archive',          'href' => route('finance-office.proposal-archive'),           'icon' => 'archive'],
                 // Annual Procurement Plan moved to Procurement Office
                 ['slug' => 'budget-utilization-report', 'label' => 'Budget Utilization Report', 'href' => route('finance-office.budget-utilization-report'),  'icon' => 'trending-up'],
             ],

@@ -97,6 +97,8 @@
     /* Uploaded PO PDF — the scanned, physically-signed document */
     .pdf-preview { border-radius: 12px; border: 1px solid var(--s200); background: var(--s50); overflow: hidden; aspect-ratio: 8.5 / 11; display: flex; align-items: center; justify-content: center; position: relative; }
     .pdf-preview iframe { width: 100%; height: 100%; border: none; }
+    .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200); background: #fff; color: var(--s700); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
+    .pdf-print-btn:hover { background: var(--crimson); color: #fff; border-color: var(--crimson); }
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 42px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
@@ -120,8 +122,8 @@
     /* Delivery & payment timeline (separate chain) — same red/green as the
        signatory timeline above (PR and AOC's tracking uses only those two),
        so no color override here; just the wrap-related line fix below. */
-    /* 6 steps wrap onto a second row after "Waiting for Cashier – Payment Receipt"
-       (5th step) at this panel's width, dropping "Paid" to its own line below —
+    /* 6 steps wrap onto a second row after "Waiting for Accounting – Payment
+       Processing" (5th step) at this panel's width, dropping "Paid" to its own line below —
        the connector line assumes a same-row next step, so it dangles rightward
        into nothing at the wrap point. Cut just that one line. */
     .po-status-timeline .sig-step:nth-child(5)::after { display: none; }
@@ -166,6 +168,30 @@
 
     @media (max-width: 1200px) { .po-grid { grid-template-columns: 1fr; } }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } .form-grid { grid-template-columns: 1fr; } }
+
+    /* Review PO Document modal */
+    .po-review-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(28,16,16,.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .po-review-overlay.open { display: flex; }
+    .po-review-modal { position: relative; background: #fff; border-radius: 18px; box-shadow: 0 6px 24px rgba(0,0,0,.18); width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto; padding: 26px 28px; font-family: 'Poppins', sans-serif; }
+    .po-review-close { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 22px; line-height: 1; color: var(--s400); cursor: pointer; }
+    .po-review-close:hover { color: var(--s700); }
+    .po-review-title { font-size: 16px; font-weight: 800; color: var(--s900); padding-right: 30px; }
+    .po-review-sub { font-size: 12px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
+    .po-review-file { font-size: 11.5px; color: var(--s400); margin-top: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .po-review-validation { margin-top: 10px; border-radius: 10px; padding: 10px 14px; }
+    .po-review-validation.pass { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .po-review-validation.fail { background: #fee2e2; border: 1px solid #fecaca; }
+    .po-review-validation-summary { font-size: 12.5px; font-weight: 700; }
+    .po-review-validation.pass .po-review-validation-summary { color: #166534; }
+    .po-review-validation.fail .po-review-validation-summary { color: #b91c1c; }
+
+    .po-review-item-row { padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+    .po-review-item-row:last-child { border-bottom: none; }
+    .po-review-item-note { display: block; font-size: 11px; color: var(--s500); margin-top: 2px; }
+    .po-review-note { font-size: 12px; color: var(--s500); margin-top: 14px; line-height: 1.6; }
+
+    .po-review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 </style>
 @endpush
 
@@ -409,6 +435,36 @@
     </div>
 </div>
 
+{{-- Review PO Document modal — shows what was actually read off a candidate
+     PO file (its own P.O. No. + item prices, each checked against the AOC
+     it was issued from) before it's attached for real, the same way the
+     AOC upload and PR Step 2/3 review an extraction before committing.
+     Covers the first upload and any re-upload alike — there is no separate,
+     unvalidated shortcut for either. --}}
+<div class="po-review-overlay" id="poReviewOverlay">
+    <div class="po-review-modal">
+        <button type="button" class="po-review-close" id="poReviewCloseBtn" aria-label="Close">&times;</button>
+        <p class="po-review-title">Review PO Document</p>
+        <p class="po-review-sub">Confirm this document's P.O. number and prices against the Abstract of Canvass before attaching it.</p>
+
+        <p class="po-review-file" id="poReviewFileName"></p>
+
+        <div class="po-review-validation" id="poReviewPoNumber" style="display:none;">
+            <p class="po-review-validation-summary" id="poReviewPoNumberSummary"></p>
+        </div>
+        <div class="po-review-validation" id="poReviewValidation" style="display:none;">
+            <p class="po-review-validation-summary" id="poReviewValidationSummary"></p>
+        </div>
+        <div id="poReviewItems"></div>
+        <p class="po-review-note" id="poReviewNote" style="display:none;"></p>
+
+        <div class="po-review-actions">
+            <button type="button" class="btn-route btn-route-ret" id="poReviewCancelBtn">Cancel</button>
+            <button type="button" class="btn-route btn-route-fwd" id="poReviewConfirmBtn" disabled><i class="ti ti-check"></i> Confirm &amp; Attach</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 <script type="application/json" id="poData">@json($purchaseOrders)</script>
@@ -609,7 +665,7 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = po.pdfFile
-            ? `<iframe src="/storage/${po.pdfFile}#toolbar=0" title="PO Document"></iframe>`
+            ? `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${po.pdfFile}#toolbar=0" title="PO Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
         uploadPoText.textContent = po.pdfFile ? 'Re-upload PDF' : 'Upload PO PDF';
 
@@ -772,38 +828,86 @@
     uploadPoInput.addEventListener('change', async function () {
         const file = this.files[0];
         if (!file || !activePo) return;
+        const fileInput = this;
         const origText = uploadPoText.textContent;
-        uploadPoText.textContent = 'Uploading…';
-        this.disabled = true;
-        const fd = new FormData();
-        fd.append('file', file);
+        fileInput.disabled = true;
+        uploadPoText.textContent = 'Reading document…';
+
+        // Nothing is uploaded yet — the review modal shows exactly what was
+        // read (P.O. No. + item prices, each checked against the AOC) and
+        // only its Confirm & Attach button actually sends the file. Covers
+        // the first upload and any re-upload alike.
+        let preview = null;
         try {
-            const resp = await fetch(activePo.uploadUrl, {
+            const fd = new FormData();
+            fd.append('file', file);
+            const resp = await fetch(activePo.extractUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                 body: fd,
             });
             const json = await resp.json();
-            if (resp.ok && json.success) {
-                activePo.pdfFile    = json.filePath;
-                activePo.alobsNo    = json.alobsNo || activePo.alobsNo;
-                activePo.fundSource = json.fundSource || activePo.fundSource;
-                document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.filePath}#toolbar=0" title="PO Document"></iframe>`;
-                document.getElementById('fAlobsNo').textContent    = activePo.alobsNo || '—';
-                document.getElementById('fFundSource').textContent = activePo.fundSource || '—';
-                uploadPoText.textContent = 'Re-upload PDF';
-                showToast('PO PDF uploaded successfully.' + (json.alobsNo || json.fundSource ? ' ALOBS/Fund Source detected from the document.' : ''));
-            } else {
-                uploadPoText.textContent = origText;
-                showToast(json.message || 'Upload failed.', true);
-            }
+            if (resp.ok) preview = json;
         } catch {
-            uploadPoText.textContent = origText;
-            showToast('Network error during upload.', true);
+            // best-effort — the review modal still opens below, just without a validation result
         }
-        this.disabled = false;
-        this.value = '';
+
+        uploadPoText.textContent = origText;
+
+        openPoReviewModal({
+            fileName:       file.name,
+            poNumber:       preview?.poNumber ?? null,
+            poNumberOk:     preview?.poNumberOk ?? false,
+            poNumberReason: preview?.poNumberReason ?? 'Could not read this document to check its P.O. No. — try again.',
+            validation:     preview?.validation ?? null,
+            onConfirm: async () => {
+                uploadPoText.textContent = 'Uploading…';
+                const fd = new FormData();
+                fd.append('file', file);
+                try {
+                    const resp = await fetch(activePo.uploadUrl, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body: fd,
+                    });
+                    const json = await resp.json();
+                    if (resp.ok && json.success) {
+                        const updated = json.po;
+                        activePo.pdfFile        = updated.pdfFile;
+                        activePo.poNumber       = updated.poNumber;
+                        activePo.alobsNo        = updated.alobsNo;
+                        activePo.fundSource     = updated.fundSource;
+                        activePo.signatoryStage = updated.signatoryStage;
+                        activePo.signatoryLabel = updated.signatoryLabel;
+
+                        document.getElementById('pdfPreview').innerHTML =
+                            `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${updated.pdfFile}#toolbar=0" title="PO Document"></iframe>`;
+                        document.getElementById('fPoNumber').textContent  = activePo.poNumber;
+                        titleEl.textContent = activePo.poNumber;
+                        document.getElementById('fAlobsNo').textContent    = activePo.alobsNo || '—';
+                        document.getElementById('fFundSource').textContent = activePo.fundSource || '—';
+                        updateSigBadge(activePo.id, activePo.signatoryLabel, activePo.signatoryStage);
+                        const numberCell = tbody?.querySelector(`[data-po-row][data-po-id="${activePo.id}"] td:first-child`);
+                        if (numberCell) numberCell.textContent = activePo.poNumber;
+                        uploadPoText.textContent = 'Re-upload PDF';
+                        showToast(`PO PDF uploaded successfully — ${activePo.poNumber}.` + (activePo.alobsNo !== '—' || activePo.fundSource !== '—' ? ' ALOBS/Fund Source detected from the document.' : ''));
+                    } else {
+                        uploadPoText.textContent = origText;
+                        showToast(json.error || json.message || 'Upload failed.', true);
+                    }
+                } catch {
+                    uploadPoText.textContent = origText;
+                    showToast('Network error during upload.', true);
+                }
+                fileInput.disabled = false;
+                fileInput.value = '';
+            },
+            onCancel: () => {
+                uploadPoText.textContent = origText;
+                fileInput.disabled = false;
+                fileInput.value = '';
+            },
+        });
     });
 
     /* ── Open Issue PO modal ── */
@@ -909,6 +1013,101 @@
 
     function escapeHtml(s) {
         return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ── Review PO Document modal ────────────────────────────────────────
+    // Shows what was actually read off a candidate PO file — its own P.O.
+    // number, plus item prices each checked against the Abstract of Canvass
+    // it was issued from — before it's attached for real. Covers the first
+    // upload and any re-upload alike; nothing is saved until Confirm &
+    // Attach is clicked here.
+    const poReviewOverlay      = document.getElementById('poReviewOverlay');
+    const poReviewFileNameEl   = document.getElementById('poReviewFileName');
+    const poReviewPoNumberEl        = document.getElementById('poReviewPoNumber');
+    const poReviewPoNumberSummaryEl = document.getElementById('poReviewPoNumberSummary');
+    const poReviewValidationEl = document.getElementById('poReviewValidation');
+    const poReviewValidationSummaryEl = document.getElementById('poReviewValidationSummary');
+    const poReviewItemsEl      = document.getElementById('poReviewItems');
+    const poReviewNoteEl       = document.getElementById('poReviewNote');
+    const poReviewConfirmBtn   = document.getElementById('poReviewConfirmBtn');
+    const poReviewCancelBtn    = document.getElementById('poReviewCancelBtn');
+    const poReviewCloseBtn     = document.getElementById('poReviewCloseBtn');
+
+    let poReviewState = null;
+
+    function closePoReview() {
+        poReviewOverlay.classList.remove('open');
+        if (poReviewState && poReviewState.onCancel) poReviewState.onCancel();
+        poReviewState = null;
+    }
+
+    poReviewCancelBtn.addEventListener('click', closePoReview);
+    poReviewCloseBtn.addEventListener('click', closePoReview);
+    poReviewOverlay.addEventListener('click', (e) => { if (e.target === poReviewOverlay) closePoReview(); });
+
+    poReviewConfirmBtn.addEventListener('click', () => {
+        if (poReviewConfirmBtn.disabled || !poReviewState) return;
+        const onConfirm = poReviewState.onConfirm;
+        poReviewState = null; // cleared before close so closePoReview()'s onCancel doesn't also fire
+        poReviewOverlay.classList.remove('open');
+        onConfirm();
+    });
+
+    /**
+     * @param {object} opts
+     * @param {string} opts.fileName
+     * @param {string|null} opts.poNumber
+     * @param {boolean} opts.poNumberOk
+     * @param {string|null} opts.poNumberReason
+     * @param {object|null} opts.validation  Result of validatePoAgainstAoc(), or null if not run (the AOC's own file wasn't on hand or wasn't text-readable).
+     * @param {() => void} opts.onConfirm  Called once, only when Confirm & Attach is clicked.
+     * @param {() => void} opts.onCancel   Called on Cancel/×/backdrop dismissal.
+     */
+    function openPoReviewModal(opts) {
+        poReviewState = opts;
+        poReviewFileNameEl.textContent = opts.fileName;
+
+        poReviewPoNumberEl.style.display = '';
+        poReviewPoNumberEl.className = 'po-review-validation ' + (opts.poNumberOk ? 'pass' : 'fail');
+        poReviewPoNumberSummaryEl.textContent = opts.poNumberOk
+            ? '✓ P.O. No. ' + opts.poNumber
+            : '✕ ' + (opts.poNumberReason || 'This document\'s P.O. No. could not be used.');
+
+        const validation = opts.validation;
+        const money = n => '₱' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+        if (validation) {
+            const passed = validation.verdict === 'passed';
+            poReviewValidationEl.style.display = '';
+            poReviewValidationEl.className = 'po-review-validation ' + (passed ? 'pass' : 'fail');
+            poReviewValidationSummaryEl.textContent = (passed ? '✓ ' : '✕ ') + (validation.summary || '');
+
+            const dealerHtml = (validation.dealerCheck && !validation.dealerCheck.ok)
+                ? `<div style="margin:10px 0;padding:9px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#b91c1c;">${escapeHtml(validation.dealerCheck.reason)}</div>`
+                : '';
+            const rows = (validation.items || []).map(it => {
+                const ok = it.verdict === 'passed';
+                return `<div class="po-review-item-row">
+                    <span style="font-weight:700;color:${ok ? '#166534' : '#b91c1c'};">${ok ? '✓' : '✕'}</span>
+                    ${escapeHtml(it.name)} — ${money(it.price)}
+                    <span class="po-review-item-note">${escapeHtml(it.reason || '')}</span>
+                </div>`;
+            }).join('');
+            poReviewItemsEl.innerHTML = dealerHtml + rows;
+            poReviewNoteEl.style.display = 'none';
+        } else {
+            poReviewValidationEl.style.display = 'none';
+            poReviewItemsEl.innerHTML = '';
+            poReviewNoteEl.style.display = '';
+            poReviewNoteEl.textContent = 'The Abstract of Canvass this PO was issued from has no readable document on file, so this PO will be attached without a price check.';
+        }
+
+        // Same gate as everywhere else this pattern is used: a document
+        // that was read and found not to check out can't be confirmed.
+        // Nothing to check against is allowed through instead of blocked.
+        poReviewConfirmBtn.disabled = !opts.poNumberOk || !!(validation && validation.verdict !== 'passed');
+
+        poReviewOverlay.classList.add('open');
     }
 
     function handleRefresh(json) {

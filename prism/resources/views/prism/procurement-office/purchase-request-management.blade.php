@@ -90,6 +90,8 @@
     /* PDF preview */
     .pdf-preview { border-radius: 12px; border: 1px solid var(--s200); background: var(--s50); overflow: hidden; aspect-ratio: 8.5 / 11; display: flex; align-items: center; justify-content: center; position: relative; }
     .pdf-preview iframe { width: 100%; height: 100%; border: none; }
+    .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200); background: #fff; color: var(--s700); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
+    .pdf-print-btn:hover { background: var(--crimson); color: #fff; border-color: var(--crimson); }
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 42px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
@@ -181,8 +183,12 @@
     .pr-modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
     .pr-modal-overlay.open { display: flex; }
     .pr-modal { background: #fff; border-radius: 18px; width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; padding: 24px 28px; box-shadow: 0 24px 60px rgba(0,0,0,.25); font-family: 'Poppins', sans-serif; }
-    .pr-modal-title { font-size: 17px; font-weight: 800; color: #0f172a; }
-    .pr-modal-sub { font-size: 12.5px; color: #64748b; margin-top: 3px; }
+    /* padding-right reserves the close button's own corner (see
+       .pr-modal-close below) so the title and the long subtitle text can
+       never wrap underneath it — without this, the subtitle's first line
+       especially could flow right into the button's footprint. */
+    .pr-modal-title { font-size: 17px; font-weight: 800; color: #0f172a; padding-right: 34px; }
+    .pr-modal-sub { font-size: 12.5px; color: #64748b; margin-top: 3px; padding-right: 34px; }
     .pr-modal-close { position: absolute; top: 20px; right: 24px; background: none; border: none; font-size: 22px; color: #94a3b8; cursor: pointer; line-height: 1; }
     .pr-modal-close:hover { color: #334155; }
     .pr-modal-body { position: relative; }
@@ -212,7 +218,13 @@
     .pr-file-picker { display: flex; align-items: center; gap: 10px; }
     .pr-choose-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 9px; border: 1.5px dashed #cbd5e1; background: #f8fafc; color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; }
     .pr-choose-btn:hover { border-color: var(--crimson); color: var(--crimson); }
-    .pr-file-name { font-size: 12px; color: #475569; font-weight: 600; }
+    .pr-file-name { font-size: 12px; color: var(--crimson); font-weight: 600; text-decoration: none; }
+    .pr-file-name:not(:empty):hover { text-decoration: underline; }
+
+    .pr-locked-ppmp { border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; padding: 12px 14px; }
+    .pr-locked-ppmp .code { font-size: 12.5px; font-weight: 800; color: #0f172a; }
+    .pr-locked-ppmp .office { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 20px; background: #f1f5f9; color: #334155; font-size: 10px; font-weight: 700; margin-left: 6px; }
+    .pr-locked-ppmp .title { font-size: 12px; color: #475569; margin-top: 4px; }
     .pr-extract-status { font-size: 12px; color: #64748b; margin-top: 8px; display: none; }
     .pr-extract-status.show { display: flex; align-items: center; gap: 6px; }
     .pr-extract-warn { font-size: 11.5px; color: #92400E; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px; padding: 8px 10px; margin-top: 8px; display: none; }
@@ -231,9 +243,8 @@
     .pr-items-table input { width: 100%; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 8px; font-size: 12px; font-family: 'Poppins', sans-serif; }
     .pr-items-table input.pr-item-name { min-width: 160px; }
     .pr-items-table input.pr-item-num { text-align: right; width: 80px; }
-    .pr-row-remove { background: none; border: none; color: #DC2626; cursor: pointer; font-size: 15px; padding: 4px; }
-    .pr-add-item-btn { margin-top: 8px; background: none; border: 1.5px dashed #cbd5e1; border-radius: 8px; color: #475569; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer; font-family: 'Poppins', sans-serif; }
-    .pr-add-item-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+    .pr-row-undo { background: none; border: none; color: #64748b; cursor: pointer; font-size: 15px; padding: 4px; }
+    .pr-row-undo:hover { color: var(--crimson); }
     .pr-items-total { text-align: right; font-size: 12.5px; font-weight: 700; color: #0f172a; margin-top: 8px; }
 
     .pr-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
@@ -241,10 +252,6 @@
     .pr-status-msg { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 9px 12px; margin-top: 12px; display: none; }
     .pr-status-msg.error { display: block; background: #fee2e2; color: #b91c1c; }
     .pr-status-msg.success { display: block; background: #dcfce7; color: #166534; }
-
-    /* Quarter picker */
-    .pr-quarter-select { height: 38px; width: 100%; border-radius: 9px; border: 1px solid #cbd5e1; background: #fff; padding: 0 12px; font-size: 12.5px; font-weight: 600; color: #334155; font-family: 'Poppins', sans-serif; }
-    .pr-quarter-hint { font-size: 10.5px; color: #94a3b8; margin-top: 5px; }
 
     /* Content-validation result */
     .pr-validation { border-radius: 9px; padding: 10px 13px; margin-bottom: 12px; }
@@ -255,6 +262,12 @@
     .pr-validation.fail .pr-validation-summary { color: #b91c1c; }
     .pr-validation-warnings { margin: 6px 0 0 16px; padding: 0; }
     .pr-validation-warnings li { font-size: 11px; color: #854f0b; line-height: 1.5; }
+    /* Document field checks (Office/Fiscal Year/Total Cost/PR Number) — a
+       failure here blocks submission the same as a mismatched item, so it
+       reads as a hard reason (red), separate from the amber "noted only"
+       warnings list above. */
+    .pr-validation-field-checks { margin: 6px 0 0 16px; padding: 0; }
+    .pr-validation-field-checks li { font-size: 11px; color: #b91c1c; font-weight: 600; line-height: 1.5; }
 
     .pr-items-table tr.row-fail td { background: #fef2f2; }
     .pr-item-verdict { display: block; font-size: 10.5px; font-weight: 700; margin-top: 3px; line-height: 1.4; }
@@ -401,11 +414,14 @@
                         <span>No PDF attached</span>
                     </div>
                 </div>
-                <label class="upload-pr-label" id="uploadPrLabel">
+                <button type="button" class="upload-pr-label" id="uploadPrLabel">
                     <i class="ti ti-upload"></i>
                     <span id="uploadPrText">Upload PR PDF</span>
-                    <input type="file" id="uploadPrInput" accept="application/pdf,.pdf">
-                </label>
+                </button>
+                {{-- Fallback only: a PR with no linked PPMP (legacy data) has
+                     nothing to re-validate against, so it keeps the plain
+                     file-swap instead of the Step 2/3 wizard below. --}}
+                <input type="file" id="uploadPrInput" accept="application/pdf,.pdf" style="display:none;">
 
                 {{-- Extracted fields --}}
                 <div class="detail-fields">
@@ -532,10 +548,10 @@
     <div class="pr-modal">
         <div class="pr-modal-body">
             <button type="button" class="pr-modal-close" id="prModalCloseBtn" aria-label="Close">&times;</button>
-            <p class="pr-modal-title">Upload Purchase Request</p>
-            <p class="pr-modal-sub">Pick the approved PPMP this PR is for, then upload the signed document — its contents get read automatically for you to review before creating it.</p>
+            <p class="pr-modal-title" id="prModalTitle">Upload Purchase Request</p>
+            <p class="pr-modal-sub" id="prModalSub">Pick the approved PPMP this PR is for, then upload the signed document — its contents get read automatically for you to review before creating it.</p>
 
-            <div class="pr-step">
+            <div class="pr-step" id="prPpmpStep">
                 <p class="pr-step-label">1. Approved PPMP <span style="text-transform:none;font-weight:600;color:#94a3b8;">(newest first)</span></p>
                 <div class="pr-ppmp-list" id="prPpmpList">
                     @forelse ($approvedPpmps as $p)
@@ -555,30 +571,21 @@
                     @endforelse
                 </div>
                 <div class="pr-missing-box" id="prMissingBox" style="margin-top:10px;display:none;"></div>
+            </div>
 
-                <div id="prQuarterWrap" style="margin-top:12px;display:none;">
-                    <label class="pr-step-label" for="prQuarterSelect" style="display:block;margin-bottom:6px;">
-                        Target quarter to check against
-                    </label>
-                    <select id="prQuarterSelect" class="pr-quarter-select">
-                        <option value="">All quarters (check the whole PPMP)</option>
-                        <option value="Q1">Q1 (Jan–Mar)</option>
-                        <option value="Q2">Q2 (Apr–Jun)</option>
-                        <option value="Q3">Q3 (Jul–Sep)</option>
-                        <option value="Q4">Q4 (Oct–Dec)</option>
-                    </select>
-                    <p class="pr-quarter-hint">
-                        This is the <strong>Target Quarter the requesting office set on each PPMP item</strong> — not a date on the PR itself.
-                        Pick one to compare only that quarter's items; leave it on "All quarters" if you're unsure.
-                    </p>
-                </div>
+            {{-- Re-upload mode only: the PR already belongs to a specific
+                 PPMP, so Step 1 becomes a fixed readout instead of a picker —
+                 re-uploading a document can't reassign which PPMP it's for. --}}
+            <div class="pr-step" id="prLockedPpmpStep" style="display:none;">
+                <p class="pr-step-label">1. Linked PPMP</p>
+                <div class="pr-locked-ppmp" id="prLockedPpmpBox"></div>
             </div>
 
             <div class="pr-step" id="prUploadStep" style="display:none;">
                 <p class="pr-step-label">2. PR Document (PDF)</p>
                 <div class="pr-file-picker">
                     <button type="button" class="pr-choose-btn" id="prChooseFileBtn"><i class="ti ti-file-upload"></i> Choose PDF</button>
-                    <span class="pr-file-name" id="prFileName"></span>
+                    <a class="pr-file-name" id="prFileName" href="#" target="_blank" rel="noopener" title="Open this file to read it"></a>
                 </div>
                 <input type="file" id="prFileInput" accept="application/pdf,.pdf" style="display:none;">
                 <div class="pr-extract-status" id="prExtractStatus"><i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Reading document…</div>
@@ -586,7 +593,7 @@
             </div>
 
             <div class="pr-step pr-review" id="prReview">
-                <p class="pr-step-label">3. Review Before Creating</p>
+                <p class="pr-step-label" id="prReviewStepLabel">3. Review Before Creating</p>
                 <div class="pr-review-grid">
                     <div class="pr-field"><label>PR Number</label><input type="text" id="prNumberInput"></div>
                     <div class="pr-field"><label>Title (optional)</label><input type="text" id="prTitleInput" placeholder="e.g. project/purpose"></div>
@@ -596,16 +603,22 @@
                      extract call, and re-checked server-side on submit. --}}
                 <div class="pr-validation" id="prValidation" style="display:none;">
                     <p class="pr-validation-summary" id="prValidationSummary"></p>
+                    <ul class="pr-validation-field-checks" id="prValidationFieldChecks"></ul>
                     <ul class="pr-validation-warnings" id="prValidationWarnings"></ul>
                 </div>
 
+                {{-- Column order matches the official PR form: Unit, Item
+                     Description, Qty, Unit Cost, Total Cost. Rows only ever
+                     come from what Step 2 actually scanned — no add, no
+                     delete; the last column is an undo, not a remove, so a
+                     stray edit can be reverted but the row set itself can't
+                     be changed by hand. --}}
                 <table class="pr-items-table">
                     <thead>
-                        <tr><th>Item</th><th>Unit</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th></th></tr>
+                        <tr><th>Unit</th><th>Item Description</th><th>Qty</th><th>Unit Cost</th><th>Total Cost</th><th></th></tr>
                     </thead>
                     <tbody id="prItemsBody"></tbody>
                 </table>
-                <button type="button" class="pr-add-item-btn" id="prAddItemBtn"><i class="ti ti-plus"></i> Add item row</button>
                 <p class="pr-items-total" id="prItemsTotal">Total: ₱0.00</p>
             </div>
 
@@ -654,6 +667,7 @@
     const btnConfirmRet    = document.getElementById('btnConfirmReturn');
     const uploadPrInput    = document.getElementById('uploadPrInput');
     const uploadPrText     = document.getElementById('uploadPrText');
+    const uploadPrLabel    = document.getElementById('uploadPrLabel');
     const csrfToken        = document.querySelector('meta[name="csrf-token"]').content;
 
     const pageStageMeta    = JSON.parse(document.getElementById('stagesData').textContent);
@@ -889,7 +903,7 @@
 
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = pr.pdfFile
-            ? `<iframe src="/storage/${pr.pdfFile}#toolbar=0" title="PR Document"></iframe>`
+            ? `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${pr.pdfFile}#toolbar=0" title="PR Document"></iframe>`
             : `<div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF attached</span></div>`;
         uploadPrText.textContent = pr.pdfFile ? 'Re-upload PDF' : 'Upload PR PDF';
 
@@ -1121,7 +1135,10 @@
         finally { saving = false; btnSave.disabled = false; btnSave.innerHTML = origHtml; }
     });
 
-    /* ── Upload PR PDF ── */
+    /* ── Upload/re-upload PR PDF: fallback only, for a PR with no linked PPMP
+       (legacy data) — nothing to re-validate against, so it keeps the plain
+       file-swap. Everything else goes through the wizard (see
+       openPrModalForReupload below), wired up once that's defined. ── */
     uploadPrInput.addEventListener('change', async function () {
         const file = this.files[0];
         if (!file || !activePr) return;
@@ -1140,7 +1157,7 @@
             if (resp.ok && json.success) {
                 activePr.pdfFile = json.filePath;
                 document.getElementById('pdfPreview').innerHTML =
-                    `<iframe src="/storage/${json.filePath}#toolbar=0" title="PR Document"></iframe>`;
+                    `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${json.filePath}#toolbar=0" title="PR Document"></iframe>`;
                 uploadPrText.textContent = 'Re-upload PDF';
                 showToast('PR PDF uploaded successfully.');
             } else {
@@ -1264,6 +1281,11 @@
     const createUrl  = JSON.parse(document.getElementById('createPrUrlData').textContent);
 
     const prOverlay       = document.getElementById('prModalOverlay');
+    const prModalTitle    = document.getElementById('prModalTitle');
+    const prModalSub      = document.getElementById('prModalSub');
+    const prPpmpStep       = document.getElementById('prPpmpStep');
+    const prLockedPpmpStep = document.getElementById('prLockedPpmpStep');
+    const prLockedPpmpBox  = document.getElementById('prLockedPpmpBox');
     const prPpmpList      = document.getElementById('prPpmpList');
     const prMissingBox    = document.getElementById('prMissingBox');
     const prUploadStep    = document.getElementById('prUploadStep');
@@ -1279,33 +1301,63 @@
     const prItemsTotalEl  = document.getElementById('prItemsTotal');
     const prStatusMsg     = document.getElementById('prStatusMsg');
     const prSubmitBtn     = document.getElementById('prSubmitBtn');
-    const prQuarterWrap   = document.getElementById('prQuarterWrap');
-    const prQuarterSelect = document.getElementById('prQuarterSelect');
     const prValidation        = document.getElementById('prValidation');
     const prValidationSummary = document.getElementById('prValidationSummary');
     const prValidationWarnings = document.getElementById('prValidationWarnings');
+    const prValidationFieldChecks = document.getElementById('prValidationFieldChecks');
+    const prReviewStepLabel = document.getElementById('prReviewStepLabel');
 
     let selectedPpmpId = null;
     let selectedPpmpOfficeCode = null;
     let lastValidation = null;
+    // Set only while re-uploading an existing PR's document through this same
+    // wizard — null means "creating a brand-new PR" (the original behavior).
+    let reuploadPr = null;
+    let prFileObjectUrl = null;
+
+    const CREATE_MODAL_TITLE = prModalTitle.textContent;
+    const CREATE_MODAL_SUB   = prModalSub.textContent;
 
     function money(n) {
         return '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function submitBtnLabel() {
+        return reuploadPr ? 'Save Re-uploaded PR' : 'Create Purchase Request';
+    }
+
+    // Lets Step 2's file name be opened and actually read before submitting —
+    // a local object URL, since the file hasn't been sent to the server yet.
+    function setPrFilePreview(file) {
+        if (prFileObjectUrl) { URL.revokeObjectURL(prFileObjectUrl); prFileObjectUrl = null; }
+        if (file) {
+            prFileObjectUrl = URL.createObjectURL(file);
+            prFileNameEl.textContent = file.name;
+            prFileNameEl.href = prFileObjectUrl;
+        } else {
+            prFileNameEl.textContent = '';
+            prFileNameEl.removeAttribute('href');
+        }
     }
 
     function resetPrModal() {
         selectedPpmpId = null;
         selectedPpmpOfficeCode = null;
         lastValidation = null;
+        reuploadPr = null;
+        prModalTitle.textContent = CREATE_MODAL_TITLE;
+        prModalSub.textContent = CREATE_MODAL_SUB;
+        prReviewStepLabel.textContent = '3. Review Before Creating';
+        prPpmpStep.style.display = '';
+        prLockedPpmpStep.style.display = 'none';
+        prLockedPpmpBox.innerHTML = '';
         prPpmpList.querySelectorAll('.pr-ppmp-row.selected').forEach(r => r.classList.remove('selected'));
         prMissingBox.style.display = 'none';
         prMissingBox.innerHTML = '';
-        if (prQuarterWrap) prQuarterWrap.style.display = 'none';
-        if (prQuarterSelect) prQuarterSelect.value = '';
         if (prValidation) prValidation.style.display = 'none';
         prUploadStep.style.display = 'none';
         prFileInput.value = '';
-        prFileNameEl.textContent = '';
+        setPrFilePreview(null);
         prExtractStatus.classList.remove('show');
         prExtractWarn.classList.remove('show');
         prReview.classList.remove('show');
@@ -1313,6 +1365,7 @@
         prNumberInput.value = '';
         prTitleInput.value = '';
         prStatusMsg.className = 'pr-status-msg';
+        prSubmitBtn.innerHTML = '<i class="ti ti-check"></i> ' + submitBtnLabel();
         prSubmitBtn.disabled = true;
         recalcPrItemsTotal();
     }
@@ -1321,6 +1374,47 @@
         resetPrModal();
         prOverlay.classList.add('open');
     });
+
+    /**
+     * Re-upload an existing PR's document through the same Step 2/3
+     * read-and-review flow used for creating one — instead of the old plain
+     * file-swap — so a corrected document gets re-checked against the PPMP
+     * it's linked to, and its item rows are refreshed to match, rather than
+     * trusting whatever was scanned the first time.
+     */
+    function openPrModalForReupload(pr) {
+        resetPrModal();
+        reuploadPr = pr;
+        selectedPpmpId = pr.budgetProposalId;
+        selectedPpmpOfficeCode = pr.office;
+
+        prModalTitle.textContent = 'Re-upload Purchase Request';
+        prModalSub.textContent = `Upload a corrected document for ${pr.prNumber} — its contents will be re-checked against the linked PPMP, and the item list below refreshed to match, before saving.`;
+
+        prPpmpStep.style.display = 'none';
+        prLockedPpmpStep.style.display = '';
+        prLockedPpmpBox.innerHTML = `<span class="code">${escapeHtml(pr.budgetProposalCode || '—')}</span><span class="office">${escapeHtml(pr.office)}</span>`
+            + (pr.item ? `<p class="title">${escapeHtml(pr.item)}</p>` : '');
+
+        prUploadStep.style.display = '';
+        prReviewStepLabel.textContent = '3. Review Before Saving';
+        prNumberInput.value = pr.prNumber || '';
+        prSubmitBtn.innerHTML = '<i class="ti ti-check"></i> ' + submitBtnLabel();
+
+        prOverlay.classList.add('open');
+    }
+
+    uploadPrLabel.addEventListener('click', () => {
+        if (!activePr) return;
+        // A PR with no linked PPMP (legacy data) has nothing to re-validate
+        // against — fall back to the plain file-swap input instead.
+        if (activePr.reuploadUrl) {
+            openPrModalForReupload(activePr);
+        } else {
+            uploadPrInput.click();
+        }
+    });
+
     function closePrModal() { prOverlay.classList.remove('open'); }
     document.getElementById('prModalCloseBtn').addEventListener('click', closePrModal);
     document.getElementById('prCancelBtn').addEventListener('click', closePrModal);
@@ -1346,32 +1440,41 @@
                     </div>`).join('')
                 : '<p class="pr-missing-empty">Every item in this PPMP already has a Purchase Request.</p>';
 
-            prQuarterWrap.style.display = '';
             prUploadStep.style.display = '';
             prReview.classList.remove('show');
             prSubmitBtn.disabled = true;
         });
     });
 
-    // Changing the quarter changes which PPMP items the document is checked
-    // against, so re-run the check on whatever file is already chosen.
-    prQuarterSelect?.addEventListener('change', () => {
-        if (prFileInput.files[0]) extractAndValidate();
-    });
-
     prChooseFileBtn.addEventListener('click', () => prFileInput.click());
 
+    /**
+     * A row's fields stay editable (fixing a scan that misread one letter is
+     * legitimate) but the row itself is never added or removed by hand — it
+     * exists only because Step 2 actually found it in the document. The last
+     * column is Undo, not Delete: it snaps that one row's fields back to
+     * exactly what was scanned, for the "pressed/changed something by
+     * accident" case, without ever letting the row count itself drift from
+     * what was extracted.
+     */
     function addPrItemRow(item) {
+        const original = {
+            name: item?.name ?? '', unit: item?.unit ?? '',
+            quantity: item?.quantity ?? '', unitCost: item?.unitCost ?? '',
+        };
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><input type="text" class="pr-item-name" value="${escapeHtml(item?.name ?? '')}"></td>
-            <td><input type="text" class="pr-item-unit" style="width:70px;" value="${escapeHtml(item?.unit ?? '')}"></td>
-            <td><input type="number" class="pr-item-num pr-item-qty" min="0.01" step="0.01" value="${item?.quantity ?? ''}"></td>
-            <td><input type="number" class="pr-item-num pr-item-cost" min="0" step="0.01" value="${item?.unitCost ?? ''}"></td>
-            <td class="pr-item-row-total" style="text-align:right;font-weight:700;white-space:nowrap;">${money((item?.quantity || 0) * (item?.unitCost || 0))}</td>
-            <td><button type="button" class="pr-row-remove" title="Remove row"><i class="ti ti-trash"></i></button></td>`;
+            <td><input type="text" class="pr-item-unit" style="width:70px;" value="${escapeHtml(original.unit)}"></td>
+            <td><input type="text" class="pr-item-name" value="${escapeHtml(original.name)}"></td>
+            <td><input type="number" class="pr-item-num pr-item-qty" min="0.01" step="0.01" value="${original.quantity}"></td>
+            <td><input type="number" class="pr-item-num pr-item-cost" min="0" step="0.01" value="${original.unitCost}"></td>
+            <td class="pr-item-row-total" style="text-align:right;font-weight:700;white-space:nowrap;">${money((original.quantity || 0) * (original.unitCost || 0))}</td>
+            <td><button type="button" class="pr-row-undo" title="Undo — revert this row to what was scanned"><i class="ti ti-arrow-back-up"></i></button></td>`;
         prItemsBody.appendChild(tr);
 
+        const unitInput = tr.querySelector('.pr-item-unit');
+        const nameInput = tr.querySelector('.pr-item-name');
         const qtyInput  = tr.querySelector('.pr-item-qty');
         const costInput = tr.querySelector('.pr-item-cost');
         const totalCell = tr.querySelector('.pr-item-row-total');
@@ -1381,7 +1484,13 @@
         }
         qtyInput.addEventListener('input', updateRowTotal);
         costInput.addEventListener('input', updateRowTotal);
-        tr.querySelector('.pr-row-remove').addEventListener('click', () => { tr.remove(); recalcPrItemsTotal(); });
+        tr.querySelector('.pr-row-undo').addEventListener('click', () => {
+            unitInput.value = original.unit;
+            nameInput.value = original.name;
+            qtyInput.value  = original.quantity;
+            costInput.value = original.unitCost;
+            updateRowTotal();
+        });
     }
 
     function recalcPrItemsTotal() {
@@ -1397,8 +1506,6 @@
         const blocked = lastValidation && lastValidation.verdict !== 'passed';
         prSubmitBtn.disabled = prItemsBody.children.length === 0 || !!blocked;
     }
-
-    document.getElementById('prAddItemBtn').addEventListener('click', () => addPrItemRow(null));
 
     /**
      * Paints the content-check result: a summary banner, per-row verdicts, and
@@ -1423,6 +1530,14 @@
         prValidation.className = 'pr-validation ' + (passed ? 'pass' : 'fail');
         prValidationSummary.textContent = (passed ? '✓ ' : '✕ ') + (validation.summary || '');
 
+        // Field checks (Office/Fiscal Year/Total Cost/PR Number) — only the
+        // failing ones are shown; a passing check has nothing worth saying.
+        if (prValidationFieldChecks) {
+            prValidationFieldChecks.innerHTML = (validation.fieldChecks || [])
+                .filter(c => !c.ok)
+                .map(c => `<li>${escapeHtml(c.reason || (c.field + ' does not match.'))}</li>`).join('');
+        }
+
         prValidationWarnings.innerHTML = (validation.warnings || [])
             .map(w => `<li>${escapeHtml(w)}</li>`).join('');
 
@@ -1434,7 +1549,10 @@
             if (!tr) return;
             const ok = res.verdict === 'passed';
             if (!ok) tr.classList.add('row-fail');
-            const cell = tr.querySelector('td');
+            // The description cell specifically — not just "the first td",
+            // which is Unit now that the columns match the official form's
+            // order (Unit, Item Description, Qty, Unit Cost, Total Cost).
+            const cell = tr.querySelector('.pr-item-name')?.closest('td');
             if (!cell) return;
             const note = document.createElement('span');
             note.className = 'pr-item-verdict ' + (ok ? 'ok' : 'bad');
@@ -1449,7 +1567,7 @@
         const file = prFileInput.files[0];
         if (!file) return;
 
-        prFileNameEl.textContent = file.name;
+        setPrFilePreview(file);
         prExtractWarn.classList.remove('show');
         prExtractStatus.classList.add('show');
         prReview.classList.remove('show');
@@ -1462,7 +1580,9 @@
             // Sending these lets the server check the document's contents
             // against the chosen PPMP in the same round-trip.
             if (selectedPpmpId) fd.append('budget_proposal_id', selectedPpmpId);
-            if (prQuarterSelect?.value) fd.append('quarter', prQuarterSelect.value);
+            // Re-upload mode: this PR's own existing number would otherwise
+            // trip the uniqueness check against itself.
+            if (reuploadPr) fd.append('exclude_pr_id', reuploadPr.id);
 
             const resp = await fetch(extractUrl, {
                 method: 'POST',
@@ -1473,18 +1593,17 @@
             prExtractStatus.classList.remove('show');
 
             if (!resp.ok || !json.success) {
-                prExtractWarn.textContent = 'Could not read the document automatically — enter the items manually below.';
+                // No manual-entry fallback — a document the system can't read
+                // isn't submittable at all; re-upload a text-based PDF of the
+                // actual signed form instead of typing items in by hand.
+                prExtractWarn.textContent = 'Could not read this document automatically. Please upload a text-based PDF of the actual signed PR form.';
                 prExtractWarn.classList.add('show');
             } else {
-                // The office is already known from the PPMP row picked in
-                // step 1 — the document's own office field is only useful
-                // here as a sanity check that the right file was uploaded.
-                if (json.officeCode && selectedPpmpOfficeCode && json.officeCode !== selectedPpmpOfficeCode) {
-                    prExtractWarn.textContent = `Heads up — this document looks like it's for "${json.officeCode}", but the PPMP you selected is for "${selectedPpmpOfficeCode}". Double-check before creating.`;
-                    prExtractWarn.classList.add('show');
-                }
+                // Office/Fiscal Year/Total Cost/PR Number mismatches are now
+                // authoritative, blocking checks — see renderValidation()'s
+                // fieldChecks list below, not a dismissible banner here.
                 if (!json.items || !json.items.length) {
-                    prExtractWarn.textContent = (prExtractWarn.classList.contains('show') ? prExtractWarn.textContent + ' ' : '') + 'No item rows were recognized — add them manually below.';
+                    prExtractWarn.textContent = (prExtractWarn.classList.contains('show') ? prExtractWarn.textContent + ' ' : '') + 'No item rows were recognized in this document — it cannot be submitted as-is. Re-upload the correct PDF, or check that the item table matches the standard PR form layout.';
                     prExtractWarn.classList.add('show');
                 }
                 prNumberInput.value = json.prNumber || '';
@@ -1493,16 +1612,14 @@
 
             prItemsBody.innerHTML = '';
             (json.items || []).forEach(it => addPrItemRow(it));
-            if (!json.items || !json.items.length) addPrItemRow(null);
             recalcPrItemsTotal();
             prReview.classList.add('show');
             renderValidation(json.validation);
         } catch {
             prExtractStatus.classList.remove('show');
-            prExtractWarn.textContent = 'Network error while reading the document — you can still enter the items manually below.';
+            prExtractWarn.textContent = 'Network error while reading the document — please try uploading it again.';
             prExtractWarn.classList.add('show');
             prItemsBody.innerHTML = '';
-            addPrItemRow(null);
             recalcPrItemsTotal();
             prReview.classList.add('show');
         }
@@ -1534,14 +1651,13 @@
         }
 
         prSubmitBtn.disabled = true;
-        prSubmitBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Creating…';
+        prSubmitBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> ' + (reuploadPr ? 'Saving…' : 'Creating…');
 
         try {
             const fd = new FormData();
-            fd.append('budget_proposal_id', selectedPpmpId);
+            if (!reuploadPr) fd.append('budget_proposal_id', selectedPpmpId);
             fd.append('pr_number', prNumberInput.value.trim());
             fd.append('title', prTitleInput.value.trim());
-            if (prQuarterSelect?.value) fd.append('quarter', prQuarterSelect.value);
             fd.append('file', prFileInput.files[0]);
             items.forEach((it, i) => {
                 fd.append(`items[${i}][name]`, it.name);
@@ -1550,19 +1666,19 @@
                 fd.append(`items[${i}][unit_cost]`, it.unit_cost);
             });
 
-            const resp = await fetch(createUrl, {
+            const resp = await fetch(reuploadPr ? reuploadPr.reuploadUrl : createUrl, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                 body: fd,
             });
             const json = await resp.json();
             if (resp.ok && json.success) {
-                showToast(`${json.prNumber} created.`);
+                showToast(reuploadPr ? `${json.prNumber} updated.` : `${json.prNumber} created.`);
                 closePrModal();
                 setTimeout(() => window.location.reload(), 700);
             } else {
                 prStatusMsg.className = 'pr-status-msg error';
-                prStatusMsg.textContent = json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Could not create the Purchase Request.');
+                prStatusMsg.textContent = json.error || (json.errors ? Object.values(json.errors).flat().join(' ') : 'Could not save the Purchase Request.');
                 // The server re-checks the reviewed list, which the user may
                 // have edited after the file was read — show its verdict.
                 if (json.validation) renderValidation(json.validation);
@@ -1571,7 +1687,7 @@
             prStatusMsg.className = 'pr-status-msg error';
             prStatusMsg.textContent = 'Network error — please try again.';
         } finally {
-            prSubmitBtn.innerHTML = '<i class="ti ti-check"></i> Create Purchase Request';
+            prSubmitBtn.innerHTML = '<i class="ti ti-check"></i> ' + submitBtnLabel();
             recalcPrItemsTotal();   // owns the disabled state, incl. the validation gate
         }
     });

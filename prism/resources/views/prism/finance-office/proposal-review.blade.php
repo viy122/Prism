@@ -203,7 +203,7 @@
             <div>
                 <p class="card-eyebrow">Budget Office</p>
                 <h2 class="card-title">Proposal Review</h2>
-                <p class="card-sub">Review office details, encoded procurement items, justifications, target quarters, and AI market scoping references.</p>
+                <p class="card-sub">Review office details, encoded procurement items, justifications, target quarters, and market scoping references.</p>
             </div>
             @if($pendingCount > 0)
             <span class="pill-awaiting">
@@ -262,6 +262,9 @@
                 <h2 class="card-title">{{ $selectedProposal['title'] }}</h2>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+                <a class="btn-ghost" href="{{ route('finance-office.proposal-review.document', $selectedProposal['id']) }}" target="_blank" rel="noopener">
+                    <i class="ti ti-file-text"></i> View PPMP Document
+                </a>
                 @if(count($selectedProposal['reviewHistory']) > 0)
                 <button type="button" class="btn-ghost" id="btnViewReviewHistory">
                     <i class="ti ti-history"></i> Review History
@@ -286,10 +289,6 @@
             <div class="meta-box">
                 <dt>Fiscal Year</dt>
                 <dd>{{ $selectedProposal['office']['fiscalYear'] }}</dd>
-            </div>
-            <div class="meta-box">
-                <dt>Submitted Date</dt>
-                <dd>{{ $selectedProposal['office']['submittedDate'] }}</dd>
             </div>
             <div class="meta-box">
                 <dt>Proposed Budget</dt>
@@ -341,7 +340,7 @@
                         <th>Qty</th>
                         <th>Estimated Cost</th>
                         <th>Quarter</th>
-                        <th>AI Market Scoping</th>
+                        <th>Market Scoping</th>
                         <th>Budget Remarks</th>
                     </tr>
                 </thead>

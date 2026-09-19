@@ -196,6 +196,13 @@ trait HandlesSignatureQueue
                 ];
             })->values()->all();
 
+        // "Needs You" is what a signatory actually cares about seeing first —
+        // the 3-state filter is built around that, not the raw stage:
+        // Pending = it's on YOU right now, In Progress = moving through the
+        // pipeline elsewhere (including not-yet-created), Fully Signed = done.
+        $canAct = $doc->signatory_stage !== 'fully_signed'
+            && $doc->stageOwnerRole($doc->signatory_stage) === $this->queueRoleCode();
+
         $row = [
             'docType'        => $docType,
             'docLabel'       => strtoupper($docType),
@@ -206,20 +213,14 @@ trait HandlesSignatureQueue
             'remarks'        => $remarks ?: '—',
             'signatoryStage' => $doc->signatory_stage,
             'signatoryLabel' => $doc->signatory_label,
-            // Reliable 3-state bucket for filtering — PR/AOC/PO all share the
-            // same signatory_stage + file_path columns, so this is the same
-            // "not yet created" / "fully signed" / else logic as
-            // PurchaseRequest::signingStatusBucket(), just generic here since
-            // it applies identically across all three document types.
             'statusBucket'   => match (true) {
-                $doc->signatory_stage === 'draft' && !$doc->file_path => 'pending',
-                $doc->signatory_stage === 'fully_signed'              => 'fully_signed',
-                default                                               => 'in_progress',
+                $doc->signatory_stage === 'fully_signed' => 'fully_signed',
+                $canAct                                  => 'pending',
+                default                                  => 'in_progress',
             },
             'stageType'      => $doc->stageMetaFor($doc->signatory_stage)['type'] ?? 'signature',
             'nextStage'      => $doc->nextSignatoryStage(),
-            'canAct'         => $doc->signatory_stage !== 'fully_signed'
-                && $doc->stageOwnerRole($doc->signatory_stage) === $this->queueRoleCode(),
+            'canAct'         => $canAct,
             // Set when the document failed the content check against the
             // document it came from. advance() refuses it either way; surfacing
             // it here lets the queue explain the hold instead of only failing

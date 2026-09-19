@@ -24,9 +24,14 @@
     .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
-    .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 10px; background: var(--m); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: background .2s; white-space: nowrap; }
+    .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 10px; background: var(--m); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Poppins', sans-serif; border: none; transition: background .2s; white-space: nowrap; text-decoration: none; }
     .btn-primary:hover { background: var(--m-dk); }
     .btn-primary svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-secondary { background: var(--white); color: var(--m); border: 1.5px solid var(--m); }
+    .btn-secondary:hover { background: var(--crimson-mid); }
+
+    .report-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .office-filter-select { height: 42px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--s300); background: var(--white); font-size: 13px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; cursor: pointer; }
 
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .stat-card {
@@ -81,8 +86,11 @@
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
     @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
 
+    .print-only-filter-note { display: none; }
+
     @media print {
-        .btn-primary { display: none !important; }
+        .btn-primary, .office-filter-select { display: none !important; }
+        .print-only-filter-note { display: block !important; font-size: 12px; font-weight: 700; color: var(--m); margin-top: 6px; }
         body { background: #fff !important; }
         .content { padding: 0 !important; }
         .card, .stat-card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
@@ -107,11 +115,29 @@
             <p class="page-hdr-eyebrow">Procurement Office</p>
             <h1 class="page-hdr-title">Procurement Reports</h1>
             <p class="page-hdr-sub">Review quarterly accomplishment, completed purchases, and delayed items with remarks.</p>
+            {{-- Hidden on screen (the dropdown already shows this); shown only
+                 when printed, since the dropdown itself is hidden there — a
+                 printed filtered report needs to say so on the page itself. --}}
+            @if($selectedOffice)
+            <p class="print-only-filter-note">Filtered to office: {{ $selectedOffice }}</p>
+            @endif
         </div>
-        <button class="btn-primary" type="button" id="printReportBtn">
-            <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Export / Print
-        </button>
+        <div class="report-actions">
+            <select id="officeFilter" class="office-filter-select">
+                <option value="">All Offices</option>
+                @foreach ($offices as $office)
+                    <option value="{{ $office->code }}" {{ $selectedOffice === $office->code ? 'selected' : '' }}>{{ $office->code }}</option>
+                @endforeach
+            </select>
+            <a class="btn-primary btn-secondary" href="{{ $exportUrl }}" id="exportReportBtn">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export CSV
+            </a>
+            <button class="btn-primary" type="button" id="printReportBtn">
+                <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                Print
+            </button>
+        </div>
     </div>
 
     <div class="stats-grid">
@@ -318,6 +344,16 @@
 <script>
 document.getElementById('printReportBtn').addEventListener('click', function () {
     window.print();
+});
+
+document.getElementById('officeFilter').addEventListener('change', function () {
+    const url = new URL(window.location.href);
+    if (this.value) {
+        url.searchParams.set('office', this.value);
+    } else {
+        url.searchParams.delete('office');
+    }
+    window.location.href = url.toString();
 });
 </script>
 @endpush

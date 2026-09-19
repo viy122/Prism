@@ -55,11 +55,16 @@
     .icon-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; font-size: 16px; }
     .icon-btn-check { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
     .icon-btn-check:hover:not(:disabled) { background: #bbf7d0; }
-    .icon-btn-x { background: var(--s100); color: var(--s400); border-color: var(--s200); cursor: default; }
     .icon-btn-view { background: #e6f1fb; color: #185fa5; border-color: #b5d4f4; }
     .icon-btn-view:hover:not(:disabled) { background: #b5d4f4; }
     .icon-btn:disabled { opacity: .5; cursor: not-allowed; }
     .payment-made-cell { display: flex; align-items: center; gap: 8px; }
+
+    .po-doc-link { color: #185fa5; text-decoration: none; }
+    .po-doc-link:hover { text-decoration: underline; }
+    .attachment-links { display: flex; flex-direction: column; gap: 3px; }
+    .attachment-link { font-size: 11px; font-weight: 600; color: #185fa5; text-decoration: none; white-space: nowrap; }
+    .attachment-link:hover { text-decoration: underline; }
 
     .search-wrap { position: relative; }
     .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
@@ -205,9 +210,6 @@
                                     title="View Accounting's Payment Processing Attachment">
                                     <i class="ti ti-paperclip"></i>
                                 </button>
-                                <button type="button" class="icon-btn icon-btn-x" disabled title="Not yet paid">
-                                    <i class="ti ti-x"></i>
-                                </button>
                                 <button type="button" class="icon-btn icon-btn-check btn-open-payment"
                                     data-url="{{ $po['uploadUrl'] }}"
                                     data-po-id="{{ $po['id'] }}"
@@ -260,18 +262,36 @@
                         <th>Amount</th>
                         <th>Paid Date</th>
                         <th>Paid By (Cashier)</th>
+                        <th>Attachments</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="paidTbody">
                     @foreach($recentlyPaid as $po)
                     <tr data-paid-row data-office="{{ $po['office'] }}" data-paid-at-raw="{{ $po['paidAtRaw'] }}" data-search="{{ strtolower($po['poNumber'] . ' ' . $po['office'] . ' ' . $po['supplier']) }}">
-                        <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}</td>
+                        <td style="font-weight:700;font-size:12px;">
+                            @if($po['pdfFile'])
+                                <a href="/storage/{{ $po['pdfFile'] }}" target="_blank" rel="noopener" class="po-doc-link" title="Open the full PO document">{{ $po['poNumber'] }}</a>
+                            @else
+                                <span style="color:var(--s500);">{{ $po['poNumber'] }}</span>
+                            @endif
+                        </td>
                         <td style="font-size:12px;font-weight:600;color:var(--s600);">{{ $po['office'] }}</td>
                         <td>{{ $po['supplier'] }}</td>
                         <td style="font-weight:600;white-space:nowrap;">₱{{ number_format($po['totalAmount'], 2) }}</td>
                         <td style="font-size:12px;color:var(--s500);">{{ $po['paidAt'] }}</td>
                         <td style="font-size:12px;color:var(--s500);">{{ $po['paidBy'] }}</td>
+                        <td>
+                            @if(count($po['attachments']))
+                                <div class="attachment-links">
+                                    @foreach($po['attachments'] as $att)
+                                        <a href="{{ $att['url'] }}" target="_blank" rel="noopener" class="attachment-link" title="{{ $att['filename'] }}">{{ $att['label'] }}</a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <span style="color:var(--s400);font-size:12px;">—</span>
+                            @endif
+                        </td>
                         <td><span class="badge badge-paid">Payment Made ✓</span></td>
                     </tr>
                     @endforeach
@@ -386,25 +406,21 @@
     cancelBtn.addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
-    /* ── View PO Document / Accounting's processing attachment ── */
-    function wireDocViewButtons(selector, missingMsg, titleSuffix) {
+    /* ── View PO Document / Accounting's processing attachment ──────────
+       Opens the actual file in a new tab/window instead of a preview modal
+       — the point of this button is to actually read the document in full
+       (zoomable, scrollable, printable via the browser's own PDF viewer). ── */
+    function wireDocViewButtons(selector, missingMsg) {
         document.querySelectorAll(selector).forEach(btn => {
             btn.addEventListener('click', () => {
                 const pdf = btn.dataset.pdf;
                 if (!pdf) { showToast(missingMsg, true); return; }
-                if (window.prismInfoModal) {
-                    window.prismInfoModal({
-                        title: btn.dataset.poNumber + ' — ' + titleSuffix,
-                        bodyHtml: `<iframe src="/storage/${pdf}#toolbar=0" style="width:100%;height:65vh;border:none;border-radius:8px;"></iframe>`,
-                    });
-                } else {
-                    window.open('/storage/' + pdf, '_blank', 'noopener');
-                }
+                window.open('/storage/' + pdf, '_blank', 'noopener');
             });
         });
     }
-    wireDocViewButtons('.btn-view-po-doc', 'No PO document has been uploaded for this PO yet.', 'PO Document');
-    wireDocViewButtons('.btn-view-processing-doc', "Accounting hasn't attached a payment processing file for this PO yet.", 'Payment Processing Attachment');
+    wireDocViewButtons('.btn-view-po-doc', 'No PO document has been uploaded for this PO yet.');
+    wireDocViewButtons('.btn-view-processing-doc', "Accounting hasn't attached a payment processing file for this PO yet.");
 
     submitBtn.addEventListener('click', async () => {
         if (!activeBtn) return;

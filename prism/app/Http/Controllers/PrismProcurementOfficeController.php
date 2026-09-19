@@ -17,6 +17,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseRequest;
 use App\Models\PurchaseRequestItem;
 use App\Services\DocumentValidationService;
+use App\Services\ItemMatchingService;
 use App\Services\NotificationService;
 use App\Services\ProcurementModeService;
 use App\Services\SignatoryActionService;
@@ -29,36 +30,87 @@ use Illuminate\View\View;
 
 class PrismProcurementOfficeController extends Controller
 {
-    public function dashboard(): View
+    public function dashboard(Request $request): View
     {
-        // Every bucket below is derived from PurchaseRequest::signingStatusBucket()
-        // (signatory_stage + file_path), never the raw `status` column — that
-        // column only ever holds granular values Procurement Office itself
-        // writes ('new', 'for_alobs', 'po_confirmed', ...); the simple values
-        // this dashboard used to filter on ('completed', 'pending', 'delayed')
-        // are never actually written by any real code path.
-        $totalPrsReceived = PurchaseRequest::count();
-        $allPrs            = PurchaseRequest::with('office')->get();
-        $bucketCounts       = $allPrs->countBy(fn ($pr) => $pr->signingStatusBucket());
+        // Every 3-state bucket below (pending / in_progress / completed) is the
+        // same signatory_stage + file_path read PurchaseRequest::signingStatusBucket()
+        // already used — AOC and PO share those exact columns via HasSignatoryChain,
+        // so the same rule is inlined for them rather than reading their raw
+        // `status`/`signatory_stage` columns directly, which hold granular
+        // values ('for_alobs', 'awaiting_delivery', ...) this 3-way summary
+        // was never meant to filter on.
+        $bucketOf = fn ($doc) => ($doc->signatory_stage === 'draft' && !$doc->file_path)
+            ? 'pending'
+            : ($doc->signatory_stage === 'fully_signed' ? 'completed' : 'in_progress');
 
-        $prsInProgress = $bucketCounts['in_progress'] ?? 0;
-        $prsCompleted  = $bucketCounts['completed'] ?? 0;
+        // ── Filters: Office + Fiscal Year, both optional, default to "all" ──────
+        $officeId   = $request->integer('office') ?: null;
+        $fiscalYear = $request->integer('year') ?: null;
 
-        // No due-date/deadline column exists anywhere on purchase_requests —
-        // "overdue" here means the closest real, honest signal available:
-        // still not fully signed, N+ days after it was submitted.
+        $officeOptions = Office::whereHas('purchaseRequests')
+            ->orderBy('code')->get(['id', 'code', 'name']);
+        $yearOptions = PurchaseRequest::whereNotNull('fiscal_year')
+            ->distinct()->orderByDesc('fiscal_year')->pluck('fiscal_year');
+
+        $prQuery = PurchaseRequest::with('office')
+            ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            ->when($fiscalYear, fn ($q) => $q->where('fiscal_year', $fiscalYear));
+        $allPrs = $prQuery->get();
+
+        $aocQuery = AbstractOfCanvass::with('purchaseRequest.office')
+            ->when($officeId, fn ($q) => $q->whereHas('purchaseRequest', fn ($q2) => $q2->where('office_id', $officeId)))
+            ->when($fiscalYear, fn ($q) => $q->whereHas('purchaseRequest', fn ($q2) => $q2->where('fiscal_year', $fiscalYear)));
+        $allAocs = $aocQuery->get();
+
+        $poQuery = PurchaseOrder::with('abstractOfCanvass.purchaseRequest.office')
+            ->when($officeId, fn ($q) => $q->whereHas('abstractOfCanvass.purchaseRequest', fn ($q2) => $q2->where('office_id', $officeId)))
+            ->when($fiscalYear, fn ($q) => $q->whereHas('abstractOfCanvass.purchaseRequest', fn ($q2) => $q2->where('fiscal_year', $fiscalYear)));
+        $allPos = $poQuery->get();
+
+        $prBuckets  = $allPrs->countBy($bucketOf);
+        $aocBuckets = $allAocs->countBy($bucketOf);
+        $poBuckets  = $allPos->countBy($bucketOf);
+
+        // No due-date/deadline column exists on any of the three documents —
+        // "overdue" is the closest real, honest signal: still open (not fully
+        // signed) N+ days after the PR's own submission date (the one date
+        // that anchors the whole PR → AOC → PO chain).
         $overdueThresholdDays = 30;
-        $overduePrs = $allPrs->filter(fn ($pr) =>
-            $pr->signingStatusBucket() !== 'completed'
-            && $pr->submitted_at
-            && $pr->submitted_at->diffInDays(now()) > $overdueThresholdDays
-        )->count();
+        $isOverdue = fn ($doc, $bucket) => $bucket !== 'completed'
+            && $doc->submitted_at
+            && $doc->submitted_at->diffInDays(now()) > $overdueThresholdDays;
+        $overdueCount = $allPrs->filter(fn ($pr) => $isOverdue($pr, $bucketOf($pr)))->count()
+            + $allAocs->filter(fn ($aoc) => $isOverdue($aoc->purchaseRequest, $bucketOf($aoc)))->count()
+            + $allPos->filter(fn ($po) => $isOverdue($po->abstractOfCanvass?->purchaseRequest, $bucketOf($po)))->count();
 
-        $officeStatusGroups = Office::has('purchaseRequests')
-            ->with('purchaseRequests')
+        // ── Per-office volume — PR/AOC/PO counts together, one grouped chart
+        //    instead of three, so it can't silently stay PR-only again. ───────
+        $officeVolume = $allPrs->countBy(fn ($pr) => $pr->office?->code ?? '—');
+        $aocOfficeVolume = $allAocs->countBy(fn ($aoc) => $aoc->purchaseRequest?->office?->code ?? '—');
+        $poOfficeVolume  = $allPos->countBy(fn ($po) => $po->abstractOfCanvass?->purchaseRequest?->office?->code ?? '—');
+        $officeVolumeChart = collect($officeVolume->keys())
+            ->merge($aocOfficeVolume->keys())->merge($poOfficeVolume->keys())
+            ->unique()->sort()->values()
+            ->map(fn ($code) => [
+                'office' => $code,
+                'pr'     => $officeVolume[$code] ?? 0,
+                'aoc'    => $aocOfficeVolume[$code] ?? 0,
+                'po'     => $poOfficeVolume[$code] ?? 0,
+            ])
+            ->sortByDesc(fn ($r) => $r['pr'] + $r['aoc'] + $r['po'])
+            ->values()->all();
+
+        $officeStatusGroups = Office::whereHas('purchaseRequests', fn ($q) =>
+                $q->when($officeId, fn ($q2) => $q2->where('office_id', $officeId))
+                  ->when($fiscalYear, fn ($q2) => $q2->where('fiscal_year', $fiscalYear))
+            )
+            ->when($officeId, fn ($q) => $q->where('id', $officeId))
+            ->with(['purchaseRequests' => fn ($q) =>
+                $q->when($fiscalYear, fn ($q2) => $q2->where('fiscal_year', $fiscalYear))
+            ])
             ->get()
-            ->map(function ($office) {
-                $counts = $office->purchaseRequests->countBy(fn ($pr) => $pr->signingStatusBucket());
+            ->map(function ($office) use ($bucketOf) {
+                $counts = $office->purchaseRequests->countBy($bucketOf);
                 return [
                     'office'     => $office->code,
                     'completed'  => $counts['completed'] ?? 0,
@@ -70,49 +122,60 @@ class PrismProcurementOfficeController extends Controller
             ->values()
             ->all();
 
-        // "Urgent" = still open (not fully signed) and has been waiting the
-        // longest since submission — the only real, honest urgency signal
-        // available (no target-quarter or due-date column exists on this
-        // model; "Quarter" below is a best-effort parse of the PR number,
-        // blank when the number doesn't embed a "-Q#" tag).
-        $urgentPrs = $allPrs
-            ->filter(fn ($pr) => $pr->signingStatusBucket() !== 'completed' && $pr->submitted_at)
-            ->sortBy('submitted_at')
+        // "Urgent" = still open and has been waiting the longest since the PR
+        // was submitted — merged across all three document types so this is
+        // an actual worklist, not just a PR-only view of it.
+        $urgentDocs = collect()
+            ->concat($allPrs->map(fn ($pr) => ['doc' => $pr, 'docType' => 'PR', 'number' => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT), 'title' => $pr->title, 'office' => $pr->office, 'anchor' => $pr->submitted_at, 'bucket' => $bucketOf($pr)]))
+            ->concat($allAocs->map(fn ($aoc) => ['doc' => $aoc, 'docType' => 'AOC', 'number' => $aoc->code, 'title' => $aoc->purchaseRequest?->title, 'office' => $aoc->purchaseRequest?->office, 'anchor' => $aoc->purchaseRequest?->submitted_at, 'bucket' => $bucketOf($aoc)]))
+            ->concat($allPos->map(fn ($po) => ['doc' => $po, 'docType' => 'PO', 'number' => $po->po_number, 'title' => $po->abstractOfCanvass?->purchaseRequest?->title, 'office' => $po->abstractOfCanvass?->purchaseRequest?->office, 'anchor' => $po->abstractOfCanvass?->purchaseRequest?->submitted_at, 'bucket' => $bucketOf($po)]))
+            ->filter(fn ($r) => $r['bucket'] !== 'completed' && $r['anchor'])
+            ->sortBy('anchor')
             ->take(8)
-            ->map(fn ($pr) => [
-                'office'        => $pr->office?->code ?? '—',
-                'prNumber'      => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
-                'item'          => $pr->title,
-                'targetQuarter' => $pr->numberQuarter() ?? '—',
-                'daysPending'   => (int) $pr->submitted_at->diffInDays(now()),
-                'status'        => ucfirst(str_replace('_', ' ', $pr->signingStatusBucket())),
+            ->map(fn ($r) => [
+                'docType'       => $r['docType'],
+                'office'        => $r['office']?->code ?? '—',
+                'number'        => $r['number'],
+                'item'          => $r['title'] ?? '—',
+                'daysPending'   => (int) $r['anchor']->diffInDays(now()),
+                'status'        => ucfirst(str_replace('_', ' ', $r['bucket'])),
             ])
             ->values()
             ->all();
 
         return view('prism.procurement-office.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Procurement Office Dashboard',
+            'filters'   => [
+                'officeOptions' => $officeOptions,
+                'yearOptions'   => $yearOptions,
+                'selectedOffice' => $officeId,
+                'selectedYear'   => $fiscalYear,
+            ],
             'summary'   => [
-                'totalPrsReceived' => $totalPrsReceived,
-                'prsInProgress'    => $prsInProgress,
-                'prsCompleted'     => $prsCompleted,
-                'overduePrs'       => $overduePrs,
+                'totalPrs'  => $allPrs->count(),
+                'totalAocs' => $allAocs->count(),
+                'totalPos'  => $allPos->count(),
+                'overdueCount'         => $overdueCount,
                 'overdueThresholdDays' => $overdueThresholdDays,
             ],
             'officeStatusGroups' => $officeStatusGroups,
-            'urgentPrs'          => $urgentPrs,
-            'statusChart'        => [
-                'pending'     => $bucketCounts['pending'] ?? 0,
-                'in_progress' => $prsInProgress,
-                'completed'   => $prsCompleted,
+            'urgentDocs'         => $urgentDocs,
+            // One chart, three document types — a stacked bar reads their
+            // status mix at a glance without resorting to three separate pies.
+            'docStatusChart' => [
+                ['doc' => 'PR',  'pending' => $prBuckets['pending'] ?? 0,  'in_progress' => $prBuckets['in_progress'] ?? 0,  'completed' => $prBuckets['completed'] ?? 0],
+                ['doc' => 'AOC', 'pending' => $aocBuckets['pending'] ?? 0, 'in_progress' => $aocBuckets['in_progress'] ?? 0, 'completed' => $aocBuckets['completed'] ?? 0],
+                ['doc' => 'PO',  'pending' => $poBuckets['pending'] ?? 0,  'in_progress' => $poBuckets['in_progress'] ?? 0,  'completed' => $poBuckets['completed'] ?? 0],
             ],
-            'officeVolumeChart' => Office::has('purchaseRequests')
-                ->withCount('purchaseRequests')
-                ->get()
-                ->map(fn ($o) => ['office' => $o->code, 'count' => $o->purchase_requests_count])
-                ->sortByDesc('count')
-                ->values()
-                ->all(),
+            // Pie/donut is legitimate here: 3 categories, and the question it
+            // answers ("what share of the pipeline is PR vs AOC vs PO?") is
+            // genuinely part-to-whole, not a precise-comparison ask.
+            'docMixChart' => [
+                'pr'  => $allPrs->count(),
+                'aoc' => $allAocs->count(),
+                'po'  => $allPos->count(),
+            ],
+            'officeVolumeChart' => $officeVolumeChart,
         ]));
     }
 
@@ -231,6 +294,10 @@ class PrismProcurementOfficeController extends Controller
                 'returnUrl'     => route('procurement-office.purchase-request.return', $pr->id),
                 'updateUrl'     => route('procurement-office.purchase-request.update-status', $pr->id),
                 'uploadUrl'         => route('procurement-office.purchase-request.upload', $pr->id),
+                // Only offered when the PR is linked to a PPMP — re-scanning
+                // items needs something to validate them against. Legacy PRs
+                // without one fall back to the plain file-swap above.
+                'reuploadUrl'       => $pr->budget_proposal_id ? route('procurement-office.purchase-request.reupload', $pr->id) : null,
                 ];
             })
             ->all();
@@ -572,6 +639,7 @@ class PrismProcurementOfficeController extends Controller
             'file'               => 'required|file|mimes:pdf|max:10240',
             'budget_proposal_id' => 'nullable|integer|exists:budget_proposals,id',
             'quarter'            => 'nullable|in:Q1,Q2,Q3,Q4',
+            'exclude_pr_id'      => 'nullable|integer|exists:purchase_requests,id',
         ]);
 
         $text   = $this->readPdfText($request->file('file'));
@@ -580,13 +648,20 @@ class PrismProcurementOfficeController extends Controller
         $payload = ['success' => true] + $parsed;
 
         if ($request->filled('budget_proposal_id')) {
-            $proposal = BudgetProposal::find($request->input('budget_proposal_id'));
+            $proposal = BudgetProposal::with('office')->find($request->input('budget_proposal_id'));
             if ($proposal) {
                 $payload['validation'] = $validator->validatePrAgainstPpmp(
                     $parsed['items'],
                     $proposal,
                     $request->input('quarter'),
-                    $parsed['parseError'] ?? null
+                    $parsed['parseError'] ?? null,
+                    [
+                        'officeCode'  => $parsed['officeCode'] ?? null,
+                        'fiscalYear'  => $parsed['fiscalYear'] ?? null,
+                        'totalCost'   => $parsed['totalCost'] ?? null,
+                        'prNumber'    => $parsed['prNumber'] ?? null,
+                        'excludePrId' => $request->input('exclude_pr_id'),
+                    ]
                 );
             }
         }
@@ -613,6 +688,17 @@ class PrismProcurementOfficeController extends Controller
      */
     private function parsePurchaseRequestForm(string $text): array
     {
+        // Real forms wrap label text itself mid-phrase depending on column
+        // width ("Name of\nProject:", "TOTAL\nCOST") — not just the value
+        // after a label. Collapsing every run of whitespace (space, tab,
+        // newline) to a single space up front, before anything else runs,
+        // makes every literal-label match below robust to that by
+        // construction, on top of (not instead of) labelPattern()'s \s+ and
+        // the \s+ already used around "UNIT COST"/"TOTAL COST" — belt and
+        // suspenders, since a form export nobody has tested against yet
+        // could still wrap some other label the same way.
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
         $prNumber = null;
         if (preg_match('/PR\s*No:?\s*([A-Za-z0-9\-\/]+)/u', $text, $m)) {
             $prNumber = $m[1];
@@ -631,13 +717,25 @@ class PrismProcurementOfficeController extends Controller
             $date = $m[1];
         }
 
+        // No standalone "Fiscal Year" field exists on this form — the PR's own
+        // Date line is the closest real, honest signal for which fiscal year
+        // it was actually raised in.
+        $fiscalYear = null;
+        if ($date && preg_match('/(\d{4})\s*$/', $date, $ym)) {
+            $fiscalYear = (int) $ym[1];
+        }
+
+        // "TOTAL COST" (and "UNIT COST" below) use \s+ between the two words,
+        // not a literal space — a narrow grand-total cell commonly wraps this
+        // exact label to "TOTAL\nCOST" in the extracted text, same reason
+        // labelPattern() exists for the labels above.
         $totalCost = null;
-        if (preg_match('/TOTAL COST\s*Php\s*([\d,]+\.\d{2})/u', $text, $m)) {
+        if (preg_match('/TOTAL\s+COST\s*Php\s*([\d,]+\.\d{2})/u', $text, $m)) {
             $totalCost = (float) str_replace(',', '', $m[1]);
         }
 
         $items = [];
-        if (preg_match('/QTY\s*UNIT COST\s*TOTAL COST(.*?)TOTAL COST\s*Php/su', $text, $tableMatch)) {
+        if (preg_match('/QTY\s*UNIT\s+COST\s*TOTAL\s+COST(.*?)TOTAL\s+COST\s*Php/su', $text, $tableMatch)) {
             // Per-item costs are usually prefixed with "₱", but some forms
             // (or this same form filled via different software) spell it out
             // as "Php"/"PHP" instead — same as this form's own grand-total
@@ -678,6 +776,7 @@ class PrismProcurementOfficeController extends Controller
                     'officeCode'  => $officeCode,
                     'projectName' => $projectName,
                     'date'        => $date,
+                    'fiscalYear'  => $fiscalYear,
                     'totalCost'   => $totalCost,
                     'items'       => [],
                     'parseError'  => 'The item table was too large or complex to read reliably (PCRE error ' . preg_last_error() . ').',
@@ -686,7 +785,7 @@ class PrismProcurementOfficeController extends Controller
 
             // Known units are still used — not to find rows, but to split a glued
             // "unitAir Conditioner" back into its unit and its description.
-            $uom = 'units?|reams?|boxe?s?|packs?|sets?|lots?|rolls?|kgs?|liters?|gallons?|pcs?|pieces?|bottles?|cans?|dozens?|pairs?|bundles?|sacks?|sheets?|tubes?|pads?|trays?|cartons?|ctns?|jars?|tins?|bags?|drums?|cases?|kits?|spools?|meters?|m|ea|each|unit\/s';
+            $uom = $this->unitVocabularyPattern();
 
             $cursor = 0;
             foreach ($rows as $row) {
@@ -701,7 +800,7 @@ class PrismProcurementOfficeController extends Controller
                 // up to and including the last repeated column-header line rather
                 // than discarding the head wholesale — the first item on every
                 // page after the first is a real item and must survive.
-                if (preg_match('/^.*QTY\s*UNIT COST\s*TOTAL COST(.*)$/su', $head, $hm)) {
+                if (preg_match('/^.*QTY\s*UNIT\s+COST\s*TOTAL\s+COST(.*)$/su', $head, $hm)) {
                     $head = trim($hm[1]);
                 }
 
@@ -736,15 +835,275 @@ class PrismProcurementOfficeController extends Controller
             'officeCode'  => $officeCode,
             'projectName' => $projectName,
             'date'        => $date,
+            'fiscalYear'  => $fiscalYear,
             'totalCost'   => $totalCost,
             'items'       => $items,
         ];
     }
 
+    /** Shared between parsePurchaseRequestForm() and parseQuotationItems() — both split a glued "unitSomething" back into its unit and its description off the same vocabulary. */
+    private function unitVocabularyPattern(): string
+    {
+        return 'units?|reams?|boxe?s?|packs?|sets?|lots?|rolls?|kgs?|liters?|gallons?|pcs?|pieces?|bottles?|cans?|dozens?|pairs?|bundles?|sacks?|sheets?|tubes?|pads?|trays?|cartons?|ctns?|jars?|tins?|bags?|drums?|cases?|kits?|spools?|meters?|m|ea|each|unit\/s';
+    }
+
+    /**
+     * Parses the item table of the standardized BatStateU-FO-PRO-01
+     * Quotation/Canvass Form: ITEM NO. | UNIT | ITEM AND DESCRIPTION |
+     * QUANTITY | UNIT PRICE. Same row-by-tail scanning approach as
+     * parsePurchaseRequestForm() (see its docblock for why), just with a
+     * single trailing currency amount per row instead of two — this form has
+     * one price column, not a unit-cost/total-cost pair.
+     *
+     * @return array<int, array{name: string, unit: string, quantity: float, unitPrice: float}>
+     */
+    private function parseQuotationItems(string $text): array
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
+        $items = [];
+        if (!preg_match('/QUANTITY\s+UNIT\s+PRICE(.*?)Brand\s+Model\s*:/su', $text, $tableMatch)) {
+            return $items;
+        }
+
+        $currency = '(?:₱|Php|PHP)';
+        $matched  = preg_match_all(
+            '/(\d+(?:\.\d+)?)\s*' . $currency . '\s*([\d,]+\.\d{2})/u',
+            $tableMatch[1],
+            $rows,
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+        );
+
+        if ($matched === false || $matched === 0) {
+            return $items;
+        }
+
+        $uom    = $this->unitVocabularyPattern();
+        $cursor = 0;
+        foreach ($rows as $row) {
+            [$qtyRaw, $qtyOffset] = $row[1];
+            $head   = trim(substr($tableMatch[1], $cursor, $qtyOffset - $cursor));
+            $cursor = $row[2][1] + strlen($row[2][0]);
+
+            // Drop the leading "ITEM NO." column value (e.g. "1 ", "2 ").
+            if (preg_match('/^\d+\s*(.+)$/su', $head, $hm)) {
+                $head = trim($hm[1]);
+            }
+
+            if ($head === '') {
+                continue;
+            }
+
+            if (preg_match('/^(' . $uom . ')\s*(.+)$/isu', $head, $split)) {
+                $unit = $split[1];
+                $name = $split[2];
+            } elseif (preg_match('/^(\S{1,15})\s+(.+)$/su', $head, $split)) {
+                $unit = $split[1];
+                $name = $split[2];
+            } else {
+                $unit = '';
+                $name = $head;
+            }
+
+            $items[] = [
+                'name'      => trim(preg_replace('/\s+/', ' ', $name)),
+                'unit'      => trim($unit),
+                'quantity'  => (float) $qtyRaw,
+                'unitPrice' => (float) str_replace(',', '', $row[2][0]),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Parses the item table of the standardized BatStateU-FO-PRO-04 Abstract
+     * of Canvass form: QUANTITY | UNIT | NAME AND DESCRIPTION OF ARTICLE/S |
+     * SUPPLIER 1 | SUPPLIER 2 | SUPPLIER 3 | Previous Price | Date Purchased
+     * | RESPONSIVE DEALER.
+     *
+     * Anchored on each row's Date Purchased rather than on its currency
+     * amounts, unlike the PR/quotation parsers above — how many of the 3
+     * supplier-price cells are actually filled genuinely varies row to row
+     * (not every item gets canvassed from all 3 suppliers), so there's no
+     * fixed count of amounts per row to anchor on the way "qty then two
+     * costs" works for a PR row. A date, in contrast, is reliably present
+     * once per row and doesn't occur anywhere else in this form's prose.
+     *
+     * The column order is fixed, though: whatever currency amounts appear
+     * right before that date, the LAST one is always Previous Price (a
+     * historical reference figure, not a live quotation) and is dropped;
+     * everything earlier is a real Supplier N price kept for checking
+     * against this PR's actual quotations.
+     *
+     * @return array<int, array{name: string, unit: string, quantity: float, supplierPrices: list<float>}>
+     */
+    private function parseAbstractOfCanvassItems(string $text): array
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
+        $items = [];
+        if (!preg_match('/RESPONSIVE\s+DEALER(.*?)I\s+HEREBY\s+CERTIFY/su', $text, $tableMatch)) {
+            return $items;
+        }
+
+        $table = $tableMatch[1];
+        // Boilerplate ("...ARTICLE/S End-user") between the column headers
+        // and the first real row — best-effort, only stripped if present.
+        $table = preg_replace('/^.*?End-user\s*/su', '', $table) ?? $table;
+
+        if (!preg_match_all('/\d{1,2}\/\d{1,2}\/\d{4}/u', $table, $dates, PREG_OFFSET_CAPTURE)) {
+            return $items;
+        }
+
+        $currency = '(?:₱|Php|PHP)';
+        $uom      = $this->unitVocabularyPattern();
+        $cursor   = 0;
+
+        foreach ($dates[0] as $i => [$dateStr, $dateOffset]) {
+            $head = substr($table, $cursor, $dateOffset - $cursor);
+
+            // Everything after this date up to the next row's leading
+            // "qty unit" (or the table's end, for the last row) is this
+            // row's Responsive Dealer name — not needed for validation, but
+            // has to be skipped past correctly to find where the next row
+            // actually starts.
+            $tailStart = $dateOffset + strlen($dateStr);
+            $rowEnd    = strlen($table);
+            if (preg_match('/\d+\s*(?:' . $uom . ')/isu', $table, $nm, PREG_OFFSET_CAPTURE, $tailStart)) {
+                $rowEnd = $nm[0][1];
+            }
+            $cursor = $rowEnd;
+
+            // Every currency amount in the head, in column order — the last
+            // is Previous Price (excluded), any earlier ones are Supplier
+            // N prices actually being canvassed right now.
+            preg_match_all('/' . $currency . '\s*([\d,]+\.\d{2})/u', $head, $priceMatches);
+            $prices = array_map(fn ($p) => (float) str_replace(',', '', $p), $priceMatches[1] ?? []);
+            $supplierPrices = $prices ? array_slice($prices, 0, -1) : [];
+
+            // The item's own qty/unit/description is everything in the head
+            // before its first price.
+            $itemHead = preg_match('/^(.*?)' . $currency . '/su', $head, $ihm) ? $ihm[1] : $head;
+            $itemHead = trim($itemHead);
+
+            if (preg_match('/^(\d+(?:\.\d+)?)\s*(.+)$/su', $itemHead, $qm)) {
+                $qty  = (float) $qm[1];
+                $rest = trim($qm[2]);
+            } else {
+                $qty  = 0.0;
+                $rest = $itemHead;
+            }
+
+            if ($rest === '') {
+                continue;
+            }
+
+            if (preg_match('/^(' . $uom . ')\s*(.+)$/isu', $rest, $split)) {
+                $unit = $split[1];
+                $name = $split[2];
+            } else {
+                $unit = '';
+                $name = $rest;
+            }
+
+            $items[] = [
+                'name'           => trim(preg_replace('/\s+/', ' ', $name)),
+                'unit'           => trim($unit),
+                'quantity'       => $qty,
+                'supplierPrices' => $supplierPrices,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Parses the item table of the standardized BatStateU-FO-PRO-03 Purchase
+     * Order form: Stock No. | Unit | Item Description | Qty | Unit Cost |
+     * Amount. Same row-by-tail scanning as parsePurchaseRequestForm() — a
+     * qty followed by two consecutive currency amounts (Unit Cost then
+     * Amount) is exactly the same row shape as a PR's item table, just under
+     * different column headers.
+     *
+     * @return array<int, array{name: string, unit: string, quantity: float, unitCost: float}>
+     */
+    private function parsePoItems(string $text): array
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+
+        $items = [];
+        if (!preg_match('/Qty\s+Unit\s+Cost\s+Amount(.*?)\(TOTAL\s+AMOUNT\s+IN\s+WORDS\)/su', $text, $tableMatch)) {
+            return $items;
+        }
+
+        $currency = '(?:₱|Php|PHP)';
+        $matched  = preg_match_all(
+            '/(\d+(?:\.\d+)?)\s*' . $currency . '\s*([\d,]+\.\d{2})\s*' . $currency . '\s*([\d,]+\.\d{2})/u',
+            $tableMatch[1],
+            $rows,
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+        );
+
+        if ($matched === false || $matched === 0) {
+            return $items;
+        }
+
+        $uom    = $this->unitVocabularyPattern();
+        $cursor = 0;
+        foreach ($rows as $row) {
+            [$qtyRaw, $qtyOffset] = $row[1];
+            $head   = trim(substr($tableMatch[1], $cursor, $qtyOffset - $cursor));
+            $cursor = $row[3][1] + strlen($row[3][0]);
+
+            // Drop the leading "Stock No." column value (e.g. "1 ", "2 ").
+            if (preg_match('/^\d+\s*(.+)$/su', $head, $hm)) {
+                $head = trim($hm[1]);
+            }
+
+            if ($head === '') {
+                continue;
+            }
+
+            if (preg_match('/^(' . $uom . ')\s*(.+)$/isu', $head, $split)) {
+                $unit = $split[1];
+                $name = $split[2];
+            } elseif (preg_match('/^(\S{1,15})\s+(.+)$/su', $head, $split)) {
+                $unit = $split[1];
+                $name = $split[2];
+            } else {
+                $unit = '';
+                $name = $head;
+            }
+
+            $items[] = [
+                'name'     => trim(preg_replace('/\s+/', ' ', $name)),
+                'unit'     => trim($unit),
+                'quantity' => (float) $qtyRaw,
+                'unitCost' => (float) str_replace(',', '', $row[2][0]),
+            ];
+        }
+
+        return $items;
+    }
+
     /** A form label followed by a value that may span 1-2 lines before the next label starts. */
+    /**
+     * A multi-word label ("Name of Project:", "Project Location:") isn't
+     * safe to match literally — a narrow form column wraps the label text
+     * itself mid-phrase in the extracted text ("Name of\nProject:"), not
+     * just the value after it. Quoting first (so punctuation like "/" and
+     * ":" stays literal) and then loosening each of the label's own
+     * internal spaces into \s+ is what makes this tolerant of that.
+     */
+    private function labelPattern(string $label): string
+    {
+        return str_replace(' ', '\s+', preg_quote($label, '/'));
+    }
+
     private function parseLabeledBlock(string $text, string $label, string $stopLabel): ?string
     {
-        $pattern = '/' . preg_quote($label, '/') . '\s*(.*?)\s*' . preg_quote($stopLabel, '/') . '/su';
+        $pattern = '/' . $this->labelPattern($label) . '\s*(.*?)\s*' . $this->labelPattern($stopLabel) . '/su';
         if (preg_match($pattern, $text, $m)) {
             return trim(preg_replace('/\s+/', ' ', $m[1])) ?: null;
         }
@@ -787,7 +1146,13 @@ class PrismProcurementOfficeController extends Controller
         // the extracted text, but what actually gets saved is the reviewed list
         // — which the user can edit — so the decision is re-made here against
         // exactly what is about to be written, and refused outright if it
-        // doesn't hold up.
+        // doesn't hold up. Document fields (office/fiscal year/total) are
+        // likewise re-read off the freshly uploaded file rather than trusted
+        // from the modal's earlier round-trip — same reasoning, just for the
+        // header instead of the item table. PR number isn't included here;
+        // it's already the exact value just checked above.
+        $file       = $request->file('file');
+        $parsed     = $this->parsePurchaseRequestForm($this->readPdfText($file));
         $quarter    = $validated['quarter'] ?? null;
         $forCheck   = array_map(fn ($i) => [
             'name'     => $i['name'],
@@ -795,7 +1160,11 @@ class PrismProcurementOfficeController extends Controller
             'unit'     => $i['unit'] ?? '',
             'unitCost' => (float) $i['unit_cost'],
         ], $validated['items']);
-        $validation = $validator->validatePrAgainstPpmp($forCheck, $proposal, $quarter);
+        $validation = $validator->validatePrAgainstPpmp($forCheck, $proposal, $quarter, null, [
+            'officeCode' => $parsed['officeCode'] ?? null,
+            'fiscalYear' => $parsed['fiscalYear'] ?? null,
+            'totalCost'  => $parsed['totalCost'] ?? null,
+        ]);
 
         if ($validation['verdict'] !== DocumentValidation::PASSED) {
             return response()->json([
@@ -804,7 +1173,6 @@ class PrismProcurementOfficeController extends Controller
             ], 422);
         }
 
-        $file = $request->file('file');
         $path = $file->storeAs('purchase-requests/' . now()->year, Str::slug($number) . '-' . now()->format('His') . '.pdf', 'public');
 
         $pr = PurchaseRequest::create([
@@ -840,6 +1208,101 @@ class PrismProcurementOfficeController extends Controller
         $validator->record($pr, $proposal, DocumentValidation::PAIR_PPMP_PR, $validation, $quarter);
 
         return response()->json(['success' => true, 'prId' => $pr->id, 'prNumber' => $pr->number]);
+    }
+
+    /**
+     * Re-uploads the PR document for a PR that already exists, going through
+     * the same Step 2/3 read-and-review flow as creating one (see
+     * createPurchaseRequestFromApp()) instead of the plain file-swap in
+     * uploadPurchaseRequest() below — a corrected/re-scanned document is
+     * re-checked against the linked PPMP and its item rows replace the old
+     * ones, rather than trusting whatever was scanned the first time.
+     *
+     * Only offered while nothing downstream depends on the current item
+     * list yet: once an Abstract of Canvass exists, quotations were already
+     * gathered against those specific items, so re-scanning would silently
+     * invalidate them.
+     */
+    public function reuploadPurchaseRequestFromApp(Request $request, PurchaseRequest $pr, DocumentValidationService $validator): JsonResponse
+    {
+        abort_if($pr->abstractOfCanvass, 422, 'This PR already has an Abstract of Canvass, so its items can no longer be re-scanned. Contact an administrator if the uploaded document itself needs correcting.');
+
+        $proposal = BudgetProposal::with('office')->find($pr->budget_proposal_id);
+        abort_if(!$proposal, 422, 'This PR is not linked to a PPMP and cannot be re-validated this way.');
+        $office = $proposal->office;
+        abort_if(!$office, 422, 'This PPMP has no office on record.');
+
+        $validated = $request->validate([
+            'pr_number'          => 'nullable|string|max:100',
+            'title'              => 'nullable|string|max:255',
+            'quarter'            => 'nullable|in:Q1,Q2,Q3,Q4',
+            'file'               => 'required|file|mimes:pdf|max:10240',
+            'items'              => 'required|array|min:1',
+            'items.*.name'       => 'required|string|max:255',
+            'items.*.unit'       => 'nullable|string|max:50',
+            'items.*.quantity'   => 'required|numeric|min:0.01',
+            'items.*.unit_cost'  => 'required|numeric|min:0',
+        ]);
+
+        $number = trim((string) ($validated['pr_number'] ?? '')) ?: $pr->number;
+        if ($number !== $pr->number && PurchaseRequest::where('number', $number)->where('id', '!=', $pr->id)->exists()) {
+            return response()->json(['error' => "A Purchase Request numbered \"{$number}\" already exists."], 422);
+        }
+
+        // Same authoritative re-check as creation — see the comment on
+        // createPurchaseRequestFromApp() above. excludePrId keeps this PR's
+        // own (unchanged) number from being flagged as a duplicate of itself.
+        $file       = $request->file('file');
+        $parsed     = $this->parsePurchaseRequestForm($this->readPdfText($file));
+        $quarter    = $validated['quarter'] ?? null;
+        $forCheck   = array_map(fn ($i) => [
+            'name'     => $i['name'],
+            'quantity' => (float) $i['quantity'],
+            'unit'     => $i['unit'] ?? '',
+            'unitCost' => (float) $i['unit_cost'],
+        ], $validated['items']);
+        $validation = $validator->validatePrAgainstPpmp($forCheck, $proposal, $quarter, null, [
+            'officeCode'  => $parsed['officeCode'] ?? null,
+            'fiscalYear'  => $parsed['fiscalYear'] ?? null,
+            'totalCost'   => $parsed['totalCost'] ?? null,
+            'excludePrId' => $pr->id,
+        ]);
+
+        if ($validation['verdict'] !== DocumentValidation::PASSED) {
+            return response()->json([
+                'error'      => $validation['summary'],
+                'validation' => $validation,
+            ], 422);
+        }
+
+        $path = $file->storeAs('purchase-requests/' . now()->year, Str::slug($number) . '-' . now()->format('His') . '.pdf', 'public');
+
+        $pr->items()->delete();
+        foreach ($validated['items'] as $item) {
+            $unitCost = (float) $item['unit_cost'];
+            $qty      = (float) $item['quantity'];
+            $pr->items()->create([
+                'name'                 => $item['name'],
+                'quantity'             => $qty,
+                'unit'                 => $item['unit'] ?? null,
+                'estimated_unit_cost'  => $unitCost,
+                'estimated_total_cost' => round($unitCost * $qty, 2),
+            ]);
+        }
+
+        $pr->update([
+            'number'       => $number,
+            'title'        => trim((string) ($validated['title'] ?? '')) ?: $pr->title,
+            'file_path'    => $path,
+            'uploaded_at'  => now(),
+            'total_amount' => $pr->items()->sum('estimated_total_cost'),
+        ]);
+
+        $validator->record($pr, $proposal, DocumentValidation::PAIR_PPMP_PR, $validation, $quarter);
+
+        NotificationService::prUploaded($pr);
+
+        return response()->json(['success' => true, 'prId' => $pr->id, 'prNumber' => $pr->number, 'filePath' => $path]);
     }
 
     // ── Canvassing tab (quotation uploads + stage tracking) ──────────────────
@@ -927,25 +1390,36 @@ class PrismProcurementOfficeController extends Controller
      * filename client-side when a scanned/image upload or unrecognized layout
      * makes extraction return null).
      */
-    public function extractCanvassSupplier(Request $request): JsonResponse
+    public function extractCanvassSupplier(Request $request, DocumentValidationService $validator): JsonResponse
     {
-        $request->validate(['document' => 'required|file|mimes:pdf,jpeg,jpg,png|max:10240']);
+        $request->validate([
+            'document'            => 'required|file|mimes:pdf,jpeg,jpg,png|max:10240',
+            'purchase_request_id' => 'nullable|integer|exists:purchase_requests,id',
+        ]);
 
         $file = $request->file('document');
         if ($file->getClientMimeType() !== 'application/pdf' && $file->getClientOriginalExtension() !== 'pdf') {
+            // Can't read an image for its item table — best-effort supplier
+            // name only; item-vs-PR validation is skipped, not failed.
             return response()->json(['supplierName' => null]);
         }
 
-        $text = '';
-        try {
-            $parser = new PdfParser();
-            $pdf    = $parser->parseContent($file->get());
-            $text   = $pdf->getText();
-        } catch (\Exception $e) {
-            $text = '';
+        $text  = $this->readPdfText($file);
+        $items = $this->parseQuotationItems($text);
+
+        $payload = [
+            'supplierName' => $this->parseSupplierNameFromQuotation($text),
+            'items'        => $items,
+        ];
+
+        if ($request->filled('purchase_request_id')) {
+            $pr = PurchaseRequest::find($request->input('purchase_request_id'));
+            if ($pr) {
+                $payload['validation'] = $validator->validateQuotationAgainstPr($items, $pr);
+            }
         }
 
-        return response()->json(['supplierName' => $this->parseSupplierNameFromQuotation($text)]);
+        return response()->json($payload);
     }
 
     private function parseSupplierNameFromQuotation(string $text): ?string
@@ -999,7 +1473,7 @@ class PrismProcurementOfficeController extends Controller
      * stay addable/removable until an Abstract of Canvass is actually created for
      * the PR, at which point they lock (see abstractOfCanvass()).
      */
-    public function uploadCanvassDocument(Request $request, PurchaseRequest $pr): JsonResponse
+    public function uploadCanvassDocument(Request $request, PurchaseRequest $pr, DocumentValidationService $validator): JsonResponse
     {
         if ($pr->signatory_stage !== 'fully_signed') {
             return response()->json(['error' => 'PR must be fully signed before canvassing.'], 422);
@@ -1013,11 +1487,29 @@ class PrismProcurementOfficeController extends Controller
             'supplier_name' => 'required|string|max:255',
         ]);
 
-        $file = $request->file('document');
+        $file  = $request->file('document');
+        $isPdf = $file->getClientMimeType() === 'application/pdf' || $file->getClientOriginalExtension() === 'pdf';
+
+        // Authoritative re-check, same reasoning as createPurchaseRequestFromApp():
+        // the earlier extract-and-preview round trip already showed a verdict,
+        // but the file actually being saved is re-read and re-validated here
+        // rather than trusted from that round trip. Can't be run on a plain
+        // image (no text table to read), so those skip straight through —
+        // same limitation the supplier-name/address extraction already has.
+        $text       = $isPdf ? $this->readPdfText($file) : '';
+        $items      = $isPdf ? $this->parseQuotationItems($text) : [];
+        $validation = $isPdf ? $validator->validateQuotationAgainstPr($items, $pr) : null;
+
+        if ($validation && $validation['verdict'] === DocumentValidation::FAILED) {
+            return response()->json([
+                'error'      => $validation['summary'],
+                'validation' => $validation,
+            ], 422);
+        }
+
         $path = $file->store('canvass/' . now()->year, 'public');
 
-        $isPdf = $file->getClientMimeType() === 'application/pdf' || $file->getClientOriginalExtension() === 'pdf';
-        $supplierAddress = $isPdf ? $this->parseSupplierAddressFromQuotation($this->readPdfText($file)) : null;
+        $supplierAddress = $isPdf ? $this->parseSupplierAddressFromQuotation($text) : null;
 
         $doc = DocumentUpload::create([
             'uploaded_by_user_id' => auth()->id(),
@@ -1033,6 +1525,10 @@ class PrismProcurementOfficeController extends Controller
             'uploaded_at'         => now(),
             'extracted_fields_json' => $supplierAddress ? ['supplier_address' => $supplierAddress] : null,
         ]);
+
+        if ($validation) {
+            $validator->record($doc, $pr, DocumentValidation::PAIR_PR_CANVASS, $validation);
+        }
 
         if ($pr->canvassing_stage === 'not_started') {
             $pr->update(['canvassing_stage' => 'in_progress']);
@@ -1222,6 +1718,8 @@ class PrismProcurementOfficeController extends Controller
             $supplierAddress = $matchedQuotation->extracted_fields_json['supplier_address'] ?? null;
         }
 
+        $winningTotal = $this->computeWinningSupplierTotal($pr, $matchedQuotation);
+
         return [
             'id'             => $aoc->id,
             'code'           => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
@@ -1273,8 +1771,16 @@ class PrismProcurementOfficeController extends Controller
             'returnUrl'      => route('procurement-office.aoc.return', $aoc->id),
             'issuePoUrl'     => route('procurement-office.po.issue', $aoc->id),
             'uploadUrl'      => route('procurement-office.aoc.upload', $aoc->id),
+            'extractUrl'     => route('procurement-office.aoc.extract', $aoc->id),
             'pdfFile'        => $aoc->file_path,
             'prTotal'        => (float) ($pr->total_amount ?? 0),
+            // What the Issue PO form's Total Amount should actually default
+            // to — the winning supplier's own quoted unit prices times the
+            // PR's item quantities, not the PPMP's estimate (prTotal above,
+            // still used elsewhere for the PR items preview). Null when it
+            // can't be computed (no quotation on file, or unreadable), so
+            // the frontend falls back to prTotal rather than prefilling ₱0.
+            'winningTotal'   => $winningTotal,
             'prItems'        => $pr->items->map(fn ($i) => [
                 'name'      => $i->name,
                 'quantity'  => (float) $i->quantity,
@@ -1291,6 +1797,55 @@ class PrismProcurementOfficeController extends Controller
             'supplierName'    => $winningName ?? $matchedQuotation?->title,
             'supplierAddress' => $supplierAddress,
         ];
+    }
+
+    /**
+     * What a Purchase Order for this AOC should actually total — the
+     * winning supplier's own quoted unit price for each PR item, times that
+     * item's actual quantity, summed up. Deliberately not the PR's
+     * PPMP-estimated total: canvassing exists precisely because the real
+     * price a supplier charges is expected to differ from the plan, so the
+     * PO amount should reflect what was actually quoted, not what was
+     * budgeted for.
+     *
+     * Returns null (not 0) when there's nothing to compute from — no
+     * matched quotation, or its item table couldn't be read — so the
+     * caller can fall back to the PPMP estimate instead of prefilling ₱0.
+     */
+    private function computeWinningSupplierTotal(PurchaseRequest $pr, ?DocumentUpload $matchedQuotation): ?float
+    {
+        if (!$matchedQuotation) {
+            return null;
+        }
+
+        $quotedItems = $this->parseQuotationItems($this->readStoredPdfText($matchedQuotation->file_path));
+        if (!$quotedItems) {
+            return null;
+        }
+
+        $prItems = $pr->items()->get();
+        if ($prItems->isEmpty()) {
+            return null;
+        }
+
+        $matcher = app(ItemMatchingService::class);
+        $left    = $prItems->map(fn ($i) => ['name' => $i->name])->all();
+        $right   = array_map(fn ($i) => ['name' => $i['name']], $quotedItems);
+        $result  = $matcher->match($left, $right);
+
+        $total   = 0.0;
+        $matched = 0;
+        foreach ($result['matches'] as $m) {
+            if (!$m['matched']) {
+                continue;
+            }
+            $prItem      = $prItems[$m['leftIndex']];
+            $quotedPrice = (float) $quotedItems[$m['rightIndex']]['unitPrice'];
+            $total      += (float) $prItem->quantity * $quotedPrice;
+            $matched++;
+        }
+
+        return $matched > 0 ? round($total, 2) : null;
     }
 
     public function createAoc(Request $request, PurchaseRequest $pr): JsonResponse
@@ -1413,7 +1968,10 @@ class PrismProcurementOfficeController extends Controller
                 ? \Illuminate\Support\Facades\Storage::url($receipt->file_path)
                 : null,
             'id'           => $po->id,
-            'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+            // No placeholder number synthesized here on purpose — a PO with
+            // nothing uploaded yet genuinely has no number, and showing a
+            // fake one would misleadingly suggest it does.
+            'poNumber'     => $po->po_number ?? '—',
             'aocCode'      => $po->abstractOfCanvass->code ?? '—',
             'prNumber'     => $pr->number ?? '—',
             'office'       => $pr?->office?->code ?? '—',
@@ -1439,10 +1997,17 @@ class PrismProcurementOfficeController extends Controller
                 // "in progress", so every step (including 'paid' itself) reads as
                 // done rather than leaving the last dot stuck on the "active" style.
                 $isComplete = $current === count($chain) - 1;
+                // status stays 'issued' as a placeholder default from the moment
+                // the PO record is created (see issuePo()), well before signing
+                // is even done — updatePoStatus() already refuses to advance it
+                // any further until signatory_stage is 'fully_signed', so the
+                // display shouldn't show delivery progress that early either.
+                // Every step reads as not-yet-started until then.
+                $signingDone = $po->signatory_stage === 'fully_signed';
                 return [
                     'key'    => $key,
                     'label'  => (clone $po)->fill(['status' => $key])->status_label,
-                    'status' => $isComplete ? 'done' : ($idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending')),
+                    'status' => !$signingDone ? 'pending' : ($isComplete ? 'done' : ($idx < $current ? 'done' : ($idx === $current ? 'active' : 'pending'))),
                 ];
             })->values()->all(),
             'issuedAt'     => $po->issued_at?->format('M d, Y') ?? '—',
@@ -1463,6 +2028,7 @@ class PrismProcurementOfficeController extends Controller
             'advanceUrl'       => route('procurement-office.po.advance', $po->id),
             'returnUrl'        => route('procurement-office.po.return', $po->id),
             'uploadUrl'        => route('procurement-office.po.upload', $po->id),
+            'extractUrl'       => route('procurement-office.po.extract', $po->id),
             'pdfFile'          => $po->file_path,
             'alobsNo'          => $po->alobs_no ?: '—',
             'fundSource'       => $po->fund_source ?: '—',
@@ -1503,7 +2069,9 @@ class PrismProcurementOfficeController extends Controller
         $po = PurchaseOrder::create([
             'abstract_of_canvass_id' => $aoc->id,
             'created_by_user_id'     => auth()->id(),
-            'po_number'              => 'PO-' . now()->format('Ymd') . '-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+            // Left unset on purpose — this is just the row that lets the PO
+            // be routed for signatures; its real number only exists once
+            // uploadPurchaseOrder() reads one off the actual signed document.
             'supplier_name'          => $request->input('supplier_name'),
             'supplier_address'       => $request->input('supplier_address'),
             'total_amount'           => $request->input('total_amount'),
@@ -1578,15 +2146,96 @@ class PrismProcurementOfficeController extends Controller
         return response()->json($result, $result['status'] ?? 200);
     }
 
-    public function procurementReports(): View
+    public function procurementReports(Request $request): View
     {
-        $quarterlyRows = $this->buildQuarterlyAccomplishment();
+        // Every table on this page can be narrowed to one office — "all
+        // offices" (no filter) stays the default so opening the page fresh
+        // always shows the whole picture; a report reader only reaches for
+        // this once they already know which office they're checking on.
+        $officeCode = $request->query('office') ?: null;
 
+        $quarterlyRows      = $this->buildQuarterlyAccomplishment($officeCode);
+        $prReportRows       = $this->buildPrReportRows($officeCode);
+        $ppmpValidationRows = $this->buildPpmpValidationRows($officeCode);
+
+        return view('prism.procurement-office.procurement-reports', $this->withCommon('procurement-reports', [
+            'pageTitle'          => 'Procurement Reports',
+            'quarterlyRows'      => $quarterlyRows,
+            'completedPurchases' => $prReportRows['completed'],
+            'delayedItems'       => $prReportRows['delayed'],
+            'ppmpValidationRows' => $ppmpValidationRows,
+            'offices'            => Office::orderBy('code')->get(['id', 'code', 'name']),
+            'selectedOffice'     => $officeCode,
+            'exportUrl'          => route('procurement-office.procurement-reports.export', $officeCode ? ['office' => $officeCode] : []),
+        ]));
+    }
+
+    /** CSV of the same four report tables procurementReports() renders, honoring the same office filter. */
+    public function exportProcurementReportsCsv(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $officeCode = $request->query('office') ?: null;
+
+        $quarterlyRows      = $this->buildQuarterlyAccomplishment($officeCode);
+        $prReportRows       = $this->buildPrReportRows($officeCode);
+        $ppmpValidationRows = $this->buildPpmpValidationRows($officeCode);
+
+        $filename = 'procurement-report-' . ($officeCode ?: 'all-offices') . '-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($quarterlyRows, $prReportRows, $ppmpValidationRows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads ₱/accented text correctly
+
+            fputcsv($out, ['Quarterly Accomplishment — Items Targeted vs Procured']);
+            fputcsv($out, ['Office', 'Quarter', 'Targeted', 'Procured', 'Completion Rate']);
+            foreach ($quarterlyRows as $r) {
+                fputcsv($out, [$r['office'], $r['quarter'], $r['targeted'], $r['procured'], $r['completionRate'] . '%']);
+            }
+            fputcsv($out, []);
+
+            fputcsv($out, ['Completed Purchases']);
+            fputcsv($out, ['Office', 'Item', 'PR No.', 'Date', 'Amount']);
+            foreach ($prReportRows['completed'] as $r) {
+                fputcsv($out, [$r['office'], $r['item'], $r['prNumber'], $r['completedDate'], $r['amount']]);
+            }
+            fputcsv($out, []);
+
+            fputcsv($out, ['Delayed Items']);
+            fputcsv($out, ['Office', 'Item', 'PR No.', 'Reason']);
+            foreach ($prReportRows['delayed'] as $r) {
+                fputcsv($out, [$r['office'], $r['item'], $r['prNumber'], $r['reason']]);
+            }
+            fputcsv($out, []);
+
+            fputcsv($out, ['PPMP Validation — Planned vs. Actually Purchased']);
+            fputcsv($out, ['Office', 'PPMP Item', 'Planned Qty', 'Planned Amount', 'Matched PR Item', 'Purchased Qty', 'Purchased Amount', 'Tracking Status', 'Flag']);
+            foreach ($ppmpValidationRows as $r) {
+                fputcsv($out, [
+                    $r['office'], $r['item'], $r['plannedQty'], $r['plannedTotal'],
+                    $r['matchedItem'] ?? '—', $r['purchasedQty'] ?? '—', $r['purchasedTotal'] ?? '—',
+                    $r['trackingStatus']['label'], $r['flag'],
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Completed-purchases and delayed-items tables — shared by
+     * procurementReports() and exportProcurementReportsCsv() so the page
+     * and its export are always built from exactly the same rows.
+     */
+    private function buildPrReportRows(?string $officeCode = null): array
+    {
         // Same "fully signed" journey used everywhere else on this page's
         // report-driven data, plus a real completion signal (paid = actually
         // done) instead of the raw `status` column, which Procurement itself
         // almost never sets to the literal value 'completed'.
-        $allPrs = PurchaseRequest::with(['office', 'abstractOfCanvass.purchaseOrder'])->get();
+        $allPrs = PurchaseRequest::with(['office', 'abstractOfCanvass.purchaseOrder'])
+            ->when($officeCode, fn ($q) => $q->whereHas('office', fn ($q2) => $q2->where('code', $officeCode)))
+            ->get();
 
         $completedPurchases = $allPrs
             ->filter(fn ($pr) => $pr->lifecycleBucket() === 'completed')
@@ -1623,15 +2272,7 @@ class PrismProcurementOfficeController extends Controller
             ->values()
             ->all();
 
-        $ppmpValidationRows = $this->buildPpmpValidationRows();
-
-        return view('prism.procurement-office.procurement-reports', $this->withCommon('procurement-reports', [
-            'pageTitle'          => 'Procurement Reports',
-            'quarterlyRows'      => $quarterlyRows,
-            'completedPurchases' => $completedPurchases,
-            'delayedItems'       => $delayedItems,
-            'ppmpValidationRows' => $ppmpValidationRows,
-        ]));
+        return ['completed' => $completedPurchases, 'delayed' => $delayedItems];
     }
 
     /**
@@ -1641,10 +2282,11 @@ class PrismProcurementOfficeController extends Controller
      * target_quarter instead of splitting PR totals evenly across quarters.
      * "Procured" means the matched PR's full journey actually reached paid.
      */
-    private function buildQuarterlyAccomplishment(): array
+    private function buildQuarterlyAccomplishment(?string $officeCode = null): array
     {
         $items = BudgetProposalItem::with('budgetProposal.office')
             ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->when($officeCode, fn ($q) => $q->whereHas('budgetProposal.office', fn ($q2) => $q2->where('code', $officeCode)))
             ->whereNotNull('target_quarter')
             ->get();
 
@@ -1682,10 +2324,11 @@ class PrismProcurementOfficeController extends Controller
      * quantity/amount discrepancies so Procurement can spot-check that
      * purchases matched the plan — not just track process stage.
      */
-    private function buildPpmpValidationRows(): array
+    private function buildPpmpValidationRows(?string $officeCode = null): array
     {
         $items = BudgetProposalItem::with('budgetProposal.office')
             ->whereHas('budgetProposal', fn ($q) => $q->whereIn('status', ['endorsed', 'approved']))
+            ->when($officeCode, fn ($q) => $q->whereHas('budgetProposal.office', fn ($q2) => $q2->where('code', $officeCode)))
             ->get();
 
         $officeIds     = $items->pluck('budgetProposal.office_id')->filter()->unique()->values();
@@ -1767,17 +2410,105 @@ class PrismProcurementOfficeController extends Controller
         ]);
     }
 
-    /** Upload/re-upload the scanned, physically-signed AOC document. */
-    public function uploadAbstractOfCanvass(Request $request, AbstractOfCanvass $aoc): JsonResponse
+    /**
+     * Preview-only counterpart to uploadAbstractOfCanvass() — reads and
+     * validates a candidate AOC file exactly the same way, but saves
+     * nothing. Lets the upload button show a review (pass or fail) before
+     * the file is actually attached, the same way PR Step 2/3 and the
+     * canvass-quotation upload both review before committing, rather than
+     * uploading immediately and only finding out after the fact.
+     */
+    public function extractAocValidation(Request $request, AbstractOfCanvass $aoc, DocumentValidationService $validator): JsonResponse
     {
         $request->validate([
             'file' => 'required|file|mimes:pdf|max:10240',
         ]);
 
+        $text             = $this->readPdfText($request->file('file'));
+        $responsiveDealer = $this->extractResponsiveDealer($text);
+        $validation       = $this->validateAocDocument($aoc, $text, $validator);
+
+        return response()->json([
+            'success'          => true,
+            'responsiveDealer' => $responsiveDealer,
+            'validation'       => $validation,
+        ]);
+    }
+
+    /**
+     * Shared by extractAocValidation() (preview, saves nothing) and
+     * uploadAbstractOfCanvass() (the real thing) so the same document only
+     * ever gets judged one way. Returns null — not a failing verdict — when
+     * none of the PR's quotations are text PDFs to check against; see the
+     * leniency note on uploadAbstractOfCanvass() below.
+     */
+    private function validateAocDocument(AbstractOfCanvass $aoc, string $text, DocumentValidationService $validator): ?array
+    {
+        $quotations = [];
+        foreach ($aoc->purchaseRequest->documents()->where('document_type', 'canvass_quotation')->get() as $doc) {
+            $isPdf = $doc->mime_type === 'application/pdf' || str_ends_with(strtolower($doc->file_path), '.pdf');
+            if (!$isPdf) {
+                continue; // can't read prices out of a phone-photo quotation
+            }
+            $qItems = $this->parseQuotationItems($this->readStoredPdfText($doc->file_path));
+            if ($qItems) {
+                $quotations[] = ['supplier' => $doc->title, 'items' => $qItems];
+            }
+        }
+
+        if (!$quotations) {
+            return null;
+        }
+
+        $aocItems         = $this->parseAbstractOfCanvassItems($text);
+        $responsiveDealer = $this->extractResponsiveDealer($text);
+
+        return $validator->validateAocAgainstQuotations($aocItems, $responsiveDealer, $quotations);
+    }
+
+    /**
+     * Upload/re-upload the scanned, physically-signed AOC document.
+     *
+     * Same "scan it before it's attached" principle as PR Step 2: the AOC is
+     * meant to be a faithful summary of the supplier quotations already on
+     * file for this PR, condensed for easier price comparison, so before the
+     * file is saved its own item table is checked against them — every price
+     * it states has to be traceable to an actual quotation, and its declared
+     * Responsive Dealer has to be one of the suppliers who actually
+     * submitted one. A document that fails that check is refused outright,
+     * the same way an unapproved PR item is. Re-uploading an existing AOC's
+     * document goes through this exact same check — there is no separate,
+     * unvalidated path for that, on either the frontend (see the review
+     * modal wired to extractUrl above) or here.
+     *
+     * Skipped (not blocked) when none of this PR's quotations are text PDFs
+     * to begin with (e.g. every supplier's quotation was a phone-photo
+     * image) — there is nothing to check against, the same leniency already
+     * applied to quotation uploads themselves for that case.
+     */
+    public function uploadAbstractOfCanvass(Request $request, AbstractOfCanvass $aoc, DocumentValidationService $validator): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $text = $this->readPdfText($file);
+        $pr   = $aoc->purchaseRequest;
+
+        $responsiveDealer = $this->extractResponsiveDealer($text);
+        $validation       = $this->validateAocDocument($aoc, $text, $validator);
+
+        if ($validation && $validation['verdict'] !== DocumentValidation::PASSED) {
+            return response()->json([
+                'error'      => $validation['summary'],
+                'validation' => $validation,
+            ], 422);
+        }
+
         $year = now()->year;
         $slug = Str::slug($aoc->code ?? 'aoc-' . $aoc->id);
         $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
-        $file = $request->file('file');
         $path = $file->storeAs("abstract-of-canvass/{$year}", $name, 'public');
 
         $aoc->update([
@@ -1791,9 +2522,12 @@ class PrismProcurementOfficeController extends Controller
         // any later reads, e.g. pre-filling the Issue PO form's supplier name.
         // Stored on the AOC itself rather than on the quotation documents,
         // since a PR can now carry several suppliers' quotations at once.
-        $responsiveDealer = $this->extractResponsiveDealer($this->readPdfText($file));
         if ($responsiveDealer) {
             $aoc->update(['winning_supplier_name' => $responsiveDealer]);
+        }
+
+        if ($validation) {
+            $validator->record($aoc, $pr, DocumentValidation::PAIR_CANVASS_AOC, $validation);
         }
 
         $aoc->load(['purchaseRequest.office', 'purchaseRequest.items', 'purchaseRequest.documents', 'signatureLogs.signedBy', 'signatureLogs.attachments', 'purchaseOrder']);
@@ -1801,34 +2535,132 @@ class PrismProcurementOfficeController extends Controller
         return response()->json(['success' => true, 'aoc' => $this->mapAocForFrontend($aoc)]);
     }
 
-    /** Upload/re-upload the scanned, physically-signed PO document. */
-    public function uploadPurchaseOrder(Request $request, PurchaseOrder $po): JsonResponse
+    /**
+     * Preview-only counterpart to uploadPurchaseOrder() — reads and
+     * validates a candidate PO file exactly the same way, but saves
+     * nothing. Lets the upload button show a review (pass or fail) before
+     * the file is actually attached, the same way the AOC upload does.
+     */
+    public function extractPoValidation(Request $request, PurchaseOrder $po, DocumentValidationService $validator): JsonResponse
     {
         $request->validate([
             'file' => 'required|file|mimes:pdf|max:10240',
         ]);
 
-        $year = now()->year;
-        $slug = Str::slug($po->po_number ?? 'po-' . $po->id);
-        $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
+        $text = $this->readPdfText($request->file('file'));
+
+        return response()->json(['success' => true] + $this->validatePoDocument($po, $text, $validator));
+    }
+
+    /**
+     * Shared by extractPoValidation() (preview, saves nothing) and
+     * uploadPurchaseOrder() (the real thing) so the same document only ever
+     * gets judged one way.
+     *
+     * Two independent things are checked:
+     *   - the PO's own number, read off the document — issuePo() leaves it
+     *     unset when the row is first created (nothing signed exists yet at
+     *     that point), so this is the only place it's ever known. A
+     *     document with no readable "P.O. No." value, or one already used
+     *     by a different PO, fails this half.
+     *   - its contents against the AOC (see validatePoAgainstAoc()) —
+     *     skipped, not failed, when the AOC's own file isn't on hand or
+     *     wasn't text-readable, the same leniency the AOC upload applies to
+     *     its quotations.
+     */
+    private function validatePoDocument(PurchaseOrder $po, string $text, DocumentValidationService $validator): array
+    {
+        $poNumber       = $this->extractPoNumber($text);
+        $poNumberOk     = true;
+        $poNumberReason = null;
+
+        if (!$poNumber) {
+            $poNumberOk     = false;
+            $poNumberReason = 'Could not read a "P.O. No." from this document. Re-upload a text-based PDF of the actual signed PO form.';
+        } elseif (PurchaseOrder::where('po_number', $poNumber)->where('id', '!=', $po->id)->exists()) {
+            $poNumberOk     = false;
+            $poNumberReason = "A Purchase Order numbered \"{$poNumber}\" already exists.";
+        }
+
+        $aoc              = $po->abstractOfCanvass;
+        $externalProvider = $this->extractExternalProvider($text);
+        $validation       = null;
+
+        if ($aoc && $aoc->file_path) {
+            $aocText  = $this->readStoredPdfText($aoc->file_path);
+            $aocItems = $this->parseAbstractOfCanvassItems($aocText);
+
+            if ($aocItems) {
+                $poItems          = $this->parsePoItems($text);
+                $responsiveDealer = $this->extractResponsiveDealer($aocText);
+                $validation       = $validator->validatePoAgainstAoc($poItems, $externalProvider, $aocItems, $responsiveDealer);
+            }
+        }
+
+        return [
+            'poNumber'       => $poNumber,
+            'poNumberOk'     => $poNumberOk,
+            'poNumberReason' => $poNumberReason,
+            'validation'     => $validation,
+        ];
+    }
+
+    /**
+     * Upload/re-upload the scanned, physically-signed PO document. Covers
+     * the first upload and any re-upload alike — there is no separate,
+     * unvalidated shortcut for either; both go through validatePoDocument()
+     * the same way extractPoValidation() (the frontend's review-before-
+     * confirm preview) already showed.
+     */
+    public function uploadPurchaseOrder(Request $request, PurchaseOrder $po, DocumentValidationService $validator): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
         $file = $request->file('file');
+        $text = $this->readPdfText($file);
+
+        ['poNumber' => $poNumber, 'poNumberOk' => $poNumberOk, 'poNumberReason' => $poNumberReason, 'validation' => $validation]
+            = $this->validatePoDocument($po, $text, $validator);
+
+        if (!$poNumberOk) {
+            return response()->json(['error' => $poNumberReason], 422);
+        }
+        if ($validation && $validation['verdict'] !== DocumentValidation::PASSED) {
+            return response()->json([
+                'error'      => $validation['summary'],
+                'validation' => $validation,
+            ], 422);
+        }
+
+        $year = now()->year;
+        $slug = Str::slug($poNumber);
+        $name = $slug . '-' . now()->format('Ymd-His') . '.pdf';
         $path = $file->storeAs("purchase-orders/{$year}", $name, 'public');
 
-        $poFields = $this->extractPoFundingFields($this->readPdfText($file));
+        $poFields = $this->extractPoFundingFields($text);
 
         $po->update([
+            'po_number'   => $poNumber,
             'file_path'   => $path,
             'uploaded_at' => now(),
             'alobs_no'    => $poFields['alobsNo'] ?? $po->alobs_no,
             'fund_source' => $poFields['fundSource'] ?? $po->fund_source,
         ]);
 
-        return response()->json([
-            'success'    => true,
-            'filePath'   => $path,
-            'alobsNo'    => $po->fresh()->alobs_no,
-            'fundSource' => $po->fresh()->fund_source,
-        ]);
+        if ($validation) {
+            $validator->record($po, $po->abstractOfCanvass, DocumentValidation::PAIR_AOC_PO, $validation);
+        }
+
+        // Full mapPoForFrontend() payload, not just the fields this endpoint
+        // itself changed — signatoryLabel in particular now reads "PO
+        // Created" instead of "PO to be Created" the moment file_path is
+        // set (see PurchaseOrder::getSignatoryLabelAttribute()), and the
+        // frontend needs that to update the row's badge without a reload.
+        $po->load(['abstractOfCanvass.purchaseRequest.office', 'createdBy', 'paidBy', 'documents', 'signatureLogs.signedBy', 'signatureLogs.attachments']);
+
+        return response()->json(['success' => true, 'po' => $this->mapPoForFrontend($po)]);
     }
 
     /** Best-effort PDF text-layer read — scanned/image-only uploads just yield ''. */
@@ -1838,6 +2670,22 @@ class PrismProcurementOfficeController extends Controller
             $parser = new PdfParser();
             return $parser->parseContent($file->get())->getText();
         } catch (\Exception $e) {
+            return '';
+        }
+    }
+
+    /** Same as readPdfText(), for a file already on the public disk (e.g. a previously-uploaded quotation) rather than one just submitted with this request. */
+    private function readStoredPdfText(string $diskPath): string
+    {
+        $contents = Storage::disk('public')->get($diskPath);
+        if ($contents === null) {
+            return ''; // file missing from disk (e.g. a test fixture's fake upload)
+        }
+
+        try {
+            $parser = new PdfParser();
+            return $parser->parseContent($contents)->getText();
+        } catch (\Throwable $e) {
             return '';
         }
     }
@@ -1877,6 +2725,32 @@ class PrismProcurementOfficeController extends Controller
         }
 
         return $result;
+    }
+
+    /**
+     * The Purchase Order form's External Provider is the supplier name — read
+     * the same way "Name of Project:"/"Department /Office:" are read off the
+     * PR form (see parseLabeledBlock()), between the "External Provider:"
+     * label and the next field's own label.
+     */
+    private function extractExternalProvider(string $text): ?string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+        return $this->parseLabeledBlock($text, 'External Provider:', 'P.O. No.:');
+    }
+
+    /**
+     * The PO's own number, read the same way as any other labeled field on
+     * this form — between "P.O. No.:" and the next field's own label
+     * ("Address:", right below it). This is the PO's real identity, only
+     * knowable once an actual signed document exists — see
+     * uploadPurchaseOrder(), which is the only place it's ever set; issuePo()
+     * deliberately leaves it unset when the row is first created.
+     */
+    private function extractPoNumber(string $text): ?string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text));
+        return $this->parseLabeledBlock($text, 'P.O. No.:', 'Address:');
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
