@@ -756,9 +756,17 @@
         const query = (queryInput?.value || '').trim();
         if (!query) { queryInput?.focus(); return; }
 
-        /* Extract individual keywords as specs for semantic filtering */
-        const STOP  = new Set(['for','the','and','with','of','per','mga','ang','na','ng','is','an','a']);
-        const specs = query.split(/[\s,]+/).map(w => w.toLowerCase().trim()).filter(w => w.length >= 3 && !STOP.has(w));
+        // Not sending the query's own words as "specs" anymore — the matcher
+        // treats each spec as a REQUIRED match (specific mode: ~80% of them
+        // must individually score above threshold), so splitting a detailed
+        // query like "Dell Latitude 5440 Intel Core i7 16GB RAM 512GB SSD
+        // laptop" into 10 separate required words was demanding an almost
+        // impossible AND-match and silently collapsing real, relevant
+        // results down to 1 or 0. Sending no specs lets the matcher's own
+        // "general" mode rank by whole-query semantic similarity instead —
+        // same effect Google search has: more results, still relevant,
+        // ranked best-first instead of hard-filtered.
+        const specs = [];
         const budget = parseFloat(document.getElementById('marketBudgetInput')?.value || 0) || 0;
 
         /* Hide search prompt once user starts a real search */

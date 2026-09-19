@@ -48,6 +48,14 @@ return [
         'key' => env('SERPER_API_KEY'),
     ],
 
+    // Lazada PH product search (via RapidAPI) — genuinely different source
+    // from SerpApi/Serper (both just Google Shopping wrappers): real Lazada
+    // PH listings, native PHP pricing, with ratings/review counts built in.
+    'lazada_rapidapi' => [
+        'key'  => env('RAPIDAPI_LAZADA_KEY'),
+        'host' => env('RAPIDAPI_LAZADA_HOST', 'lazada-api.p.rapidapi.com'),
+    ],
+
     // Local Flask matcher (microservice/app.py) — semantic item matching for
     // cross-document validation, plus market scoping and signature detection.
     'matcher' => [

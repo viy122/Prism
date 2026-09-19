@@ -15,15 +15,17 @@ class MarketScopingService
 
     public function isQuotaExhausted(): bool
     {
-        $hasAnyProvider = $this->primaryKey() !== null || $this->backupKey() !== null || $this->serperKey() !== null;
+        $hasAnyProvider = $this->primaryKey() !== null || $this->backupKey() !== null
+            || $this->serperKey() !== null || $this->lazadaKey() !== null;
         if (!$hasAnyProvider) {
             return false;
         }
 
         $serpApiUsable = $this->activeApiKey() !== null;
         $serperUsable  = $this->serperKey() !== null && !$this->isSlotExhausted('serper');
+        $lazadaUsable  = $this->lazadaKey() !== null && !$this->isSlotExhausted('lazada');
 
-        return !$serpApiUsable && !$serperUsable;
+        return !$serpApiUsable && !$serperUsable && !$lazadaUsable;
     }
 
     private function primaryKey(): ?string
@@ -39,6 +41,11 @@ class MarketScopingService
     private function serperKey(): ?string
     {
         return config('services.serper.key') ?: null;
+    }
+
+    private function lazadaKey(): ?string
+    {
+        return config('services.lazada_rapidapi.key') ?: null;
     }
 
     private function isSlotExhausted(string $slot): bool
@@ -97,9 +104,10 @@ class MarketScopingService
         $priceApi        = new PriceApiService();
         $priceApiResults = $priceApi->search($query, $limit, $department);
 
-        $serpResults = $this->searchGoogleShopping($query, $limit);
+        $serpResults   = $this->searchGoogleShopping($query, $limit);
+        $lazadaResults = $this->searchViaLazada($query, $limit);
 
-        $results = $this->interleave($priceApiResults, $serpResults, $limit);
+        $results = $this->interleaveMany([$priceApiResults, $lazadaResults, $serpResults], $limit);
 
         if (!empty($results)) {
             Cache::put($cacheKey, $results, self::CACHE_TTL);
@@ -113,23 +121,24 @@ class MarketScopingService
     }
 
     /**
-     * Alternate items from both lists (price API first) so neither source
-     * monopolizes the visible results, capped at $limit.
+     * Alternate items across however many source lists are given (price API
+     * first, in the order passed in) so no single source monopolizes the
+     * visible results, capped at $limit.
      */
-    private function interleave(array $a, array $b, int $limit): array
+    private function interleaveMany(array $lists, int $limit): array
     {
         $merged = [];
-        $max = max(count($a), count($b));
+        $max    = $lists ? max(array_map('count', $lists)) : 0;
 
-        for ($i = 0; $i < $max && count($merged) < $limit; $i++) {
-            if ($i < count($a)) {
-                $merged[] = $a[$i];
-            }
-            if (count($merged) >= $limit) {
-                break;
-            }
-            if ($i < count($b)) {
-                $merged[] = $b[$i];
+        for ($i = 0; $i < $max; $i++) {
+            foreach ($lists as $list) {
+                if ($i >= count($list)) {
+                    continue;
+                }
+                $merged[] = $list[$i];
+                if (count($merged) >= $limit) {
+                    return $merged;
+                }
             }
         }
 
@@ -454,6 +463,84 @@ class MarketScopingService
                         'source'          => $item['source']      ?? 'Google Shopping',
                         'rating'          => $item['rating']      ?? null,
                         'reviews'         => $item['ratingCount'] ?? null,
+                        'snippet'         => null,
+                        'date_retrieved'  => now()->format('M d, Y'),
+                        'cached'          => false,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Lazada PH product listings (via RapidAPI) — a genuinely different
+     * source from SerpApi/Serper (both just Google Shopping wrappers): real
+     * marketplace listings, native PHP pricing (no conversion needed), and
+     * built-in ratings/review counts. Independent of the SerpApi/Serper
+     * quota chain — this runs regardless of whether either of those is
+     * exhausted, since it's a separate provider with its own free quota.
+     */
+    private function searchViaLazada(string $query, int $limit): array
+    {
+        $apiKey = $this->lazadaKey();
+        if ($apiKey === null || $this->isSlotExhausted('lazada')) {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(15)
+                ->withHeaders([
+                    'x-rapidapi-host' => config('services.lazada_rapidapi.host'),
+                    'x-rapidapi-key'  => $apiKey,
+                ])
+                ->get('https://' . config('services.lazada_rapidapi.host') . '/lazada/search/items', [
+                    'keywords' => $query,
+                    'site'     => 'ph',
+                    'sort'     => 'pop',
+                    'page'     => 1,
+                ]);
+
+            if (!$response->successful()) {
+                if (in_array($response->status(), [401, 403, 429], true)) {
+                    $this->markSlotExhausted('lazada');
+                }
+                return [];
+            }
+
+            $items = $response->json('data.items', []);
+
+            return collect($items)
+                ->reject(fn ($item) => ($item['is_ad'] ?? false) || !($item['is_in_stock'] ?? true))
+                ->take($limit)
+                ->map(function ($item) {
+                    $name  = $item['title'] ?? null;
+                    $price = isset($item['price']) ? (float) $item['price'] : null;
+
+                    if (!$name || !$price) {
+                        return null;
+                    }
+
+                    if ($this->looksNonLatin($name)) {
+                        return null;
+                    }
+
+                    $reviewInfo = $item['review_info'] ?? [];
+
+                    return [
+                        'name'            => $name,
+                        'price'           => $price,
+                        'price_formatted' => '₱' . number_format($price, 2),
+                        'image_url'       => $item['img'] ?? null,
+                        'source_icon'     => null,
+                        'source_url'      => $item['product_url'] ?? 'https://www.lazada.com.ph/',
+                        'page_token'      => null,
+                        'source'          => $item['shop_info']['shop_name'] ?? 'Lazada PH',
+                        'rating'          => isset($reviewInfo['average_score']) ? round((float) $reviewInfo['average_score'], 1) : null,
+                        'reviews'         => isset($reviewInfo['review_count']) ? (int) $reviewInfo['review_count'] : null,
                         'snippet'         => null,
                         'date_retrieved'  => now()->format('M d, Y'),
                         'cached'          => false,
