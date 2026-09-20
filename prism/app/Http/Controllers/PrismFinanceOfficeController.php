@@ -369,7 +369,12 @@ class PrismFinanceOfficeController extends Controller
         $statusFrom = $proposal->status;
         $remarks    = $request->input('remarks', '');
 
-        $proposal->update(['status' => 'endorsed', 'reviewed_at' => now(), 'remarks' => $remarks]);
+        $proposal->update([
+            'status'              => 'endorsed',
+            'reviewed_by_user_id' => auth()->id(),
+            'reviewed_at'         => now(),
+            'remarks'             => $remarks,
+        ]);
 
         BudgetProposalReview::create([
             'budget_proposal_id'  => $proposal->id,
@@ -407,7 +412,12 @@ class PrismFinanceOfficeController extends Controller
         $remarks    = (string) $request->input('remarks', '');
         $statusFrom = $proposal->status;
 
-        $proposal->update(['status' => 'returned', 'reviewed_at' => now(), 'remarks' => $remarks]);
+        $proposal->update([
+            'status'              => 'returned',
+            'reviewed_by_user_id' => auth()->id(),
+            'reviewed_at'         => now(),
+            'remarks'             => $remarks,
+        ]);
 
         BudgetProposalReview::create([
             'budget_proposal_id'  => $proposal->id,

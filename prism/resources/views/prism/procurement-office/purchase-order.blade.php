@@ -949,7 +949,7 @@
                         const numberCell = tbody?.querySelector(`[data-po-row][data-po-id="${activePo.id}"] td:first-child`);
                         if (numberCell) numberCell.textContent = activePo.poNumber;
                         uploadPoText.textContent = 'Re-upload PDF';
-                        showToast(`PO PDF uploaded successfully — ${activePo.poNumber}.` + (activePo.alobsNo !== '—' || activePo.fundSource !== '—' ? ' ALOBS/Fund Source detected from the document.' : ''));
+                        showToast(`PO PDF uploaded successfully — ${activePo.poNumber}.` + (activePo.alobsNo !== '—' ? ' ALOBS No. detected from the document.' : ''));
                     } else {
                         uploadPoText.textContent = origText;
                         showToast(json.error || json.message || 'Upload failed.', true);

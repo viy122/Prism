@@ -936,7 +936,7 @@ class PrismProcurementOfficeController extends Controller
      * everything earlier is a real Supplier N price kept for checking
      * against this PR's actual quotations.
      *
-     * @return array<int, array{name: string, unit: string, quantity: float, supplierPrices: list<float>}>
+     * @return array<int, array{name: string, unit: string, quantity: float, supplierPrices: list<float>, responsiveDealer: string}>
      */
     private function parseAbstractOfCanvassItems(string $text): array
     {
@@ -965,14 +965,15 @@ class PrismProcurementOfficeController extends Controller
 
             // Everything after this date up to the next row's leading
             // "qty unit" (or the table's end, for the last row) is this
-            // row's Responsive Dealer name — not needed for validation, but
-            // has to be skipped past correctly to find where the next row
-            // actually starts.
-            $tailStart = $dateOffset + strlen($dateStr);
-            $rowEnd    = strlen($table);
+            // row's Responsive Dealer name — kept as a fallback for
+            // extractResponsiveDealer() below, for AOCs where the
+            // recommendation paragraph's blank was left unfilled.
+            $tailStart   = $dateOffset + strlen($dateStr);
+            $rowEnd      = strlen($table);
             if (preg_match('/\d+\s*(?:' . $uom . ')/isu', $table, $nm, PREG_OFFSET_CAPTURE, $tailStart)) {
                 $rowEnd = $nm[0][1];
             }
+            $responsiveDealer = trim(substr($table, $tailStart, $rowEnd - $tailStart));
             $cursor = $rowEnd;
 
             // Every currency amount in the head, in column order — the last
@@ -1008,10 +1009,11 @@ class PrismProcurementOfficeController extends Controller
             }
 
             $items[] = [
-                'name'           => trim(preg_replace('/\s+/', ' ', $name)),
-                'unit'           => trim($unit),
-                'quantity'       => $qty,
-                'supplierPrices' => $supplierPrices,
+                'name'             => trim(preg_replace('/\s+/', ' ', $name)),
+                'unit'             => trim($unit),
+                'quantity'         => $qty,
+                'supplierPrices'   => $supplierPrices,
+                'responsiveDealer' => $responsiveDealer,
             ];
         }
 
@@ -1437,9 +1439,29 @@ class PrismProcurementOfficeController extends Controller
     }
 
     /**
-     * The BatStateU-FO-PRO-01 Quotation/Canvass Form always puts the value for
-     * a given field on the line right above that field's own label (both sit
-     * in the supplier's signature block). Best-effort only.
+     * The BatStateU-FO-PRO-01 Quotation/Canvass Form's signature block can
+     * extract in two different orders depending on how the PDF was produced:
+     *
+     *   - interleaved: each value sits on the line right above its own label
+     *     ("Toy Ride Company" / "Company Name" / ...), or
+     *   - blocked: every label in the block extracts first (as the form's
+     *     static template text), followed by every filled-in value in the
+     *     same relative order ("Printed / Signature" / "Company Name" /
+     *     "Company Address" / "Contact No." / "Juan Toy Ride" / "Toy Ride
+     *     Company" / "Batangas City" / "+63912345678") — this happens when
+     *     the filled values were added as a separate text/annotation layer
+     *     on top of the template, which is what typed-and-signed uploads
+     *     from suppliers commonly produce.
+     *
+     * The blocked case previously broke extraction: reading "the line right
+     * above the label" for "Company Name" landed on "Printed / Signature"
+     * (a label itself, not a value) whenever that label read as "Printed /
+     * Signature" rather than "Printed Name" — the only variant the old
+     * label-detection regex recognized — so it was returned as if it were
+     * the actual supplier name. Both layouts are handled here: block
+     * position-matching is tried first (only fires when multiple labels
+     * genuinely run together), falling back to the original
+     * line-right-above-the-label check for the interleaved layout.
      */
     private function parseLabeledLineFromQuotation(string $text, string $label): ?string
     {
@@ -1448,16 +1470,45 @@ class PrismProcurementOfficeController extends Controller
             fn ($line) => $line !== ''
         ));
 
+        $isLabelLine = fn (string $line): bool => (bool) preg_match(
+            '/^(Printed(\s*Name)?\s*\/?\s*Signature|Signature|Company\s*(Name|Address)|Contact\s*No\.?|Canvasser|Procurement Officer)/i',
+            $line
+        );
+
         foreach ($lines as $i => $line) {
-            if (stripos($line, $label) === false || $i === 0) {
+            if (stripos($line, $label) === false) {
                 continue;
             }
 
-            $candidate = $lines[$i - 1];
-            $looksLikeLabel = preg_match('/^(Printed Name|Signature|Company (Name|Address)|Contact No|Canvasser|Procurement Officer)/i', $candidate);
+            // Blocked layout: expand to the full run of consecutive label
+            // lines this one sits in, then read the value at the same
+            // position within the run of lines immediately following it.
+            $blockStart = $i;
+            while ($blockStart > 0 && $isLabelLine($lines[$blockStart - 1])) {
+                $blockStart--;
+            }
+            $blockEnd = $i;
+            while ($blockEnd < count($lines) - 1 && $isLabelLine($lines[$blockEnd + 1])) {
+                $blockEnd++;
+            }
 
-            if ($candidate !== '' && !$looksLikeLabel) {
-                return $candidate;
+            if ($blockEnd > $blockStart) {
+                $offset       = $i - $blockStart;
+                $valueLineIdx = $blockEnd + 1 + $offset;
+                $blocked      = $lines[$valueLineIdx] ?? null;
+
+                if ($blocked !== null && $blocked !== '' && !$isLabelLine($blocked)) {
+                    return $blocked;
+                }
+            }
+
+            // Interleaved layout: the value sits on the line right above
+            // this (isolated) label line.
+            if ($i > 0) {
+                $candidate = $lines[$i - 1];
+                if ($candidate !== '' && !$isLabelLine($candidate)) {
+                    return $candidate;
+                }
             }
         }
 
@@ -2079,6 +2130,9 @@ class PrismProcurementOfficeController extends Controller
             'signatory_stage'        => 'draft',
             'issued_at'              => now(),
             'expected_delivery_date' => $request->input('expected_delivery_date'),
+            // Known as soon as the PR is known — doesn't need to wait for the
+            // signed PO document to be uploaded (see resolveFundSourceFromPpmp()).
+            'fund_source'            => $this->resolveFundSourceFromPpmp($aoc->purchaseRequest),
         ]);
 
         NotificationService::prStatusUpdated($aoc->purchaseRequest);
@@ -2646,7 +2700,10 @@ class PrismProcurementOfficeController extends Controller
             'file_path'   => $path,
             'uploaded_at' => now(),
             'alobs_no'    => $poFields['alobsNo'] ?? $po->alobs_no,
-            'fund_source' => $poFields['fundSource'] ?? $po->fund_source,
+            // Falls back here too in case issuePo() couldn't resolve it yet
+            // (e.g. the PPMP item's Source of Funds was filled in afterward)
+            // — never overwrites an already-known value.
+            'fund_source' => $po->fund_source ?: $this->resolveFundSourceFromPpmp($po->abstractOfCanvass?->purchaseRequest),
         ]);
 
         if ($validation) {
@@ -2691,40 +2748,93 @@ class PrismProcurementOfficeController extends Controller
     }
 
     /**
-     * The Abstract of Canvass form's recommendation paragraph always names the
-     * winning bidder the same way: "...prices offered by <Supplier> is/are
-     * considered reasonable and most advantageous...". Best-effort only.
+     * The Abstract of Canvass form's recommendation paragraph usually names
+     * the winning bidder the same way: "...prices offered by <Supplier>
+     * is/are considered reasonable and most advantageous...". That blank is
+     * often left unfilled, though (just underscores), even when the item
+     * table's own RESPONSIVE DEALER column does name the winning supplier —
+     * in that case, fall back to the table instead of declaring the blank
+     * placeholder itself as the dealer name. Best-effort only.
      */
     private function extractResponsiveDealer(string $text): ?string
     {
         $normalized = preg_replace('/\s+/', ' ', $text);
         if (preg_match('/offered by (.+?) is\s*\/?\s*are considered/i', $normalized, $m)) {
-            return trim($m[1]);
+            $declared = trim($m[1]);
+            if ($declared !== '' && !preg_match('/^_+$/', $declared)) {
+                return $declared;
+            }
         }
+
+        foreach ($this->parseAbstractOfCanvassItems($text) as $item) {
+            $dealer = trim($item['responsiveDealer'] ?? '');
+            if ($dealer !== '') {
+                return $dealer;
+            }
+        }
+
         return null;
     }
 
     /**
-     * The Purchase Order form's "Funds Available" box lists the ALOBS No. and
-     * Fund Source on their own labeled lines. Best-effort only — a scanned,
-     * hand-filled PO may have no text layer at all for these values.
+     * The Purchase Order form's "Funds Available" box lists the ALOBS No. on
+     * its own labeled line. Best-effort only — a scanned, hand-filled PO may
+     * have no text layer at all for this value.
+     *
+     * Fund Source is deliberately NOT read from this document — that field
+     * on the PO form is routinely left blank there (Accounting fills the
+     * ALOBS box, not this one); the actual source of funds was already
+     * declared per item back in the PR's own PPMP, so it's resolved from
+     * there instead — see resolveFundSourceFromPpmp().
      */
     private function extractPoFundingFields(string $text): array
     {
-        $result = ['alobsNo' => null, 'fundSource' => null];
+        $result = ['alobsNo' => null];
 
         // Colon is required (not "?") and the capture allows zero length — this
         // keeps the match confined to the same line and stops the regex engine
         // from "giving back" the colon into the capture group when the field is
         // left blank on the form (which would otherwise wrongly extract ":").
-        if (preg_match('/ALOBS No\.?[ \t]*:[ \t]*([^\r\n]*)/i', $text, $m) && trim($m[1]) !== '') {
-            $result['alobsNo'] = trim($m[1]);
-        }
-        if (preg_match('/Fund Source[ \t]*:[ \t]*([^\r\n]*)/i', $text, $m) && trim($m[1]) !== '') {
-            $result['fundSource'] = trim($m[1]);
+        if (preg_match('/ALOBS No\.?[ \t]*:[ \t]*([^\r\n]*)/i', $text, $m, PREG_OFFSET_CAPTURE) && trim($m[1][0]) !== '') {
+            $result['alobsNo'] = trim($m[1][0]);
+        } elseif (preg_match('/ALOBS No\.?[ \t]*:?[ \t]*$/im', $text, $m, PREG_OFFSET_CAPTURE)) {
+            // Some PDFs extract the label and its filled-in value on separate
+            // lines (the value was added as a layer on top of the template
+            // rather than typed inline) — take the next non-blank line as a
+            // fallback, unless it's actually the start of the following
+            // labeled row rather than a value.
+            $after = substr($text, $m[0][1] + strlen($m[0][0]));
+            if (preg_match('/\s*([^\r\n]+)/u', $after, $nm) && trim($nm[1]) !== '' && !preg_match('/^(Amount|Fund Source)\b/i', trim($nm[1]))) {
+                $result['alobsNo'] = trim($nm[1]);
+            }
         }
 
         return $result;
+    }
+
+    /**
+     * The PO's Fund Source is the "Source of Funds" already declared per
+     * item in the PR's own PPMP (Column 9 of the PPMP document — see
+     * BudgetProposalItem::source_of_fund), matched by item name the same way
+     * matchPrItemsByOfficeAndName() matches in the other direction. Not read
+     * off the PO document itself — see extractPoFundingFields() above.
+     */
+    private function resolveFundSourceFromPpmp(?PurchaseRequest $pr): ?string
+    {
+        $budgetItems = $pr?->budgetProposal?->items;
+        if (!$budgetItems || $budgetItems->isEmpty()) {
+            return null;
+        }
+
+        $byName = $budgetItems->keyBy(fn ($item) => strtolower(trim($item->name)));
+
+        $sources = $pr->items
+            ->map(fn ($item) => $byName->get(strtolower(trim($item->name)))?->source_of_fund)
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $sources->isEmpty() ? null : $sources->implode(', ');
     }
 
     /**
