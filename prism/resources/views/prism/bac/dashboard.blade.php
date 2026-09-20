@@ -27,22 +27,40 @@
     .card-title   { font-size: 17px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 13px; margin-bottom: 20px; }
     .stat-card {
-        position: relative; overflow: hidden;
         background: var(--white); border: 1px solid var(--s200);
         border-radius: 15px; padding: 18px 20px 16px;
-        box-shadow: var(--sh-sm); transition: box-shadow .25s, border-color .25s, transform .2s;
+        position: relative; overflow: hidden; box-shadow: var(--sh-sm);
+        transition: box-shadow .25s, border-color .25s, transform .2s;
     }
     .stat-card:hover { box-shadow: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
-    .stat-card::before { content: ''; position: absolute; left: 0; top: 16px; width: 4px; height: 38px; border-radius: 0 4px 4px 0; background: #681012; }
-    .stat-icon { position: absolute; right: 14px; top: 16px; width: 34px; height: 34px; border-radius: 10px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
-    .stat-icon svg { width: 17px; height: 17px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); margin-bottom: 9px; padding-right: 40px; }
-    .stat-value { font-size: 26px; font-weight: 800; color: #681012; letter-spacing: -.5px; line-height: 1; }
+    .stat-card::before {
+        content: ""; position: absolute; left: 0; top: 16px;
+        width: 4px; height: 38px; background: #681012; border-radius: 0 4px 4px 0;
+    }
+    .stat-icon {
+        position: absolute; right: 16px; top: 16px;
+        width: 38px; height: 38px; border-radius: 11px;
+        background: rgba(104,16,18,.07);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .stat-icon svg { width: 19px; height: 19px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 9px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: #681012; letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
+    .stat-value.sm { font-size: 18px; letter-spacing: -.3px; }
+    .stat-hint { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
     .stat-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; color: #681012; text-decoration: none; }
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .chart-icon-badge {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        background: rgba(104,16,18,.07);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .chart-icon-badge i { font-size: 18px; color: var(--m); }
+    .chart-card-head-text { flex: 1; min-width: 0; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; background: var(--white); }
@@ -82,45 +100,60 @@
     </div>
 
     <div class="stat-grid">
-        <div class="stat-card">
+        <article class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
             <p class="stat-label">Awaiting My Signature</p>
             <p class="stat-value">{{ $summary['awaitingMySignature'] }}</p>
+            <p class="stat-hint">Requires action at your BAC stage</p>
             <a class="stat-link" href="{{ route('bac.for-my-signature') }}">Open queue <i class="ti ti-arrow-right"></i></a>
-        </div>
-        <div class="stat-card">
+        </article>
+        <article class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
             <p class="stat-label">AOCs In BAC Stages</p>
             <p class="stat-value">{{ $summary['aocsInBacStages'] }}</p>
-        </div>
-        <div class="stat-card">
+            <p class="stat-hint">Currently moving through BAC review</p>
+        </article>
+        <article class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
             <p class="stat-label">Total Value Pending</p>
-            <p class="stat-value">₱{{ number_format($summary['totalValuePending'], 0) }}</p>
-        </div>
-        <div class="stat-card">
+            <p class="stat-value sm">₱{{ number_format($summary['totalValuePending'], 0) }}</p>
+            <p class="stat-hint">Combined value of AOCs awaiting BAC action</p>
+        </article>
+        <article class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
             <p class="stat-label">Avg. Days Pending</p>
             <p class="stat-value">{{ $summary['avgDaysPending'] }}</p>
-        </div>
-        <div class="stat-card">
+            <p class="stat-hint">Average time awaiting signature</p>
+        </article>
+        <article class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <p class="stat-label">AOCs Fully Signed</p>
             <p class="stat-value">{{ $summary['aocsFullySigned'] }}</p>
-        </div>
+            <p class="stat-hint">Cleared through all BAC stages</p>
+        </article>
     </div>
 
     <div class="charts-grid">
         <div class="card">
-            <p class="card-eyebrow">By BAC stage</p>
-            <h2 class="card-title" style="margin-bottom:16px;">AOCs Pending, per Stage</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-bar"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">By BAC stage</p>
+                    <h2 class="card-title">AOCs Pending, per Stage</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="stageChart" data-rows="{{ json_encode($stageChart) }}"></canvas>
             </div>
         </div>
         <div class="card">
-            <p class="card-eyebrow">Per office</p>
-            <h2 class="card-title" style="margin-bottom:16px;">AOCs Pending, per Office</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-building"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Per office</p>
+                    <h2 class="card-title">AOCs Pending, per Office</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="officeChart" data-rows="{{ json_encode($officeChart) }}"></canvas>
             </div>
@@ -129,9 +162,12 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Needs follow-up</p>
-                <h2 class="card-title">Oldest Pending AOCs</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-clock"></i></div>
+                <div>
+                    <p class="card-eyebrow">Needs follow-up</p>
+                    <h2 class="card-title">Oldest Pending AOCs</h2>
+                </div>
             </div>
         </div>
 
@@ -175,9 +211,12 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Activity</p>
-                <h2 class="card-title">Recent AOC Signature Activity</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-history"></i></div>
+                <div>
+                    <p class="card-eyebrow">Activity</p>
+                    <h2 class="card-title">Recent AOC Signature Activity</h2>
+                </div>
             </div>
         </div>
 

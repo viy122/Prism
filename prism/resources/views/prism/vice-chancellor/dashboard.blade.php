@@ -62,6 +62,14 @@
 
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .chart-icon-badge {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        background: rgba(104,16,18,.07);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .chart-icon-badge i { font-size: 18px; color: var(--m); }
+    .chart-card-head-text { flex: 1; min-width: 0; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
     /* Office-utilization chart grows with office count instead of squeezing
        many bars into a fixed box — left uncapped, that stretched the WHOLE
@@ -80,7 +88,7 @@
     .chart-expand-btn:hover { text-decoration: underline; }
     .card-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .card-head-row .card-title { margin-bottom: 0; }
-    .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
+    .pd-chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
     .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
@@ -170,20 +178,30 @@
 
     <div class="charts-grid">
         <div class="card">
-            <p class="card-eyebrow">Division-wide</p>
-            <h2 class="card-title" style="margin-bottom:16px;">APP Item Status</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-donut"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Division-wide</p>
+                    <h2 class="card-title">APP Item Status</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="itemStatusChart" data-status="{{ json_encode($itemStatusChart) }}"></canvas>
             </div>
             <div class="pd-chart-legend" id="itemStatusLegend"></div>
         </div>
         <div class="card">
-            <p class="card-eyebrow">Per office</p>
-            <div class="card-head-row">
-                <h2 class="card-title">Utilization Rate</h2>
-                <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
-                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
-                </button>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-building"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Per office</p>
+                    <div class="card-head-row" style="margin-bottom:0;">
+                        <h2 class="card-title">Utilization Rate</h2>
+                        <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
+                            <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="chart-wrap collapsible" id="officeUtilWrap">
                 <canvas id="officeUtilizationChart" data-rows="{{ json_encode($officeUtilization) }}"></canvas>
@@ -195,9 +213,12 @@
 
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Utilization rate per office</p>
-                    <h2 class="card-title">Division Utilization</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-gauge"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Utilization rate per office</p>
+                        <h2 class="card-title">Division Utilization</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">
@@ -243,9 +264,12 @@
 
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Pending PR summary</p>
-                    <h2 class="card-title">Division PR Queue</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-clipboard-list"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Pending PR summary</p>
+                        <h2 class="card-title">Division PR Queue</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">
@@ -327,11 +351,22 @@
                 expandBtn.querySelector('span').textContent = expanded ? 'Collapse' : 'Expand';
             });
         }
+        // A distinct color per office (cycled), drawn from the same palette
+        // already used for status/category colors across the other PRISM
+        // dashboards (crimson, blue, green, amber, violet, red) — the office
+        // names on the y-axis already carry identity, so color here is for
+        // visual variety rather than a strict categorical encoding.
+        const officePalette = ['#681012', '#185fa5', '#3b6d11', '#854f0b', '#5b21b6', '#a32d2d', '#c9a84c'];
         new Chart(officeEl, {
             type: 'bar',
             data: {
                 labels: rows.map(r => r.office),
-                datasets: [{ label: 'Utilization %', data: rows.map(r => r.utilization), backgroundColor: '#681012', borderRadius: 4 }],
+                datasets: [{
+                    label: 'Utilization %',
+                    data: rows.map(r => r.utilization),
+                    backgroundColor: rows.map((_, i) => officePalette[i % officePalette.length]),
+                    borderRadius: 4,
+                }],
             },
             options: {
                 indexAxis: 'y',

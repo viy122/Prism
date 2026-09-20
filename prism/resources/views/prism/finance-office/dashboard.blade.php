@@ -49,7 +49,16 @@
 
     .pd-card { background: var(--white); border: 1px solid var(--s200); border-radius: 15px; padding: 20px 22px; box-shadow: var(--sh-sm); }
     .pd-card-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--crimson); margin-bottom: 3px; }
-    .pd-card-title { font-size: 15px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; margin-bottom: 16px; }
+    .pd-card-title { font-size: 15px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; }
+
+    .pd-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+    .pd-card-icon-badge {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        background: var(--crimson-mid); border: 1px solid var(--crimson-border);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .pd-card-icon-badge i { font-size: 18px; color: var(--crimson); }
+    .pd-card-head-text { flex: 1; min-width: 0; }
 
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .pd-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -108,8 +117,7 @@
         font-family: 'Poppins', sans-serif; padding: 0; margin-left: auto;
     }
     .pd-chart-expand-btn:hover { text-decoration: underline; }
-    .pd-card-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-    .pd-card-head-row .pd-card-title { margin-bottom: 0; }
+    .pd-card-head-row { display: flex; align-items: center; gap: 8px; }
     .pd-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: var(--s600); }
     .pd-legend-item { display: flex; align-items: center; gap: 6px; }
     .pd-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
@@ -173,27 +181,42 @@
 
     <div class="pd-charts-grid">
         <article class="pd-card">
-            <p class="pd-card-eyebrow">Campus PPMP pipeline</p>
-            <h2 class="pd-card-title">Proposals by Status</h2>
+            <div class="pd-card-head">
+                <div class="pd-card-icon-badge"><i class="ti ti-chart-donut"></i></div>
+                <div class="pd-card-head-text">
+                    <p class="pd-card-eyebrow">Campus PPMP pipeline</p>
+                    <h2 class="pd-card-title">Proposals by Status</h2>
+                </div>
+            </div>
             <div class="pd-chart-wrap" style="height:220px;">
                 <canvas id="statusChart" data-statuses="{{ json_encode($proposalsByStatus) }}"></canvas>
             </div>
         </article>
         <article class="pd-card">
-            <p class="pd-card-eyebrow">Active submissions</p>
-            <div class="pd-card-head-row">
-                <h2 class="pd-card-title">Proposed Budget by Office</h2>
-                <button type="button" class="pd-chart-expand-btn" id="officeBudgetExpandBtn" style="display:none;">
-                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
-                </button>
+            <div class="pd-card-head">
+                <div class="pd-card-icon-badge"><i class="ti ti-building"></i></div>
+                <div class="pd-card-head-text">
+                    <p class="pd-card-eyebrow">Active submissions</p>
+                    <div class="pd-card-head-row">
+                        <h2 class="pd-card-title">Proposed Budget by Office</h2>
+                        <button type="button" class="pd-chart-expand-btn" id="officeBudgetExpandBtn" style="display:none;">
+                            <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="pd-chart-wrap collapsible" id="officeBudgetWrap">
                 <canvas id="officeBudgetChart" data-offices="{{ json_encode($budgetByOffice) }}"></canvas>
             </div>
         </article>
         <article class="pd-card">
-            <p class="pd-card-eyebrow">This fiscal year</p>
-            <h2 class="pd-card-title">Monthly Review Activity</h2>
+            <div class="pd-card-head">
+                <div class="pd-card-icon-badge"><i class="ti ti-calendar-stats"></i></div>
+                <div class="pd-card-head-text">
+                    <p class="pd-card-eyebrow">This fiscal year</p>
+                    <h2 class="pd-card-title">Monthly Review Activity</h2>
+                </div>
+            </div>
             <div class="pd-chart-wrap" style="height:220px;">
                 <canvas id="activityChart" data-activity="{{ json_encode($monthlyReviewActivity) }}"></canvas>
             </div>
@@ -203,8 +226,13 @@
     <div class="two-col">
 
         <article class="pd-card">
-            <p class="pd-card-eyebrow">Grouped by office</p>
-            <h2 class="pd-card-title">Proposals by Status</h2>
+            <div class="pd-card-head">
+                <div class="pd-card-icon-badge"><i class="ti ti-list-details"></i></div>
+                <div class="pd-card-head-text">
+                    <p class="pd-card-eyebrow">Grouped by office</p>
+                    <h2 class="pd-card-title">Proposals by Status</h2>
+                </div>
+            </div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -223,21 +251,21 @@
                                     @if($office['pending'] > 0)
                                         <span class="badge badge-pending">{{ $office['pending'] }}</span>
                                     @else
-                                        <span style="font-size:13px;color:var(--s400);font-weight:600;">—</span>
+                                        <span class="badge badge-default">0</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($office['endorsed'] > 0)
                                         <span class="badge badge-endorsed">{{ $office['endorsed'] }}</span>
                                     @else
-                                        <span style="font-size:13px;color:var(--s400);font-weight:600;">—</span>
+                                        <span class="badge badge-default">0</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($office['returned'] > 0)
                                         <span class="badge badge-returned">{{ $office['returned'] }}</span>
                                     @else
-                                        <span style="font-size:13px;color:var(--s400);font-weight:600;">—</span>
+                                        <span class="badge badge-default">0</span>
                                     @endif
                                 </td>
                             </tr>
@@ -250,8 +278,13 @@
         </article>
 
         <article class="pd-card">
-            <p class="pd-card-eyebrow">Recent submissions</p>
-            <h2 class="pd-card-title">Review Queue</h2>
+            <div class="pd-card-head">
+                <div class="pd-card-icon-badge"><i class="ti ti-clipboard-list"></i></div>
+                <div class="pd-card-head-text">
+                    <p class="pd-card-eyebrow">Recent submissions</p>
+                    <h2 class="pd-card-title">Review Queue</h2>
+                </div>
+            </div>
             <div class="table-wrap">
                 <table>
                     <thead>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Models\BudgetProposal;
+use App\Models\PurchaseRequestItem;
 use App\Services\ProcurementModeService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -40,6 +41,19 @@ trait RendersPpmpDocument
             'approvedDate'    => $proposal->approved_at?->format('M d, Y') ?? '',
         ];
 
+        // Official PPMP form column 8 "Expected Delivery/Implementation" — the
+        // ACTUAL date Procurement Office set when it issued the Purchase
+        // Order for this item (PurchaseOrder::expected_delivery_date),
+        // reported back here rather than guessed up front by the office
+        // head, since it isn't real until a supplier's been picked and a PO
+        // issued. No stored link exists between a PPMP item and the PR item
+        // eventually raised from it, so this matches on item name.
+        $poDeliveryDateByItemName = PurchaseRequestItem::with('purchaseRequest.abstractOfCanvass.purchaseOrder')
+            ->whereHas('purchaseRequest', fn ($q) => $q->where('budget_proposal_id', $proposal->id))
+            ->get()
+            ->keyBy(fn ($pri) => strtolower(trim($pri->name)))
+            ->map(fn ($pri) => $pri->purchaseRequest?->abstractOfCanvass?->purchaseOrder?->expected_delivery_date);
+
         $items = $proposal->items->map(fn ($item) => [
             'description'      => $item->name,
             'projectType'       => $item->project_type ?? 'Goods',
@@ -49,6 +63,7 @@ trait RendersPpmpDocument
             'preProcurementConference' => (bool) $item->pre_procurement_conference,
             'procurementStartDate' => $item->procurement_start_date?->format('M d, Y'),
             'dateNeeded'        => $item->date_needed?->format('M d, Y'),
+            'expectedDeliveryDate' => $poDeliveryDateByItemName->get(strtolower(trim($item->name)))?->format('M d, Y'),
             'sourceOfFund'      => $item->source_of_fund,
             'totalCost'         => (float) $item->estimated_total_cost,
             'justification'     => $item->remarks ?? '',

@@ -4,7 +4,12 @@
 @push('page-css')
 <style>
     /* ══ TOP CARD ══ */
-    .top-card { background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); overflow: hidden; }
+    /* overflow was `hidden` for corner-clipping, but that also clipped the
+       recent-searches dropdown (`.suggest-dropdown`, absolutely positioned
+       off `.search-wrap` inside here) at this card's bottom edge instead of
+       letting it float over the Market References grid below. Nothing else
+       in this card bleeds to its rounded corners, so visible is safe. */
+    .top-card { background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); overflow: visible; }
     .top-card-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px 16px; }
     .top-card-title-left { display: flex; align-items: center; gap: 12px; }
     .top-card-title-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -281,9 +286,9 @@
                 </select>
 
                 <label>Price</label>
-                <input id="priceMin" class="filter-price" type="number" min="0" placeholder="Min ₱">
+                <input id="priceMin" class="filter-price" type="number" min="0" placeholder="₱ Min ">
                 <span style="color:var(--txt3);font-size:11px;">–</span>
-                <input id="priceMax" class="filter-price" type="number" min="0" placeholder="Max ₱">
+                <input id="priceMax" class="filter-price" type="number" min="0" placeholder="₱ Max ">
                 <button type="button" class="filter-clear" id="filterClear">Clear</button>
             </div>
 

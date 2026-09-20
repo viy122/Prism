@@ -8,7 +8,8 @@
 
 @push('page-css')
 <style>
-    .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
+    .page-hdr { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
+    .page-hdr .filter-bar { flex-shrink: 0; }
     .page-hdr-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--crimson-mid); border: 1px solid var(--crimson-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .page-hdr-icon i { font-size: 22px; color: var(--crimson); }
     .page-hdr-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--crimson); margin-bottom: 3px; }
@@ -29,19 +30,40 @@
     .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
+    .chart-card-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 16px; }
+    .chart-icon-badge {
+        width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+        background: var(--crimson-mid); border: 1px solid var(--crimson-border);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .chart-icon-badge i { font-size: 20px; color: var(--m); }
+    .chart-card-head-text { flex: 1; min-width: 180px; }
+
     /* ── Filter bar ── */
     .filter-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    .filter-field { display: flex; flex-direction: column; gap: 4px; }
-    .filter-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
-    .filter-select {
-        height: 38px; padding: 0 34px 0 12px; border-radius: 9px; border: 1px solid var(--s200);
-        background: var(--white); color: var(--s700); font-size: 13px; font-weight: 600;
-        font-family: 'Poppins', sans-serif; cursor: pointer; min-width: 170px;
+    .filter-box {
+        position: relative; display: flex; align-items: center; gap: 10px;
+        height: 58px; background: var(--white); border: 1px solid var(--s200);
+        border-radius: 12px; padding: 0 16px; min-width: 260px;
+        transition: border-color .15s, box-shadow .15s;
     }
-    .filter-select:focus { outline: none; border-color: var(--crimson); }
-    .filter-reset { font-size: 12px; font-weight: 700; color: var(--m); text-decoration: none; margin-top: 18px; }
+    .filter-box:hover, .filter-box:focus-within { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box-icon {
+        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+        background: var(--crimson-mid); display: flex; align-items: center; justify-content: center;
+    }
+    .filter-box-icon i { font-size: 16px; color: var(--crimson); }
+    .filter-box-body { display: flex; flex-direction: column; line-height: 1.3; overflow: hidden; }
+    .filter-box-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--crimson); }
+    .filter-box-value { font-size: 14px; font-weight: 800; color: var(--s900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-box-chev { font-size: 13px; color: var(--crimson); flex-shrink: 0; margin-left: auto; }
+    .filter-box-select {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+    }
+    .filter-reset { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--m); text-decoration: none; }
     .filter-reset:hover { text-decoration: underline; }
-    .filter-active-note { font-size: 11.5px; color: var(--s500); margin-left: auto; margin-top: 18px; }
+    .filter-active-note { font-size: 11.5px; color: var(--s500); margin-top: -6px; }
 
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .stat-card {
@@ -109,6 +131,13 @@
 
 <div class="content">
 
+    @php
+        $selectedOfficeLabel = 'All Offices';
+        foreach ($filters['officeOptions'] as $o) {
+            if ($filters['selectedOffice'] == $o->id) { $selectedOfficeLabel = $o->code . ' — ' . $o->name; break; }
+        }
+        $selectedYearLabel = $filters['selectedYear'] ? 'FY ' . $filters['selectedYear'] : 'All Years';
+    @endphp
     <div class="page-hdr">
         <div class="page-hdr-icon"><i class="ti ti-layout-dashboard"></i></div>
         <div style="flex:1;">
@@ -116,22 +145,29 @@
             <h1 class="page-hdr-title">Dashboard</h1>
             <p class="page-hdr-sub">Purchase Requests, Abstracts of Canvass, and Purchase Orders — status, volume, and what's been waiting longest.</p>
         </div>
-    </div>
-
-    <div class="card">
         <form class="filter-bar" method="GET" action="{{ route('procurement-office.dashboard') }}" id="dashFilterForm">
-            <div class="filter-field">
-                <label class="filter-label" for="filterOffice">Office</label>
-                <select class="filter-select" id="filterOffice" name="office" onchange="document.getElementById('dashFilterForm').submit()">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-building"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Office</span>
+                    <span class="filter-box-value">{{ $selectedOfficeLabel }}</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="filterOffice" name="office" onchange="document.getElementById('dashFilterForm').submit()">
                     <option value="">All Offices</option>
                     @foreach ($filters['officeOptions'] as $o)
                         <option value="{{ $o->id }}" @selected($filters['selectedOffice'] == $o->id)>{{ $o->code }} — {{ $o->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="filter-field">
-                <label class="filter-label" for="filterYear">Fiscal Year</label>
-                <select class="filter-select" id="filterYear" name="year" onchange="document.getElementById('dashFilterForm').submit()">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-calendar"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Fiscal Year</span>
+                    <span class="filter-box-value">{{ $selectedYearLabel }}</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="filterYear" name="year" onchange="document.getElementById('dashFilterForm').submit()">
                     <option value="">All Years</option>
                     @foreach ($filters['yearOptions'] as $y)
                         <option value="{{ $y }}" @selected($filters['selectedYear'] == $y)>FY {{ $y }}</option>
@@ -140,12 +176,12 @@
             </div>
             @if ($filters['selectedOffice'] || $filters['selectedYear'])
                 <a href="{{ route('procurement-office.dashboard') }}" class="filter-reset"><i class="ti ti-x"></i> Clear filters</a>
-                <span class="filter-active-note">Showing filtered results — everything below updates to match.</span>
-            @else
-                <span class="filter-active-note">Showing all offices, all years.</span>
             @endif
         </form>
     </div>
+    @if ($filters['selectedOffice'] || $filters['selectedYear'])
+        <p class="filter-active-note">Showing filtered results — everything below updates to match.</p>
+    @endif
 
     <div class="stats-grid">
         <div class="stat-card">
@@ -184,15 +220,25 @@
 
     <div class="charts-grid">
         <article class="card chart-card">
-            <p class="card-eyebrow">By document type</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Status — PR vs AOC vs PO</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-bar"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">By document type</p>
+                    <h2 class="card-title">Status — PR vs AOC vs PO</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="docStatusChart" data-status="{{ json_encode($docStatusChart) }}"></canvas>
             </div>
         </article>
         <article class="card chart-card">
-            <p class="card-eyebrow">Pipeline share</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Document Mix</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-donut"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Pipeline share</p>
+                    <h2 class="card-title">Document Mix</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="docMixChart" data-mix="{{ json_encode($docMixChart) }}"></canvas>
             </div>
@@ -200,8 +246,13 @@
     </div>
 
     <div class="card volume-card">
-        <p class="card-eyebrow">By office</p>
-        <h2 class="card-title" style="margin-bottom:16px;">Volume — PR / AOC / PO per Office</h2>
+        <div class="chart-card-head">
+            <div class="chart-icon-badge"><i class="ti ti-building"></i></div>
+            <div class="chart-card-head-text">
+                <p class="card-eyebrow">By office</p>
+                <h2 class="card-title">Volume — PR / AOC / PO per Office</h2>
+            </div>
+        </div>
         <div class="volume-scroll">
             <div class="chart-wrap" id="officeVolumeWrap">
                 <canvas id="officeVolumeChart" data-offices="{{ json_encode($officeVolumeChart) }}"></canvas>
@@ -216,9 +267,12 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Current status</p>
-                <h2 class="card-title">PRs per Office by Status</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-list-details"></i></div>
+                <div>
+                    <p class="card-eyebrow">Current status</p>
+                    <h2 class="card-title">PRs per Office by Status</h2>
+                </div>
             </div>
         </div>
         <div class="table-wrap">
@@ -249,12 +303,15 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Longest waiting</p>
-                <h2 class="card-title">Needs Attention — PR, AOC &amp; PO</h2>
-                <p class="card-sub">Not yet fully signed, oldest submission first, across all three document types. No due-date field exists on any of them — this is how long each has genuinely been waiting for action.</p>
+            <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0;">
+                <div class="chart-icon-badge"><i class="ti ti-alert-triangle"></i></div>
+                <div style="min-width:0;">
+                    <p class="card-eyebrow">Longest waiting</p>
+                    <h2 class="card-title">Needs Attention — PR, AOC &amp; PO</h2>
+                    <p class="card-sub">Not yet fully signed, oldest submission first, across all three document types. No due-date field exists on any of them — this is how long each has genuinely been waiting for action.</p>
+                </div>
             </div>
-            <span class="count-chip" id="urgentVisibleCount">{{ count($urgentDocs) }} shown</span>
+            <span class="count-chip" id="urgentVisibleCount" style="flex-shrink:0;">{{ count($urgentDocs) }} shown</span>
         </div>
         <div class="table-wrap">
             <table>
@@ -302,7 +359,7 @@
 <script>
 (function () {
     const STATUS_COLORS = { pending: '#c9862b', in_progress: '#2f7fc4', completed: '#4f8a1f' };
-    const DOC_COLORS     = { pr: '#681012', aoc: '#8b3fb8', po: '#c4720f' };
+    const DOC_COLORS     = { pr: '#a13a3f', aoc: '#8a76b5', po: '#d9a15c' };
 
     // ── Status — PR vs AOC vs PO (stacked horizontal bar) ───────────────────
     // A stacked bar reads three documents' status mix at a glance and lets
@@ -328,13 +385,8 @@
                 scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } },
                 plugins: {
                     legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
-                    datalabels: {
-                        color: '#fff', font: { size: 11, weight: '700' },
-                        formatter: (v) => v > 0 ? v : '',
-                    },
                 },
             },
-            plugins: [ChartDataLabels],
         });
     }
 
@@ -401,7 +453,7 @@
                 options: {
                     indexAxis: 'y',
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
                     scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
                 },
             });

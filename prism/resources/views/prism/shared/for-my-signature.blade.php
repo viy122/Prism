@@ -55,6 +55,9 @@
     .search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; border: none; background: var(--s200); color: var(--s500); display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 12px; line-height: 1; transition: background .15s, color .15s; }
     .search-clear:hover { background: var(--s300); color: var(--s700); }
     .search-clear.visible { display: flex; }
+    /* Highlights the matched substring inside a table cell while a search
+       query is active, so it's visible at a glance why a row matched. */
+    tbody mark { background: rgba(139,26,28,.16); color: var(--crimson-dark); padding: 0 1px; border-radius: 2px; font-weight: 700; }
 
     .search-toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .search-toolbar .search-wrap { width: 100%; margin-bottom: 0; }
@@ -690,6 +693,20 @@
         logEl.classList.toggle('open');
     });
 
+    // Wraps the matched substring of `query` inside `cell`'s text in <mark>,
+    // so it's visible at a glance why a row matched. cell.textContent always
+    // reads back the plain text even after a previous highlight pass already
+    // wrapped part of it in <mark>, so this is safe to call on every keystroke.
+    function highlightCell(cell, query) {
+        if (!cell) return;
+        const text = cell.textContent;
+        const idx  = query ? text.toLowerCase().indexOf(query) : -1;
+        if (idx === -1) { cell.textContent = text; return; }
+        cell.innerHTML = escapeHtml(text.slice(0, idx))
+            + '<mark>' + escapeHtml(text.slice(idx, idx + query.length)) + '</mark>'
+            + escapeHtml(text.slice(idx + query.length));
+    }
+
     function applyDocSearchFilter() {
         if (!docSearch) return;
         if (docSearchClear) docSearchClear.classList.toggle('visible', docSearch.value.length > 0);
@@ -706,6 +723,10 @@
             const match = matchesSearch && matchesType && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
+            // Number, Office, Title columns — the same fields data-search is built from.
+            highlightCell(row.cells[1], q);
+            highlightCell(row.cells[2], q);
+            highlightCell(row.cells[3], q);
         });
         if (docCount) docCount.textContent = visible + (visible === 1 ? ' document' : ' documents');
         if (docNoResults) docNoResults.classList.toggle('visible', visible === 0);

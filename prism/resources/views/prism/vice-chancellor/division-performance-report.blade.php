@@ -166,14 +166,6 @@
         </div>
     </div>
 
-    <div class="card">
-        <p class="card-eyebrow">Per office</p>
-        <h2 class="card-title" style="margin-bottom:16px;">Procured vs Pending, Utilization</h2>
-        <div class="chart-wrap">
-            <canvas id="performanceChart" data-rows="{{ json_encode($performanceRows) }}"></canvas>
-        </div>
-    </div>
-
     <div class="highlight-grid">
         <div class="highlight-card highlight-best">
             <div class="hl-icon">
@@ -246,6 +238,14 @@
                     @endforeach
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <p class="card-eyebrow">Per office</p>
+        <h2 class="card-title" style="margin-bottom:16px;">Procured vs Pending, Utilization</h2>
+        <div class="chart-wrap">
+            <canvas id="performanceChart" data-rows="{{ json_encode($performanceRows) }}"></canvas>
         </div>
     </div>
 

@@ -107,11 +107,18 @@
     .search-toolbar .search-wrap { flex: 1; min-width: 0; }
     .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
     .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+    .filter-wrap { position: relative; flex-shrink: 0; }
+    .filter-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; stroke: var(--s400); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+    .filter-wrap .filter-select { padding-left: 32px; }
     @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 160px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 28px; text-align: center; }
     .empty-state i { font-size: 36px; color: var(--s300); }
     .empty-state p { font-size: 13px; color: var(--s400); max-width: 240px; line-height: 1.6; }
+    .table-empty-row td { padding: 36px 16px !important; text-align: center; }
+    .table-empty-row .te-inner { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .table-empty-row svg { width: 28px; height: 28px; stroke: var(--s300); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .table-empty-row p { font-size: 12.5px; color: var(--s400); }
 
     .pr-toast { position: fixed; bottom: 28px; right: 28px; z-index: 9999; padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .28s, transform .28s; transform: translateY(8px); }
     .pr-toast.visible { opacity: 1; transform: translateY(0); }
@@ -293,13 +300,19 @@
                 <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input class="search-input" type="search" id="paidSearch" placeholder="Search by PO number, office, or supplier">
             </div>
-            <select class="filter-select" id="paidOfficeFilter" title="Filter by office">
-                <option value="">All Offices</option>
-            </select>
-            <select class="filter-select" id="paidSortOrder" title="Sort by paid date">
-                <option value="desc">Newest → Oldest</option>
-                <option value="asc">Oldest → Newest</option>
-            </select>
+            <div class="filter-wrap">
+                <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+                <select class="filter-select" id="paidOfficeFilter" title="Filter by office">
+                    <option value="">All Offices</option>
+                </select>
+            </div>
+            <div class="filter-wrap">
+                <svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-4-4M7 20l4-4M17 20V4M17 4l-4 4M17 4l4 4"/></svg>
+                <select class="filter-select" id="paidSortOrder" title="Sort by paid date">
+                    <option value="desc">Newest → Oldest</option>
+                    <option value="asc">Oldest → Newest</option>
+                </select>
+            </div>
         </div>
 
         <div class="table-wrap">
@@ -345,6 +358,14 @@
                         <td><span class="badge badge-paid">Payment Made ✓</span></td>
                     </tr>
                     @endforeach
+                    <tr class="table-empty-row" id="paidNoResultsRow" style="display:none;">
+                        <td colspan="8">
+                            <div class="te-inner">
+                                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                                <p>No matching results found. Try adjusting your search or filters.</p>
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -512,6 +533,7 @@
     const paidOfficeFilter = document.getElementById('paidOfficeFilter');
     const paidSortOrder   = document.getElementById('paidSortOrder');
     const paidCount       = document.getElementById('paidVisibleCount');
+    const paidNoResults   = document.getElementById('paidNoResultsRow');
 
     if (paidTbody && paidSearch) {
         const paidRows = () => paidTbody.querySelectorAll('[data-paid-row]');
@@ -538,6 +560,7 @@
                 if (match) visible++;
             });
             paidCount.textContent = visible + (visible === 1 ? ' shown' : ' shown');
+            if (paidNoResults) paidNoResults.style.display = visible === 0 ? '' : 'none';
         }
 
         function applyPaidSort() {

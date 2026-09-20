@@ -32,31 +32,42 @@
 
         /* Page header card */
         .pd-header {
-            background: var(--white); border: 1px solid var(--s200);
+            background: var(--white); border: 1px solid var(--border2);
             border-radius: 18px; padding: 22px 26px; margin-bottom: 20px;
             display: flex; align-items: center; justify-content: space-between;
-            gap: 16px; flex-wrap: wrap; box-shadow: var(--sh-sm);
+            gap: 16px; flex-wrap: wrap; box-shadow: var(--sh);
         }
         .pd-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
         .pd-header h1 { font-size: 26px; font-weight: 800; color: var(--s900); letter-spacing: -.5px; margin-bottom: 5px; line-height: 1.15; }
         .pd-header-sub { font-size: 13px; color: var(--s600); line-height: 1.65; max-width: 500px; }
         .pd-header-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-        .pd-year-filter { display: flex; align-items: center; gap: 8px; }
-        .pd-year-filter label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); }
-        .pd-year-select {
-            height: 38px; border-radius: 10px; border: 1.5px solid var(--s200);
-            background: var(--white); padding: 0 30px 0 14px;
-            font-size: 12.5px; font-weight: 700; color: var(--s700);
-            font-family: 'Poppins', sans-serif; outline: none; cursor: pointer;
+        .pd-year-filter {
+            position: relative; display: flex; align-items: center; gap: 8px;
+            height: 44px; background: var(--white); border: 1.5px solid var(--s200);
+            border-radius: 11px; padding: 0 12px 0 7px;
             transition: border-color .15s, box-shadow .15s;
         }
-        .pd-year-select:hover, .pd-year-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+        .pd-year-filter:hover, .pd-year-filter:focus-within { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
+        .pd-year-icon {
+            width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+            background: rgba(104,16,18,.08); display: flex; align-items: center; justify-content: center;
+        }
+        .pd-year-icon svg { width: 14px; height: 14px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-year-body { display: flex; flex-direction: column; line-height: 1.2; }
+        .pd-year-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
+        .pd-year-value { font-size: 12.5px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; }
+        .pd-year-chevron { width: 13px; height: 13px; stroke: var(--s500); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; margin-left: 2px; }
+        .pd-year-filter form { position: absolute; inset: 0; }
+        .pd-year-filter select {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            opacity: 0; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+        }
 
         .pd-btn-primary {
             display: inline-flex; align-items: center; gap: 8px;
-            background: var(--m); color: #fff;
-            padding: 10px 18px; border-radius: 10px;
+            height: 44px; background: var(--m); color: #fff;
+            padding: 0 18px; border-radius: 11px;
             font-size: 13px; font-weight: 700;
             text-decoration: none; border: none; cursor: pointer;
             font-family: 'Poppins', sans-serif;
@@ -68,9 +79,9 @@
 
         .pd-btn-outline {
             display: inline-flex; align-items: center; gap: 8px;
-            background: var(--white); color: var(--m);
+            height: 44px; background: var(--white); color: var(--m);
             border: 1.5px solid rgba(104,16,18,.35);
-            padding: 10px 18px; border-radius: 10px;
+            padding: 0 18px; border-radius: 11px;
             font-size: 13px; font-weight: 700;
             text-decoration: none; cursor: pointer;
             font-family: 'Poppins', sans-serif;
@@ -122,7 +133,7 @@
         .pd-badge-finance   { background: #f0fdf4; color: #166534; }
 
         /* Main 2-col */
-        .pd-main-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
+        .pd-main-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 15px; margin-bottom: 15px; }
 
         /* Progress */
         .pd-prog-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
@@ -147,23 +158,57 @@
         .pd-update-meta   { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
         .pd-update-time   { font-size: 11px; color: var(--s400); white-space: nowrap; }
 
+        /* Recent Activity table card */
+        .pd-activity-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .pd-activity-heading { display: flex; align-items: flex-start; gap: 12px; }
+        .pd-activity-icon {
+            width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+            background: rgba(104,16,18,.08); display: flex; align-items: center; justify-content: center;
+        }
+        .pd-activity-icon svg { width: 17px; height: 17px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-activity-title { font-size: 15px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; margin-bottom: 2px; }
+        .pd-activity-sub   { font-size: 12px; color: var(--s500); }
+        .pd-activity-link  { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--m); text-decoration: none; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+        .pd-activity-link:hover { text-decoration: underline; }
+        .pd-activity-link svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .pd-activity-table-wrap { overflow-x: auto; }
+        .pd-activity-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+        .pd-activity-table thead th {
+            text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+            color: var(--s400); padding: 0 10px 10px; border-bottom: 1px solid var(--s200);
+        }
+        .pd-activity-table tbody td { padding: 13px 10px; border-bottom: 1px solid var(--s100); vertical-align: top; }
+        .pd-activity-table tbody tr:last-child td { border-bottom: none; }
+        .pd-activity-row-el { transition: background .15s; cursor: pointer; }
+        .pd-activity-row-el:hover { background: var(--s50); }
+        .pd-activity-row-el td:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        .pd-activity-row-el td:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+        .pd-activity-datetime { font-size: 12px; color: var(--s500); white-space: nowrap; }
+        .pd-activity-ref { font-size: 13px; font-weight: 700; color: var(--s900); }
+        .pd-activity-remarks { font-size: 12.5px; color: var(--s600); line-height: 1.5; max-width: 320px; }
+        .pd-activity-chev { color: var(--s400); text-align: right; }
+
         /* Bottom 3-col */
-        .pd-bottom-grid { display: grid; grid-template-columns: 1.1fr 1fr 0.85fr; gap: 15px; }
+        .pd-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        /* Both cards stretch to the same row height, and their chart fills
+           the extra space instead of leaving a gap below a shorter card's
+           legend/content when its sibling is taller. */
+        .pd-bottom-grid > .pd-card { display: flex; flex-direction: column; }
 
         /* Extra charts row */
         .pd-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; margin-bottom: 15px; }
 
-        /* PR links */
-        .pd-pr-links { display: flex; flex-direction: column; gap: 9px; }
-        .pd-pr-link {
-            display: block; background: var(--s50); border: 1px solid var(--s200);
-            border-radius: 11px; padding: 13px 15px; text-decoration: none;
-            transition: border-color .2s, background .2s, box-shadow .2s, transform .15s;
+        /* Chart card icon header — reused on every chart card for a
+           consistent icon + eyebrow + title look. */
+        .pd-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+        .pd-chart-heading { display: flex; align-items: flex-start; gap: 10px; }
+        .pd-chart-icon {
+            width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+            background: rgba(104,16,18,.08); display: flex; align-items: center; justify-content: center;
         }
-        .pd-pr-link:hover { border-color: rgba(104,16,18,.22); background: var(--white); box-shadow: var(--sh-md); transform: translateY(-1px); }
-        .pd-pr-link-title { font-size: 13px; font-weight: 700; color: var(--s900); margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
-        .pd-pr-link-title svg { width: 14px; height: 14px; stroke: var(--m); fill: none; flex-shrink: 0; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .pd-pr-link-sub { font-size: 12px; color: var(--s600); line-height: 1.55; }
+        .pd-chart-icon svg { width: 16px; height: 16px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-chart-title { font-size: 14px; font-weight: 800; color: var(--s900); letter-spacing: -.2px; margin-bottom: 2px; }
 
         /* Legend */
         .pd-legend { display: flex; flex-wrap: wrap; gap: 13px; margin-bottom: 10px; font-size: 12px; color: var(--s600); }
@@ -175,7 +220,8 @@
 
         /* Always-visible chart legend (labels shouldn't require a hover to
            read) — kept compact so it doesn't get crowded with many slices. */
-        .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; max-height: 52px; overflow-y: auto; }
+        .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; }
+        .pd-chart-legend-center { justify-content: center; }
         .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: var(--s600); white-space: nowrap; }
         .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
@@ -206,15 +252,24 @@
                     <p class="pd-header-sub">Track proposed budgets, approvals, procurement movement, and PR readiness for your office.</p>
                 </div>
                 <div class="pd-header-actions">
-                    <form method="GET" action="{{ route('office-head.dashboard') }}" class="pd-year-filter">
-                        <label for="pdYearSelect">Year</label>
-                        <select name="year" id="pdYearSelect" class="pd-year-select" onchange="this.form.submit()">
-                            <option value="all" {{ is_null($selectedYear) ? 'selected' : '' }}>Overall</option>
-                            @foreach($availableYears as $y)
-                                <option value="{{ $y }}" {{ $selectedYear === $y ? 'selected' : '' }}>FY {{ $y }}</option>
-                            @endforeach
-                        </select>
-                    </form>
+                    <div class="pd-year-filter">
+                        <div class="pd-year-icon">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <div class="pd-year-body">
+                            <span class="pd-year-label">Year</span>
+                            <span class="pd-year-value">{{ $selectedYear ? 'FY ' . $selectedYear : 'Overall' }}</span>
+                        </div>
+                        <svg class="pd-year-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                        <form method="GET" action="{{ route('office-head.dashboard') }}">
+                            <select name="year" id="pdYearSelect" onchange="this.form.submit()" aria-label="Filter dashboard by fiscal year">
+                                <option value="all" {{ is_null($selectedYear) ? 'selected' : '' }}>Overall</option>
+                                @foreach($availableYears as $y)
+                                    <option value="{{ $y }}" {{ $selectedYear === $y ? 'selected' : '' }}>FY {{ $y }}</option>
+                                @endforeach
+                            </select>
+                        </form>
+                    </div>
                     <a href="{{ route('office-head.budget-proposal') }}" class="pd-btn-primary">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                         New PPMP
@@ -237,7 +292,7 @@
                 <article class="pd-stat">
                     <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
                     <div class="pd-stat-label">Total Proposed Budget</div>
-                    <div class="pd-stat-value sm">PHP {{ number_format($summary['totalProposedBudget']) }}</div>
+                    <div class="pd-stat-value sm">₱ {{ number_format($summary['totalProposedBudget']) }}</div>
                     <div class="pd-stat-hint">Across all your office's PPMPs, any status</div>
                 </article>
                 <article class="pd-stat">
@@ -259,14 +314,20 @@
 
                 {{-- PR pipeline funnel --}}
                 <article class="pd-card">
-                    <p class="pd-card-eyebrow">Pipeline</p>
-                    <h2 class="pd-card-title">PR → AOC → PO → Payment</h2>
-                    <div class="pd-legend">
-                        <span class="pd-legend-item">Where your office's PRs are right now</span>
-                        @if($summary['funnelStages']['halted'] > 0)
-                            <span class="pd-legend-item">({{ $summary['funnelStages']['halted'] }} cancelled/denied, not shown)</span>
-                        @endif
+                    <div class="pd-chart-head">
+                        <div class="pd-chart-heading">
+                            <div class="pd-chart-icon">
+                                <svg viewBox="0 0 24 24"><path d="M4 4h16l-6.5 8.5v6l-3 2v-8L4 4z"/></svg>
+                            </div>
+                            <div>
+                                <p class="pd-card-eyebrow" style="margin-bottom:2px;">Pipeline</p>
+                                <div class="pd-chart-title">PR → AOC → PO → Payment</div>
+                            </div>
+                        </div>
                     </div>
+                    @if($summary['funnelStages']['halted'] > 0)
+                        <p style="font-size:11px;color:var(--s400);margin:-6px 0 10px;">{{ $summary['funnelStages']['halted'] }} cancelled/denied not shown</p>
+                    @endif
                     <div class="pd-chart-wrap" style="height:196px;">
                         <canvas id="funnelChart" role="img" aria-label="PR pipeline funnel chart"
                             data-stages="{{ json_encode($summary['funnelStages']['buckets']) }}">
@@ -274,70 +335,50 @@
                     </div>
                 </article>
 
-                {{-- PPMP category breakdown --}}
+                {{-- Status breakdown --}}
                 <article class="pd-card">
-                    <p class="pd-card-eyebrow">Proposal Breakdown</p>
-                    <h2 class="pd-card-title">Spend by Category</h2>
-                    <div class="pd-legend">
-                        <span class="pd-legend-item">Across all your office's PPMPs, any status</span>
+                    <div class="pd-chart-head">
+                        <div class="pd-chart-heading">
+                            <div class="pd-chart-icon">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                            </div>
+                            <div>
+                                <p class="pd-card-eyebrow" style="margin-bottom:2px;">Proposal Breakdown</p>
+                                <div class="pd-chart-title">Items by Status</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="pd-chart-wrap" style="height:150px;">
-                        <canvas id="categoryChart" role="img" aria-label="Spend by category doughnut chart"
-                            data-categories="{{ json_encode($summary['categoryBreakdown']) }}">
+                    <div class="pd-chart-wrap" style="height:190px;">
+                        <canvas id="statusChart" role="img" aria-label="Items by status pie chart"
+                            data-approved="{{ $summary['approvedItems'] }}"
+                            data-pending="{{ $summary['pendingItems'] }}"
+                            data-returned="{{ $summary['returnedItems'] ?? 0 }}"
+                            data-draft="{{ $summary['draftItems'] ?? 0 }}">
                         </canvas>
                     </div>
-                    <div class="pd-chart-legend" id="categoryChartLegend"></div>
+                    <div class="pd-chart-legend pd-chart-legend-center" id="statusChartLegend"></div>
                 </article>
 
                 {{-- Budget by quarter --}}
                 <article class="pd-card">
-                    <p class="pd-card-eyebrow">PPMP Planning</p>
-                    <h2 class="pd-card-title">Budget by Quarter</h2>
-                    <div class="pd-legend">
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Planned budget (PHP)</span>
+                    <div class="pd-chart-head">
+                        <div class="pd-chart-heading">
+                            <div class="pd-chart-icon">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            </div>
+                            <div>
+                                <p class="pd-card-eyebrow" style="margin-bottom:2px;">PPMP Planning</p>
+                                <div class="pd-chart-title">Budget by Quarter</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="pd-chart-wrap" style="height:196px;">
                         <canvas id="quarterChart" role="img" aria-label="Planned budget by quarter bar chart"
                             data-quarters="{{ json_encode($summary['budgetByQuarter']) }}">
                         </canvas>
                     </div>
-                </article>
-
-            </div>
-
-            {{-- Main 2-col --}}
-            <div class="pd-main-grid">
-
-                {{-- Recent updates --}}
-                <article class="pd-card">
-                    <p class="pd-card-eyebrow">Activity</p>
-                    <h2 class="pd-card-title">Recent Status Updates</h2>
-                    <div class="pd-updates">
-                        @forelse ($recentUpdates as $update)
-                            @php
-                                $sc = match(strtolower($update['status'])) {
-                                    'approved'                                   => 'pd-badge-approved',
-                                    'returned'                                   => 'pd-badge-returned',
-                                    'pending'                                    => 'pd-badge-pending',
-                                    'submitted'                                  => 'pd-badge-submitted',
-                                    'in progress', 'progress'                    => 'pd-badge-progress',
-                                    'budget review completed', 'budget review'   => 'pd-badge-finance',
-                                    default                                      => 'pd-badge-info',
-                                };
-                            @endphp
-                            <a class="pd-update" href="{{ route('office-head.budget-proposal', ['proposal' => $update['proposalId']]) }}" style="text-decoration:none;cursor:pointer;">
-                                <div>
-                                    <div class="pd-update-title">{{ $update['title'] }}</div>
-                                    <div class="pd-update-detail">{{ $update['details'] }}</div>
-                                </div>
-                                <div class="pd-update-meta">
-                                    <span class="pd-badge {{ $sc }}">{{ $update['status'] }}</span>
-                                    <span class="pd-update-time">{{ $update['time'] }}</span>
-                                </div>
-                            </a>
-                        @empty
-                            <p style="font-size:13px;color:#94a3b8;text-align:center;padding:20px 0;">No recent updates.</p>
-                        @endforelse
+                    <div class="pd-legend" style="justify-content:center; margin-top:10px; margin-bottom:0;">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Planned Budget</span>
                     </div>
                 </article>
 
@@ -348,67 +389,121 @@
 
                 {{-- Monthly bar chart --}}
                 <article class="pd-card">
-                    <p class="pd-card-eyebrow">Budget Overview</p>
-                    <h2 class="pd-card-title">Monthly Budget Utilization</h2>
-                    <div class="pd-legend">
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Budget used (PHP)</span>
+                    <div class="pd-chart-head">
+                        <div class="pd-chart-heading">
+                            <div class="pd-chart-icon">
+                                <svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
+                            </div>
+                            <div>
+                                <p class="pd-card-eyebrow" style="margin-bottom:2px;">Budget Overview</p>
+                                <div class="pd-chart-title">Monthly Budget Utilization</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="pd-chart-wrap" style="height:196px;">
+                    <div class="pd-chart-wrap" style="flex:1; min-height:220px;">
                         <canvas id="barChart" role="img" aria-label="Monthly budget utilization bar chart">Monthly budget data.</canvas>
+                    </div>
+                    <div class="pd-legend" style="justify-content:center; margin-top:10px; margin-bottom:0;">
+                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#681012"></span>Monthly Budget Spending</span>
                     </div>
                 </article>
 
-                {{-- Status breakdown --}}
+                {{-- PPMP category breakdown --}}
                 <article class="pd-card">
-                    <p class="pd-card-eyebrow">Proposal Breakdown</p>
-                    <h2 class="pd-card-title">Items by Status</h2>
-                    <div class="pd-legend">
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#166534"></span>Approved</span>
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#92400e"></span>Pending</span>
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#991b1b"></span>Returned</span>
-                        <span class="pd-legend-item"><span class="pd-legend-dot" style="background:#334155"></span>Draft</span>
+                    <div class="pd-chart-head">
+                        <div class="pd-chart-heading">
+                            <div class="pd-chart-icon">
+                                <svg viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="10"/></svg>
+                            </div>
+                            <div>
+                                <p class="pd-card-eyebrow" style="margin-bottom:2px;">Proposal Breakdown</p>
+                                <div class="pd-chart-title">Spend by Category</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="pd-chart-wrap" style="height:196px;">
-                        <canvas id="statusChart" role="img" aria-label="Items by status horizontal bar chart"
-                            data-approved="{{ $summary['approvedItems'] }}"
-                            data-pending="{{ $summary['pendingItems'] }}"
-                            data-returned="{{ $summary['returnedItems'] ?? 0 }}"
-                            data-draft="{{ $summary['draftItems'] ?? 0 }}">
+                    @php
+                        $categoryCount = count($summary['categoryBreakdown'] ?? []);
+                        $categoryChartHeight = max(150, min(260, $categoryCount * 34 + 20));
+                    @endphp
+                    <div class="pd-chart-wrap" style="flex:1; min-height:{{ $categoryChartHeight }}px;">
+                        <canvas id="categoryChart" role="img" aria-label="Spend by category horizontal bar chart"
+                            data-categories="{{ json_encode($summary['categoryBreakdown']) }}">
                         </canvas>
                     </div>
                 </article>
 
-                {{-- PR readiness --}}
+            </div>
+
+            {{-- Main 2-col --}}
+            <div class="pd-main-grid">
+
+                {{-- Recent activity --}}
                 <article class="pd-card">
-                    <div class="pd-card-head">
-                        <div>
-                            <p class="pd-card-eyebrow">Next Actions</p>
-                            <h2 class="pd-card-title">PR Readiness</h2>
+                    <div class="pd-activity-head">
+                        <div class="pd-activity-heading">
+                            <div class="pd-activity-icon">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <div>
+                                <div class="pd-activity-title">Recent Activity</div>
+                                <div class="pd-activity-sub">Latest updates from your office's PPMPs and PRs</div>
+                            </div>
                         </div>
-                        <span class="pd-badge pd-badge-pending">{{ $summary['pendingItems'] }} pending</span>
+                        <a class="pd-activity-link" href="{{ route('office-head.my-proposals') }}">
+                            View all activity
+                            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        </a>
                     </div>
-                    <div class="pd-pr-links">
-                        <a href="{{ route('office-head.budget-proposal') }}" class="pd-pr-link">
-                            <div class="pd-pr-link-title">
-                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                                Prepare budget proposal
-                            </div>
-                            <div class="pd-pr-link-sub">Encode items and run market scoping before submission.</div>
-                        </a>
-                        <a href="{{ route('office-head.my-proposals') }}" class="pd-pr-link">
-                            <div class="pd-pr-link-title">
-                                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                Review proposal status
-                            </div>
-                            <div class="pd-pr-link-sub">Check Budget and Chancellor remarks for returned items.</div>
-                        </a>
-                        <a href="{{ route('office-head.purchase-requests') }}" class="pd-pr-link">
-                            <div class="pd-pr-link-title">
-                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                View Purchase Requests
-                            </div>
-                            <div class="pd-pr-link-sub">Track the status of your office's purchase requests.</div>
-                        </a>
+                    <div class="pd-activity-table-wrap">
+                        <table class="pd-activity-table">
+                            <thead>
+                                <tr>
+                                    <th>Date &amp; Time</th>
+                                    <th>Reference</th>
+                                    <th>Action / Status</th>
+                                    <th>Remarks</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($recentActivity as $activity)
+                                    @php
+                                        $statusLower = strtolower($activity['status']);
+                                        $sc = match(true) {
+                                            str_contains($statusLower, 'approved')
+                                                || str_contains($statusLower, 'fully signed')
+                                                || str_contains($statusLower, 'delivered')
+                                                || str_contains($statusLower, 'complete')
+                                                || str_contains($statusLower, 'paid')      => 'pd-badge-approved',
+                                            str_contains($statusLower, 'denied')
+                                                || str_contains($statusLower, 'cancelled')
+                                                || str_contains($statusLower, 'returned')  => 'pd-badge-returned',
+                                            str_contains($statusLower, 'for signature')
+                                                || str_contains($statusLower, 'pending')
+                                                || str_contains($statusLower, 'awaiting')  => 'pd-badge-pending',
+                                            str_contains($statusLower, 'submitted')        => 'pd-badge-submitted',
+                                            str_contains($statusLower, 'canvass')
+                                                || str_contains($statusLower, 'forwarded')
+                                                || str_contains($statusLower, 'progress')  => 'pd-badge-progress',
+                                            default                                        => 'pd-badge-info',
+                                        };
+                                    @endphp
+                                    <tr class="pd-activity-row-el" onclick="window.location='{{ $activity['href'] }}'">
+                                        <td class="pd-activity-datetime">{{ $activity['time'] }}</td>
+                                        <td class="pd-activity-ref">{{ $activity['reference'] }}</td>
+                                        <td><span class="pd-badge {{ $sc }}">{{ $activity['status'] }}</span></td>
+                                        <td class="pd-activity-remarks">{{ $activity['remarks'] }}</td>
+                                        <td class="pd-activity-chev">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" style="text-align:center;padding:24px 0;color:#94a3b8;font-size:13px;">No recent activity.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </article>
 
@@ -422,17 +517,19 @@
     const pp = "'Poppins', sans-serif";
     Chart.defaults.font.family = pp;
 
-    /* BAR — Monthly */
+    /* LINE — Monthly */
     const bEl = document.getElementById('barChart');
     if (bEl) {
         new Chart(bEl, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
                 datasets: [{
-                    label: 'Budget Used (PHP)',
+                    label: 'Budget Used (₱)',
                     data: {!! json_encode($summary['monthlyBudgetUsage'] ?? array_fill(0,12,0)) !!},
-                    backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
+                    borderColor: '#681012', backgroundColor: 'rgba(104,16,18,.10)',
+                    fill: true, tension: .35, borderWidth: 2.5,
+                    pointRadius: 3, pointBackgroundColor: '#681012', pointBorderColor: '#fff', pointBorderWidth: 1.5
                 }]
             },
             options: {
@@ -440,34 +537,76 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
-                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
+                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'₱ '+Math.round(v/1000)+'k':'₱ '+v } }
                 }
             }
         });
     }
 
-    /* HORIZONTAL BAR — Status */
+    /* PIE — Items by status */
     const sEl = document.getElementById('statusChart');
     if (sEl) {
+        const sLabels = ['Approved','Pending','Returned','Draft'];
+        const sValues = [parseInt(sEl.dataset.approved||0),parseInt(sEl.dataset.pending||0),parseInt(sEl.dataset.returned||0),parseInt(sEl.dataset.draft||0)];
+        const sColors = ['#16a34a','#e3a53d','#df5b53','#cbd5e1'];
+        const sTotal  = sValues.reduce((a, b) => a + b, 0);
+
+        // Always-visible percentage labels on each slice (not just on hover) —
+        // the tooltip below is left untouched so hovering still shows the
+        // exact label/value.
+        const sliceLabelPlugin = {
+            id: 'statusSliceLabel',
+            afterDraw(chart) {
+                if (!sTotal) return;
+                const { ctx } = chart;
+                chart.getDatasetMeta(0).data.forEach((arc, i) => {
+                    const val = sValues[i];
+                    if (!val) return;
+                    const pct = val / sTotal;
+                    if (pct < 0.04) return;
+                    const angle  = (arc.startAngle + arc.endAngle) / 2;
+                    const radius = arc.outerRadius * 0.65;
+                    const x = arc.x + Math.cos(angle) * radius;
+                    const y = arc.y + Math.sin(angle) * radius;
+                    ctx.save();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '700 11px ' + pp;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(Math.round(pct * 100) + '%', x, y);
+                    ctx.restore();
+                });
+            }
+        };
+
         new Chart(sEl, {
-            type: 'bar',
+            type: 'pie',
             data: {
-                labels: ['Approved','Pending','Returned','Draft'],
+                labels: sLabels,
                 datasets: [{
-                    data: [parseInt(sEl.dataset.approved||0),parseInt(sEl.dataset.pending||0),parseInt(sEl.dataset.returned||0),parseInt(sEl.dataset.draft||0)],
-                    backgroundColor: ['#166534','#92400e','#991b1b','#334155'],
-                    borderRadius: 6, borderSkipped: false
+                    data: sValues,
+                    backgroundColor: sColors,
+                    borderWidth: 2, borderColor: '#fff'
                 }]
             },
             options: {
-                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
-                    y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 12, weight: '600', family: pp } } }
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: c => '  ' + c.label + ': ' + c.parsed } }
                 }
-            }
+            },
+            plugins: [sliceLabelPlugin]
         });
+
+        const sLegendEl = document.getElementById('statusChartLegend');
+        if (sLegendEl) {
+            sLegendEl.innerHTML = sLabels.map((label, i) => `
+                <span class="pd-chart-legend-item">
+                    <span class="pd-chart-legend-dot" style="background:${sColors[i]}"></span>${label}
+                </span>
+            `).join('');
+        }
     }
 
     /* HORIZONTAL BAR — Pipeline funnel */
@@ -495,43 +634,36 @@
         });
     }
 
-    /* DOUGHNUT — Category breakdown */
+    /* HORIZONTAL BAR — Category breakdown */
     const cEl = document.getElementById('categoryChart');
     if (cEl) {
         const categories = JSON.parse(cEl.dataset.categories || '{}');
         const palette = ['#681012','#0369a1','#854f0b','#5b21b6','#166534','#991b1b','#334155','#c9a84c'];
         const labels = Object.keys(categories);
+        const values = Object.values(categories);
         const colors = labels.map((_, i) => palette[i % palette.length]);
         new Chart(cEl, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
                 labels,
                 datasets: [{
-                    data: Object.values(categories),
+                    data: values,
                     backgroundColor: colors,
-                    borderWidth: 0, borderRadius: 4, hoverOffset: 6
+                    borderRadius: 6, borderSkipped: false
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: false, cutout: '65%',
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { label: c => '  '+c.label+': PHP '+Number(c.parsed).toLocaleString() } }
+                    tooltip: { callbacks: { label: c => '  ₱ ' + Number(c.parsed.x).toLocaleString() } }
+                },
+                scales: {
+                    x: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'₱ '+Math.round(v/1000)+'k':'₱ '+v } },
+                    y: { grid: { display: false }, ticks: { color: '#334155', font: { size: 11, weight: '600', family: pp } } }
                 }
             }
         });
-
-        // Always-visible labels (not just on hover) — a compact legend below
-        // the doughnut instead of on-slice text, which gets unreadable fast
-        // once there are more than 2-3 thin slices.
-        const legendEl = document.getElementById('categoryChartLegend');
-        if (legendEl) {
-            legendEl.innerHTML = labels.map((label, i) => `
-                <span class="pd-chart-legend-item">
-                    <span class="pd-chart-legend-dot" style="background:${colors[i]}"></span>${label}
-                </span>
-            `).join('');
-        }
     }
 
     /* BAR — Budget by quarter */
@@ -542,7 +674,7 @@
             data: {
                 labels: ['Q1','Q2','Q3','Q4'],
                 datasets: [{
-                    label: 'Planned Budget (PHP)',
+                    label: 'Planned Budget (₱)',
                     data: JSON.parse(qEl.dataset.quarters || '[0,0,0,0]'),
                     backgroundColor: '#681012', borderRadius: 6, borderSkipped: false
                 }]
@@ -552,7 +684,7 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10, family: pp } } },
-                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'PHP '+Math.round(v/1000)+'k':'PHP '+v } }
+                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 10, family: pp }, callback: v => v>=1000?'₱ '+Math.round(v/1000)+'k':'₱ '+v } }
                 }
             }
         });

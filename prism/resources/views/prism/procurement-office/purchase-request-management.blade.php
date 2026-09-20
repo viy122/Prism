@@ -27,6 +27,10 @@
     .pr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; align-items: start; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; max-height: 62vh; background: var(--white); box-shadow: inset 0 1px 4px rgba(15,23,42,.04); }
+    .pr-no-results { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 32px; text-align: center; }
+    .pr-no-results.visible { display: flex; }
+    .pr-no-results i { font-size: 34px; color: var(--s300); }
+    .pr-no-results p { font-size: 13px; color: var(--s400); max-width: 260px; line-height: 1.6; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
     thead th { position: sticky; top: 0; z-index: 5; background: var(--s50); border-bottom: 1px solid var(--s200); padding: 11px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); white-space: nowrap; }
     tbody td { padding: 13px 16px; border-bottom: 1px solid var(--s100); vertical-align: middle; }
@@ -72,6 +76,9 @@
     .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
     .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     .search-input::placeholder { color: var(--s400); }
+    /* Highlights the matched substring inside a table cell while a search
+       query is active, so it's visible at a glance why a row matched. */
+    tbody mark { background: rgba(139,26,28,.16); color: var(--m); padding: 0 1px; border-radius: 2px; font-weight: 700; }
 
     /* Detail panel */
     .detail-panel { display: flex; flex-direction: column; gap: 16px; }
@@ -117,12 +124,6 @@
     .items-table .num-cell   { font-weight: 700; color: var(--s700); text-align: right; }
     .items-table .total-cell { font-weight: 700; color: var(--m); text-align: right; }
 
-    /* Status control */
-    .status-control { display: flex; flex-direction: column; gap: 8px; }
-    .status-control label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s500); }
-    .status-select { width: 100%; height: 42px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--s200); background: var(--white); color: var(--s700); font-size: 13px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; outline: none; transition: border-color .2s; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
-    .status-select:focus { border-color: var(--m); }
-
     .remarks-textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--s200); background: var(--white); color: var(--s700); font-size: 13px; font-family: 'Poppins', sans-serif; resize: vertical; min-height: 80px; outline: none; transition: border-color .2s; line-height: 1.6; box-sizing: border-box; }
     .remarks-textarea:focus { border-color: var(--m); }
     .remarks-textarea::placeholder { color: var(--s300); }
@@ -162,7 +163,10 @@
 
     .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
     .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
-    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-wrap { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
+    .filter-wrap i.ficon { position: absolute; left: 14px; font-size: 14px; color: var(--m); pointer-events: none; }
+    .filter-wrap i.fchev { position: absolute; right: 13px; font-size: 12px; color: var(--s400); pointer-events: none; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 32px 0 38px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
     .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
@@ -310,18 +314,26 @@
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input class="search-input" type="search" id="prSearch" placeholder="Search by PR number, item, office, or remarks">
                     </div>
-                    <select class="filter-select" id="prOfficeFilter" title="Filter by office">
-                        <option value="">All Offices</option>
-                        @foreach($offices as $office)
-                            <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
-                        @endforeach
-                    </select>
-                    <select class="filter-select" id="prStatusFilter" title="Filter by signatory status">
-                        <option value="">All Statuses</option>
-                        <option value="fully_signed">Fully Signed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="pending">Pending</option>
-                    </select>
+                    <div class="filter-wrap">
+                        <i class="ti ti-building ficon"></i>
+                        <select class="filter-select" id="prOfficeFilter" title="Filter by office">
+                            <option value="">All Offices</option>
+                            @foreach($offices as $office)
+                                <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
+                            @endforeach
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
+                    <div class="filter-wrap">
+                        <i class="ti ti-progress-check ficon"></i>
+                        <select class="filter-select" id="prStatusFilter" title="Filter by signatory status">
+                            <option value="">All Statuses</option>
+                            <option value="fully_signed">Fully Signed</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
                 </div>
             @endif
 
@@ -331,7 +343,11 @@
                     <p style="font-size:13px;color:var(--s400);max-width:240px;line-height:1.6;">No purchase requests have been uploaded yet.</p>
                 </div>
             @else
-            <div class="table-wrap">
+            <div class="pr-no-results" id="prNoResults">
+                <i class="ti ti-search-off"></i>
+                <p>No purchase requests match your search or filters.</p>
+            </div>
+            <div class="table-wrap" id="prTableWrap">
                 <table>
                     <thead>
                         <tr>
@@ -477,47 +493,6 @@
                     </div>
                 </div>
 
-                {{-- Update controls --}}
-                <div class="status-control">
-                    <label>Update Processing Status</label>
-                    <select class="status-select" id="statusSelect">
-                        <optgroup label="Receiving">
-                            <option value="new">New</option>
-                            <option value="approved_pr_received">Approved PR Received</option>
-                            <option value="forwarded_to_bac">Approved PR Received – Forwarded to BAC</option>
-                            <option value="forwarded_to_rgo">Approved PR Received – Forwarded to RGO</option>
-                            <option value="forwarded_to_end_user">Approved PR Received – Forwarded to End-User</option>
-                        </optgroup>
-                        <optgroup label="Processing">
-                            <option value="canvassing">Canvassing</option>
-                            <option value="abstract_of_canvass_made">Abstract of Canvass Made</option>
-                            <option value="for_po">For PO</option>
-                            <option value="po_made">PO Made</option>
-                            <option value="po_confirmed">PO Confirmed</option>
-                            <option value="for_alobs">For ALOBS</option>
-                        </optgroup>
-                        <optgroup label="Special">
-                            <option value="for_reimbursement">For Reimbursement</option>
-                            <option value="for_consolidation">For CONSOLIDATION</option>
-                        </optgroup>
-                        <optgroup label="Closed">
-                            <option value="pr_denied">PR Denied</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="cancelled_system_error">Cancelled – System Error</option>
-                        </optgroup>
-                    </select>
-                </div>
-
-                <div class="status-control">
-                    <label>Remarks</label>
-                    <textarea class="remarks-textarea" id="remarksInput" placeholder="Add a remark or note about this update…"></textarea>
-                </div>
-
-                <button class="btn-save" id="btnSave" type="button">
-                    <i class="ti ti-device-floppy"></i>
-                    Save Changes
-                </button>
-
                 {{-- Activity log --}}
                 <div>
                     <div class="card-head log-toggle" id="logToggle">
@@ -654,9 +629,6 @@
     const contentEl    = document.getElementById('detailContent');
     const titleEl      = document.getElementById('detailPrNumber');
     const officeChip   = document.getElementById('detailPrOffice');
-    const statusSel    = document.getElementById('statusSelect');
-    const remarksIn    = document.getElementById('remarksInput');
-    const btnSave      = document.getElementById('btnSave');
     const logEl        = document.getElementById('activityLog');
     const logToggle    = document.getElementById('logToggle');
     const toastEl      = document.getElementById('prToast');
@@ -685,35 +657,8 @@
     const logs = {};
     let activePr = null;
     let saving = false;
-    // True once the user touches the status dropdown themselves, so a
-    // background refresh doesn't silently revert an unsaved selection.
-    // Cleared whenever the value is set programmatically (open / save / refresh).
-    let statusDirty = false;
-    statusSel.addEventListener('change', () => { statusDirty = true; });
 
     /* ── Helpers ── */
-    function displayStatus(val) {
-        const map = {
-            new: 'New',
-            approved_pr_received: 'Approved PR Received',
-            forwarded_to_bac: 'Approved PR Received – Forwarded to BAC',
-            forwarded_to_rgo: 'Approved PR Received – Forwarded to RGO',
-            forwarded_to_end_user: 'Approved PR Received – Forwarded to End-User',
-            canvassing: 'Canvassing',
-            abstract_of_canvass_made: 'Abstract of Canvass Made',
-            for_po: 'For PO',
-            po_made: 'PO Made',
-            po_confirmed: 'PO Confirmed',
-            for_alobs: 'For ALOBS',
-            for_reimbursement: 'For Reimbursement',
-            for_consolidation: 'For CONSOLIDATION',
-            pr_denied: 'PR Denied',
-            cancelled: 'Cancelled',
-            cancelled_system_error: 'Cancelled – System Error',
-        };
-        return map[val] ?? val;
-    }
-
     function nowStr() {
         return new Date().toLocaleString('en-PH', {
             timeZone: 'Asia/Manila', month: 'short', day: 'numeric',
@@ -897,10 +842,6 @@
             fItemsField.style.display = 'none';
         }
 
-        statusSel.value = pr.currentStatus ?? 'new';
-        statusDirty = false;
-        remarksIn.value = '';
-
         const pdfEl = document.getElementById('pdfPreview');
         pdfEl.innerHTML = pr.pdfFile
             ? `<button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${pr.pdfFile}#toolbar=0" title="PR Document"></iframe>`
@@ -953,6 +894,37 @@
     const prCountChip    = document.getElementById('prVisibleCount');
     const prOfficeFilter = document.getElementById('prOfficeFilter');
     const prStatusFilter = document.getElementById('prStatusFilter');
+    const prNoResults    = document.getElementById('prNoResults');
+    const prTableWrap    = document.getElementById('prTableWrap');
+
+    // Wraps the matched substring of `query` in <mark> — but only within the
+    // cell's leading text (before any nested element, e.g. the item-count /
+    // sibling-PR chip <span> some cells append) so those chips never get
+    // clobbered. Always re-collapses any previous highlight back to plain
+    // text first, so it's safe to call on every keystroke.
+    function highlightLeadingText(cell, query) {
+        if (!cell) return;
+        let buf = '';
+        while (cell.firstChild && (cell.firstChild.nodeType === 3 || cell.firstChild.nodeName === 'MARK')) {
+            buf += cell.firstChild.textContent;
+            cell.removeChild(cell.firstChild);
+        }
+        const textNode = document.createTextNode(buf);
+        cell.insertBefore(textNode, cell.firstChild || null);
+
+        const idx = query ? buf.toLowerCase().indexOf(query) : -1;
+        if (idx === -1) return;
+
+        const beforeNode = document.createTextNode(buf.slice(0, idx));
+        const mark        = document.createElement('mark');
+        mark.textContent  = buf.slice(idx, idx + query.length);
+        const afterNode   = document.createTextNode(buf.slice(idx + query.length));
+
+        cell.replaceChild(afterNode, textNode);
+        cell.insertBefore(mark, afterNode);
+        cell.insertBefore(beforeNode, mark);
+    }
+
     function applyPrSearchFilter() {
         if (!prSearchInput) return;
         const q      = prSearchInput.value.trim().toLowerCase();
@@ -966,8 +938,16 @@
             const match = matchesSearch && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
+            // Office, PR No., Description, Date Submitted — the columns
+            // data-search is built from that also render as plain text.
+            highlightLeadingText(row.cells[0], q);
+            highlightLeadingText(row.cells[1], q);
+            highlightLeadingText(row.cells[2], q);
+            highlightLeadingText(row.cells[3], q);
         });
         if (prCountChip) prCountChip.textContent = visible + (visible === 1 ? ' PR' : ' PRs');
+        if (prNoResults) prNoResults.classList.toggle('visible', visible === 0);
+        if (prTableWrap) prTableWrap.style.display = visible === 0 ? 'none' : '';
     }
     prSearchInput?.addEventListener('input', applyPrSearchFilter);
     prOfficeFilter?.addEventListener('change', applyPrSearchFilter);
@@ -1097,44 +1077,6 @@
         finally { saving = false; btnConfirmRet.disabled = false; }
     });
 
-    /* ── Save processing status ── */
-    btnSave.addEventListener('click', async () => {
-        if (!activePr || saving) return;
-        const pr         = activePr;
-        const statusVal  = statusSel.value;
-        const statusDisp = displayStatus(statusVal);
-        const remarks    = remarksIn.value.trim();
-
-        saving = true;
-        const origHtml   = btnSave.innerHTML;
-        btnSave.disabled = true;
-        btnSave.innerHTML = '<i class="ti ti-loader-2" style="animation:spin .7s linear infinite;"></i> Saving…';
-
-        try {
-            const resp = await fetch(pr.updateUrl, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({ status: statusVal, remarks }),
-            });
-            if (resp.ok) {
-                pr.currentStatus = statusDisp;
-                if (remarks) pr.remarks = remarks;
-                if (remarks) document.getElementById('fRemarks').textContent = remarks;
-                let logText = `Processing status → <strong>${statusDisp}</strong>`;
-                if (remarks) logText += ` &mdash; ${remarks}`;
-                logs[pr.id].push({ text: logText, time: nowStr(), atRaw: new Date().toISOString() });
-                remarksIn.value = '';
-                statusDirty = false;
-                renderLog(pr.id);
-                showToast('Saved successfully.');
-            } else {
-                const json = await resp.json().catch(() => null);
-                showToast(json?.message || 'Save failed.', true);
-            }
-        } catch { showToast('Network error.', true); }
-        finally { saving = false; btnSave.disabled = false; btnSave.innerHTML = origHtml; }
-    });
-
     /* ── Upload/re-upload PR PDF: fallback only, for a PR with no linked PPMP
        (legacy data) — nothing to re-validate against, so it keeps the plain
        file-swap. Everything else goes through the wizard (see
@@ -1206,8 +1148,7 @@
     }
 
     function handleRefresh(json) {
-        if (saving || statusDirty) return;
-        if (remarksIn.value.trim()) return;
+        if (saving) return;
         if (returnIn.value.trim() || returnRemarks.style.display !== 'none') return;
         if (thirdSignerPanel.style.display !== 'none') return;
 
@@ -1241,8 +1182,6 @@
             if (freshActive) {
                 activePr = freshActive;
                 document.getElementById('fSigLabel').textContent = activePr.signatoryLabel;
-                statusSel.value = activePr.currentStatus ?? 'new';
-                statusDirty = false;
                 updateTimeline(activePr);
                 updateRoutingButtons(activePr);
                 logs[activePr.id] = (activePr.activityLog || []).map(e => ({

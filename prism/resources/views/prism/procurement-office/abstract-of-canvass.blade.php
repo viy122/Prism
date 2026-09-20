@@ -31,6 +31,10 @@
     .aoc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; align-items: start; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; max-height: 62vh; background: var(--white); box-shadow: inset 0 1px 4px rgba(15,23,42,.04); }
+    .aoc-no-results { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 32px; text-align: center; }
+    .aoc-no-results.visible { display: flex; }
+    .aoc-no-results i { font-size: 34px; color: var(--s300); }
+    .aoc-no-results p { font-size: 13px; color: var(--s400); max-width: 260px; line-height: 1.6; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
     thead th { position: sticky; top: 0; z-index: 5; background: var(--s50); border-bottom: 1px solid var(--s200); padding: 11px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); white-space: nowrap; }
     tbody td { padding: 13px 16px; border-bottom: 1px solid var(--s100); vertical-align: middle; }
@@ -52,9 +56,15 @@
     .search-input { height: 40px; width: 100%; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 16px 0 36px; font-size: 13px; font-weight: 500; color: var(--s900); font-family: 'Poppins', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
     .search-input:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     .search-input::placeholder { color: var(--s400); }
+    /* Highlights the matched substring inside a table cell while a search
+       query is active, so it's visible at a glance why a row matched. */
+    tbody mark { background: rgba(139,26,28,.16); color: var(--m); padding: 0 1px; border-radius: 2px; font-weight: 700; }
     .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
     .search-toolbar .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
-    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+    .filter-wrap { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
+    .filter-wrap i.ficon { position: absolute; left: 14px; font-size: 14px; color: var(--m); pointer-events: none; }
+    .filter-wrap i.fchev { position: absolute; right: 13px; font-size: 12px; color: var(--s400); pointer-events: none; }
+    .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 32px 0 38px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
     .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
     @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
 
@@ -254,18 +264,26 @@
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input class="search-input" type="search" id="aocSearch" placeholder="Search by AOC code, PR number, office, or title">
                     </div>
-                    <select class="filter-select" id="aocOfficeFilter" title="Filter by office">
-                        <option value="">All Offices</option>
-                        @foreach($offices as $office)
-                            <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
-                        @endforeach
-                    </select>
-                    <select class="filter-select" id="aocStatusFilter" title="Filter by signatory status">
-                        <option value="">All Statuses</option>
-                        <option value="fully_signed">Fully Signed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="draft">Draft</option>
-                    </select>
+                    <div class="filter-wrap">
+                        <i class="ti ti-building ficon"></i>
+                        <select class="filter-select" id="aocOfficeFilter" title="Filter by office">
+                            <option value="">All Offices</option>
+                            @foreach($offices as $office)
+                                <option value="{{ $office['code'] }}">{{ $office['code'] }}</option>
+                            @endforeach
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
+                    <div class="filter-wrap">
+                        <i class="ti ti-progress-check ficon"></i>
+                        <select class="filter-select" id="aocStatusFilter" title="Filter by signatory status">
+                            <option value="">All Statuses</option>
+                            <option value="fully_signed">Fully Signed</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="draft">Draft</option>
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
                 </div>
             @endif
 
@@ -275,7 +293,11 @@
                     <p style="font-size:13px;color:var(--s400);max-width:240px;line-height:1.6;">No AOCs created yet. Fully-signed PRs will appear above.</p>
                 </div>
             @else
-            <div class="table-wrap">
+            <div class="aoc-no-results" id="aocNoResults">
+                <i class="ti ti-search-off"></i>
+                <p>No AOCs match your search or filters.</p>
+            </div>
+            <div class="table-wrap" id="aocTableWrap">
                 <table>
                     <thead>
                         <tr>
@@ -476,6 +498,8 @@
     const aocOfficeFilter = document.getElementById('aocOfficeFilter');
     const aocStatusFilter = document.getElementById('aocStatusFilter');
     const aocCount        = document.getElementById('aocVisibleCount');
+    const aocNoResults    = document.getElementById('aocNoResults');
+    const aocTableWrap    = document.getElementById('aocTableWrap');
     const uploadAocInput  = document.getElementById('uploadAocInput');
     const uploadAocText   = document.getElementById('uploadAocText');
 
@@ -892,6 +916,33 @@
         logEl.classList.toggle('open');
     });
 
+    // Wraps the matched substring of `query` in <mark>, restricted to the
+    // cell's leading text (before any nested element such as a badge span),
+    // so those never get clobbered. Always re-collapses any previous
+    // highlight back to plain text first, so it's safe every keystroke.
+    function highlightLeadingText(cell, query) {
+        if (!cell) return;
+        let buf = '';
+        while (cell.firstChild && (cell.firstChild.nodeType === 3 || cell.firstChild.nodeName === 'MARK')) {
+            buf += cell.firstChild.textContent;
+            cell.removeChild(cell.firstChild);
+        }
+        const textNode = document.createTextNode(buf);
+        cell.insertBefore(textNode, cell.firstChild || null);
+
+        const idx = query ? buf.toLowerCase().indexOf(query) : -1;
+        if (idx === -1) return;
+
+        const beforeNode = document.createTextNode(buf.slice(0, idx));
+        const mark        = document.createElement('mark');
+        mark.textContent  = buf.slice(idx, idx + query.length);
+        const afterNode   = document.createTextNode(buf.slice(idx + query.length));
+
+        cell.replaceChild(afterNode, textNode);
+        cell.insertBefore(mark, afterNode);
+        cell.insertBefore(beforeNode, mark);
+    }
+
     function applyAocSearchFilter() {
         if (!aocSearch) return;
         const q      = aocSearch.value.trim().toLowerCase();
@@ -905,8 +956,16 @@
             const match = matchesSearch && matchesOffice && matchesStatus;
             row.style.display = match ? '' : 'none';
             if (match) visible++;
+            // Office, AOC Code, PR No., Description — the columns
+            // data-search is built from that also render as plain text.
+            highlightLeadingText(row.cells[0], q);
+            highlightLeadingText(row.cells[1], q);
+            highlightLeadingText(row.cells[2], q);
+            highlightLeadingText(row.cells[3], q);
         });
         if (aocCount) aocCount.textContent = visible + (visible === 1 ? ' AOC' : ' AOCs');
+        if (aocNoResults) aocNoResults.classList.toggle('visible', visible === 0);
+        if (aocTableWrap) aocTableWrap.style.display = visible === 0 ? 'none' : '';
     }
     aocSearch?.addEventListener('input', applyAocSearchFilter);
     aocOfficeFilter?.addEventListener('change', applyAocSearchFilter);

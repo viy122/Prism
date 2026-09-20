@@ -23,11 +23,15 @@
     .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
+    .filter-wrap { position: relative; display: inline-flex; align-items: center; }
+    .filter-wrap i.ficon { position: absolute; left: 14px; font-size: 14px; color: var(--crimson); pointer-events: none; }
+    .filter-wrap i.fchev { position: absolute; right: 13px; font-size: 12px; color: var(--s400); pointer-events: none; }
     .filter-select {
         height: 40px; border-radius: 99px; border: 1px solid var(--s200);
-        background: var(--s50); padding: 0 30px 0 14px;
+        background: var(--s50); padding: 0 32px 0 38px;
         font-size: 12.5px; font-weight: 600; color: var(--s700);
         font-family: 'Poppins', sans-serif; outline: none; cursor: pointer;
+        appearance: none; -webkit-appearance: none; -moz-appearance: none;
         transition: border-color .15s, box-shadow .15s;
     }
     .filter-select:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
@@ -70,12 +74,16 @@
                 <p class="card-sub">{{ count($proposals) }} proposal{{ count($proposals) === 1 ? '' : 's' }} shown</p>
             </div>
             <form method="GET" action="{{ route('finance-office.proposal-archive') }}">
-                <select name="status" class="filter-select" onchange="this.form.submit()">
-                    <option value="all" {{ $selectedStatus === 'all' ? 'selected' : '' }}>All statuses</option>
-                    @foreach ($statuses as $value => $label)
-                        <option value="{{ $value }}" {{ $selectedStatus === $value ? 'selected' : '' }}>{{ $label }}</option>
-                    @endforeach
-                </select>
+                <div class="filter-wrap">
+                    <i class="ti ti-filter ficon"></i>
+                    <select name="status" class="filter-select" onchange="this.form.submit()">
+                        <option value="all" {{ $selectedStatus === 'all' ? 'selected' : '' }}>All statuses</option>
+                        @foreach ($statuses as $value => $label)
+                            <option value="{{ $value }}" {{ $selectedStatus === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <i class="ti ti-chevron-down fchev"></i>
+                </div>
             </form>
         </div>
 

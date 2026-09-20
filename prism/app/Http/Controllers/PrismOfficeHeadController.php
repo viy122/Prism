@@ -10,7 +10,9 @@ use App\Models\DocumentUpload;
 use App\Models\MarketPriceSurvey;
 use App\Models\MarketScopingReference;
 use App\Models\Office;
+use App\Models\ProcurementStatusUpdate;
 use App\Models\PurchaseRequest;
+use App\Models\PurchaseRequestItem;
 use App\Services\MarketScopingService;
 use App\Services\NotificationService;
 use App\Services\ProcurementModeService;
@@ -116,27 +118,115 @@ class PrismOfficeHeadController extends Controller
             'budgetByQuarter'        => $this->itemBudgetByQuarter($officeId, $selectedYear),
         ];
 
-        $recentUpdates = BudgetProposalReview::with('budgetProposal')
-            ->whereIn('budget_proposal_id', $proposals->pluck('id'))
-            ->latest()
-            ->take(5)
-            ->get()
-            ->map(fn ($r) => [
-                'proposalId' => $r->budget_proposal_id,
-                'title'   => $r->budgetProposal?->title ?? 'PPMP',
-                'status'  => \App\Support\ActionVerb::label($r->status_to ?? $r->action),
-                'time'    => ($r->reviewed_at ?? $r->created_at)->format('M d, Y, g:i A'),
-                'details' => $r->remarks ?? '—',
-            ])
-            ->all();
+        $recentActivity = $this->recentActivity($officeId, $proposals->pluck('id'));
 
         return view('prism.office-head.dashboard', $this->withCommon('office-head', 'dashboard', [
             'pageTitle'      => 'Office Head / Dean Dashboard',
             'summary'        => $summary,
-            'recentUpdates'  => $recentUpdates,
+            'recentActivity' => $recentActivity,
             'availableYears' => $availableYears,
             'selectedYear'   => $selectedYear,
         ]));
+    }
+
+    /**
+     * Merged "Recent Activity" feed for the dashboard's activity table —
+     * combines PPMP review actions (BudgetProposalReview, written by Budget
+     * Office/Chancellor as a proposal moves through review) with PR
+     * procurement updates (ProcurementStatusUpdate, written on every
+     * signatory advance/return and every procurement-office status change)
+     * into a single reverse-chronological list, since the office head cares
+     * about both kinds of movement equally and the mock only ever showed one
+     * combined table.
+     */
+    private function recentActivity(int $officeId, $proposalIds): array
+    {
+        $ppmpRows = BudgetProposalReview::with('budgetProposal')
+            ->whereIn('budget_proposal_id', $proposalIds)
+            ->latest()
+            ->take(8)
+            ->get()
+            ->map(function ($r) {
+                $proposal = $r->budgetProposal;
+                $at = $r->reviewed_at ?? $r->created_at;
+                return [
+                    'reference' => 'PPMP – ' . ($proposal?->title ?? 'Untitled') . ($proposal?->fiscal_year ? ' (FY ' . $proposal->fiscal_year . ')' : ''),
+                    'href'      => $proposal ? route('office-head.budget-proposal', ['proposal' => $proposal->id]) : route('office-head.budget-proposal'),
+                    'status'    => \App\Support\ActionVerb::label($r->status_to ?? $r->action),
+                    'remarks'   => $r->remarks ?: '—',
+                    'at'        => $at,
+                ];
+            });
+
+        $prRows = ProcurementStatusUpdate::with('purchaseRequest')
+            ->whereHas('purchaseRequest', fn ($q) => $q->where('office_id', $officeId))
+            ->latest()
+            ->take(8)
+            ->get()
+            ->map(function ($u) {
+                $pr = $u->purchaseRequest;
+                $label = $pr?->number ? 'PR #' . $pr->number : 'PR';
+                return [
+                    'reference' => $label . ($pr?->title ? ' (' . $pr->title . ')' : ''),
+                    'href'      => route('office-head.purchase-requests'),
+                    'status'    => $this->procurementStatusLabel((string) $u->status),
+                    'remarks'   => $u->remarks ?: '—',
+                    'at'        => $u->created_at,
+                ];
+            });
+
+        return $ppmpRows->concat($prRows)
+            ->sortByDesc('at')
+            ->take(8)
+            ->map(fn ($row) => $row + ['time' => $row['at']->format('M d, Y, g:i A')])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Human-readable label for a ProcurementStatusUpdate::status value. These
+     * come from several different code paths (signatory-stage keys off
+     * PurchaseRequest::SIGNATORY_STAGES, canvassing progress markers, and the
+     * legacy free-form `status` enum on the PR itself), so there's no single
+     * source of truth to defer to — this reconciles them for display.
+     */
+    private function procurementStatusLabel(string $status): string
+    {
+        $known = [
+            'draft'                      => 'PR Created',
+            'fully_signed'               => 'Fully Signed',
+            'returned_one_step'          => 'Returned',
+            'canvass_quotation_uploaded' => 'Canvassing',
+            'canvassing_completed'       => 'Canvassing Completed',
+            'new'                        => 'New',
+            'approved_pr_received'       => 'PR Received',
+            'forwarded_to_bac'           => 'Forwarded to BAC',
+            'forwarded_to_rgo'           => 'Forwarded to RGO',
+            'forwarded_to_end_user'      => 'Forwarded to End User',
+            'canvassing'                 => 'Canvassing',
+            'abstract_of_canvass_made'   => 'Abstract of Canvass Made',
+            'for_po'                     => 'For Purchase Order',
+            'po_made'                    => 'Purchase Order Made',
+            'po_confirmed'               => 'Purchase Order Confirmed',
+            'for_alobs'                  => 'For ALOBS',
+            'for_reimbursement'          => 'For Reimbursement',
+            'for_consolidation'          => 'For Consolidation',
+            'pr_denied'                  => 'PR Denied',
+            'cancelled'                  => 'Cancelled',
+            'cancelled_system_error'     => 'Cancelled – System Error',
+        ];
+        if (isset($known[$status])) {
+            return $known[$status];
+        }
+
+        // Signatory-stage keys ('at_chancellor', 'at_vice_chancellor', ...)
+        // read best as "who it's waiting on" rather than the raw stage name.
+        if (str_starts_with($status, 'at_')) {
+            $stageLabels = collect(PurchaseRequest::SIGNATORY_STAGES)->pluck('label', 'key');
+            return 'For Signature – ' . ($stageLabels[$status] ?? ucfirst(str_replace('_', ' ', substr($status, 3))));
+        }
+
+        return ucfirst(str_replace('_', ' ', $status));
     }
 
     public function budgetProposal(Request $request): View
@@ -277,9 +367,27 @@ class PrismOfficeHeadController extends Controller
         $proposedBudgetUpdateUrl = $proposal ? route('office-head.budget-proposal.update-proposed-budget', $proposal->id) : null;
         $officeUpdateUrl         = $proposal ? route('office-head.budget-proposal.update-office', $proposal->id) : null;
 
+        // Official PPMP form column 8 "Expected Delivery/Implementation" — the
+        // ACTUAL date Procurement Office set when it issued the Purchase Order
+        // for this item (PurchaseOrder::expected_delivery_date), reported back
+        // here rather than guessed by the office head up front, since it's not
+        // real until a supplier's been picked and a PO issued. No stored link
+        // exists between a PPMP item and the PR item eventually raised from
+        // it, so this matches on item name the same best-effort way
+        // Procurement's own matchPrItemsByOfficeAndName() does.
+        $poDeliveryDateByItemName = $proposal
+            ? PurchaseRequestItem::with('purchaseRequest.abstractOfCanvass.purchaseOrder')
+                ->whereHas('purchaseRequest', fn ($q) => $q->where('budget_proposal_id', $proposal->id))
+                ->get()
+                ->keyBy(fn ($pri) => strtolower(trim($pri->name)))
+                ->map(fn ($pri) => $pri->purchaseRequest?->abstractOfCanvass?->purchaseOrder?->expected_delivery_date)
+            : collect();
+
         $encodedItems = $proposal
             ? $proposal->items()->with(['marketReferences', 'sourceFiles'])->get()
-                ->map(fn ($item) => [
+                ->map(function ($item) use ($poDeliveryDateByItemName) {
+                    $expectedDeliveryDate = $poDeliveryDateByItemName->get(strtolower(trim($item->name)));
+                    return [
                     'id'                => (string) $item->id,
                     'description'       => $item->name,
                     'unit'              => $item->unit,
@@ -308,6 +416,7 @@ class PrismOfficeHeadController extends Controller
                     'procurementMode'      => $item->procurement_mode ?: ProcurementModeService::recommend((float) $item->estimated_total_cost),
                     'procurementStartDate' => $item->procurement_start_date?->format('M d, Y'),
                     'dateNeeded'           => $item->date_needed?->format('M d, Y'),
+                    'expectedDeliveryDate' => $expectedDeliveryDate?->format('M d, Y'),
                     'attachUrl'         => route('office-head.budget-proposal.item-attachment', $item->id),
                     'attachments'       => $item->sourceFiles->map(fn ($doc) => [
                         'id'        => $doc->id,
@@ -328,7 +437,8 @@ class PrismOfficeHeadController extends Controller
                             'sourceLink'    => $ref->source_url ?? '',
                             'dateRetrieved' => $ref->date_accessed?->format('M d, Y') ?? '',
                         ])->values()->all(),
-                ])->all()
+                    ];
+                })->all()
             : [];
 
         // Readiness: an item is supported by market scoping refs OR an attached source file

@@ -34,7 +34,26 @@
     .btn-primary:hover { background: var(--crimson-dark); }
 
     .filters-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
+    .filter-box {
+        position: relative; display: flex; align-items: center; gap: 10px;
+        height: 58px; background: var(--white); border: 1px solid var(--s200);
+        border-radius: 12px; padding: 0 14px;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .filter-box:hover, .filter-box:focus-within { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box-icon {
+        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+        background: var(--crimson-mid); display: flex; align-items: center; justify-content: center;
+    }
+    .filter-box-icon i { font-size: 16px; color: var(--crimson); }
+    .filter-box-body { display: flex; flex-direction: column; line-height: 1.3; overflow: hidden; }
+    .filter-box-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--s500); }
+    .filter-box-value { font-size: 13.5px; font-weight: 800; color: var(--s900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-box-chev { font-size: 13px; color: var(--s400); flex-shrink: 0; margin-left: auto; }
+    .filter-box-select {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+    }
     .field-select {
         height: 44px; width: 100%; border-radius: 10px;
         border: 1px solid var(--s300); background: var(--white);
@@ -161,36 +180,56 @@
 
     <div class="card">
         <div class="filters-grid">
-            <div>
-                <label class="field-label" for="appYearFilter">Fiscal Year</label>
-                <select class="field-select" id="appYearFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-calendar"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Year</span>
+                    <span class="filter-box-value" id="appYearValue">All years</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="appYearFilter">
                     <option value="all">All years</option>
                     @foreach ($fiscalYears as $year)
                         <option value="{{ $year }}">FY {{ $year }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="field-label" for="appOfficeFilter">Office</label>
-                <select class="field-select" id="appOfficeFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-building"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Office</span>
+                    <span class="filter-box-value" id="appOfficeValue">All offices</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="appOfficeFilter">
                     <option value="all">All offices</option>
                     @foreach ($offices as $office)
                         <option value="{{ $office }}">{{ $office }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="field-label" for="appQuarterFilter">Quarter</label>
-                <select class="field-select" id="appQuarterFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-chart-pie"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Quarter</span>
+                    <span class="filter-box-value" id="appQuarterValue">All quarters</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="appQuarterFilter">
                     <option value="all">All quarters</option>
                     @foreach ($quarters as $quarter)
                         <option value="{{ $quarter }}">{{ $quarter }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="field-label" for="appModeFilter">Procurement mode</label>
-                <select class="field-select" id="appModeFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-briefcase"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Mode</span>
+                    <span class="filter-box-value" id="appModeValue">All modes</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="appModeFilter">
                     <option value="all">All modes</option>
                     @foreach ($procurementModes as $mode)
                         <option value="{{ $mode }}">{{ $mode }}</option>
@@ -222,7 +261,7 @@
                         <th>Source of Fund</th>
                         <th>Procurement Mode</th>
                         <th>Start of Procurement Activity</th>
-                        <th>Date Needed</th>
+                        <th>End of Procurement Activity</th>
                         <th>Tracking Status</th>
                         <th>Action</th>
                     </tr>
@@ -357,7 +396,20 @@
     const countEl   = document.getElementById('appVisibleCount');
     const rows      = document.querySelectorAll('[data-app-row]');
 
+    // Keeps each filter box's visible value text (e.g. "FY 2026") in sync
+    // with its underlying <select>, which sits invisibly on top of the box
+    // so the whole card — not just the native dropdown — is clickable.
+    function syncFilterValue(selectEl, valueEl) {
+        if (!selectEl || !valueEl) return;
+        valueEl.textContent = selectEl.options[selectEl.selectedIndex]?.text || '';
+    }
+
     function applyFilters() {
+        syncFilterValue(yearEl,    document.getElementById('appYearValue'));
+        syncFilterValue(officeEl,  document.getElementById('appOfficeValue'));
+        syncFilterValue(quarterEl, document.getElementById('appQuarterValue'));
+        syncFilterValue(modeEl,    document.getElementById('appModeValue'));
+
         const year    = yearEl.value;
         const office  = officeEl.value;
         const quarter = quarterEl.value;

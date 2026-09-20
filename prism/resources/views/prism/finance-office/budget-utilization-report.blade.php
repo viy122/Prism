@@ -50,15 +50,26 @@
     .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
 
     .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .field-label { font-size: 13px; font-weight: 700; color: var(--s700); margin-bottom: 7px; display: block; }
-    .field-select {
-        height: 44px; width: 100%; border-radius: 10px;
-        border: 1px solid var(--s300); background: var(--white);
-        padding: 0 14px; font-size: 13.5px; font-weight: 500;
-        color: var(--s900); font-family: 'Poppins', sans-serif; outline: none;
+    .filter-box {
+        position: relative; display: flex; align-items: center; gap: 10px;
+        height: 64px; background: var(--white); border: 1px solid var(--s300);
+        border-radius: 12px; padding: 0 16px;
         transition: border-color .15s, box-shadow .15s;
     }
-    .field-select:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box:hover, .filter-box:focus-within { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box-icon {
+        width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+        background: var(--crimson-mid); display: flex; align-items: center; justify-content: center;
+    }
+    .filter-box-icon i { font-size: 17px; color: var(--crimson); }
+    .filter-box-body { display: flex; flex-direction: column; line-height: 1.3; overflow: hidden; }
+    .filter-box-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--s500); }
+    .filter-box-value { font-size: 15px; font-weight: 800; color: var(--s900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-box-chev { font-size: 14px; color: var(--s400); flex-shrink: 0; margin-left: auto; }
+    .filter-box-select {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+    }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; max-height: 64vh; background: var(--white); box-shadow: inset 0 1px 4px rgba(15,23,42,.04); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
@@ -84,7 +95,7 @@
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
-    .charts-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 240px; }
 
     .chart-card-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
@@ -168,43 +179,53 @@
         <div class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
             <p class="stat-label">Total campus budget</p>
-            <strong class="stat-value">₱ {{ number_format($summary['campusBudget']) }}</strong>
+            <strong class="stat-value" id="statCampusBudget">₱ {{ number_format($summary['campusBudget']) }}</strong>
             <p class="stat-desc">Approved allocation for monitored offices</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <p class="stat-label">Total utilized</p>
-            <strong class="stat-value">₱ {{ number_format($summary['totalUtilized']) }}</strong>
+            <strong class="stat-value" id="statTotalUtilized">₱ {{ number_format($summary['totalUtilized']) }}</strong>
             <p class="stat-desc">Posted utilization across procurement activity</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
             <p class="stat-label">Overall utilization</p>
-            <strong class="stat-value">{{ $summary['utilizationPercent'] }}%</strong>
+            <strong class="stat-value" id="statUtilizationPercent">{{ $summary['utilizationPercent'] }}%</strong>
             <p class="stat-desc">Campus-wide budget utilization percentage</p>
         </div>
         <div class="stat-card">
             <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
             <p class="stat-label">Offices at risk</p>
-            <strong class="stat-value">{{ $summary['officesAtRisk'] }}</strong>
+            <strong class="stat-value" id="statOfficesAtRisk">{{ $summary['officesAtRisk'] }}</strong>
             <p class="stat-desc">Low utilization or delayed procurement movement</p>
         </div>
     </div>
 
     <div class="card" id="filtersCard">
         <div class="filters-grid">
-            <div>
-                <label class="field-label" for="utilQuarterFilter">Quarter</label>
-                <select class="field-select" id="utilQuarterFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-calendar"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Quarter</span>
+                    <span class="filter-box-value" id="utilQuarterValue">All quarters</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="utilQuarterFilter">
                     <option value="all">All quarters</option>
                     @foreach ($quarters as $quarter)
                         <option value="{{ $quarter }}">{{ $quarter }}</option>
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="field-label" for="utilOfficeFilter">Office</label>
-                <select class="field-select" id="utilOfficeFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-building"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Office</span>
+                    <span class="filter-box-value" id="utilOfficeValue">All offices</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="utilOfficeFilter">
                     <option value="all">All offices</option>
                     @foreach ($offices as $office)
                         <option value="{{ $office }}">{{ $office }}</option>
@@ -232,25 +253,22 @@
         });
     @endphp
 
+    @php
+        $categoryChartHeight = max(220, min(320, count($categoryBreakdown) * 34 + 40));
+    @endphp
+
     <div class="charts-grid">
         <article class="card chart-card">
             <div class="chart-card-head">
-                <div class="chart-icon-badge"><i class="ti ti-coin"></i></div>
+                <div class="chart-icon-badge"><i class="ti ti-chart-bar"></i></div>
                 <div class="chart-card-head-text">
-                    <p class="card-eyebrow">Per office</p>
-                    <h2 class="card-title">Budget vs. Utilized</h2>
-                    <p class="card-sub">Comparison of allocated budget and actual utilization per office.</p>
-                </div>
-                <div class="chart-chip">
-                    <div class="chart-chip-icon"><i class="ti ti-chart-bar"></i></div>
-                    <div>
-                        <p class="chart-chip-label">Total Budget</p>
-                        <p class="chart-chip-value">₱ {{ number_format($summary['campusBudget']) }}</p>
-                    </div>
+                    <p class="card-eyebrow">Across all offices/quarters</p>
+                    <h2 class="card-title">Spend by Category</h2>
+                    <p class="card-sub">Where the campus budget is going, by Schedule 9 category.</p>
                 </div>
             </div>
-            <div class="chart-wrap" style="margin-top:18px;">
-                <canvas id="officeChart" data-offices="{{ json_encode($utilByOfficeChart) }}"></canvas>
+            <div class="chart-wrap" style="margin-top:18px;height:{{ $categoryChartHeight }}px;">
+                <canvas id="categoryBarChart" data-categories="{{ json_encode($categoryBreakdown) }}"></canvas>
             </div>
         </article>
         <article class="card chart-card">
@@ -283,11 +301,37 @@
         </article>
     </div>
 
+    <article class="card chart-card" style="margin-top:16px;">
+        <div class="chart-card-head">
+            <div class="chart-icon-badge"><i class="ti ti-coin"></i></div>
+            <div class="chart-card-head-text">
+                <p class="card-eyebrow">Per office</p>
+                <h2 class="card-title">Budget vs. Utilized</h2>
+                <p class="card-sub">Comparison of allocated budget and actual utilization per office.</p>
+            </div>
+            <div class="chart-chip">
+                <div class="chart-chip-icon"><i class="ti ti-chart-bar"></i></div>
+                <div>
+                    <p class="chart-chip-label">Total Budget</p>
+                    <p class="chart-chip-value" id="officeChartTotalBudget">₱ {{ number_format($summary['campusBudget']) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="chart-wrap" style="margin-top:18px;">
+            <canvas id="officeChart" data-offices="{{ json_encode($utilByOfficeChart) }}"></canvas>
+        </div>
+    </article>
+
+    <div id="utilRowsData" data-rows="{{ json_encode($utilizationRows) }}" style="display:none"></div>
+
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Utilization per office</p>
-                <h2 class="card-title">Office Spending Progress</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-building-bank"></i></div>
+                <div>
+                    <p class="card-eyebrow">Utilization per office</p>
+                    <h2 class="card-title">Office Spending Progress</h2>
+                </div>
             </div>
             <span class="count-chip" id="utilVisibleCount">{{ count($utilizationRows) }} shown</span>
         </div>
@@ -341,10 +385,58 @@
     const officeEl  = document.getElementById('utilOfficeFilter');
     const countEl   = document.getElementById('utilVisibleCount');
     const rows      = document.querySelectorAll('[data-util-row]');
+    const quarterValueEl = document.getElementById('utilQuarterValue');
+    const officeValueEl  = document.getElementById('utilOfficeValue');
+
+    const rowsDataEl = document.getElementById('utilRowsData');
+    const allRows    = JSON.parse(rowsDataEl?.dataset.rows || '[]');
+
+    const statCampusBudgetEl       = document.getElementById('statCampusBudget');
+    const statTotalUtilizedEl      = document.getElementById('statTotalUtilized');
+    const statUtilizationPercentEl = document.getElementById('statUtilizationPercent');
+    const statOfficesAtRiskEl      = document.getElementById('statOfficesAtRisk');
+    const officeChartTotalBudgetEl = document.getElementById('officeChartTotalBudget');
+
+    function peso(n) {
+        return '₱ ' + Math.round(n).toLocaleString('en-US');
+    }
+
+    function filteredRows(quarter, office) {
+        return allRows.filter(r =>
+            (quarter === 'all' || r.quarter === quarter) &&
+            (office  === 'all' || r.office  === office)
+        );
+    }
+
+    function officeChartData(rows) {
+        const map = new Map();
+        rows.forEach(r => {
+            if (!map.has(r.office)) map.set(r.office, { office: r.office, budget: 0, utilized: 0 });
+            const entry = map.get(r.office);
+            entry.budget   += r.budget;
+            entry.utilized += r.utilized;
+        });
+        return Array.from(map.values());
+    }
+
+    function updateStats(rows) {
+        const budget   = rows.reduce((sum, r) => sum + r.budget, 0);
+        const utilized = rows.reduce((sum, r) => sum + r.utilized, 0);
+        const pct      = budget > 0 ? Math.round((utilized / budget) * 100) : 0;
+        const atRisk   = new Set(rows.filter(r => r.risk === 'At Risk').map(r => r.office)).size;
+
+        if (statCampusBudgetEl)       statCampusBudgetEl.textContent       = peso(budget);
+        if (statTotalUtilizedEl)      statTotalUtilizedEl.textContent      = peso(utilized);
+        if (statUtilizationPercentEl) statUtilizationPercentEl.textContent = pct + '%';
+        if (statOfficesAtRiskEl)      statOfficesAtRiskEl.textContent      = atRisk;
+        if (officeChartTotalBudgetEl) officeChartTotalBudgetEl.textContent = peso(budget);
+    }
 
     function applyFilters() {
         const quarter = quarterEl.value;
         const office  = officeEl.value;
+        if (quarterValueEl) quarterValueEl.textContent = quarterEl.options[quarterEl.selectedIndex]?.text || '';
+        if (officeValueEl)  officeValueEl.textContent  = officeEl.options[officeEl.selectedIndex]?.text || '';
         let visible   = 0;
 
         rows.forEach(row => {
@@ -356,18 +448,30 @@
         });
 
         countEl.textContent = visible + ' shown';
+
+        const matched = filteredRows(quarter, office);
+        updateStats(matched);
+
+        if (officeChartInstance) {
+            const offices = officeChartData(matched);
+            officeChartInstance.data.labels             = offices.map(o => o.office);
+            officeChartInstance.data.datasets[0].data   = offices.map(o => o.budget);
+            officeChartInstance.data.datasets[1].data   = offices.map(o => o.utilized);
+            officeChartInstance.update();
+        }
     }
 
     quarterEl.addEventListener('change', applyFilters);
     officeEl.addEventListener('change',  applyFilters);
 
+    let officeChartInstance = null;
     const officeChartEl = document.getElementById('officeChart');
     if (officeChartEl) {
         const offices = JSON.parse(officeChartEl.dataset.offices || '[]');
         // Horizontal, not vertical — dozens of offices campus-wide means a
         // vertical bar chart's x-axis labels collide past a handful of bars.
         officeChartEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
-        new Chart(officeChartEl, {
+        officeChartInstance = new Chart(officeChartEl, {
             type: 'bar',
             data: {
                 labels: offices.map(o => o.office),
@@ -381,9 +485,41 @@
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
-                    tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': PHP ' + Number(ctx.raw).toLocaleString() } },
+                    tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': ₱ ' + Number(ctx.raw).toLocaleString() } },
                 },
-                scales: { x: { ticks: { callback: (v) => 'PHP ' + Number(v).toLocaleString(undefined, { notation: 'compact' }) } } },
+                scales: { x: { ticks: { callback: (v) => '₱ ' + Number(v).toLocaleString(undefined, { notation: 'compact' }) } } },
+            },
+        });
+    }
+
+    const categoryChartEl = document.getElementById('categoryBarChart');
+    if (categoryChartEl) {
+        const categories = JSON.parse(categoryChartEl.dataset.categories || '{}');
+        const palette = ['#681012', '#d4a017', '#16794f', '#7c3aed', '#d8b4fe', '#e8a06a', '#94a3b8', '#0369a1'];
+        const labels = Object.keys(categories);
+        const values = Object.values(categories);
+        const colors = labels.map((_, i) => palette[i % palette.length]);
+        new Chart(categoryChartEl, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderRadius: 6, borderSkipped: false,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => '  ₱ ' + Number(ctx.parsed.x).toLocaleString() } },
+                },
+                scales: {
+                    x: { ticks: { callback: (v) => v >= 1000 ? '₱ ' + Math.round(v / 1000) + 'k' : '₱ ' + v } },
+                    y: { grid: { display: false } },
+                },
             },
         });
     }

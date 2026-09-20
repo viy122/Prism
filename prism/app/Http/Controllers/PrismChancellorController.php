@@ -167,15 +167,15 @@ class PrismChancellorController extends Controller
         };
 
         // Full overdue set (not yet procured, past its target quarter) — the
-        // "10 alerts to display" list below is only a slice of this, so the
-        // summary count must come from the full filtered set, not the slice.
+        // alert list below shows every one of these (scrollable in the view),
+        // not just a slice.
         $overdueItemsAll = $allItems->filter(fn ($item) =>
             $item->target_quarter
             && $item->target_quarter < $currentQ
             && $matchedPrFor($item)?->lifecycleBucket() !== 'completed'
         )->sortByDesc('target_quarter')->values();
 
-        $overdueAlerts = $overdueItemsAll->take(10)->map(function ($item) use ($matchedPrFor, $quarterEnd) {
+        $overdueAlerts = $overdueItemsAll->map(function ($item) use ($matchedPrFor, $quarterEnd) {
             $pr = $matchedPrFor($item);
 
             return [

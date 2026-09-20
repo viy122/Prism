@@ -165,7 +165,7 @@
             box-shadow: 0 4px 16px rgba(139,26,28,.30); transition: all .2s;
         }
         .btn-submit:hover:not(:disabled) { background: var(--crimson-dark); transform: translateY(-1px); }
-        .btn-submit:disabled { background: var(--s300); color: var(--s500); cursor: not-allowed; box-shadow: none; }
+        .btn-submit:disabled { background: rgba(139,26,28,.35); color: rgba(255,255,255,.85); cursor: not-allowed; box-shadow: none; }
         .btn-submit.needs-source { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; box-shadow: none; }
         .btn-submit i { font-size: 17px; }
 
@@ -1077,8 +1077,9 @@
     }
 
     // ── Total vs. Proposed Budget coloring ──────────────────────────────────
-    // Green while comfortably under budget, amber once the running total gets
-    // close to (or lands exactly on) the proposed budget, red once it's over.
+    // Green while comfortably under budget or exactly on it, amber once the
+    // running total is close to (but not yet at) the proposed budget, red
+    // once it goes over.
     function currentProposedBudget() {
         const el = document.getElementById('proposedBudget');
         if (!el) return 0;
@@ -1090,9 +1091,9 @@
         const budget = currentProposedBudget();
         if (!budget) { el.style.color = ''; return; }
         const ratio = total / budget;
-        if (ratio > 1)        el.style.color = 'var(--red, #991B1B)';
-        else if (ratio >= 0.9) el.style.color = 'var(--amber, #92400E)';
-        else                   el.style.color = 'var(--green, #166534)';
+        if (ratio > 1)                    el.style.color = 'var(--red, #991B1B)';
+        else if (ratio >= 0.9 && ratio < 1) el.style.color = 'var(--amber, #92400E)';
+        else                                el.style.color = 'var(--green, #166534)';
     }
 
     // ── Render table ─────────────────────────────────────────────────────────
@@ -1609,8 +1610,8 @@
                     <td>${esc(item.procurementMode || '')}</td>
                     <td>${item.preProcurementConference ? 'Yes' : 'No'}</td>
                     <td>${esc(item.procurementStartDate || '')}</td>
-                    <td>—</td>
                     <td>${esc(item.dateNeeded || '')}</td>
+                    <td>${esc(item.expectedDeliveryDate || '')}</td>
                     <td>${esc(item.sourceOfFund || '')}</td>
                     <td><strong>PHP ${fmt(item.totalCost)}</strong></td>
                     <td>${attachCell}</td>

@@ -321,7 +321,26 @@ class PrismFinanceOfficeController extends Controller
             'utilizationRows'   => $utilizationRows,
             'utilByOfficeChart' => $this->utilizationByOfficeChart($utilizationRows),
             'riskDistribution'  => collect($utilizationRows)->countBy('risk')->all(),
+            'categoryBreakdown' => $this->campusCategoryBreakdown(),
         ]));
+    }
+
+    /**
+     * Campus-wide spend by Schedule 9 category, across every office's PPMP
+     * items regardless of proposal status — the same fallback chain the
+     * Office Head dashboard's own category chart uses (`category` is free
+     * text and takes priority; `ppmp_category` is the Schedule 9 letter code,
+     * never actually written anywhere in the app, so it's really just a
+     * safety net before falling back to "General").
+     */
+    private function campusCategoryBreakdown(): array
+    {
+        return BudgetProposalItem::whereHas('budgetProposal')
+            ->get(['category', 'ppmp_category', 'estimated_total_cost'])
+            ->groupBy(fn ($item) => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'))
+            ->map(fn ($group) => (float) $group->sum('estimated_total_cost'))
+            ->sortDesc()
+            ->all();
     }
 
     /** Budget vs utilized totals per office (summed across quarters), for the office bar chart. */

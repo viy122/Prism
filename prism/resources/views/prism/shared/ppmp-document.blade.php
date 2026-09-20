@@ -139,8 +139,8 @@
                         <td>{{ $item['procurementMode'] }}</td>
                         <td>{{ $item['preProcurementConference'] ? 'Yes' : 'No' }}</td>
                         <td>{{ $item['procurementStartDate'] ?? '' }}</td>
-                        <td>—</td>
                         <td>{{ $item['dateNeeded'] ?? '' }}</td>
+                        <td>{{ $item['expectedDeliveryDate'] ?? '' }}</td>
                         <td>{{ $item['sourceOfFund'] ?? '' }}</td>
                         <td><strong>PHP {{ number_format($item['totalCost'], 2) }}</strong></td>
                         <td>{!! $attachCell !!}</td>

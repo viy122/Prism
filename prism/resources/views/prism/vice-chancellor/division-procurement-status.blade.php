@@ -18,9 +18,26 @@
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
     .filters-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .filter-group label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); margin-bottom: 7px; }
-    .filter-group select { width: 100%; height: 42px; border-radius: 10px; border: 1px solid var(--s200); background: var(--s50); padding: 0 34px 0 14px; font-size: 13px; font-weight: 500; color: var(--s700); font-family: 'Poppins', sans-serif; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
-    .filter-group select:focus { outline: none; border-color: var(--m); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box {
+        position: relative; display: flex; align-items: center; gap: 8px;
+        height: 48px; background: var(--white); border: 1px solid var(--s300);
+        border-radius: 10px; padding: 0 12px;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .filter-box:hover, .filter-box:focus-within { border-color: var(--m); box-shadow: 0 0 0 3px var(--crimson-mid); }
+    .filter-box-icon {
+        width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+        background: var(--crimson-mid); display: flex; align-items: center; justify-content: center;
+    }
+    .filter-box-icon i { font-size: 13px; color: var(--m); }
+    .filter-box-body { display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
+    .filter-box-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--s500); }
+    .filter-box-value { font-size: 12.5px; font-weight: 800; color: var(--s900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-box-chev { font-size: 12px; color: var(--s400); flex-shrink: 0; margin-left: auto; }
+    .filter-box-select {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        opacity: 0; border: none; cursor: pointer; font-family: 'Poppins', sans-serif;
+    }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); white-space: nowrap; }
 
@@ -46,9 +63,31 @@
 
     .detail-panel { background: var(--white); border: 1px solid var(--s200); border-radius: 18px; padding: 22px 26px; box-shadow: var(--sh-sm); position: sticky; top: 86px; }
 
+    .detail-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .detail-header-icon {
+        width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+        background: var(--crimson-mid); display: flex; align-items: center; justify-content: center;
+    }
+    .detail-header-icon i { font-size: 22px; color: var(--m); }
+    .detail-header-eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .detail-header-eyebrow-bar { display: inline-block; width: 3px; height: 11px; background: var(--m); border-radius: 2px; }
+
     .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 220px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); text-align: center; padding: 32px; }
     .detail-empty svg { width: 32px; height: 32px; stroke: var(--crimson-light); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     .detail-empty p { font-size: 13px; color: var(--s400); line-height: 1.6; max-width: 220px; }
+
+    .btn-timeline-toggle {
+        display: flex; align-items: center; justify-content: space-between; width: 100%;
+        gap: 8px; padding: 11px 14px; border-radius: 10px;
+        border: 1px solid var(--s200); background: var(--s50);
+        font-size: 12.5px; font-weight: 700; color: var(--m);
+        font-family: 'Poppins', sans-serif; cursor: pointer;
+        transition: background .15s, border-color .15s;
+    }
+    .btn-timeline-toggle:hover { background: var(--crimson-mid); border-color: var(--crimson-border); }
+    .btn-timeline-toggle-left { display: flex; align-items: center; gap: 8px; }
+    .btn-timeline-toggle .chev { transition: transform .2s; flex-shrink: 0; }
+    .btn-timeline-toggle.is-open .chev { transform: rotate(180deg); }
 
     .timeline { display: flex; flex-direction: column; gap: 0; }
     .tl-item { display: flex; gap: 14px; padding-bottom: 20px; position: relative; }
@@ -69,6 +108,15 @@
     .btn-save:hover { opacity: .88; }
     .btn-save:active { transform: scale(.97); }
     .btn-save svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+    .btn-toggle-tl { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 8px; background: var(--s50); color: var(--s600); font-size: 12px; font-weight: 700; font-family: 'Poppins', sans-serif; border: 1px solid var(--s200); cursor: pointer; transition: background .15s, transform .1s; }
+    .btn-toggle-tl:hover { background: var(--s100); }
+    .btn-toggle-tl:active { transform: scale(.97); }
+    .btn-toggle-tl svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .btn-toggle-tl svg.tl-chevron { width: 11px; height: 11px; transition: transform .15s; }
+    .btn-toggle-tl.open svg.tl-chevron { transform: rotate(180deg); }
+    .timeline-wrap { display: none; margin-top: 14px; }
+    .timeline-wrap.open { display: block; }
 
     .section-sep { height: 1px; background: var(--s100); margin: 16px 0; }
 
@@ -121,27 +169,42 @@
 
     <div class="card">
         <div class="filters-grid">
-            <div class="filter-group">
-                <label for="viceStatusOfficeFilter">Office</label>
-                <select id="viceStatusOfficeFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-building"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Office</span>
+                    <span class="filter-box-value" id="viceStatusOfficeValue">All offices</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="viceStatusOfficeFilter">
                     <option value="all">All offices</option>
                     @foreach ($offices as $office)
                         <option value="{{ $office }}">{{ $office }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="filter-group">
-                <label for="viceStatusQuarterFilter">Quarter</label>
-                <select id="viceStatusQuarterFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-chart-pie"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Quarter</span>
+                    <span class="filter-box-value" id="viceStatusQuarterValue">All quarters</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="viceStatusQuarterFilter">
                     <option value="all">All quarters</option>
                     @foreach ($quarters as $quarter)
                         <option value="{{ $quarter }}">{{ $quarter }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="filter-group">
-                <label for="viceStatusStatusFilter">Status</label>
-                <select id="viceStatusStatusFilter">
+            <div class="filter-box">
+                <div class="filter-box-icon"><i class="ti ti-clipboard-list"></i></div>
+                <div class="filter-box-body">
+                    <span class="filter-box-label">Status</span>
+                    <span class="filter-box-value" id="viceStatusStatusValue">All statuses</span>
+                </div>
+                <i class="ti ti-chevron-down filter-box-chev"></i>
+                <select class="filter-box-select" id="viceStatusStatusFilter">
                     <option value="all">All statuses</option>
                     @foreach ($statuses as $status)
                         <option value="{{ $status }}">{{ $status }}</option>
@@ -230,6 +293,10 @@
     const quarterFilter = document.getElementById('viceStatusQuarterFilter');
     const statusFilter  = document.getElementById('viceStatusStatusFilter');
 
+    const officeValueEl  = document.getElementById('viceStatusOfficeValue');
+    const quarterValueEl = document.getElementById('viceStatusQuarterValue');
+    const statusValueEl  = document.getElementById('viceStatusStatusValue');
+
     function statusBadgeClass(s) {
         const map = {
             'On Track':    'badge-on-track',
@@ -245,6 +312,9 @@
         const o = officeFilter.value;
         const q = quarterFilter.value;
         const s = statusFilter.value;
+        if (officeValueEl)  officeValueEl.textContent  = officeFilter.options[officeFilter.selectedIndex]?.text || '';
+        if (quarterValueEl) quarterValueEl.textContent = quarterFilter.options[quarterFilter.selectedIndex]?.text || '';
+        if (statusValueEl)  statusValueEl.textContent  = statusFilter.options[statusFilter.selectedIndex]?.text || '';
         let visible = 0;
         rows.forEach(row => {
             const show = (o === 'all' || row.dataset.office === o)
@@ -302,8 +372,14 @@
 
             ${timeline ? `
             <div class="section-sep"></div>
-            <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--s400);margin-bottom:14px;">Activity Timeline</p>
-            <div class="timeline">${timeline}</div>
+            <button class="btn-toggle-tl" id="toggleTimelineBtn" type="button">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+                <span id="toggleTimelineLabel">View Activity Timeline</span>
+                <svg class="tl-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="timeline-wrap" id="timelineWrap">
+                <div class="timeline">${timeline}</div>
+            </div>
             ` : ''}
 
             <div class="section-sep"></div>
@@ -316,6 +392,16 @@
                 </button>
             </div>
         `;
+
+        const toggleTimelineBtn = document.getElementById('toggleTimelineBtn');
+        if (toggleTimelineBtn) {
+            toggleTimelineBtn.addEventListener('click', () => {
+                const wrap = document.getElementById('timelineWrap');
+                const isOpen = wrap.classList.toggle('open');
+                toggleTimelineBtn.classList.toggle('open', isOpen);
+                document.getElementById('toggleTimelineLabel').textContent = isOpen ? 'Hide Activity Timeline' : 'View Activity Timeline';
+            });
+        }
 
         document.getElementById('vcNoteSave').addEventListener('click', () => {
             const note = document.getElementById('vcNoteInput').value;

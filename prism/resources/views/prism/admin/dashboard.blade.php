@@ -44,6 +44,14 @@
 
     .two-col { display: grid; grid-template-columns: 1fr 1.4fr; gap: 20px; align-items: start; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .chart-icon-badge {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        background: rgba(104,16,18,.07);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .chart-icon-badge i { font-size: 18px; color: var(--m); }
+    .chart-card-head-text { flex: 1; min-width: 0; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; background: var(--white); }
@@ -98,15 +106,25 @@
 
     <div class="charts-grid">
         <div class="card">
-            <p class="card-eyebrow">Accounts</p>
-            <h2 class="card-title" style="margin-bottom:16px;">Active vs Inactive</h2>
-            <div class="chart-wrap">
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-donut"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Accounts</p>
+                    <h2 class="card-title">Active vs Inactive</h2>
+                </div>
+            </div>
+            <div class="chart-wrap" style="height:340px;">
                 <canvas id="statusChart" data-summary="{{ json_encode($summary) }}"></canvas>
             </div>
         </div>
         <div class="card">
-            <p class="card-eyebrow">Roles</p>
-            <h2 class="card-title" style="margin-bottom:16px;">User Distribution per Role</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-shield-lock"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Roles</p>
+                    <h2 class="card-title">User Distribution per Role</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="roleChart" data-rows="{{ json_encode($usersByRole) }}"></canvas>
             </div>
@@ -116,9 +134,12 @@
     <div class="two-col">
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Roles</p>
-                    <h2 class="card-title">Users per Role</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-shield-lock"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Roles</p>
+                        <h2 class="card-title">Users per Role</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">
@@ -138,9 +159,12 @@
 
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Activity</p>
-                    <h2 class="card-title">Recent Logins</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-history"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Activity</p>
+                        <h2 class="card-title">Recent Logins</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">

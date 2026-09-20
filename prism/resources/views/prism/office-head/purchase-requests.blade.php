@@ -86,9 +86,15 @@
 
         .search-toolbar { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 14px; }
         .search-toolbar .search-wrap { flex: 1; min-width: 0; }
-        .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 30px 0 14px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
+        .filter-wrap { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
+        .filter-wrap i.ficon { position: absolute; left: 14px; font-size: 14px; color: var(--m); pointer-events: none; }
+        .filter-wrap i.fchev { position: absolute; right: 13px; font-size: 12px; color: var(--s400); pointer-events: none; }
+        .filter-select { height: 40px; border-radius: 99px; border: 1px solid var(--s200); background: var(--s50); padding: 0 32px 0 38px; font-size: 12.5px; font-weight: 600; color: var(--s700); font-family: 'Poppins', sans-serif; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: border-color .15s, box-shadow .15s; flex-shrink: 0; }
         .filter-select:focus { border-color: var(--m); box-shadow: 0 0 0 3px rgba(104,16,18,.08); }
         @media (max-width: 640px) { .search-toolbar { flex-wrap: wrap; } .search-toolbar .search-wrap { flex-basis: 100%; } }
+        /* Highlights the matched substring inside a PR card while a search
+           query is active, so it's visible at a glance why a card matched. */
+        .pr-card mark { background: rgba(139,26,28,.16); color: var(--m); padding: 0 1px; border-radius: 2px; font-weight: 700; }
 
         .pr-no-results { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border-radius: 12px; border: 1.5px dashed var(--s300); background: var(--s50); padding: 32px; text-align: center; }
         .pr-no-results.visible { display: flex; }
@@ -262,17 +268,25 @@
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input class="search-input" type="search" id="prSearch" placeholder="Search Purchase Request number or title">
                     </div>
-                    <select class="filter-select" id="prStatusFilter" title="Filter by status">
-                        <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="delayed">Delayed</option>
-                    </select>
-                    <select class="filter-select" id="prSortOrder" title="Sort by date submitted">
-                        <option value="desc">Newest → Oldest</option>
-                        <option value="asc">Oldest → Newest</option>
-                    </select>
+                    <div class="filter-wrap">
+                        <i class="ti ti-progress-check ficon"></i>
+                        <select class="filter-select" id="prStatusFilter" title="Filter by status">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="delayed">Delayed</option>
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
+                    <div class="filter-wrap">
+                        <i class="ti ti-arrows-sort ficon"></i>
+                        <select class="filter-select" id="prSortOrder" title="Sort by date submitted">
+                            <option value="desc">Newest → Oldest</option>
+                            <option value="asc">Oldest → Newest</option>
+                        </select>
+                        <i class="ti ti-chevron-down fchev"></i>
+                    </div>
                 </div>
 
                 <div class="pr-list" id="prList">
@@ -292,7 +306,7 @@
                             <div class="pr-card-info">
                                 <p class="pr-card-title">{{ $pr['title'] }}</p>
                                 <p class="pr-card-meta">
-                                    {{ $pr['number'] }}
+                                    <span class="pr-card-number">{{ $pr['number'] }}</span>
                                     &nbsp;•&nbsp; {{ $pr['itemCount'] }} {{ Str::plural('item', $pr['itemCount']) }}
                                     &nbsp;•&nbsp; PHP {{ number_format($pr['totalAmount']) }}
                                     @if($pr['uploadedAt'])
@@ -455,6 +469,22 @@
     const sortOrderSelect = document.getElementById('prSortOrder');
     const prNoResults     = document.getElementById('prNoResults');
 
+    // Wraps the matched substring of `query` in <mark>. Always re-collapses
+    // any previous highlight back to plain text first, so it's safe to call
+    // on every keystroke.
+    function highlightText(el, query) {
+        if (!el) return;
+        const text = el.textContent;
+        const idx  = query ? text.toLowerCase().indexOf(query) : -1;
+        if (idx === -1) { el.textContent = text; return; }
+        el.innerHTML = escapeHtml(text.slice(0, idx))
+            + '<mark>' + escapeHtml(text.slice(idx, idx + query.length)) + '</mark>'
+            + escapeHtml(text.slice(idx + query.length));
+    }
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
     function applyPrFilter() {
         const q      = (searchInput?.value || '').toLowerCase();
         const status = statusFilter ? statusFilter.value : '';
@@ -465,6 +495,9 @@
             const match = matchesSearch && matchesStatus;
             card.style.display = match ? '' : 'none';
             if (match) visible++;
+            // Title and PR number — the two fields data-search is built from.
+            highlightText(card.querySelector('.pr-card-title'), q);
+            highlightText(card.querySelector('.pr-card-number'), q);
         });
         if (prNoResults) prNoResults.classList.toggle('visible', visible === 0);
     }

@@ -13,6 +13,7 @@
         --s50: #f8fafc; --s100: #f1f5f9; --s200: #e2e8f0; --s300: #cbd5e1;
         --s400: #94a3b8; --s500: #64748b; --s600: #475569; --s700: #334155; --s900: #0f172a;
         --sh-sm: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+        --sh-lg: 0 8px 28px rgba(15,23,42,.10), 0 2px 8px rgba(15,23,42,.05);
     }
 
     .page-hdr { display: flex; align-items: center; gap: 14px; background: var(--white); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: var(--sh); padding: 18px 22px; }
@@ -32,16 +33,16 @@
     .stat-card {
         position: relative; overflow: hidden;
         background: var(--white); border: 1px solid var(--s200);
-        border-radius: 18px; padding: 20px 20px 20px 24px;
-        box-shadow: var(--sh-sm); transition: border-color .2s, box-shadow .2s;
+        border-radius: 15px; padding: 18px 20px 16px;
+        box-shadow: var(--sh-sm); transition: box-shadow .25s, border-color .25s, transform .2s;
     }
-    .stat-card:hover { border-color: var(--crimson-border); box-shadow: 0 12px 28px rgba(15,23,42,.07); }
-    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: var(--gold); }
-    .stat-icon { position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--crimson-border); background: var(--crimson-mid); display: flex; align-items: center; justify-content: center; }
-    .stat-icon svg { width: 17px; height: 17px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
-    .stat-value { font-size: 1.55rem; font-weight: 800; color: var(--m); margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
-    .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
+    .stat-card:hover { box-shadow: var(--sh-lg); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 16px; width: 4px; height: 38px; border-radius: 0 4px 4px 0; background: var(--m); }
+    .stat-icon { position: absolute; right: 16px; top: 16px; width: 38px; height: 38px; border-radius: 11px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
+    .stat-icon svg { width: 19px; height: 19px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); margin-bottom: 9px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--m); display: block; letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
+    .stat-desc  { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
 
     .table-wrap { border-radius: 12px; border: 1px solid var(--s200); overflow: auto; max-height: 52vh; background: var(--white); box-shadow: inset 0 1px 4px rgba(15,23,42,.04); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--s700); text-align: left; }
@@ -68,6 +69,7 @@
     .prog-fill-maroon { height: 100%; border-radius: 99px; background: var(--m); }
     .prog-fill-gold   { height: 100%; border-radius: 99px; background: var(--gold); }
 
+    .alert-list-scroll { max-height: 520px; overflow-y: auto; padding-right: 4px; }
     .alert-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px; border-radius: 14px; border: 1px solid #f7c1c1; background: rgba(252,235,235,.6); transition: background .15s, box-shadow .15s; }
     .alert-item:hover { background: #fff; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
     .alert-item strong { font-size: 13px; font-weight: 700; color: var(--s900); display: block; }
@@ -79,6 +81,15 @@
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+    .chart-card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+    .chart-icon-badge {
+        width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+        background: rgba(104,16,18,.07);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .chart-icon-badge i { font-size: 18px; color: var(--m); }
+    .chart-card-head-text { flex: 1; min-width: 0; }
+    .chart-card-head-text .card-eyebrow { margin-bottom: 2px; }
     .chart-wrap  { position: relative; width: 100%; height: 230px; }
     /* Office-utilization chart grows with office count instead of squeezing
        many bars into a fixed box — left uncapped, that stretched the WHOLE
@@ -99,7 +110,7 @@
     .card-head-row .card-title { margin-bottom: 0; }
     /* Always-visible chart legend (labels shouldn't require a hover to
        read) — kept compact so it doesn't get crowded with many slices. */
-    .pd-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
+    .pd-chart-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; margin-top: 10px; font-size: 10.5px; font-weight: 600; color: var(--s600); }
     .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
@@ -169,20 +180,30 @@
 
     <div class="charts-grid">
         <div class="card">
-            <p class="card-eyebrow">Campus-wide</p>
-            <h2 class="card-title" style="margin-bottom:16px;">APP Item Status</h2>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-chart-donut"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Campus-wide</p>
+                    <h2 class="card-title">APP Item Status</h2>
+                </div>
+            </div>
             <div class="chart-wrap">
                 <canvas id="itemStatusChart" data-status="{{ json_encode($itemStatusChart) }}"></canvas>
             </div>
             <div class="pd-chart-legend" id="itemStatusLegend"></div>
         </div>
         <div class="card">
-            <p class="card-eyebrow">Budget vs. Utilized</p>
-            <div class="card-head-row">
-                <h2 class="card-title">Utilization by Office</h2>
-                <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
-                    <i class="ti ti-arrows-vertical"></i><span>Expand</span>
-                </button>
+            <div class="chart-card-head">
+                <div class="chart-icon-badge"><i class="ti ti-building"></i></div>
+                <div class="chart-card-head-text">
+                    <p class="card-eyebrow">Budget vs. Utilized</p>
+                    <div class="card-head-row" style="margin-bottom:0;">
+                        <h2 class="card-title">Utilization by Office</h2>
+                        <button type="button" class="chart-expand-btn" id="officeUtilExpandBtn" style="display:none;">
+                            <i class="ti ti-arrows-vertical"></i><span>Expand</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="chart-wrap collapsible" id="officeUtilWrap">
                 <canvas id="officeUtilizationChart" data-offices="{{ json_encode($officeUtilizationChart) }}"></canvas>
@@ -192,9 +213,12 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Q1 to Q4</p>
-                <h2 class="card-title">Procurement Status per Office</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-calendar-stats"></i></div>
+                <div>
+                    <p class="card-eyebrow">Q1 to Q4</p>
+                    <h2 class="card-title">Procurement Status per Office</h2>
+                </div>
             </div>
         </div>
         <div class="table-wrap">
@@ -234,9 +258,12 @@
 
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Forecast</p>
-                    <h2 class="card-title">Year-End Utilization by Office</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-trending-up"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Forecast</p>
+                        <h2 class="card-title">Year-End Utilization by Office</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">
@@ -277,9 +304,12 @@
 
         <div class="card">
             <div class="card-head">
-                <div>
-                    <p class="card-eyebrow">Ranked by utilization rate</p>
-                    <h2 class="card-title">Office Utilization Ranking</h2>
+                <div style="display:flex;align-items:flex-start;gap:14px;">
+                    <div class="chart-icon-badge"><i class="ti ti-list-numbers"></i></div>
+                    <div>
+                        <p class="card-eyebrow">Ranked by utilization rate</p>
+                        <h2 class="card-title">Office Utilization Ranking</h2>
+                    </div>
                 </div>
             </div>
             <div class="table-wrap">
@@ -312,15 +342,18 @@
 
     <div class="card">
         <div class="card-head">
-            <div>
-                <p class="card-eyebrow">Overdue PR Alerts</p>
-                <h2 class="card-title">Action List</h2>
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+                <div class="chart-icon-badge"><i class="ti ti-alert-triangle"></i></div>
+                <div>
+                    <p class="card-eyebrow">Overdue PR Alerts</p>
+                    <h2 class="card-title">Action List</h2>
+                </div>
             </div>
             <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:20px;font-size:11px;font-weight:700;background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1;">
-                {{ $summary['itemsOverdue'] }} alerts{{ $summary['itemsOverdue'] > count($overdueAlerts) ? ' (showing ' . count($overdueAlerts) . ')' : '' }}
+                {{ $summary['itemsOverdue'] }} alerts
             </span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="alert-list-scroll" style="display:flex;flex-direction:column;gap:10px;">
             @foreach ($overdueAlerts as $alert)
                 @php
                     $statusClass = match(strtolower($alert['status'])) {
