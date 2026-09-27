@@ -88,12 +88,38 @@
     .progress-fill.medium { background: #ef9f27; }
     .progress-fill.high   { background: #639922; }
 
+    .office-group-row td { background: #fbfdff; border-top: 1px solid var(--s200); border-bottom: 1px solid var(--s200); }
+    .office-group-row:first-child td { border-top: none; }
+    .office-group-cell { min-width: 180px; }
+    .office-group-name { font-size: 14px; font-weight: 800; color: var(--s900); letter-spacing: -.15px; }
+    .office-group-meta { font-size: 11px; color: var(--s500); margin-top: 3px; }
+    .office-quarter-row td { background: #fff; }
+    .office-quarter-cell {
+        position: relative; padding-left: 34px;
+        font-size: 13px; font-weight: 700; color: var(--s600); white-space: nowrap;
+    }
+    .office-quarter-cell::before {
+        content: ""; position: absolute; left: 17px; top: 50%;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--s300); transform: translateY(-50%);
+    }
+    .office-quarter-row:hover td { background: var(--crimson-mid); }
+
     .risk-badge { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .risk-badge.at-risk  { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
     .risk-badge.on-track { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
     .risk-badge.watch    { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
+
+    .util-legend { display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--s100); }
+    .util-legend-item { display: flex; align-items: center; gap: 9px; }
+    .util-legend-swatch { width: 34px; height: 8px; border-radius: 99px; flex-shrink: 0; }
+    .util-legend-swatch.high { background: #639922; }
+    .util-legend-swatch.medium { background: #ef9f27; }
+    .util-legend-swatch.low { background: #e24b4a; }
+    .util-legend-label { font-size: 12px; font-weight: 800; color: var(--s900); }
+    .util-legend-range { font-size: 11px; color: var(--s500); margin-top: 1px; }
 
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .chart-wrap  { position: relative; width: 100%; height: 240px; }
@@ -324,6 +350,32 @@
 
     <div id="utilRowsData" data-rows="{{ json_encode($utilizationRows) }}" style="display:none"></div>
 
+    @php
+        $utilizationOfficeGroups = collect($utilizationRows)
+            ->groupBy('office')
+            ->map(function ($rows, $office) {
+                $rows = $rows->sortBy('quarter')->values();
+                $budget = (float) $rows->sum('budget');
+                $utilized = (float) $rows->sum('utilized');
+                $pct = $budget > 0 ? min(100, round(($utilized / $budget) * 100)) : 0;
+                $risk = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'Watch' : 'At Risk');
+
+                return [
+                    'office' => $office,
+                    'rows' => $rows,
+                    'budget' => $budget,
+                    'utilized' => $utilized,
+                    'percent' => $pct,
+                    'risk' => $risk,
+                ];
+            });
+        $utilizationLegend = [
+            ['label' => 'On Track', 'range' => '70-100% utilized', 'class' => 'high'],
+            ['label' => 'Watch', 'range' => '40-69% utilized', 'class' => 'medium'],
+            ['label' => 'At Risk', 'range' => '0-39% utilized', 'class' => 'low'],
+        ];
+    @endphp
+
     <div class="card">
         <div class="card-head">
             <div style="display:flex;align-items:flex-start;gap:14px;">
@@ -339,8 +391,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Office</th>
-                        <th>Quarter</th>
+                        <th>Office / Quarter</th>
                         <th>Budget</th>
                         <th>Utilized</th>
                         <th>Utilization</th>
@@ -348,6 +399,52 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @foreach ($utilizationOfficeGroups as $group)
+                        @php
+                            $groupPct = $group['percent'];
+                            $groupFillClass = $groupPct >= 70 ? 'high' : ($groupPct >= 40 ? 'medium' : 'low');
+                            $groupRiskSlug = strtolower(str_replace(' ', '-', $group['risk']));
+                        @endphp
+                        <tr class="office-group-row" data-util-group data-office="{{ $group['office'] }}">
+                            <td class="office-group-cell">
+                                <p class="office-group-name">{{ $group['office'] }}</p>
+                                <p class="office-group-meta" data-group-meta>{{ $group['rows']->count() }} {{ Str::plural('quarter', $group['rows']->count()) }}</p>
+                            </td>
+                            <td><p class="amount-val" data-group-budget>PHP {{ number_format($group['budget']) }}</p></td>
+                            <td><p class="amount-val" data-group-utilized>PHP {{ number_format($group['utilized']) }}</p></td>
+                            <td>
+                                <div class="progress-wrap">
+                                    <p class="progress-pct" data-group-pct>{{ $groupPct }}%</p>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill {{ $groupFillClass }}" data-group-fill style="width: {{ $groupPct }}%;"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="risk-badge {{ $groupRiskSlug }}" data-group-risk>{{ $group['risk'] }}</span></td>
+                        </tr>
+                        @foreach ($group['rows'] as $row)
+                            @php
+                                $pct = $row['percent'];
+                                $fillClass = $pct >= 70 ? 'high' : ($pct >= 40 ? 'medium' : 'low');
+                                $riskSlug = strtolower(str_replace(' ', '-', $row['risk']));
+                            @endphp
+                            <tr class="office-quarter-row" data-util-row data-office="{{ $row['office'] }}" data-quarter="{{ $row['quarter'] }}">
+                                <td class="office-quarter-cell">{{ $row['quarter'] }}</td>
+                                <td><p class="amount-val">PHP {{ number_format($row['budget']) }}</p></td>
+                                <td><p class="amount-val">PHP {{ number_format($row['utilized']) }}</p></td>
+                                <td>
+                                    <div class="progress-wrap">
+                                        <p class="progress-pct">{{ $pct }}%</p>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill {{ $fillClass }}" style="width: {{ $pct }}%;"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="risk-badge {{ $riskSlug }}">{{ $row['risk'] }}</span></td>
+                            </tr>
+                        @endforeach
+                    @endforeach
+                    {{-- Legacy flat rows replaced by grouped office rows.
                     @foreach ($utilizationRows as $row)
                         @php
                             $pct = $row['percent'];
@@ -370,8 +467,20 @@
                             <td><span class="risk-badge {{ $riskSlug }}">{{ $row['risk'] }}</span></td>
                         </tr>
                     @endforeach
+                    --}}
                 </tbody>
             </table>
+        </div>
+        <div class="util-legend" aria-label="Utilization color legend">
+            @foreach ($utilizationLegend as $item)
+                <div class="util-legend-item">
+                    <span class="util-legend-swatch {{ $item['class'] }}"></span>
+                    <div>
+                        <p class="util-legend-label">{{ $item['label'] }}</p>
+                        <p class="util-legend-range">{{ $item['range'] }}</p>
+                    </div>
+                </div>
+            @endforeach
         </div>
     </div>
 
@@ -385,6 +494,7 @@
     const officeEl  = document.getElementById('utilOfficeFilter');
     const countEl   = document.getElementById('utilVisibleCount');
     const rows      = document.querySelectorAll('[data-util-row]');
+    const groupRows = document.querySelectorAll('[data-util-group]');
     const quarterValueEl = document.getElementById('utilQuarterValue');
     const officeValueEl  = document.getElementById('utilOfficeValue');
 
@@ -419,6 +529,43 @@
         return Array.from(map.values());
     }
 
+    function riskInfo(percent) {
+        if (percent >= 70) return { label: 'On Track', slug: 'on-track', fill: 'high' };
+        if (percent >= 40) return { label: 'Watch', slug: 'watch', fill: 'medium' };
+        return { label: 'At Risk', slug: 'at-risk', fill: 'low' };
+    }
+
+    function updateOfficeGroups(rows) {
+        const grouped = new Map();
+        rows.forEach(r => {
+            if (!grouped.has(r.office)) grouped.set(r.office, []);
+            grouped.get(r.office).push(r);
+        });
+
+        groupRows.forEach(group => {
+            const officeRows = grouped.get(group.dataset.office) || [];
+            group.style.display = officeRows.length ? '' : 'none';
+            if (!officeRows.length) return;
+
+            const budget = officeRows.reduce((sum, r) => sum + r.budget, 0);
+            const utilized = officeRows.reduce((sum, r) => sum + r.utilized, 0);
+            const percent = budget > 0 ? Math.min(100, Math.round((utilized / budget) * 100)) : 0;
+            const risk = riskInfo(percent);
+            const meta = officeRows.length + ' ' + (officeRows.length === 1 ? 'quarter' : 'quarters');
+            const fill = group.querySelector('[data-group-fill]');
+            const riskBadge = group.querySelector('[data-group-risk]');
+
+            group.querySelector('[data-group-meta]').textContent = meta;
+            group.querySelector('[data-group-budget]').textContent = peso(budget);
+            group.querySelector('[data-group-utilized]').textContent = peso(utilized);
+            group.querySelector('[data-group-pct]').textContent = percent + '%';
+            fill.style.width = percent + '%';
+            fill.className = 'progress-fill ' + risk.fill;
+            riskBadge.className = 'risk-badge ' + risk.slug;
+            riskBadge.textContent = risk.label;
+        });
+    }
+
     function updateStats(rows) {
         const budget   = rows.reduce((sum, r) => sum + r.budget, 0);
         const utilized = rows.reduce((sum, r) => sum + r.utilized, 0);
@@ -451,12 +598,14 @@
 
         const matched = filteredRows(quarter, office);
         updateStats(matched);
+        updateOfficeGroups(matched);
 
         if (officeChartInstance) {
             const offices = officeChartData(matched);
             officeChartInstance.data.labels             = offices.map(o => o.office);
             officeChartInstance.data.datasets[0].data   = offices.map(o => o.budget);
             officeChartInstance.data.datasets[1].data   = offices.map(o => o.utilized);
+            officeChartEl.parentElement.style.height = Math.max(230, offices.length * 34) + 'px';
             officeChartInstance.update();
         }
     }
@@ -547,6 +696,8 @@
             },
         });
     }
+
+    applyFilters();
 })();
 </script>
 @endpush

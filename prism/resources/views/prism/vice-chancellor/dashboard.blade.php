@@ -21,20 +21,91 @@
     .card-sub     { font-size: 13px; color: var(--s500); margin-top: 4px; line-height: 1.6; }
     .card-head    { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
+    .stat-wrap { position: relative; min-width: 0; outline: none; z-index: 1; }
+    .stat-wrap:hover,
+    .stat-wrap:focus-within { z-index: 80; }
     .stat-card {
-        position: relative; overflow: hidden;
+        position: relative; overflow: visible;
         background: var(--white); border: 1px solid var(--s200);
-        border-radius: 18px; padding: 20px 20px 20px 24px;
-        box-shadow: var(--sh-sm); transition: border-color .2s, box-shadow .2s;
+        border-radius: 15px; padding: 16px 18px;
+        box-shadow: var(--sh-sm);
+        transition: box-shadow .25s, border-color .25s, transform .2s;
+        min-height: 112px; height: 100%;
+        display: flex; flex-direction: column;
     }
-    .stat-card:hover { border-color: rgba(104,16,18,.2); box-shadow: 0 12px 28px rgba(15,23,42,.07); }
-    .stat-card::before { content: ''; position: absolute; left: 0; top: 20px; width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: #681012; }
-    .stat-icon { position: absolute; right: 16px; top: 16px; width: 36px; height: 36px; border-radius: 10px; background: rgba(104,16,18,.07); display: flex; align-items: center; justify-content: center; }
-    .stat-icon svg { width: 17px; height: 17px; stroke: #681012; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--s500); }
-    .stat-value { font-size: 1.55rem; font-weight: 800; color: #681012; margin-top: 10px; display: block; letter-spacing: -.5px; line-height: 1.1; }
-    .stat-desc  { font-size: 12px; color: var(--s500); margin-top: 8px; line-height: 1.6; }
+    .stat-card:hover,
+    .stat-wrap:hover .stat-card,
+    .stat-wrap:focus-within .stat-card {
+        border-color: rgba(192,57,59,.45);
+        box-shadow:
+            0 0 0 1px rgba(192,57,59,.20),
+            0 10px 28px rgba(139,26,28,.16),
+            0 2px 8px rgba(15,23,42,.08);
+        transform: translateY(-2px);
+    }
+    .stat-card::before { content: ''; position: absolute; left: 0; top: 24px; width: 4px; height: 35px; border-radius: 0 4px 4px 0; background: var(--crimson); }
+    .stat-icon { position: absolute; right: 16px; top: 14px; width: 36px; height: 36px; border-radius: 10px; background: var(--crimson-mid); display: flex; align-items: center; justify-content: center; }
+    .stat-icon svg { width: 18px; height: 18px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--s400); margin-bottom: 8px; max-width: calc(100% - 58px); }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--crimson); display: block; letter-spacing: -.7px; line-height: 1; margin-bottom: 7px; }
+    .stat-value.sm { font-size: clamp(24px, 1.55vw, 28px); letter-spacing: -.7px; white-space: nowrap; }
+    .stat-desc  { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
+
+    .stat-kpi-popover {
+        position: absolute; z-index: 90; left: 6px; top: calc(100% + 9px);
+        width: min(520px, calc(100vw - 48px)); max-width: 520px;
+        background: #fff; border: 1px solid var(--crimson-border);
+        border-radius: 10px;
+        box-shadow:
+            0 0 0 1px rgba(192,57,59,.12),
+            0 20px 52px rgba(15,23,42,.18),
+            0 10px 28px rgba(139,26,28,.12);
+        padding: 18px; color: var(--s700);
+        opacity: 0; pointer-events: none; transform: translateY(-4px);
+        visibility: hidden; transition: opacity .16s ease, transform .16s ease, visibility .16s;
+    }
+    .stat-kpi-popover::before {
+        content: ""; position: absolute; top: -9px; left: 190px;
+        width: 18px; height: 18px; background: #fff;
+        border-left: 1px solid var(--crimson-border);
+        border-top: 1px solid var(--crimson-border);
+        transform: rotate(45deg);
+    }
+    .stat-wrap:nth-child(3) .stat-kpi-popover,
+    .stat-wrap:nth-child(4) .stat-kpi-popover { left: auto; right: 0; }
+    .stat-wrap:nth-child(3) .stat-kpi-popover::before,
+    .stat-wrap:nth-child(4) .stat-kpi-popover::before { left: auto; right: 190px; }
+    .stat-wrap:hover .stat-kpi-popover,
+    .stat-wrap:focus-within .stat-kpi-popover {
+        opacity: 1; pointer-events: auto; transform: translateY(0); visibility: visible;
+    }
+    .stat-kpi-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .stat-kpi-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--crimson); margin-bottom: 4px; }
+    .stat-kpi-title { font-size: 18px; font-weight: 800; color: var(--s900); letter-spacing: -.35px; margin: 0 0 5px; line-height: 1.15; }
+    .stat-kpi-lead { font-size: 12.5px; color: var(--s600); line-height: 1.5; margin: 0; }
+    .stat-kpi-count { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11px; font-weight: 800; color: var(--crimson); }
+    .stat-kpi-scroll { max-height: 310px; overflow: auto; padding-right: 3px; }
+    .stat-kpi-list { display: flex; flex-direction: column; gap: 8px; }
+    .stat-kpi-row {
+        display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px;
+        background: var(--s50); border: 1px solid var(--s200);
+        border-radius: 8px; padding: 11px 12px;
+    }
+    .stat-kpi-row-main { min-width: 0; }
+    .stat-kpi-row-title { color: var(--s900); font-size: 12.5px; font-weight: 800; line-height: 1.35; margin-bottom: 3px; overflow-wrap: anywhere; }
+    .stat-kpi-row-meta { color: var(--s500); font-size: 11px; line-height: 1.55; }
+    .stat-kpi-row-meta .badge { height: 20px; padding: 0 8px; font-size: 10px; margin-right: 6px; vertical-align: middle; }
+    .stat-kpi-row-remarks { color: var(--s600); font-size: 11px; line-height: 1.5; margin-top: 3px; overflow-wrap: anywhere; }
+    .stat-kpi-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+    .stat-kpi-row-side strong { color: var(--crimson); font-size: 12px; white-space: nowrap; }
+    .stat-kpi-open-link {
+        grid-column: 1 / -1; width: max-content;
+        display: inline-flex; align-items: center; gap: 5px;
+        color: var(--crimson); text-decoration: none; font-size: 11px; font-weight: 800;
+    }
+    .stat-kpi-open-link:hover { text-decoration: underline; }
+    .stat-kpi-empty { padding: 18px 10px; text-align: center; color: var(--s400); font-size: 12.5px; font-weight: 700; }
 
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); white-space: nowrap; }
 
@@ -92,7 +163,15 @@
     .pd-chart-legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .pd-chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
-    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1200px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .stat-wrap .stat-kpi-popover { left: 6px; right: auto; }
+        .stat-wrap .stat-kpi-popover::before { left: 160px; right: auto; }
+        .stat-wrap:nth-child(even) .stat-kpi-popover { left: auto; right: 0; }
+        .stat-wrap:nth-child(even) .stat-kpi-popover::before { left: auto; right: 160px; }
+        .two-col { grid-template-columns: 1fr; }
+        .charts-grid { grid-template-columns: 1fr; }
+    }
     @media print {
         body { background: #fff; }
         .content { padding: 0; }
@@ -109,7 +188,16 @@
     .page-hdr-title { font-size: 18px; font-weight: 800; color: var(--txt); letter-spacing: -.3px; }
     .page-hdr-sub { font-size: 12px; color: var(--txt3); margin-top: 2px; }
     @media (max-width: 1024px) { .content { padding: 16px 16px 40px; } }
-    @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .stat-wrap:nth-child(n) .stat-kpi-popover {
+            position: fixed; left: 16px; right: 16px; top: 96px;
+            width: auto; max-width: none; max-height: calc(100vh - 128px); overflow: auto;
+        }
+        .stat-wrap:nth-child(n) .stat-kpi-popover::before { display: none; }
+        .stat-kpi-row { grid-template-columns: 1fr; }
+        .stat-kpi-row-side { align-items: flex-start; text-align: left; }
+    }
 </style>
 @endpush
 
@@ -142,38 +230,131 @@
     @endif
 
     <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+        @php
+            $flaggedOfficeCount = collect($officeUtilization)
+                ->filter(fn ($row) => ($row['risk'] ?? '') !== 'On Track' || ($row['delayed'] ?? 0) > 0 || ($row['overdue'] ?? 0) > 0)
+                ->count();
+
+            $kpiCards = [
+                [
+                    'key' => 'totalAppItems',
+                    'label' => 'Total APP Items',
+                    'value' => number_format($summary['totalAppItems']),
+                    'hint' => 'Items assigned to division offices',
+                    'icon' => '<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/></svg>',
+                ],
+                [
+                    'key' => 'procuredCount',
+                    'label' => 'Procured Count',
+                    'value' => number_format($summary['procuredCount']),
+                    'hint' => 'Completed procurement items',
+                    'icon' => '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+                ],
+                [
+                    'key' => 'divisionUtilization',
+                    'label' => 'Division Utilization',
+                    'value' => $summary['divisionUtilization'] . '%',
+                    'hint' => 'Budget utilization across assigned offices',
+                    'icon' => '<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+                ],
+                [
+                    'key' => 'flaggedOffices',
+                    'label' => 'Flagged Offices',
+                    'value' => number_format($flaggedOfficeCount),
+                    'hint' => 'Offices with delayed or overdue items',
+                    'icon' => '<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+                ],
+            ];
+        @endphp
+
+        @foreach ($kpiCards as $card)
+            @php
+                $detail = $kpiDetails[$card['key']] ?? [
+                    'title' => $card['label'],
+                    'lead' => '',
+                    'rows' => [],
+                    'empty' => 'No records found.',
+                    'type' => 'items',
+                    'countLabel' => 'record(s)',
+                ];
+                $rows = $detail['rows'] ?? [];
+                $detailType = $detail['type'] ?? 'items';
+            @endphp
+            <div class="stat-wrap" tabindex="0" aria-describedby="vc-kpi-{{ $card['key'] }}">
+                <article class="stat-card">
+                    <div class="stat-icon">{!! $card['icon'] !!}</div>
+                    <p class="stat-label">{{ $card['label'] }}</p>
+                    <strong class="stat-value {{ $card['valueClass'] ?? '' }}">{!! $card['value'] !!}</strong>
+                    <p class="stat-desc">{{ $card['hint'] }}</p>
+                </article>
+
+                <section class="stat-kpi-popover" id="vc-kpi-{{ $card['key'] }}" aria-labelledby="vc-kpi-title-{{ $card['key'] }}">
+                    <div class="stat-kpi-head">
+                        <div>
+                            <p class="stat-kpi-eyebrow">Vice Chancellor</p>
+                            <h2 class="stat-kpi-title" id="vc-kpi-title-{{ $card['key'] }}">{{ $detail['title'] }}</h2>
+                            <p class="stat-kpi-lead">{{ $detail['lead'] }}</p>
+                        </div>
+                    </div>
+                    <div class="stat-kpi-count">
+                        <span>{{ number_format(count($rows)) }}</span>
+                        <span>{{ $detail['countLabel'] ?? 'record(s)' }}</span>
+                    </div>
+                    <div class="stat-kpi-scroll">
+                        <div class="stat-kpi-list">
+                            @forelse ($rows as $row)
+                                @if ($detailType === 'utilization')
+                                    <div class="stat-kpi-row">
+                                        <div class="stat-kpi-row-main">
+                                            <div class="stat-kpi-row-title">{{ $row['title'] }}</div>
+                                            <div class="stat-kpi-row-meta">
+                                                Budget PHP {{ number_format($row['budget']) }}
+                                                &middot; Utilized PHP {{ number_format($row['utilized']) }}
+                                                &middot; Delayed {{ $row['delayed'] }}
+                                                &middot; Overdue {{ $row['overdue'] }}
+                                            </div>
+                                            <div class="stat-kpi-row-remarks">Office utilization and risk indicators for the assigned division.</div>
+                                        </div>
+                                        <div class="stat-kpi-row-side">
+                                            <strong>{{ $row['utilization'] }}%</strong>
+                                            <span class="badge {{ $row['statusClass'] }}">{{ $row['risk'] }}</span>
+                                        </div>
+                                        <a class="stat-kpi-open-link" href="{{ $row['url'] }}">
+                                            View report <i class="ti ti-arrow-right" style="font-size:12px"></i>
+                                        </a>
+                                    </div>
+                                @else
+                                    <div class="stat-kpi-row">
+                                        <div class="stat-kpi-row-main">
+                                            <div class="stat-kpi-row-title">{{ $row['name'] }}</div>
+                                            <div class="stat-kpi-row-meta">
+                                                <span class="badge {{ $row['statusClass'] }}">{{ $row['status'] }}</span>
+                                                {{ $row['office'] }} &middot; {{ $row['code'] }}
+                                                @if($row['fiscalYear'])
+                                                    &middot; FY {{ $row['fiscalYear'] }}
+                                                @endif
+                                                &middot; {{ $row['quantity'] }} {{ $row['unit'] }}
+                                                &middot; {{ $row['category'] }}
+                                                &middot; {{ $row['quarter'] }}
+                                            </div>
+                                            <div class="stat-kpi-row-remarks">{{ $row['prNumber'] }} &middot; {{ $row['remarks'] }}</div>
+                                        </div>
+                                        <div class="stat-kpi-row-side">
+                                            <strong>PHP {{ number_format($row['amount']) }}</strong>
+                                        </div>
+                                        <a class="stat-kpi-open-link" href="{{ $row['url'] }}">
+                                            View status <i class="ti ti-arrow-right" style="font-size:12px"></i>
+                                        </a>
+                                    </div>
+                                @endif
+                            @empty
+                                <div class="stat-kpi-empty">{{ $detail['empty'] }}</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </section>
             </div>
-            <p class="stat-label">Total APP Items</p>
-            <strong class="stat-value">{{ number_format($summary['totalAppItems']) }}</strong>
-            <p class="stat-desc">Items assigned to division offices</p>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            </div>
-            <p class="stat-label">Procured Count</p>
-            <strong class="stat-value">{{ number_format($summary['procuredCount']) }}</strong>
-            <p class="stat-desc">Completed procurement items</p>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            </div>
-            <p class="stat-label">Division Utilization</p>
-            <strong class="stat-value">{{ $summary['divisionUtilization'] }}%</strong>
-            <p class="stat-desc">Budget utilization across assigned offices</p>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">
-                <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </div>
-            <p class="stat-label">Flagged Offices</p>
-            <strong class="stat-value">{{ collect($officeUtilization)->where('risk', '!=', 'On Track')->count() }}</strong>
-            <p class="stat-desc">Offices with delayed or overdue items</p>
-        </div>
+        @endforeach
     </div>
 
     <div class="charts-grid">

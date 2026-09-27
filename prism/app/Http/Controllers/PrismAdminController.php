@@ -18,9 +18,25 @@ class PrismAdminController extends Controller
 {
     public function dashboard(): View
     {
-        $usersByRole = Role::withCount('users')
+        $allUsers = User::with(['roles', 'office'])
             ->orderBy('name')
-            ->get()
+            ->get();
+
+        $activeUsers = User::with(['roles', 'office'])
+            ->where('account_status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $inactiveUsers = User::with(['roles', 'office'])
+            ->where('account_status', '!=', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $roles = Role::withCount('users')
+            ->orderBy('name')
+            ->get();
+
+        $usersByRole = $roles
             ->map(fn ($role) => ['role' => $role->name, 'count' => $role->users_count])
             ->all();
 
@@ -37,17 +53,107 @@ class PrismAdminController extends Controller
             ])
             ->all();
 
+        $kpiDetails = $this->dashboardKpiDetails($allUsers, $activeUsers, $inactiveUsers, $roles);
+
         return view('prism.admin.dashboard', $this->withCommon('dashboard', [
             'pageTitle'    => 'System Administration',
             'summary'      => [
-                'totalUsers'    => User::count(),
-                'activeUsers'   => User::where('account_status', 'active')->count(),
-                'inactiveUsers' => User::where('account_status', '!=', 'active')->count(),
-                'totalRoles'    => Role::count(),
+                'totalUsers'    => $allUsers->count(),
+                'activeUsers'   => $activeUsers->count(),
+                'inactiveUsers' => $inactiveUsers->count(),
+                'totalRoles'    => $roles->count(),
             ],
             'usersByRole'  => $usersByRole,
             'recentLogins' => $recentLogins,
+            'kpiDetails'   => $kpiDetails,
         ]));
+    }
+
+    private function dashboardKpiDetails($allUsers, $activeUsers, $inactiveUsers, $roles): array
+    {
+        $allUserRows = $allUsers
+            ->map(fn (User $user) => $this->dashboardUserKpiRow($user))
+            ->values();
+
+        $activeUserRows = $activeUsers
+            ->map(fn (User $user) => $this->dashboardUserKpiRow($user))
+            ->values();
+
+        $inactiveUserRows = $inactiveUsers
+            ->map(fn (User $user) => $this->dashboardUserKpiRow($user))
+            ->values();
+
+        $roleRows = $roles
+            ->map(fn (Role $role) => $this->dashboardRoleKpiRow($role))
+            ->values();
+
+        return [
+            'totalUsers' => [
+                'title'      => 'Total Users',
+                'lead'       => 'All registered PRISM accounts visible to the system administrator.',
+                'rows'       => $allUserRows->all(),
+                'empty'      => 'No registered users found.',
+                'countLabel' => 'user account(s)',
+            ],
+            'activeUsers' => [
+                'title'      => 'Active Users',
+                'lead'       => 'Accounts currently enabled for PRISM access.',
+                'rows'       => $activeUserRows->all(),
+                'empty'      => 'No active users found.',
+                'countLabel' => 'active account(s)',
+            ],
+            'inactiveUsers' => [
+                'title'      => 'Inactive Users',
+                'lead'       => 'Accounts currently disabled or not marked active.',
+                'rows'       => $inactiveUserRows->all(),
+                'empty'      => 'No inactive users found.',
+                'countLabel' => 'inactive account(s)',
+            ],
+            'totalRoles' => [
+                'title'      => 'Roles',
+                'lead'       => 'Defined access roles and how many users are assigned to each one.',
+                'rows'       => $roleRows->all(),
+                'empty'      => 'No roles defined yet.',
+                'countLabel' => 'access role(s)',
+            ],
+        ];
+    }
+
+    private function dashboardUserKpiRow(User $user): array
+    {
+        $status = $user->account_status ?: 'inactive';
+        $isActive = $status === 'active';
+
+        return [
+            'title'       => $user->name,
+            'meta'        => ($user->username ?? '-') . ' - ' . ($user->office?->code ?? '-') . ' - ' . ($user->roles->first()?->name ?? '-'),
+            'status'      => ucfirst($status),
+            'statusClass' => $isActive ? 'badge-active' : 'badge-inactive',
+            'dateLabel'   => 'Last login',
+            'date'        => $user->last_login_at?->format('M d, Y g:i A') ?? 'Never',
+            'remarks'     => trim(($user->position_title ?: 'No position title') . ' - ' . ($user->email ?: 'No email')),
+            'sideLabel'   => null,
+            'url'         => route('admin.user-management'),
+            'urlLabel'    => 'Manage user',
+        ];
+    }
+
+    private function dashboardRoleKpiRow(Role $role): array
+    {
+        $userCount = (int) $role->users_count;
+
+        return [
+            'title'       => $role->name,
+            'meta'        => 'Role code: ' . ($role->code ?? '-'),
+            'status'      => $role->is_system ? 'System Role' : 'Custom Role',
+            'statusClass' => 'badge-role',
+            'dateLabel'   => 'Assigned users',
+            'date'        => number_format($userCount),
+            'remarks'     => $role->description ?: 'No role description provided.',
+            'sideLabel'   => number_format($userCount) . ' ' . \Illuminate\Support\Str::plural('user', $userCount),
+            'url'         => route('admin.user-management'),
+            'urlLabel'    => 'View users',
+        ];
     }
 
     public function userManagement(): View

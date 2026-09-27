@@ -7,6 +7,94 @@
     $approvedCount        = $proposalCollection->where('status', 'Approved')->count();
     $returnedCount        = $proposalCollection->where('status', 'Returned')->count();
     $approvedAmount       = $proposalCollection->where('status', 'Approved')->sum('totalAmount');
+    $proposalStatusClass = function ($status) {
+        $status = strtolower((string) $status);
+
+        return match (true) {
+            str_contains($status, 'approved') || str_contains($status, 'endorsed') => 'pd-badge-approved',
+            str_contains($status, 'returned') => 'pd-badge-returned',
+            str_contains($status, 'submitted') => 'pd-badge-submitted',
+            str_contains($status, 'review') => 'pd-badge-progress',
+            str_contains($status, 'draft') => 'pd-badge-info',
+            default => 'pd-badge-pending',
+        };
+    };
+    $proposalKpiRows = $proposalCollection
+        ->map(function ($proposal) use ($proposalStatusClass) {
+            $latestEvent = collect($proposal['timeline'] ?? [])->first();
+
+            return [
+                'id'          => $proposal['id'],
+                'title'       => $proposal['title'],
+                'meta'        => 'FY ' . $proposal['fiscalYear'] . ' · Submitted ' . $proposal['dateSubmitted'],
+                'side'        => 'PHP ' . number_format($proposal['totalAmount']),
+                'status'      => $proposal['status'],
+                'statusClass' => $proposalStatusClass($proposal['status']),
+                'note'        => ($latestEvent['step'] ?? 'Pending') . ' · ' . ($latestEvent['timestamp'] ?? 'No timeline yet'),
+            ];
+        })
+        ->values();
+    $kpiCards = [
+        [
+            'key' => 'proposals',
+            'label' => 'Proposals',
+            'value' => number_format($proposalCount),
+            'hint' => 'All PPMPs submitted or saved by your office',
+            'icon' => '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+        ],
+        [
+            'key' => 'approved',
+            'label' => 'Approved',
+            'value' => number_format($approvedCount),
+            'hint' => 'PPMPs cleared for procurement preparation',
+            'icon' => '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        ],
+        [
+            'key' => 'returned',
+            'label' => 'Returned',
+            'value' => number_format($returnedCount),
+            'hint' => 'PPMPs needing revision or resubmission',
+            'icon' => '<svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>',
+        ],
+        [
+            'key' => 'approvedAmount',
+            'label' => 'Approved Amount',
+            'value' => 'PHP ' . number_format($approvedAmount),
+            'valueClass' => 'sm',
+            'hint' => 'Total budget value from approved PPMPs',
+            'icon' => '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+        ],
+    ];
+    $kpiDetails = [
+        'proposals' => [
+            'title' => 'All Proposals',
+            'lead' => 'Every PPMP currently listed in your proposal queue.',
+            'rows' => $proposalKpiRows,
+            'empty' => 'No proposals found yet.',
+            'countLabel' => 'proposal(s)',
+        ],
+        'approved' => [
+            'title' => 'Approved PPMPs',
+            'lead' => 'PPMPs that have already passed approval.',
+            'rows' => $proposalKpiRows->where('status', 'Approved')->values(),
+            'empty' => 'No approved PPMPs yet.',
+            'countLabel' => 'approved proposal(s)',
+        ],
+        'returned' => [
+            'title' => 'Returned PPMPs',
+            'lead' => 'PPMPs sent back for correction or revision.',
+            'rows' => $proposalKpiRows->where('status', 'Returned')->values(),
+            'empty' => 'No returned PPMPs.',
+            'countLabel' => 'returned proposal(s)',
+        ],
+        'approvedAmount' => [
+            'title' => 'Approved Amount Sources',
+            'lead' => 'Approved PPMPs contributing to the approved amount total.',
+            'rows' => $proposalKpiRows->where('status', 'Approved')->sortByDesc(fn ($row) => (float) str_replace([',', 'PHP '], '', $row['side']))->values(),
+            'empty' => 'No approved amount sources yet.',
+            'countLabel' => 'approved budget source(s)',
+        ],
+    ];
 @endphp
 
 @push('page-css')
@@ -81,70 +169,184 @@
             gap: 13px;
             margin-bottom: 24px;
         }
+        .stat-wrap {
+            position: relative;
+            min-width: 0;
+            outline: none;
+            z-index: 1;
+        }
+        .stat-wrap:hover,
+        .stat-wrap:focus-within {
+            z-index: 80;
+        }
         .stat-box {
             background: var(--white);
             border: 1px solid var(--s200);
             border-radius: 15px;
-            padding: 18px 20px 16px;
+            padding: 16px 18px;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
             box-shadow: var(--sh-sm);
             transition: box-shadow .25s, border-color .25s, transform .2s;
+            min-height: 112px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
-        .stat-box:hover {
-            box-shadow: var(--sh-lg);
-            border-color: rgba(104,16,18,.2);
+        .stat-box:hover,
+        .stat-wrap:hover .stat-box,
+        .stat-wrap:focus-within .stat-box {
+            border-color: rgba(192,57,59,.45);
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.20),
+                0 10px 28px rgba(139,26,28,.16),
+                0 2px 8px rgba(15,23,42,.08);
             transform: translateY(-2px);
         }
         .stat-box::before {
             content: "";
             position: absolute;
             left: 0;
-            top: 16px;
+            top: 24px;
             width: 4px;
-            height: 38px;
+            height: 35px;
             background: var(--m);
             border-radius: 0 4px 4px 0;
         }
         .stat-icon {
             position: absolute;
             right: 16px;
-            top: 16px;
-            width: 38px;
-            height: 38px;
-            border-radius: 11px;
+            top: 14px;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             background: rgba(104,16,18,.07);
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .stat-icon svg {
-            width: 19px;
-            height: 19px;
+            width: 18px;
+            height: 18px;
             stroke: var(--m);
             fill: none;
             stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
-        .stat-box dt {
+        .stat-label {
             font-size: 10px;
             font-weight: 700;
             letter-spacing: .12em;
             text-transform: uppercase;
             color: var(--s400);
-            margin-bottom: 9px;
+            margin-bottom: 8px;
             padding-right: 46px;
         }
-        .stat-box dd {
+        .stat-value {
             font-size: 28px;
             font-weight: 800;
             color: var(--m);
             letter-spacing: -.7px;
             line-height: 1;
+            margin-bottom: 7px;
         }
-        .stat-box dd.maroon { color: var(--m); }
-        .stat-box dd.sm { font-size: 18px; letter-spacing: -.3px; }
+        .stat-value.maroon { color: var(--m); }
+        .stat-value.sm { font-size: clamp(20px, 1.45vw, 24px); letter-spacing: -.3px; white-space: nowrap; }
+        .stat-hint {
+            font-size: 11.5px;
+            color: var(--s400);
+            line-height: 1.5;
+        }
+
+        .kpi-popover {
+            position: absolute;
+            z-index: 90;
+            left: 6px;
+            top: calc(100% + 9px);
+            width: min(520px, calc(100vw - 48px));
+            max-width: 520px;
+            background: #fff;
+            border: 1px solid rgba(104,16,18,.18);
+            border-radius: 10px;
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.12),
+                0 20px 52px rgba(15,23,42,.18),
+                0 10px 28px rgba(139,26,28,.12);
+            padding: 18px;
+            color: var(--s700);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-4px);
+            visibility: hidden;
+            transition: opacity .16s ease, transform .16s ease, visibility .16s;
+        }
+        .kpi-popover::before {
+            content: "";
+            position: absolute;
+            top: -9px;
+            left: 190px;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-left: 1px solid rgba(104,16,18,.18);
+            border-top: 1px solid rgba(104,16,18,.18);
+            transform: rotate(45deg);
+        }
+        .stat-wrap:nth-child(3) .kpi-popover,
+        .stat-wrap:nth-child(4) .kpi-popover { left: auto; right: 0; }
+        .stat-wrap:nth-child(3) .kpi-popover::before,
+        .stat-wrap:nth-child(4) .kpi-popover::before { left: auto; right: 190px; }
+        .stat-wrap:hover .kpi-popover,
+        .stat-wrap:focus-within .kpi-popover {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+            visibility: visible;
+        }
+        .kpi-head { margin-bottom: 12px; }
+        .kpi-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
+        .kpi-title { font-size: 18px; font-weight: 800; color: var(--s900); letter-spacing: -.35px; margin: 0 0 5px; line-height: 1.15; }
+        .kpi-lead { font-size: 12.5px; color: var(--s600); line-height: 1.5; margin: 0; }
+        .kpi-count { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11px; font-weight: 800; color: var(--m); }
+        .kpi-scroll { max-height: 310px; overflow: auto; padding-right: 3px; }
+        .kpi-list { display: flex; flex-direction: column; gap: 8px; }
+        .kpi-row {
+            display: grid;
+            grid-template-columns: minmax(0,1fr) auto;
+            gap: 10px;
+            background: var(--s50);
+            border: 1px solid var(--s200);
+            border-radius: 8px;
+            padding: 11px 12px;
+        }
+        .kpi-row-main { min-width: 0; }
+        .kpi-row-title { color: var(--s900); font-size: 12.5px; font-weight: 800; line-height: 1.35; margin-bottom: 3px; overflow-wrap: anywhere; }
+        .kpi-row-meta { color: var(--s500); font-size: 11px; line-height: 1.55; }
+        .kpi-row-note { color: var(--s600); font-size: 11px; line-height: 1.5; margin-top: 3px; overflow-wrap: anywhere; }
+        .kpi-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+        .kpi-row-side strong { color: var(--m); font-size: 12px; white-space: nowrap; }
+        .kpi-open-link {
+            grid-column: 1 / -1;
+            width: max-content;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--m);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .kpi-open-link:hover { text-decoration: underline; }
+        .kpi-open-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .kpi-empty { padding: 18px 10px; text-align: center; color: var(--s400); font-size: 12.5px; font-weight: 700; }
+        .pd-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 99px; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
+        .pd-badge-approved  { background: #dcfce7; color: #166534; }
+        .pd-badge-pending   { background: #fef3c7; color: #92400e; }
+        .pd-badge-returned  { background: #fee2e2; color: #991b1b; }
+        .pd-badge-submitted { background: #dbeafe; color: #1e40af; }
+        .pd-badge-info      { background: #e0f2fe; color: #0369a1; }
+        .pd-badge-progress  { background: #ede9fe; color: #4c1d95; }
 
         /* ─── Filters row ─── */
         .filters-row {
@@ -400,6 +602,10 @@
         @media (max-width: 1280px) {
             .two-col { grid-template-columns: minmax(0,1fr) 380px; }
             .stats-bar { grid-template-columns: repeat(2,1fr); }
+            .stat-wrap .kpi-popover { left: 6px; right: auto; }
+            .stat-wrap .kpi-popover::before { left: 160px; right: auto; }
+            .stat-wrap:nth-child(even) .kpi-popover { left: auto; right: 0; }
+            .stat-wrap:nth-child(even) .kpi-popover::before { left: auto; right: 160px; }
         }
         @media (max-width: 1024px) {
             .content { padding: 20px 20px 48px; gap: 20px; }
@@ -409,9 +615,22 @@
             .filters-row .btn-primary { grid-column: span 2; }
         }
         @media (max-width: 640px) {
-            .stats-bar { grid-template-columns: 1fr 1fr; }
+            .stats-bar { grid-template-columns: 1fr; }
             .filters-row { grid-template-columns: 1fr; }
             .filters-row .btn-primary { grid-column: span 1; }
+            .stat-wrap:nth-child(n) .kpi-popover {
+                position: fixed;
+                left: 16px;
+                right: 16px;
+                top: 96px;
+                width: auto;
+                max-width: none;
+                max-height: calc(100vh - 128px);
+                overflow: auto;
+            }
+            .stat-wrap:nth-child(n) .kpi-popover::before { display: none; }
+            .kpi-row { grid-template-columns: 1fr; }
+            .kpi-row-side { align-items: flex-start; text-align: left; }
         }
 
         /* ── Success toast ── */
@@ -437,28 +656,70 @@
                 </a>
             </div>
 
-            <dl class="stats-bar">
-                <div class="stat-box">
-                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-                    <dt>Proposals</dt>
-                    <dd id="kpiProposalCount">{{ $proposalCount }}</dd>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-                    <dt>Approved</dt>
-                    <dd class="maroon" id="kpiApprovedCount">{{ $approvedCount }}</dd>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-icon"><svg viewBox="0 0 24 24"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg></div>
-                    <dt>Returned</dt>
-                    <dd id="kpiReturnedCount">{{ $returnedCount }}</dd>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-                    <dt>Approved Amount</dt>
-                    <dd class="sm" id="kpiApprovedAmount">₱ {{ number_format($approvedAmount) }}</dd>
-                </div>
-            </dl>
+            <div class="stats-bar">
+                @foreach ($kpiCards as $card)
+                    @php
+                        $detail = $kpiDetails[$card['key']] ?? [
+                            'title' => $card['label'],
+                            'lead' => '',
+                            'rows' => collect(),
+                            'empty' => 'No records yet.',
+                            'countLabel' => 'record(s)',
+                        ];
+                        $rows = collect($detail['rows'] ?? []);
+                        $valueId = match($card['key']) {
+                            'proposals' => 'kpiProposalCount',
+                            'approved' => 'kpiApprovedCount',
+                            'returned' => 'kpiReturnedCount',
+                            'approvedAmount' => 'kpiApprovedAmount',
+                            default => null,
+                        };
+                    @endphp
+                    <div class="stat-wrap" tabindex="0" aria-describedby="proposal-kpi-{{ $card['key'] }}">
+                        <article class="stat-box">
+                            <div class="stat-icon">{!! $card['icon'] !!}</div>
+                            <div class="stat-label">{{ $card['label'] }}</div>
+                            <div class="stat-value {{ $card['valueClass'] ?? '' }}" @if($valueId) id="{{ $valueId }}" @endif>{!! $card['value'] !!}</div>
+                            <p class="stat-hint">{{ $card['hint'] }}</p>
+                        </article>
+
+                        <section class="kpi-popover" id="proposal-kpi-{{ $card['key'] }}" aria-labelledby="proposal-kpi-title-{{ $card['key'] }}">
+                            <div class="kpi-head">
+                                <p class="kpi-eyebrow">My PPMPs</p>
+                                <h2 class="kpi-title" id="proposal-kpi-title-{{ $card['key'] }}">{{ $detail['title'] }}</h2>
+                                <p class="kpi-lead">{{ $detail['lead'] }}</p>
+                            </div>
+                            <div class="kpi-count">
+                                <span>{{ number_format($rows->count()) }}</span>
+                                <span>{{ $detail['countLabel'] ?? 'record(s)' }}</span>
+                            </div>
+                            <div class="kpi-scroll">
+                                <div class="kpi-list">
+                                    @forelse ($rows as $row)
+                                        <div class="kpi-row">
+                                            <div class="kpi-row-main">
+                                                <div class="kpi-row-title">{{ $row['title'] }}</div>
+                                                <div class="kpi-row-meta">{{ $row['meta'] }}</div>
+                                                <div class="kpi-row-note">{{ $row['note'] }}</div>
+                                            </div>
+                                            <div class="kpi-row-side">
+                                                <strong>{{ $row['side'] }}</strong>
+                                                <span class="pd-badge {{ $row['statusClass'] }}">{{ $row['status'] }}</span>
+                                            </div>
+                                            <a class="kpi-open-link" href="#proposal-row-{{ $row['id'] }}">
+                                                View in queue
+                                                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                            </a>
+                                        </div>
+                                    @empty
+                                        <div class="kpi-empty">{{ $detail['empty'] }}</div>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                @endforeach
+            </div>
 
             <div class="filters-row" aria-label="Proposal filters">
                 <div class="field-group">
@@ -503,6 +764,7 @@
                             $isReturned  = $proposal['status'] === 'Returned';
                         @endphp
                         <article
+                            id="proposal-row-{{ $proposal['id'] }}"
                             class="proposal-row"
                             data-proposal-row
                             data-proposal-id="{{ $proposal['id'] }}"

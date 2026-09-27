@@ -92,28 +92,96 @@
 
         /* Stat cards */
         .pd-stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; margin-bottom: 20px; }
+        .pd-stat-wrap { position: relative; min-width: 0; outline: none; z-index: 1; }
+        .pd-stat-wrap:hover,
+        .pd-stat-wrap:focus-within { z-index: 80; }
         .pd-stat {
             background: var(--white); border: 1px solid var(--s200);
-            border-radius: 15px; padding: 18px 20px 16px;
-            position: relative; overflow: hidden; box-shadow: var(--sh-sm);
+            border-radius: 15px; padding: 16px 18px;
+            position: relative; overflow: visible; box-shadow: var(--sh-sm);
             transition: box-shadow .25s, border-color .25s, transform .2s;
+            min-height: 112px; height: 100%;
+            display: flex; flex-direction: column;
         }
-        .pd-stat:hover { box-shadow: var(--sh-lg); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+        .pd-stat:hover,
+        .pd-stat-wrap:hover .pd-stat,
+        .pd-stat-wrap:focus-within .pd-stat {
+            border-color: rgba(192,57,59,.45);
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.20),
+                0 10px 28px rgba(139,26,28,.16),
+                0 2px 8px rgba(15,23,42,.08);
+            transform: translateY(-2px);
+        }
         .pd-stat::before {
-            content: ""; position: absolute; left: 0; top: 16px;
-            width: 4px; height: 38px; background: var(--m); border-radius: 0 4px 4px 0;
+            content: ""; position: absolute; left: 0; top: 24px;
+            width: 4px; height: 35px; background: var(--crimson); border-radius: 0 4px 4px 0;
         }
         .pd-stat-icon {
-            position: absolute; right: 16px; top: 16px;
-            width: 38px; height: 38px; border-radius: 11px;
-            background: rgba(104,16,18,.07);
+            position: absolute; right: 16px; top: 14px;
+            width: 36px; height: 36px; border-radius: 10px;
+            background: var(--crimson-mid);
             display: flex; align-items: center; justify-content: center;
         }
-        .pd-stat-icon svg { width: 19px; height: 19px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .pd-stat-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 9px; }
-        .pd-stat-value { font-size: 28px; font-weight: 800; color: var(--m); letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
-        .pd-stat-value.sm { font-size: 18px; letter-spacing: -.3px; }
+        .pd-stat-icon svg { width: 18px; height: 18px; stroke: var(--crimson); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-stat-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 8px; max-width: calc(100% - 58px); }
+        .pd-stat-value { font-size: 28px; font-weight: 800; color: var(--crimson); letter-spacing: -.7px; line-height: 1; margin-bottom: 7px; }
+        .pd-stat-value.sm { font-size: clamp(24px, 1.55vw, 28px); letter-spacing: -.7px; white-space: nowrap; }
         .pd-stat-hint { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
+
+        .pd-kpi-popover {
+            position: absolute; z-index: 90; left: 6px; top: calc(100% + 9px);
+            width: min(520px, calc(100vw - 48px)); max-width: 520px;
+            background: #fff; border: 1px solid var(--crimson-border);
+            border-radius: 10px;
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.12),
+                0 20px 52px rgba(15,23,42,.18),
+                0 10px 28px rgba(139,26,28,.12);
+            padding: 18px; color: var(--s700);
+            opacity: 0; pointer-events: none; transform: translateY(-4px);
+            visibility: hidden; transition: opacity .16s ease, transform .16s ease, visibility .16s;
+        }
+        .pd-kpi-popover::before {
+            content: ""; position: absolute; top: -9px; left: 190px;
+            width: 18px; height: 18px; background: #fff;
+            border-left: 1px solid var(--crimson-border);
+            border-top: 1px solid var(--crimson-border);
+            transform: rotate(45deg);
+        }
+        .pd-stat-wrap:nth-child(3) .pd-kpi-popover,
+        .pd-stat-wrap:nth-child(4) .pd-kpi-popover { left: auto; right: 0; }
+        .pd-stat-wrap:nth-child(3) .pd-kpi-popover::before,
+        .pd-stat-wrap:nth-child(4) .pd-kpi-popover::before { left: auto; right: 190px; }
+        .pd-stat-wrap:hover .pd-kpi-popover,
+        .pd-stat-wrap:focus-within .pd-kpi-popover {
+            opacity: 1; pointer-events: auto; transform: translateY(0); visibility: visible;
+        }
+        .pd-kpi-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+        .pd-kpi-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--crimson); margin-bottom: 4px; }
+        .pd-kpi-title { font-size: 18px; font-weight: 800; color: var(--s900); letter-spacing: -.35px; margin: 0 0 5px; line-height: 1.15; }
+        .pd-kpi-lead { font-size: 12.5px; color: var(--s600); line-height: 1.5; margin: 0; }
+        .pd-kpi-count { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11px; font-weight: 800; color: var(--crimson); }
+        .pd-kpi-scroll { max-height: 310px; overflow: auto; padding-right: 3px; }
+        .pd-kpi-list { display: flex; flex-direction: column; gap: 8px; }
+        .pd-kpi-row {
+            display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px;
+            background: var(--s50); border: 1px solid var(--s200);
+            border-radius: 8px; padding: 11px 12px;
+        }
+        .pd-kpi-row-main { min-width: 0; }
+        .pd-kpi-row-title { color: var(--s900); font-size: 12.5px; font-weight: 800; line-height: 1.35; margin-bottom: 3px; }
+        .pd-kpi-row-meta { color: var(--s500); font-size: 11px; line-height: 1.55; }
+        .pd-kpi-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+        .pd-kpi-row-side strong { color: var(--crimson); font-size: 12px; white-space: nowrap; }
+        .pd-kpi-open-link {
+            grid-column: 1 / -1; width: max-content;
+            display: inline-flex; align-items: center; gap: 5px;
+            color: var(--crimson); text-decoration: none; font-size: 11px; font-weight: 800;
+        }
+        .pd-kpi-open-link:hover { text-decoration: underline; }
+        .pd-kpi-open-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .pd-kpi-empty { padding: 18px 10px; text-align: center; color: var(--s400); font-size: 12.5px; font-weight: 700; }
 
         /* Section card */
         .pd-card { background: var(--white); border: 1px solid var(--s200); border-radius: 15px; padding: 20px 22px; box-shadow: var(--sh-sm); }
@@ -235,6 +303,10 @@
         }
         @media (max-width: 600px) {
             .pd-stat-grid { grid-template-columns: 1fr; }
+            .pd-kpi-popover { position: fixed; left: 16px; right: 16px; top: 96px; width: auto; max-width: none; max-height: calc(100vh - 128px); overflow: auto; }
+            .pd-kpi-popover::before { display: none; }
+            .pd-kpi-row { grid-template-columns: 1fr; }
+            .pd-kpi-row-side { align-items: flex-start; text-align: left; }
             .pd-bottom-grid { grid-template-columns: 1fr; }
             .pd-charts-grid { grid-template-columns: 1fr; }
         }
@@ -283,30 +355,118 @@
 
             {{-- Stat cards --}}
             <div class="pd-stat-grid">
-                <article class="pd-stat">
-                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-                    <div class="pd-stat-label">Total Proposed Items</div>
-                    <div class="pd-stat-value">{{ number_format($summary['totalProposedItems']) }}</div>
-                    <div class="pd-stat-hint">Across all your office's PPMPs, any status</div>
-                </article>
-                <article class="pd-stat">
-                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-                    <div class="pd-stat-label">Total Proposed Budget</div>
-                    <div class="pd-stat-value sm">₱ {{ number_format($summary['totalProposedBudget']) }}</div>
-                    <div class="pd-stat-hint">Across all your office's PPMPs, any status</div>
-                </article>
-                <article class="pd-stat">
-                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-                    <div class="pd-stat-label">Items Approved</div>
-                    <div class="pd-stat-value">{{ number_format($summary['approvedItems']) }}</div>
-                    <div class="pd-stat-hint">Eligible for PR preparation</div>
-                </article>
-                <article class="pd-stat">
-                    <div class="pd-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-                    <div class="pd-stat-label">Pending Approval</div>
-                    <div class="pd-stat-value">{{ number_format($summary['pendingItems']) }}</div>
-                    <div class="pd-stat-hint">Under Budget or Chancellor review</div>
-                </article>
+                @php
+                    $kpiCards = [
+                        [
+                            'key' => 'totalProposedItems',
+                            'label' => 'Total Proposed Items',
+                            'value' => number_format($summary['totalProposedItems']),
+                            'hint' => "Across all your office's PPMPs, any status",
+                            'icon' => '<svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+                        ],
+                        [
+                            'key' => 'totalProposedBudget',
+                            'label' => 'Total Proposed Budget',
+                            'value' => '&#8369; ' . number_format($summary['totalProposedBudget']),
+                            'valueClass' => 'sm',
+                            'hint' => "Across all your office's PPMPs, any status",
+                            'icon' => '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+                        ],
+                        [
+                            'key' => 'approvedItems',
+                            'label' => 'Items Approved',
+                            'value' => number_format($summary['approvedItems']),
+                            'hint' => 'Eligible for PR preparation',
+                            'icon' => '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+                        ],
+                        [
+                            'key' => 'pendingItems',
+                            'label' => 'Pending Approval',
+                            'value' => number_format($summary['pendingItems']),
+                            'hint' => 'Under Budget or Chancellor review',
+                            'icon' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+                        ],
+                    ];
+                @endphp
+                @foreach($kpiCards as $card)
+                    @php
+                        $detail = $kpiDetails[$card['key']] ?? ['title' => $card['label'], 'lead' => '', 'rows' => [], 'empty' => 'No records yet.', 'type' => 'items'];
+                        $rows = $detail['rows'] ?? [];
+                    @endphp
+                    <div class="pd-stat-wrap" tabindex="0" aria-describedby="kpi-{{ $card['key'] }}">
+                        <article class="pd-stat">
+                            <div class="pd-stat-icon">{!! $card['icon'] !!}</div>
+                            <div class="pd-stat-label">{{ $card['label'] }}</div>
+                            <div class="pd-stat-value {{ $card['valueClass'] ?? '' }}">{!! $card['value'] !!}</div>
+                            <div class="pd-stat-hint">{{ $card['hint'] }}</div>
+                        </article>
+
+                        <section class="pd-kpi-popover" id="kpi-{{ $card['key'] }}" aria-labelledby="kpi-title-{{ $card['key'] }}">
+                            <div class="pd-kpi-head">
+                                <div>
+                                    <p class="pd-kpi-eyebrow">{{ $selectedYear ? 'FY ' . $selectedYear : 'Overall' }}</p>
+                                    <h2 class="pd-kpi-title" id="kpi-title-{{ $card['key'] }}">{{ $detail['title'] }}</h2>
+                                    <p class="pd-kpi-lead">{{ $detail['lead'] }}</p>
+                                </div>
+                            </div>
+                            <div class="pd-kpi-count">
+                                <span>{{ number_format(count($rows)) }}</span>
+                                <span>{{ ($detail['type'] ?? 'items') === 'budget' ? 'PPMP budget source(s)' : 'item record(s)' }}</span>
+                            </div>
+                            <div class="pd-kpi-scroll">
+                                @forelse($rows as $row)
+                                    @if(($detail['type'] ?? 'items') === 'budget')
+                                        <div class="pd-kpi-row">
+                                            <div class="pd-kpi-row-main">
+                                                <div class="pd-kpi-row-title">{{ $row['title'] }}</div>
+                                                <div class="pd-kpi-row-meta">
+                                                    {{ $row['code'] }}
+                                                    @if($row['fiscalYear'])
+                                                        &middot; FY {{ $row['fiscalYear'] }}
+                                                    @endif
+                                                    &middot; {{ number_format($row['itemCount']) }} item(s)
+                                                </div>
+                                            </div>
+                                            <div class="pd-kpi-row-side">
+                                                <strong>&#8369; {{ number_format($row['amount']) }}</strong>
+                                                <span class="pd-badge {{ $row['statusClass'] }}">{{ $row['status'] }}</span>
+                                            </div>
+                                            <a class="pd-kpi-open-link" href="{{ $row['url'] }}">
+                                                Open PPMP
+                                                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                            </a>
+                                        </div>
+                                    @else
+                                        <div class="pd-kpi-row">
+                                            <div class="pd-kpi-row-main">
+                                                <div class="pd-kpi-row-title">{{ $row['name'] }}</div>
+                                                <div class="pd-kpi-row-meta">
+                                                    {{ $row['proposal'] }}
+                                                    @if($row['fiscalYear'])
+                                                        &middot; FY {{ $row['fiscalYear'] }}
+                                                    @endif
+                                                    &middot; {{ $row['quantity'] }} {{ $row['unit'] }}
+                                                    &middot; {{ $row['category'] }}
+                                                    &middot; {{ $row['quarter'] }}
+                                                </div>
+                                            </div>
+                                            <div class="pd-kpi-row-side">
+                                                <strong>&#8369; {{ number_format($row['amount']) }}</strong>
+                                                <span class="pd-badge {{ $row['statusClass'] }}">{{ $row['status'] }}</span>
+                                            </div>
+                                            <a class="pd-kpi-open-link" href="{{ $row['url'] }}">
+                                                Open PPMP
+                                                <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                            </a>
+                                        </div>
+                                    @endif
+                                @empty
+                                    <div class="pd-kpi-empty">{{ $detail['empty'] }}</div>
+                                @endforelse
+                            </div>
+                        </section>
+                    </div>
+                @endforeach
             </div>
 
             {{-- Extra charts row --}}

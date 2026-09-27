@@ -67,19 +67,101 @@ class PrismCashierController extends Controller
                 ];
             });
 
+        $forPayment = $pos->where('status', 'processing_payment')->values();
+        $paidRows = $pos->where('status', 'paid')->values();
+        $kpiDetails = $this->dashboardKpiDetails($forPayment->all(), $paidRows);
+
         return view('prism.cashier.dashboard', $this->withCommon('dashboard', [
             'pageTitle'    => 'Cashier Dashboard',
-            'forPayment'   => $pos->where('status', 'processing_payment')->values()->all(),
-            'recentlyPaid' => $pos->where('status', 'paid')->values()->all(),
+            'forPayment'   => $forPayment->all(),
+            'recentlyPaid' => $paidRows->all(),
+            'kpiDetails'   => $kpiDetails,
             'summary'   => [
-                'forPayment'  => $pos->where('status', 'processing_payment')->count(),
-                'totalPaid'   => PurchaseOrder::where('status', 'paid')->count(),
-                'totalAmount' => (float) PurchaseOrder::where('status', 'paid')->sum('total_amount'),
+                'forPayment'  => $forPayment->count(),
+                'totalPaid'   => $paidRows->count(),
+                'totalAmount' => (float) $paidRows->sum('totalAmount'),
             ],
         ]));
     }
 
-    /** Upload the payment receipt and mark the PO as paid — the final step of the flow. */
+    /** Cashier KPI hover details, scoped to payment release and completed payments. */
+    private function dashboardKpiDetails(array $forPayment, $paidRows): array
+    {
+        $forPaymentRows = collect($forPayment)
+            ->map(fn ($po) => $this->dashboardPoKpiRow(
+                $po,
+                $po['statusLabel'] ?? 'Processing Payment',
+                'badge-processing',
+                'Processing since',
+                $po['processingAt'] ?? '-',
+                'Ready for Cashier payment release and receipt upload.',
+                $this->dashboardPoFileUrl($po['pdfFile'] ?? null),
+                'View PO'
+            ))
+            ->values();
+
+        $paidKpiRows = $paidRows
+            ->map(fn ($po) => $this->dashboardPoKpiRow(
+                $po,
+                'Payment Made',
+                'badge-paid',
+                'Paid',
+                $po['paidAt'] ?? '-',
+                'Paid by ' . ($po['paidBy'] ?? 'Cashier'),
+                $this->dashboardPoFileUrl($po['pdfFile'] ?? null),
+                'View PO'
+            ))
+            ->values();
+
+        return [
+            'forPayment' => [
+                'title'      => 'Processing - For Payment',
+                'lead'       => 'Purchase Orders Accounting has processed and are now waiting for Cashier payment release.',
+                'rows'       => $forPaymentRows->all(),
+                'empty'      => 'No POs are currently waiting for payment release.',
+                'countLabel' => 'processing PO(s)',
+            ],
+            'totalPaid' => [
+                'title'      => 'Payments Made',
+                'lead'       => 'Purchase Orders already completed through Cashier payment release.',
+                'rows'       => $paidKpiRows->all(),
+                'empty'      => 'No paid Purchase Orders yet.',
+                'countLabel' => 'paid PO(s)',
+            ],
+            'totalAmount' => [
+                'title'      => 'Total Amount Released',
+                'lead'       => 'Paid Purchase Orders contributing to the released amount total, sorted by highest amount.',
+                'rows'       => $paidKpiRows->sortByDesc('amount')->values()->all(),
+                'empty'      => 'No released payment amount yet.',
+                'countLabel' => 'released PO(s)',
+            ],
+        ];
+    }
+
+    private function dashboardPoKpiRow(array $po, string $status, string $statusClass, string $dateLabel, string $date, string $remarks, ?string $url, string $urlLabel): array
+    {
+        return [
+            'title'       => ($po['poNumber'] ?? 'PO') . ' - ' . ($po['title'] ?? 'Untitled Purchase Order'),
+            'poNumber'    => $po['poNumber'] ?? 'PO',
+            'office'      => $po['office'] ?? '-',
+            'supplier'    => $po['supplier'] ?? '-',
+            'amount'      => (float) ($po['totalAmount'] ?? 0),
+            'status'      => $status,
+            'statusClass' => $statusClass,
+            'dateLabel'   => $dateLabel,
+            'date'        => $date,
+            'remarks'     => $remarks,
+            'url'         => $url,
+            'urlLabel'    => $urlLabel,
+        ];
+    }
+
+    private function dashboardPoFileUrl(?string $path): ?string
+    {
+        return $path ? Storage::url($path) : null;
+    }
+
+    /** Upload the payment receipt and mark the PO as paid - the final step of the flow. */
     public function uploadReceipt(Request $request, PurchaseOrder $po): JsonResponse
     {
         if ($po->status !== 'processing_payment') {

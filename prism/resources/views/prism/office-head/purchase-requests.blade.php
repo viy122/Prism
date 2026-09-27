@@ -8,6 +8,96 @@
     $inProgressCount = $prs->where('statusBucket', 'in_progress')->count();
     $completedCount  = $prs->where('statusBucket', 'completed')->count();
     $delayedCount    = $prs->where('statusBucket', 'delayed')->count();
+    $prStatusBadgeClass = function ($bucket) {
+        return match ($bucket) {
+            'completed'   => 'pd-badge-approved',
+            'delayed'     => 'pd-badge-returned',
+            'pending'     => 'pd-badge-pending',
+            'in_progress' => 'pd-badge-progress',
+            default       => 'pd-badge-info',
+        };
+    };
+    $prKpiRows = $prs
+        ->map(function ($pr, $index) use ($prStatusBadgeClass) {
+            $number       = $pr['number'] ?? 'No PR number';
+            $anchorSource = $number ?: 'pr-' . ($pr['dbId'] ?? $index);
+            $anchorId     = trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $anchorSource), '-');
+
+            return [
+                'anchor'      => 'pr-card-' . ($anchorId ?: $index),
+                'title'       => $pr['title'] ?? 'Untitled Purchase Request',
+                'meta'        => ($pr['quarter'] ?: 'PR') . ' | ' . $number,
+                'side'        => 'PHP ' . number_format($pr['totalAmount'] ?? 0),
+                'amount'      => (float) ($pr['totalAmount'] ?? 0),
+                'status'      => $pr['trackingStatus']['label'] ?? $pr['statusLabel'] ?? 'Pending',
+                'statusClass' => $prStatusBadgeClass($pr['statusBucket'] ?? ''),
+                'bucket'      => $pr['statusBucket'] ?? '',
+                'note'        => number_format($pr['itemCount'] ?? 0) . ' ' . Str::plural('item', $pr['itemCount'] ?? 0)
+                    . (!empty($pr['uploadedAt']) ? ' | Uploaded ' . $pr['uploadedAt'] : ''),
+            ];
+        })
+        ->values();
+    $kpiCards = [
+        [
+            'key' => 'totalPrs',
+            'label' => 'Total PRs',
+            'value' => number_format($prs->count()),
+            'hint' => 'All purchase requests submitted by your office',
+            'icon' => '<svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+        ],
+        [
+            'key' => 'totalAmount',
+            'label' => 'Total Amount',
+            'value' => 'PHP ' . number_format($totalAmount),
+            'valueClass' => 'sm',
+            'hint' => 'Combined estimated value of your PRs',
+            'icon' => '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+        ],
+        [
+            'key' => 'inProgress',
+            'label' => 'In Progress',
+            'value' => number_format($inProgressCount),
+            'hint' => 'PRs currently moving through procurement',
+            'icon' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        ],
+        [
+            'key' => 'completed',
+            'label' => 'Completed',
+            'value' => number_format($completedCount),
+            'hint' => 'PRs that reached the completed stage',
+            'icon' => '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+        ],
+    ];
+    $kpiDetails = [
+        'totalPrs' => [
+            'title' => 'All Purchase Requests',
+            'lead' => 'Every PR currently listed for your office.',
+            'rows' => $prKpiRows,
+            'empty' => 'No purchase requests found yet.',
+            'countLabel' => 'purchase request(s)',
+        ],
+        'totalAmount' => [
+            'title' => 'PR Amount Breakdown',
+            'lead' => 'Purchase requests contributing to the total amount, highest value first.',
+            'rows' => $prKpiRows->sortByDesc('amount')->values(),
+            'empty' => 'No PR amounts to show yet.',
+            'countLabel' => 'amount source(s)',
+        ],
+        'inProgress' => [
+            'title' => 'In Progress PRs',
+            'lead' => 'Requests currently moving through the procurement workflow.',
+            'rows' => $prKpiRows->where('bucket', 'in_progress')->values(),
+            'empty' => 'No in-progress PRs right now.',
+            'countLabel' => 'in-progress request(s)',
+        ],
+        'completed' => [
+            'title' => 'Completed PRs',
+            'lead' => 'Requests that have already reached the final completed status.',
+            'rows' => $prKpiRows->where('bucket', 'completed')->values(),
+            'empty' => 'No completed PRs yet.',
+            'countLabel' => 'completed request(s)',
+        ],
+    ];
 @endphp
 
 @push('page-css')
@@ -45,33 +135,102 @@
 
         /* ─── Stats bar ─── */
         .stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; }
+        .stat-wrap { position: relative; min-width: 0; outline: none; z-index: 1; }
+        .stat-wrap:hover,
+        .stat-wrap:focus-within { z-index: 80; }
         .stat-box  {
             background: var(--white); border: 1px solid var(--s200);
-            border-radius: 15px; padding: 18px 20px 16px;
-            position: relative; overflow: hidden; box-shadow: var(--sh-sm);
+            border-radius: 15px; padding: 16px 18px;
+            position: relative; overflow: visible; box-shadow: var(--sh-sm);
             transition: box-shadow .25s, border-color .25s, transform .2s;
+            min-height: 112px; height: 100%;
+            display: flex; flex-direction: column;
         }
-        .stat-box:hover { box-shadow: var(--sh-lg); border-color: rgba(104,16,18,.2); transform: translateY(-2px); }
+        .stat-box:hover,
+        .stat-wrap:hover .stat-box,
+        .stat-wrap:focus-within .stat-box {
+            border-color: rgba(192,57,59,.45);
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.20),
+                0 10px 28px rgba(139,26,28,.16),
+                0 2px 8px rgba(15,23,42,.08);
+            transform: translateY(-2px);
+        }
         .stat-box::before {
-            content: ""; position: absolute; left: 0; top: 16px;
-            width: 4px; height: 38px; background: var(--m); border-radius: 0 4px 4px 0;
+            content: ""; position: absolute; left: 0; top: 24px;
+            width: 4px; height: 35px; background: var(--m); border-radius: 0 4px 4px 0;
         }
         .stat-icon {
-            position: absolute; right: 16px; top: 16px;
-            width: 38px; height: 38px; border-radius: 11px;
+            position: absolute; right: 16px; top: 14px;
+            width: 36px; height: 36px; border-radius: 10px;
             background: rgba(104,16,18,.07);
             display: flex; align-items: center; justify-content: center;
         }
-        .stat-icon svg { width: 19px; height: 19px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .stat-box dt { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 9px; padding-right: 46px; }
-        .stat-box dd { font-size: 28px; font-weight: 800; color: var(--m); letter-spacing: -.7px; line-height: 1; margin-bottom: 5px; }
-        .stat-box dd.maroon { color: var(--m); }
-        .stat-box dd.amber  { color: #92400e; }
-        .stat-box dd.green  { color: #15803d; }
-        .stat-box dd.sm     { font-size: 18px; letter-spacing: -.3px; }
-        .stat-box small { display: block; font-size: 11.5px; font-weight: 500; color: var(--s400); line-height: 1.5; }
-        .stat-box small.green { color: #15803d; }
-        .stat-box small.amber { color: #92400e; }
+        .stat-icon svg { width: 18px; height: 18px; stroke: var(--m); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .stat-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--s400); margin-bottom: 8px; padding-right: 46px; }
+        .stat-value { font-size: 28px; font-weight: 800; color: var(--m); letter-spacing: -.7px; line-height: 1; margin-bottom: 7px; }
+        .stat-value.sm { font-size: clamp(20px, 1.45vw, 24px); letter-spacing: -.3px; white-space: nowrap; }
+        .stat-hint { font-size: 11.5px; color: var(--s400); line-height: 1.5; }
+        .kpi-popover {
+            position: absolute; z-index: 90; left: 6px; top: calc(100% + 9px);
+            width: min(520px, calc(100vw - 48px)); max-width: 520px;
+            background: #fff; border: 1px solid rgba(104,16,18,.18);
+            border-radius: 10px;
+            box-shadow:
+                0 0 0 1px rgba(192,57,59,.12),
+                0 20px 52px rgba(15,23,42,.18),
+                0 10px 28px rgba(139,26,28,.12);
+            padding: 18px; color: var(--s700);
+            opacity: 0; pointer-events: none; transform: translateY(-4px);
+            visibility: hidden; transition: opacity .16s ease, transform .16s ease, visibility .16s;
+        }
+        .kpi-popover::before {
+            content: ""; position: absolute; top: -9px; left: 190px;
+            width: 18px; height: 18px; background: #fff;
+            border-left: 1px solid rgba(104,16,18,.18);
+            border-top: 1px solid rgba(104,16,18,.18);
+            transform: rotate(45deg);
+        }
+        .stat-wrap:nth-child(3) .kpi-popover,
+        .stat-wrap:nth-child(4) .kpi-popover { left: auto; right: 0; }
+        .stat-wrap:nth-child(3) .kpi-popover::before,
+        .stat-wrap:nth-child(4) .kpi-popover::before { left: auto; right: 190px; }
+        .stat-wrap:hover .kpi-popover,
+        .stat-wrap:focus-within .kpi-popover {
+            opacity: 1; pointer-events: auto; transform: translateY(0); visibility: visible;
+        }
+        .kpi-head { margin-bottom: 12px; }
+        .kpi-eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--m); margin-bottom: 4px; }
+        .kpi-title { font-size: 18px; font-weight: 800; color: var(--s900); letter-spacing: -.35px; margin: 0 0 5px; line-height: 1.15; }
+        .kpi-lead { font-size: 12.5px; color: var(--s600); line-height: 1.5; margin: 0; }
+        .kpi-count { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11px; font-weight: 800; color: var(--m); }
+        .kpi-scroll { max-height: 310px; overflow: auto; padding-right: 3px; }
+        .kpi-list { display: flex; flex-direction: column; gap: 8px; }
+        .kpi-row {
+            display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px;
+            background: var(--s50); border: 1px solid var(--s200);
+            border-radius: 8px; padding: 11px 12px;
+        }
+        .kpi-row-main { min-width: 0; }
+        .kpi-row-title { color: var(--s900); font-size: 12.5px; font-weight: 800; line-height: 1.35; margin-bottom: 3px; overflow-wrap: anywhere; }
+        .kpi-row-meta { color: var(--s500); font-size: 11px; line-height: 1.55; }
+        .kpi-row-note { color: var(--s600); font-size: 11px; line-height: 1.5; margin-top: 3px; overflow-wrap: anywhere; }
+        .kpi-row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+        .kpi-row-side strong { color: var(--m); font-size: 12px; white-space: nowrap; }
+        .kpi-open-link {
+            grid-column: 1 / -1; width: max-content;
+            display: inline-flex; align-items: center; gap: 5px;
+            color: var(--m); text-decoration: none; font-size: 11px; font-weight: 800;
+        }
+        .kpi-open-link:hover { text-decoration: underline; }
+        .kpi-open-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .kpi-empty { padding: 18px 10px; text-align: center; color: var(--s400); font-size: 12.5px; font-weight: 700; }
+        .pd-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 99px; white-space: nowrap; line-height: 1.4; flex-shrink: 0; }
+        .pd-badge-approved  { background: #dcfce7; color: #166534; }
+        .pd-badge-pending   { background: #fef3c7; color: #92400e; }
+        .pd-badge-returned  { background: #fee2e2; color: #991b1b; }
+        .pd-badge-info      { background: #e0f2fe; color: #0369a1; }
+        .pd-badge-progress  { background: #ede9fe; color: #4c1d95; }
 
         /* ─── 2-col ─── */
         .two-col   { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 24px; align-items: start; }
@@ -198,6 +357,10 @@
         @media (max-width: 1280px) {
             .two-col   { grid-template-columns: minmax(0,1fr) 300px; }
             .stats-bar { grid-template-columns: repeat(2,1fr); }
+            .stat-wrap .kpi-popover { left: 6px; right: auto; }
+            .stat-wrap .kpi-popover::before { left: 160px; right: auto; }
+            .stat-wrap:nth-child(even) .kpi-popover { left: auto; right: 0; }
+            .stat-wrap:nth-child(even) .kpi-popover::before { left: auto; right: 160px; }
         }
         @media (max-width: 1024px) {
             .content { padding: 20px 20px 48px; gap: 20px; }
@@ -205,7 +368,15 @@
             .col-sticky { position: static; }
         }
         @media (max-width: 640px) {
-            .stats-bar { grid-template-columns: 1fr 1fr; }
+            .stats-bar { grid-template-columns: 1fr; }
+            .stat-wrap:nth-child(n) .kpi-popover {
+                position: fixed; left: 16px; right: 16px; top: 96px;
+                width: auto; max-width: none; max-height: calc(100vh - 128px);
+                overflow: auto;
+            }
+            .stat-wrap:nth-child(n) .kpi-popover::before { display: none; }
+            .kpi-row { grid-template-columns: 1fr; }
+            .kpi-row-side { align-items: flex-start; text-align: left; }
             .pr-card-header { flex-wrap: wrap; }
         }
 </style>
@@ -226,30 +397,63 @@
         </div>
 
         {{-- Stats --}}
-        <dl class="stats-bar">
-            <div class="stat-box">
-                <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></div>
-                <dt>Total PRs</dt>
-                <dd>{{ $prs->count() }}</dd>
-            </div>
-            <div class="stat-box">
-                <div class="stat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-                <dt>Total Amount</dt>
-                <dd class="sm">₱ {{ number_format($totalAmount) }}</dd>
-                
-            </div>
-            <div class="stat-box">
-                <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-                <dt>In Progress</dt>
-                <dd class="maroon">{{ $inProgressCount }}</dd>
-            </div>
-            <div class="stat-box">
-                <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-                <dt>Completed</dt>
-                <dd class="maroon">{{ $completedCount }}</dd>
-            </div>
-        </dl>
+        <div class="stats-bar">
+            @foreach ($kpiCards as $card)
+                @php
+                    $detail = $kpiDetails[$card['key']] ?? [
+                        'title' => $card['label'],
+                        'lead' => '',
+                        'rows' => collect(),
+                        'empty' => 'No records yet.',
+                        'countLabel' => 'record(s)',
+                    ];
+                    $rows = collect($detail['rows'] ?? []);
+                @endphp
+                <div class="stat-wrap" tabindex="0" aria-describedby="pr-kpi-{{ $card['key'] }}">
+                    <article class="stat-box">
+                        <div class="stat-icon">{!! $card['icon'] !!}</div>
+                        <div class="stat-label">{{ $card['label'] }}</div>
+                        <div class="stat-value {{ $card['valueClass'] ?? '' }}">{!! $card['value'] !!}</div>
+                        <p class="stat-hint">{{ $card['hint'] }}</p>
+                    </article>
 
+                    <section class="kpi-popover" id="pr-kpi-{{ $card['key'] }}" aria-labelledby="pr-kpi-title-{{ $card['key'] }}">
+                        <div class="kpi-head">
+                            <p class="kpi-eyebrow">Purchase Requests</p>
+                            <h2 class="kpi-title" id="pr-kpi-title-{{ $card['key'] }}">{{ $detail['title'] }}</h2>
+                            <p class="kpi-lead">{{ $detail['lead'] }}</p>
+                        </div>
+                        <div class="kpi-count">
+                            <span>{{ number_format($rows->count()) }}</span>
+                            <span>{{ $detail['countLabel'] ?? 'record(s)' }}</span>
+                        </div>
+                        <div class="kpi-scroll">
+                            <div class="kpi-list">
+                                @forelse ($rows as $row)
+                                    <div class="kpi-row">
+                                        <div class="kpi-row-main">
+                                            <div class="kpi-row-title">{{ $row['title'] }}</div>
+                                            <div class="kpi-row-meta">{{ $row['meta'] }}</div>
+                                            <div class="kpi-row-note">{{ $row['note'] }}</div>
+                                        </div>
+                                        <div class="kpi-row-side">
+                                            <strong>{{ $row['side'] }}</strong>
+                                            <span class="pd-badge {{ $row['statusClass'] }}">{{ $row['status'] }}</span>
+                                        </div>
+                                        <a class="kpi-open-link" href="#{{ $row['anchor'] }}">
+                                            View in list
+                                            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                        </a>
+                                    </div>
+                                @empty
+                                    <div class="kpi-empty">{{ $detail['empty'] }}</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            @endforeach
+        </div>
         {{-- 2-col: PR list + sidebar --}}
         <div class="two-col">
 
@@ -293,6 +497,8 @@
                     @forelse ($purchaseItems as $pr)
                     @php
                         $q      = strtolower($pr['quarter'] ?: 'pr');
+                        $anchorSource = $pr['number'] ?? 'pr-' . ($pr['dbId'] ?? $loop->index);
+                        $prAnchor = 'pr-card-' . (trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $anchorSource), '-') ?: $loop->index);
                         $trackingKey = $pr['trackingStatus']['key'] ?? null;
                         $trackingBadgeCls = match(true) {
                             $trackingKey === 'paid' => 'badge-completed',
@@ -300,7 +506,7 @@
                             default => 'badge-progress',
                         };
                     @endphp
-                    <div class="pr-card" data-search="{{ strtolower($pr['title'] . ' ' . $pr['number']) }}" data-status-bucket="{{ $pr['statusBucket'] }}" data-created-at="{{ $pr['createdAt'] }}">
+                    <div id="{{ $prAnchor }}" class="pr-card" data-search="{{ strtolower($pr['title'] . ' ' . $pr['number']) }}" data-status-bucket="{{ $pr['statusBucket'] }}" data-created-at="{{ $pr['createdAt'] }}">
                         <div class="pr-card-header" onclick="this.closest('.pr-card').classList.toggle('open')">
                             <div class="pr-quarter-tag {{ $q }}">{{ $pr['quarter'] ?: 'PR' }}</div>
                             <div class="pr-card-info">

@@ -149,8 +149,17 @@ class PrismViceChancellorController extends Controller
 
             $risk = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->code, 'utilization' => $pct, 'risk' => $risk, 'delayed' => $delayed, 'overdue' => $overdue, 'budget' => $budget];
-        })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
+            return [
+                'office'      => $office->code,
+                'officeName'  => $office->name,
+                'utilization' => $pct,
+                'risk'        => $risk,
+                'delayed'     => $delayed,
+                'overdue'     => $overdue,
+                'budget'      => $budget,
+                'utilized'    => $utilized,
+            ];
+        })->filter(fn ($r) => $r['budget'] > 0)->values();
 
         $pendingPrSummary = $offices->map(function ($office) {
             $pending    = $office->purchaseRequests->filter(fn ($pr) => $pr->signingStatusBucket() === 'pending')->count();
@@ -165,6 +174,8 @@ class PrismViceChancellorController extends Controller
             ];
         })->filter(fn ($r) => $r['pendingPrs'] + $r['inProgress'] > 0)->values()->all();
 
+        $kpiDetails = $this->dashboardKpiDetails($allItems, $matchedPrFor, $officeUtilization, $currentQ);
+
         return view('prism.vice-chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle'         => 'Vice Chancellor Division Dashboard',
             'generatedAt'       => now()->format('M d, Y g:i A'),
@@ -174,8 +185,9 @@ class PrismViceChancellorController extends Controller
                 'procuredCount'      => $procuredCount,
                 'divisionUtilization'=> $divisionUtilization,
             ],
-            'officeUtilization'  => $officeUtilization,
+            'officeUtilization'  => $officeUtilization->all(),
             'pendingPrSummary'   => $pendingPrSummary,
+            'kpiDetails'         => $kpiDetails,
             'itemStatusChart'    => ['procured' => $procuredCount, 'pending' => max(0, $totalAppItems - $procuredCount)],
         ]));
     }
@@ -310,6 +322,126 @@ class PrismViceChancellorController extends Controller
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function dashboardKpiDetails($allItems, callable $matchedPrFor, $officeUtilization, string $currentQuarter): array
+    {
+        $itemRows = $allItems
+            ->sortBy(fn ($item) => implode('|', [
+                $item->budgetProposal?->office?->code ?? '',
+                $item->target_quarter ?? '',
+                strtolower($item->name ?? ''),
+            ]))
+            ->map(fn (BudgetProposalItem $item) => $this->dashboardAppItemDetailRow($item, $matchedPrFor, $currentQuarter))
+            ->values();
+
+        $utilizationRows = $officeUtilization
+            ->sortByDesc('utilization')
+            ->map(function ($row) {
+                $officeCode = $row['office'] ?? 'Office';
+                $officeName = $row['officeName'] ?? '';
+
+                return [
+                    'title'       => $officeName ? $officeCode . ' - ' . $officeName : $officeCode,
+                    'office'      => $officeCode,
+                    'budget'      => (float) ($row['budget'] ?? 0),
+                    'utilized'    => (float) ($row['utilized'] ?? 0),
+                    'utilization' => (int) ($row['utilization'] ?? 0),
+                    'delayed'     => (int) ($row['delayed'] ?? 0),
+                    'overdue'     => (int) ($row['overdue'] ?? 0),
+                    'risk'        => $row['risk'] ?? 'At Risk',
+                    'statusClass' => $this->dashboardRiskBadgeClass($row['risk'] ?? null),
+                    'url'         => route('vice-chancellor.division-performance-report'),
+                ];
+            })
+            ->values();
+
+        return [
+            'totalAppItems' => [
+                'title'      => 'Total APP Items',
+                'lead'       => 'All approved APP line items under the assigned division offices.',
+                'rows'       => $itemRows->all(),
+                'empty'      => 'No APP items found yet.',
+                'type'       => 'items',
+                'countLabel' => 'APP item(s)',
+            ],
+            'procuredCount' => [
+                'title'      => 'Procured Count',
+                'lead'       => 'APP items with matched purchase requests that reached the completed procurement lifecycle.',
+                'rows'       => $itemRows->where('statusKey', 'procured')->values()->all(),
+                'empty'      => 'No procured APP items yet.',
+                'type'       => 'items',
+                'countLabel' => 'procured item(s)',
+            ],
+            'divisionUtilization' => [
+                'title'      => 'Division Utilization',
+                'lead'       => 'Budget utilization by office using active or completed PR amounts against approved PPMP budget.',
+                'rows'       => $utilizationRows->all(),
+                'empty'      => 'No office utilization data yet.',
+                'type'       => 'utilization',
+                'countLabel' => 'office(s)',
+            ],
+            'flaggedOffices' => [
+                'title'      => 'Flagged Offices',
+                'lead'       => 'Offices in the division with delayed, overdue, or below-target utilization signals.',
+                'rows'       => $utilizationRows->filter(fn ($row) => $row['risk'] !== 'On Track' || $row['delayed'] > 0 || $row['overdue'] > 0)->values()->all(),
+                'empty'      => 'No flagged offices right now.',
+                'type'       => 'utilization',
+                'countLabel' => 'flagged office(s)',
+            ],
+        ];
+    }
+
+    private function dashboardAppItemDetailRow(BudgetProposalItem $item, callable $matchedPrFor, string $currentQuarter): array
+    {
+        $proposal = $item->budgetProposal;
+        $pr       = $matchedPrFor($item);
+        $bucket   = $pr?->lifecycleBucket();
+        $isPastTarget = $item->target_quarter && $item->target_quarter < $currentQuarter;
+
+        [$statusKey, $status, $statusClass] = match (true) {
+            $bucket === 'completed'   => ['procured', 'Procured', 'badge-on-track'],
+            $isPastTarget             => ['overdue', 'Overdue', 'badge-delayed'],
+            $bucket === 'in_progress' => ['in_progress', 'In Progress', 'badge-progress'],
+            $bucket === 'delayed'     => ['delayed', 'Delayed', 'badge-delayed'],
+            default                   => ['not_started', 'Not Started', 'badge-pending'],
+        };
+
+        $trackingStage = $pr ? $pr->currentTrackingStage() : null;
+        $trackingLabel = $trackingStage['label'] ?? 'No linked purchase request yet.';
+
+        return [
+            'name'        => $item->name ?: 'Untitled item',
+            'proposal'    => $proposal?->title ?: ($proposal?->code ?: 'Untitled PPMP'),
+            'code'        => $proposal?->code ?: 'PPMP',
+            'office'      => $proposal?->office?->code ?? 'Unassigned',
+            'fiscalYear'  => $proposal?->fiscal_year,
+            'quantity'    => $this->formatDashboardQuantity((float) $item->quantity),
+            'unit'        => $item->unit ?: 'unit',
+            'category'    => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'),
+            'quarter'     => $item->target_quarter ?: 'Unscheduled',
+            'amount'      => (float) $item->estimated_total_cost,
+            'statusKey'   => $statusKey,
+            'status'      => $status,
+            'statusClass' => $statusClass,
+            'prNumber'    => $pr?->number ?: 'No PR yet',
+            'remarks'     => $trackingLabel,
+            'url'         => route('vice-chancellor.division-procurement-status'),
+        ];
+    }
+
+    private function dashboardRiskBadgeClass(?string $risk): string
+    {
+        return match (strtolower($risk ?? '')) {
+            'on track', 'low'  => 'badge-on-track',
+            'critical', 'high' => 'badge-delayed',
+            default            => 'badge-at-risk',
+        };
+    }
+
+    private function formatDashboardQuantity(float $quantity): string
+    {
+        return rtrim(rtrim(number_format($quantity, 2), '0'), '.');
+    }
 
     /**
      * Returns the office IDs assigned to this VC, or null if none are set

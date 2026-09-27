@@ -77,7 +77,7 @@ class PrismProcurementOfficeController extends Controller
         // that anchors the whole PR → AOC → PO chain).
         $overdueThresholdDays = 30;
         $isOverdue = fn ($doc, $bucket) => $bucket !== 'completed'
-            && $doc->submitted_at
+            && $doc?->submitted_at
             && $doc->submitted_at->diffInDays(now()) > $overdueThresholdDays;
         $overdueCount = $allPrs->filter(fn ($pr) => $isOverdue($pr, $bucketOf($pr)))->count()
             + $allAocs->filter(fn ($aoc) => $isOverdue($aoc->purchaseRequest, $bucketOf($aoc)))->count()
@@ -143,6 +143,8 @@ class PrismProcurementOfficeController extends Controller
             ->values()
             ->all();
 
+        $kpiDetails = $this->dashboardKpiDetails($allPrs, $allAocs, $allPos, $bucketOf, $isOverdue, $overdueThresholdDays);
+
         return view('prism.procurement-office.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Procurement Office Dashboard',
             'filters'   => [
@@ -158,6 +160,7 @@ class PrismProcurementOfficeController extends Controller
                 'overdueCount'         => $overdueCount,
                 'overdueThresholdDays' => $overdueThresholdDays,
             ],
+            'kpiDetails' => $kpiDetails,
             'officeStatusGroups' => $officeStatusGroups,
             'urgentDocs'         => $urgentDocs,
             // One chart, three document types — a stacked bar reads their
@@ -177,6 +180,151 @@ class PrismProcurementOfficeController extends Controller
             ],
             'officeVolumeChart' => $officeVolumeChart,
         ]));
+    }
+
+    private function dashboardKpiDetails($prs, $aocs, $pos, $bucketOf, $isOverdue, int $overdueThresholdDays): array
+    {
+        $prRows = $prs
+            ->sortByDesc(fn ($pr) => ($pr->submitted_at ?? $pr->created_at)?->timestamp ?? 0)
+            ->map(fn ($pr) => $this->dashboardPrDetailRow($pr, $bucketOf($pr)))
+            ->values()
+            ->all();
+
+        $aocRows = $aocs
+            ->sortByDesc(fn ($aoc) => ($aoc->uploaded_at ?? $aoc->created_at)?->timestamp ?? 0)
+            ->map(fn ($aoc) => $this->dashboardAocDetailRow($aoc, $bucketOf($aoc)))
+            ->values()
+            ->all();
+
+        $poRows = $pos
+            ->sortByDesc(fn ($po) => ($po->issued_at ?? $po->uploaded_at ?? $po->created_at)?->timestamp ?? 0)
+            ->map(fn ($po) => $this->dashboardPoDetailRow($po, $bucketOf($po)))
+            ->values()
+            ->all();
+
+        $attentionRows = collect()
+            ->concat($prs->filter(fn ($pr) => $isOverdue($pr, $bucketOf($pr)))
+                ->map(fn ($pr) => $this->dashboardPrDetailRow($pr, $bucketOf($pr), true)))
+            ->concat($aocs->filter(fn ($aoc) => $isOverdue($aoc->purchaseRequest, $bucketOf($aoc)))
+                ->map(fn ($aoc) => $this->dashboardAocDetailRow($aoc, $bucketOf($aoc), true)))
+            ->concat($pos->filter(fn ($po) => $isOverdue($po->abstractOfCanvass?->purchaseRequest, $bucketOf($po)))
+                ->map(fn ($po) => $this->dashboardPoDetailRow($po, $bucketOf($po), true)))
+            ->sortByDesc('daysPending')
+            ->values()
+            ->all();
+
+        return [
+            'purchaseRequests' => [
+                'title' => 'Purchase Requests',
+                'lead' => 'Uploaded PRs currently included by the selected filters.',
+                'rows' => $prRows,
+                'empty' => 'No purchase requests found for the selected filters.',
+                'countLabel' => 'purchase request(s)',
+            ],
+            'abstractsOfCanvass' => [
+                'title' => 'Abstracts of Canvass',
+                'lead' => 'AOCs created from fully-canvassed purchase requests.',
+                'rows' => $aocRows,
+                'empty' => 'No abstracts of canvass found for the selected filters.',
+                'countLabel' => 'AOC record(s)',
+            ],
+            'purchaseOrders' => [
+                'title' => 'Purchase Orders',
+                'lead' => 'Purchase orders issued to suppliers across all statuses.',
+                'rows' => $poRows,
+                'empty' => 'No purchase orders found for the selected filters.',
+                'countLabel' => 'purchase order(s)',
+            ],
+            'needsAttention' => [
+                'title' => 'Needs Attention',
+                'lead' => 'PR, AOC, and PO records still open after ' . $overdueThresholdDays . '+ days from PR submission.',
+                'rows' => $attentionRows,
+                'empty' => 'No records need attention right now.',
+                'countLabel' => 'open document(s)',
+            ],
+        ];
+    }
+
+    private function dashboardPrDetailRow(PurchaseRequest $pr, string $bucket, bool $attention = false): array
+    {
+        $anchor = $pr->submitted_at ?? $pr->uploaded_at ?? $pr->created_at;
+
+        return [
+            'docType' => 'PR',
+            'number' => $pr->number ?? 'PR-' . str_pad($pr->id, 4, '0', STR_PAD_LEFT),
+            'title' => $pr->title ?: 'Purchase Request',
+            'office' => $pr->office?->code ?? '—',
+            'fiscalYear' => $pr->fiscal_year,
+            'amount' => (float) $pr->total_amount,
+            'date' => $anchor?->format('M d, Y') ?? 'No date',
+            'daysPending' => $anchor ? (int) $anchor->diffInDays(now()) : 0,
+            'status' => $attention ? 'Needs Attention' : $this->dashboardBucketLabel($bucket),
+            'statusClass' => $attention ? 'badge-overdue' : $this->dashboardBucketBadgeClass($bucket),
+            'remarks' => $pr->remarks ?: $pr->canvassing_label,
+            'url' => route('procurement-office.purchase-request-management'),
+        ];
+    }
+
+    private function dashboardAocDetailRow(AbstractOfCanvass $aoc, string $bucket, bool $attention = false): array
+    {
+        $pr = $aoc->purchaseRequest;
+        $anchor = $aoc->uploaded_at ?? $aoc->created_at ?? $pr?->submitted_at;
+
+        return [
+            'docType' => 'AOC',
+            'number' => $aoc->code ?: 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+            'title' => $pr?->title ?: 'Abstract of Canvass',
+            'office' => $pr?->office?->code ?? '—',
+            'fiscalYear' => $pr?->fiscal_year,
+            'amount' => (float) ($pr?->total_amount ?? 0),
+            'date' => $anchor?->format('M d, Y') ?? 'No date',
+            'daysPending' => $pr?->submitted_at ? (int) $pr->submitted_at->diffInDays(now()) : 0,
+            'status' => $attention ? 'Needs Attention' : $this->dashboardBucketLabel($bucket),
+            'statusClass' => $attention ? 'badge-overdue' : $this->dashboardBucketBadgeClass($bucket),
+            'remarks' => $aoc->remarks ?: ($aoc->winning_supplier_name ? 'Winning supplier: ' . $aoc->winning_supplier_name : $aoc->signatory_label),
+            'url' => route('procurement-office.abstract-of-canvass'),
+        ];
+    }
+
+    private function dashboardPoDetailRow(PurchaseOrder $po, string $bucket, bool $attention = false): array
+    {
+        $pr = $po->abstractOfCanvass?->purchaseRequest;
+        $anchor = $po->issued_at ?? $po->uploaded_at ?? $po->created_at ?? $pr?->submitted_at;
+
+        return [
+            'docType' => 'PO',
+            'number' => $po->po_number ?: 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
+            'title' => $pr?->title ?: 'Purchase Order',
+            'office' => $pr?->office?->code ?? '—',
+            'fiscalYear' => $pr?->fiscal_year,
+            'amount' => (float) $po->total_amount,
+            'date' => $anchor?->format('M d, Y') ?? 'No date',
+            'daysPending' => $pr?->submitted_at ? (int) $pr->submitted_at->diffInDays(now()) : 0,
+            'status' => $attention ? 'Needs Attention' : $this->dashboardBucketLabel($bucket),
+            'statusClass' => $attention ? 'badge-overdue' : $this->dashboardBucketBadgeClass($bucket),
+            'remarks' => $po->remarks ?: ($po->supplier_name ? 'Supplier: ' . $po->supplier_name : $po->status_label),
+            'url' => route('procurement-office.purchase-orders'),
+        ];
+    }
+
+    private function dashboardBucketLabel(string $bucket): string
+    {
+        return match ($bucket) {
+            'completed' => 'Completed',
+            'in_progress' => 'In Progress',
+            'pending' => 'Pending',
+            default => ucwords(str_replace('_', ' ', $bucket)),
+        };
+    }
+
+    private function dashboardBucketBadgeClass(string $bucket): string
+    {
+        return match ($bucket) {
+            'completed' => 'badge-completed',
+            'in_progress' => 'badge-in-progress',
+            'pending' => 'badge-pending',
+            default => 'badge-doc-pr',
+        };
     }
 
     public function purchaseRequestManagement(): View

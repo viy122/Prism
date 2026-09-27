@@ -118,15 +118,130 @@ class PrismOfficeHeadController extends Controller
             'budgetByQuarter'        => $this->itemBudgetByQuarter($officeId, $selectedYear),
         ];
 
+        $kpiDetails = $this->dashboardKpiDetails($officeId, $selectedYear, $proposals);
         $recentActivity = $this->recentActivity($officeId, $proposals->pluck('id'));
 
         return view('prism.office-head.dashboard', $this->withCommon('office-head', 'dashboard', [
             'pageTitle'      => 'Office Head / Dean Dashboard',
             'summary'        => $summary,
+            'kpiDetails'     => $kpiDetails,
             'recentActivity' => $recentActivity,
             'availableYears' => $availableYears,
             'selectedYear'   => $selectedYear,
         ]));
+    }
+
+    private function dashboardKpiDetails(int $officeId, ?int $year, $proposals): array
+    {
+        $items = BudgetProposalItem::with(['budgetProposal:id,code,title,status,fiscal_year,office_id'])
+            ->whereHas('budgetProposal', function ($q) use ($officeId, $year) {
+                $q->where('office_id', $officeId);
+                if ($year) {
+                    $q->where('fiscal_year', $year);
+                }
+            })
+            ->latest()
+            ->get()
+            ->map(fn (BudgetProposalItem $item) => $this->dashboardItemDetailRow($item));
+
+        $proposalRows = $proposals
+            ->sortByDesc(fn ($proposal) => (float) ($proposal->items_sum_estimated_total_cost ?? 0))
+            ->map(function (BudgetProposal $proposal) {
+                return [
+                    'title'       => $proposal->title ?: ($proposal->code ?: 'Untitled PPMP'),
+                    'code'        => $proposal->code ?: 'PPMP',
+                    'fiscalYear'  => $proposal->fiscal_year,
+                    'itemCount'   => (int) $proposal->items_count,
+                    'amount'      => (float) ($proposal->items_sum_estimated_total_cost ?? 0),
+                    'status'      => $this->proposalStatusLabel($proposal->status),
+                    'statusClass' => $this->proposalStatusBadgeClass($proposal->status),
+                    'url'         => route('office-head.budget-proposal', ['proposal' => $proposal->id]),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'totalProposedItems' => [
+                'title' => 'Total Proposed Items',
+                'lead'  => "All line items included in your office's PPMPs for the selected year filter.",
+                'rows'  => $items->values()->all(),
+                'empty' => 'No proposed items yet.',
+                'type'  => 'items',
+            ],
+            'totalProposedBudget' => [
+                'title' => 'Total Proposed Budget',
+                'lead'  => 'Budget total grouped by PPMP, using the summed estimated cost of each proposal item.',
+                'rows'  => $proposalRows,
+                'empty' => 'No proposed budget recorded yet.',
+                'type'  => 'budget',
+            ],
+            'approvedItems' => [
+                'title' => 'Items Approved',
+                'lead'  => 'Items from approved PPMPs that are ready for purchase request preparation.',
+                'rows'  => $items->where('statusKey', 'approved')->values()->all(),
+                'empty' => 'No approved items yet.',
+                'type'  => 'items',
+            ],
+            'pendingItems' => [
+                'title' => 'Pending Approval',
+                'lead'  => 'Items from submitted or endorsed PPMPs still under Budget Office or Chancellor review.',
+                'rows'  => $items->whereIn('statusKey', ['submitted', 'endorsed'])->values()->all(),
+                'empty' => 'No items are pending approval.',
+                'type'  => 'items',
+            ],
+        ];
+    }
+
+    private function dashboardItemDetailRow(BudgetProposalItem $item): array
+    {
+        $proposal = $item->budgetProposal;
+        $status = $proposal?->status ?? 'draft';
+
+        return [
+            'name'        => $item->name,
+            'proposal'    => $proposal?->title ?: ($proposal?->code ?: 'Untitled PPMP'),
+            'code'        => $proposal?->code ?: 'PPMP',
+            'fiscalYear'  => $proposal?->fiscal_year,
+            'quantity'    => $this->formatDashboardQuantity((float) $item->quantity),
+            'unit'        => $item->unit,
+            'category'    => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'),
+            'quarter'     => $item->target_quarter ?: 'Unscheduled',
+            'amount'      => (float) $item->estimated_total_cost,
+            'statusKey'   => $status,
+            'status'      => $this->proposalStatusLabel($status),
+            'statusClass' => $this->proposalStatusBadgeClass($status),
+            'url'         => $proposal ? route('office-head.budget-proposal', ['proposal' => $proposal->id]) : route('office-head.budget-proposal'),
+        ];
+    }
+
+    private function formatDashboardQuantity(float $quantity): string
+    {
+        return rtrim(rtrim(number_format($quantity, 2), '0'), '.');
+    }
+
+    private function proposalStatusLabel(?string $status): string
+    {
+        return match ($status) {
+            'draft'     => 'Draft',
+            'submitted' => 'Submitted',
+            'endorsed'  => 'Endorsed',
+            'returned'  => 'Returned',
+            'approved'  => 'Approved',
+            default     => ucfirst(str_replace('_', ' ', $status ?: 'Unspecified')),
+        };
+    }
+
+    private function proposalStatusBadgeClass(?string $status): string
+    {
+        return match ($status) {
+            'approved'           => 'pd-badge-approved',
+            'submitted'          => 'pd-badge-submitted',
+            'endorsed'           => 'pd-badge-pending',
+            'returned'           => 'pd-badge-returned',
+            'draft'              => 'pd-badge-info',
+            default              => 'pd-badge-progress',
+        };
     }
 
     /**

@@ -28,6 +28,7 @@ class PrismBacController extends Controller
     public function dashboard(SignatoryQueueService $queue): View
     {
         $awaiting = $queue->countForRole('bac');
+        $signatureQueueRows = $this->signatureQueueRows();
 
         $recentActivity = AocSignatureLog::with(['abstractOfCanvass.purchaseRequest.office', 'signedBy'])
             ->latest('signed_at')
@@ -58,6 +59,11 @@ class PrismBacController extends Controller
             ? round($pending->avg(fn ($aoc) => $aoc->updated_at->diffInDays(now())), 1)
             : 0;
 
+        $fullySigned = AbstractOfCanvass::with('purchaseRequest.office')
+            ->where('signatory_stage', 'fully_signed')
+            ->latest('updated_at')
+            ->get();
+
         $stageLabels = ['at_bac_member' => 'Member', 'at_bac_vice_chair' => 'Vice Chairperson', 'at_bac_chair' => 'Chairperson'];
         $byStage = collect(self::BAC_STAGES)->map(fn ($stage) => [
             'stage' => $stageLabels[$stage],
@@ -85,6 +91,8 @@ class PrismBacController extends Controller
             ->values()
             ->all();
 
+        $kpiDetails = $this->dashboardKpiDetails($signatureQueueRows, $pending, $fullySigned, $stageLabels);
+
         return view('prism.bac.dashboard', $this->withCommon('dashboard', [
             'pageTitle'       => 'BAC Dashboard',
             'summary'         => [
@@ -98,6 +106,7 @@ class PrismBacController extends Controller
             'officeChart'     => $byOffice,
             'oldestPending'   => $oldestPending,
             'recentActivity'  => $recentActivity,
+            'kpiDetails'      => $kpiDetails,
         ]));
     }
 
@@ -119,6 +128,94 @@ class PrismBacController extends Controller
     private function signatureDocTypes(): array
     {
         return ['aoc'];
+    }
+
+    private function dashboardKpiDetails(array $signatureQueueRows, $pending, $fullySigned, array $stageLabels): array
+    {
+        $pendingRows = $pending
+            ->map(fn (AbstractOfCanvass $aoc) => $this->dashboardAocKpiRow($aoc, $stageLabels))
+            ->values();
+
+        $awaitingRows = collect($signatureQueueRows)
+            ->where('docType', 'aoc')
+            ->map(fn ($row) => [
+                'title'       => ($row['number'] ?? 'AOC') . ' - ' . ($row['title'] ?? 'Untitled AOC'),
+                'code'        => $row['number'] ?? 'AOC',
+                'office'      => $row['office'] ?? '-',
+                'stage'       => $row['stageLabel'] ?? 'BAC',
+                'amount'      => null,
+                'daysWaiting' => null,
+                'dateLabel'   => 'Waiting since',
+                'date'        => $row['waitingSince'] ?? '-',
+                'statusClass' => 'badge-stage',
+                'remarks'     => 'Requires your signature at this BAC stage.',
+                'url'         => route('bac.for-my-signature'),
+                'urlLabel'    => 'Open queue',
+            ])
+            ->values();
+
+        $fullySignedRows = $fullySigned
+            ->map(fn (AbstractOfCanvass $aoc) => $this->dashboardAocKpiRow($aoc, $stageLabels, 'Fully Signed', 'badge-days-ok', 'Completed'))
+            ->values();
+
+        return [
+            'awaitingMySignature' => [
+                'title'      => 'Awaiting My Signature',
+                'lead'       => 'AOCs currently requiring action at a BAC signature stage.',
+                'rows'       => $awaitingRows->all(),
+                'empty'      => 'No AOCs are waiting for your signature.',
+                'countLabel' => 'AOC(s) to sign',
+            ],
+            'aocsInBacStages' => [
+                'title'      => 'AOCs In BAC Stages',
+                'lead'       => 'All AOCs currently moving through BAC Member, Vice Chairperson, or Chairperson review.',
+                'rows'       => $pendingRows->all(),
+                'empty'      => 'No AOCs are currently in BAC stages.',
+                'countLabel' => 'pending AOC(s)',
+            ],
+            'totalValuePending' => [
+                'title'      => 'Total Value Pending',
+                'lead'       => 'Pending BAC-stage AOCs sorted by highest associated PR amount.',
+                'rows'       => $pendingRows->sortByDesc('amount')->values()->all(),
+                'empty'      => 'No pending value at BAC stages.',
+                'countLabel' => 'value source(s)',
+            ],
+            'avgDaysPending' => [
+                'title'      => 'Average Days Pending',
+                'lead'       => 'AOCs contributing to the average wait time, oldest first.',
+                'rows'       => $pendingRows->sortByDesc('daysWaiting')->values()->all(),
+                'empty'      => 'No AOCs are waiting at BAC stages.',
+                'countLabel' => 'waiting AOC(s)',
+            ],
+            'aocsFullySigned' => [
+                'title'      => 'AOCs Fully Signed',
+                'lead'       => 'AOCs already cleared through all BAC stages and completed in the signatory chain.',
+                'rows'       => $fullySignedRows->all(),
+                'empty'      => 'No fully signed AOCs yet.',
+                'countLabel' => 'signed AOC(s)',
+            ],
+        ];
+    }
+
+    private function dashboardAocKpiRow(AbstractOfCanvass $aoc, array $stageLabels, ?string $stageOverride = null, string $statusClass = 'badge-stage', string $dateLabel = 'Waiting'): array
+    {
+        $amount = (float) ($aoc->purchaseRequest?->total_amount ?? 0);
+        $daysWaiting = $aoc->updated_at ? (int) $aoc->updated_at->diffInDays(now()) : 0;
+
+        return [
+            'title'       => ($aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT)) . ' - ' . ($aoc->purchaseRequest?->title ?? 'Untitled AOC'),
+            'code'        => $aoc->code ?? 'AOC-' . str_pad($aoc->id, 4, '0', STR_PAD_LEFT),
+            'office'      => $aoc->purchaseRequest?->office?->code ?? '-',
+            'stage'       => $stageOverride ?? ($stageLabels[$aoc->signatory_stage] ?? $aoc->signatory_label),
+            'amount'      => $amount,
+            'daysWaiting' => $daysWaiting,
+            'dateLabel'   => $dateLabel,
+            'date'        => $aoc->updated_at?->format('M d, Y') ?? '-',
+            'statusClass' => $statusClass,
+            'remarks'     => $daysWaiting . ' ' . \Illuminate\Support\Str::plural('day', $daysWaiting) . ' since last movement.',
+            'url'         => route('bac.for-my-signature'),
+            'urlLabel'    => 'View AOC',
+        ];
     }
 
     private function withCommon(string $activePage, array $data): array

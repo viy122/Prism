@@ -85,16 +85,15 @@ class PrismChancellorController extends Controller
             return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest;
         };
         $isItemProcured = fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed';
+        $isItemUtilized = fn ($item) => in_array($matchedPrFor($item)?->lifecycleBucket(), ['in_progress', 'completed'], true);
 
         $totalAppItems = $allItems->count();
         $itemsProcured = $allItems->filter($isItemProcured)->count();
         $itemsPending  = max(0, $totalAppItems - $itemsProcured);
 
-        $approvedBudget    = (float) BudgetProposal::whereIn('status', ['endorsed', 'approved'])->sum('total_estimated_cost');
-        $utilized          = (float) PurchaseRequest::get()
-            ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
-            ->sum('total_amount');
-        $campusUtilization = $approvedBudget > 0 ? round(($utilized / $approvedBudget) * 100) : 0;
+        $approvedBudget    = (float) $allItems->sum('estimated_total_cost');
+        $utilized          = (float) $allItems->filter($isItemUtilized)->sum('estimated_total_cost');
+        $campusUtilization = $approvedBudget > 0 ? min(100, round(($utilized / $approvedBudget) * 100)) : 0;
 
         $currentQ       = $this->currentQuarter();
         $currentQNumber = (int) ltrim($currentQ, 'Q');
@@ -106,56 +105,100 @@ class PrismChancellorController extends Controller
             ])
             ->get();
 
-        $quarterlyStatuses = $offices->map(function ($office) use ($currentQ, $matchedPrFor) {
-            $items      = $office->budgetProposals->flatMap->items;
-            $quarterRow = [];
+        $officeProcurementStatuses = $offices->map(function ($office) use ($matchedPrFor) {
+            $items = $office->budgetProposals->flatMap->items;
+            $totalItems = $items->count();
+            $procuredItems = $items->filter(fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed')->count();
+            $completionRate = $totalItems > 0 ? round(($procuredItems / $totalItems) * 100) : 0;
+            $quarters = collect(['Q1', 'Q2', 'Q3', 'Q4'])
+                ->mapWithKeys(function ($quarter) use ($items, $matchedPrFor) {
+                    $quarterItems = $items->where('target_quarter', $quarter);
+                    $quarterTotal = $quarterItems->count();
+                    $quarterItemRows = $quarterItems
+                        ->sortBy(fn ($item) => strtolower($item->name ?? ''))
+                        ->map(function ($item) use ($matchedPrFor) {
+                            $pr = $matchedPrFor($item);
+                            $bucket = $pr?->lifecycleBucket();
 
-            foreach (['Q1', 'Q2', 'Q3', 'Q4'] as $q) {
-                $quarterItems = $items->where('target_quarter', $q);
-                if ($quarterItems->isEmpty()) {
-                    $quarterRow[$q] = 'Pending';
-                    continue;
-                }
+                            return [
+                                'name'     => $item->name ?: 'Untitled item',
+                                'proposal' => $item->budgetProposal?->code ?: 'PPMP',
+                                'prNumber' => $pr?->number ?: 'No PR yet',
+                                'status'   => $pr ? ucfirst(str_replace('_', ' ', $bucket)) : 'Not Started',
+                                'procured' => $bucket === 'completed',
+                            ];
+                        })
+                        ->values();
+                    $quarterProcured = $quarterItemRows->where('procured', true)->count();
+                    $quarterRate = $quarterTotal > 0 ? round(($quarterProcured / $quarterTotal) * 100) : 0;
 
-                $procuredCount = $quarterItems->filter(fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed')->count();
-
-                if ($procuredCount === $quarterItems->count()) {
-                    $quarterRow[$q] = 'Completed';
-                } elseif ($q === $currentQ) {
-                    $quarterRow[$q] = $procuredCount > 0 ? 'In Progress' : 'Pending';
-                } elseif ($q < $currentQ) {
-                    $quarterRow[$q] = $procuredCount > 0 ? 'In Progress' : 'Delayed';
-                } else {
-                    $quarterRow[$q] = 'Pending';
-                }
-            }
-
-            $risk = in_array('Delayed', $quarterRow) ? 'Critical'
-                : (in_array('In Progress', $quarterRow) ? 'At Risk' : 'On Track');
+                    return [
+                        strtolower($quarter) => [
+                            'totalItems'       => $quarterTotal,
+                            'procuredItems'    => $quarterProcured,
+                            'remainingItems'   => max(0, $quarterTotal - $quarterProcured),
+                            'completionRate'   => $quarterRate,
+                            'status'           => $quarterTotal === 0
+                                ? 'No Items'
+                                : ($quarterProcured === $quarterTotal ? 'Complete' : ($quarterProcured > 0 ? 'In Progress' : 'Pending')),
+                            'procuredList'     => $quarterItemRows->where('procured', true)->values()->all(),
+                            'notProcuredList'  => $quarterItemRows->where('procured', false)->values()->all(),
+                        ],
+                    ];
+                });
 
             return [
-                'office' => $office->code,
-                'q1'     => $quarterRow['Q1'],
-                'q2'     => $quarterRow['Q2'],
-                'q3'     => $quarterRow['Q3'],
-                'q4'     => $quarterRow['Q4'],
-                'risk'   => $risk,
+                'office'         => $office->code,
+                'officeName'     => $office->name,
+                'q1'             => $quarters->get('q1'),
+                'q2'             => $quarters->get('q2'),
+                'q3'             => $quarters->get('q3'),
+                'q4'             => $quarters->get('q4'),
+                'totalItems'     => $totalItems,
+                'procuredItems'  => $procuredItems,
+                'remainingItems' => max(0, $totalItems - $procuredItems),
+                'completionRate' => $completionRate,
+                'status'         => $procuredItems === $totalItems && $totalItems > 0
+                    ? 'Complete'
+                    : ($procuredItems > 0 ? 'In Progress' : 'Pending'),
             ];
-        })->values()->all();
+        })->filter(fn ($row) => $row['totalItems'] > 0)->values()->all();
 
-        $officeMetrics = $offices->map(function ($office) use ($currentQNumber) {
-            $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized = (float) $office->purchaseRequests
-                ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
-                ->sum('total_amount');
-            $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
+        $officeMetrics = $offices->map(function ($office) use ($currentQNumber, $matchedPrFor) {
+            $items    = $office->budgetProposals->flatMap->items;
+            $budget   = (float) $items->sum('estimated_total_cost');
+            $utilized = (float) $items
+                ->filter(fn ($item) => in_array($matchedPrFor($item)?->lifecycleBucket(), ['in_progress', 'completed'], true))
+                ->sum('estimated_total_cost');
+            $pct      = $budget > 0 ? min(100, round(($utilized / $budget) * 100)) : 0;
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
 
-            return ['office' => $office->code, 'currentUtilization' => $pct, 'forecast' => $forecast, 'risk' => $risk, 'budget' => $budget, 'utilized' => $utilized];
+            return [
+                'office'             => $office->code,
+                'officeName'         => $office->name,
+                'currentUtilization' => $pct,
+                'forecast'           => $forecast,
+                'risk'               => $risk,
+                'budget'             => $budget,
+                'utilized'           => $utilized,
+            ];
         })->filter(fn ($r) => $r['budget'] > 0)->values();
 
-        $forecasts            = $officeMetrics->all();
+        $forecasts            = $officeMetrics
+            ->sortBy(function ($row) {
+                $riskOrder = ['Critical' => 0, 'At Risk' => 1, 'On Track' => 2];
+
+                return sprintf(
+                    '%02d|%03d|%03d|%s',
+                    $riskOrder[$row['risk'] ?? ''] ?? 9,
+                    (int) ($row['forecast'] ?? 0),
+                    (int) ($row['currentUtilization'] ?? 0),
+                    $row['office'] ?? ''
+                );
+            })
+            ->values()
+            ->all();
         $utilizationRankings  = $officeMetrics->sortByDesc('currentUtilization')->values()
             ->map(fn ($r, $i) => array_merge($r, ['rank' => $i + 1, 'utilization' => $r['currentUtilization']]))->all();
 
@@ -165,6 +208,7 @@ class PrismChancellorController extends Controller
             'Q3'    => now()->startOfYear()->addMonths(9),
             default => now()->startOfYear()->addMonths(12),
         };
+        $categoryFor = fn (BudgetProposalItem $item) => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General');
 
         // Full overdue set (not yet procured, past its target quarter) — the
         // alert list below shows every one of these (scrollable in the view),
@@ -173,19 +217,38 @@ class PrismChancellorController extends Controller
             $item->target_quarter
             && $item->target_quarter < $currentQ
             && $matchedPrFor($item)?->lifecycleBucket() !== 'completed'
-        )->sortByDesc('target_quarter')->values();
+        )->sortBy(fn ($item) => implode('|', [
+            strtolower($categoryFor($item)),
+            $item->budgetProposal?->office?->code ?? '',
+            strtolower($item->name ?? ''),
+        ]))->values();
 
-        $overdueAlerts = $overdueItemsAll->map(function ($item) use ($matchedPrFor, $quarterEnd) {
+        $overdueAlerts = $overdueItemsAll->map(function ($item) use ($matchedPrFor, $quarterEnd, $categoryFor) {
             $pr = $matchedPrFor($item);
 
             return [
                 'item'        => $item->name,
+                'category'    => $categoryFor($item),
                 'office'      => $item->budgetProposal?->office?->code ?? '—',
                 'prNumber'    => $pr?->number ?? 'Not yet raised',
                 'daysOverdue' => (int) now()->diffInDays($quarterEnd($item->target_quarter)),
                 'status'      => $pr ? ucfirst(str_replace('_', ' ', $pr->lifecycleBucket())) : 'Not Started',
+                'action'      => $pr ? 'Follow up the current PR movement.' : 'Create or intervene on the pending PR.',
             ];
         })->values()->all();
+
+        $overdueAlertGroups = collect($overdueAlerts)
+            ->groupBy('category')
+            ->sortKeys()
+            ->map(fn ($alerts, $category) => [
+                'category' => $category,
+                'count'    => $alerts->count(),
+                'alerts'   => $alerts->sortByDesc('daysOverdue')->values()->all(),
+            ])
+            ->values()
+            ->all();
+
+        $kpiDetails = $this->dashboardKpiDetails($allItems, $matchedPrFor, $officeMetrics, $currentQ);
 
         return view('prism.chancellor.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Chancellor Campus Monitoring Dashboard',
@@ -197,10 +260,12 @@ class PrismChancellorController extends Controller
                 'itemsOverdue'      => $overdueItemsAll->count(),
                 'campusUtilization' => $campusUtilization,
             ],
-            'quarterlyStatuses'   => $quarterlyStatuses,
+            'officeProcurementStatuses' => $officeProcurementStatuses,
             'forecasts'           => $forecasts,
             'utilizationRankings' => $utilizationRankings,
             'overdueAlerts'       => $overdueAlerts,
+            'overdueAlertGroups'  => $overdueAlertGroups,
+            'kpiDetails'          => $kpiDetails,
             'itemStatusChart'     => [
                 'procured' => $itemsProcured,
                 'pending'  => max(0, $itemsPending - $overdueItemsAll->count()),
@@ -323,6 +388,11 @@ class PrismChancellorController extends Controller
     public function procurementReports(Request $request): View
     {
         $selectedOffice = $request->query('office', '');
+        $quarterOptions = ['Q1', 'Q2', 'Q3', 'Q4'];
+        $selectedQuarter = strtoupper((string) $request->query('quarter', ''));
+        if (! in_array($selectedQuarter, $quarterOptions, true)) {
+            $selectedQuarter = '';
+        }
 
         $offices = Office::has('budgetProposals')
             ->when($selectedOffice, fn ($q) => $q->where('code', $selectedOffice))
@@ -342,14 +412,16 @@ class PrismChancellorController extends Controller
                     $q->whereHas('office', fn ($q2) => $q2->where('code', $selectedOffice));
                 }
             })
+            ->when($selectedQuarter, fn ($q) => $q->where('target_quarter', $selectedQuarter))
             ->get();
         $officeIds     = $allItems->pluck('budgetProposal.office_id')->filter()->unique()->values();
         $prItemMatches = $this->matchPrItemsByOfficeAndName($officeIds);
-        $isItemProcured = function ($item) use ($prItemMatches) {
+        $matchedPrFor = function ($item) use ($prItemMatches) {
             $officeId = $item->budgetProposal?->office_id;
 
-            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest?->lifecycleBucket() === 'completed';
+            return $prItemMatches->get($officeId . '|' . strtolower(trim($item->name)))?->purchaseRequest;
         };
+        $isItemProcured = fn ($item) => $matchedPrFor($item)?->lifecycleBucket() === 'completed';
 
         $accomplishmentRows = $offices->map(function ($office) use ($allItems, $isItemProcured) {
             $officeItems    = $allItems->filter(fn ($item) => $item->budgetProposal?->office_id === $office->id);
@@ -358,7 +430,11 @@ class PrismChancellorController extends Controller
             $completionRate = $targeted > 0 ? round(($procured / $targeted) * 100) : 0;
 
             return ['office' => $office->code, 'targeted' => $targeted, 'procured' => $procured, 'completionRate' => $completionRate];
-        })->filter(fn ($r) => $r['targeted'] > 0)->values()->all();
+        })
+            ->filter(fn ($r) => $r['targeted'] > 0)
+            ->sortByDesc('completionRate')
+            ->values()
+            ->all();
 
         // Same items, broken down by target_quarter — gives a formal report
         // reader the per-quarter picture, not just an office-level rollup.
@@ -381,11 +457,12 @@ class PrismChancellorController extends Controller
             ->sortBy(fn ($r) => $r['office'] . $r['quarter'])
             ->values()->all();
 
-        $utilizationSummary = $offices->map(function ($office) use ($currentQNumber) {
-            $budget   = (float) $office->budgetProposals->sum('total_estimated_cost');
-            $utilized = (float) $office->purchaseRequests
-                ->filter(fn ($pr) => in_array($pr->lifecycleBucket(), ['in_progress', 'completed'], true))
-                ->sum('total_amount');
+        $utilizationSummary = $offices->map(function ($office) use ($allItems, $matchedPrFor, $currentQNumber) {
+            $officeItems = $allItems->filter(fn ($item) => $item->budgetProposal?->office_id === $office->id);
+            $budget      = (float) $officeItems->sum('estimated_total_cost');
+            $utilized    = (float) $officeItems
+                ->filter(fn ($item) => in_array($matchedPrFor($item)?->lifecycleBucket(), ['in_progress', 'completed'], true))
+                ->sum('estimated_total_cost');
             $pct      = $budget > 0 ? round(($utilized / $budget) * 100) : 0;
             $forecast = $currentQNumber > 0 ? min(100, (int) round($pct / $currentQNumber * 4)) : $pct;
             $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'At Risk' : 'Critical');
@@ -393,9 +470,13 @@ class PrismChancellorController extends Controller
             return ['office' => $office->code, 'budget' => $budget, 'utilized' => $utilized, 'forecast' => $forecast, 'risk' => $risk];
         })->filter(fn ($r) => $r['budget'] > 0)->values()->all();
 
+        $delayedPrIdsForScope = $selectedQuarter
+            ? $allItems->map(fn ($item) => $matchedPrFor($item)?->id)->filter()->unique()->values()
+            : collect();
         $overdueThresholdDays = 30;
         $delayedByOffice = PurchaseRequest::with('office')
             ->when($selectedOffice, fn ($q) => $q->whereHas('office', fn ($q2) => $q2->where('code', $selectedOffice)))
+            ->when($selectedQuarter, fn ($q) => $q->whereIn('id', $delayedPrIdsForScope))
             ->get()
             ->filter(fn ($pr) =>
                 $pr->signingStatusBucket() !== 'completed'
@@ -416,6 +497,8 @@ class PrismChancellorController extends Controller
             'generatedAt'        => now()->format('M d, Y g:i A'),
             'offices'            => Office::has('budgetProposals')->select('id', 'code', 'name')->orderBy('code')->get(),
             'selectedOffice'     => $selectedOffice,
+            'quarterOptions'     => $quarterOptions,
+            'selectedQuarter'    => $selectedQuarter,
             'accomplishmentRows' => $accomplishmentRows,
             'quarterlyRows'      => $quarterlyRows,
             'utilizationSummary' => $utilizationSummary,
@@ -438,6 +521,135 @@ class PrismChancellorController extends Controller
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function dashboardKpiDetails($allItems, callable $matchedPrFor, $officeMetrics, string $currentQuarter): array
+    {
+        $itemRows = $allItems
+            ->sortBy(fn ($item) => implode('|', [
+                $item->budgetProposal?->office?->code ?? '',
+                $item->target_quarter ?? '',
+                strtolower($item->name ?? ''),
+            ]))
+            ->map(fn (BudgetProposalItem $item) => $this->dashboardAppItemDetailRow($item, $matchedPrFor, $currentQuarter))
+            ->values();
+
+        $utilizationRows = $officeMetrics
+            ->sortByDesc('currentUtilization')
+            ->map(function ($row) {
+                $officeCode = $row['office'] ?? 'Office';
+                $officeName = $row['officeName'] ?? '';
+
+                return [
+                    'title'       => $officeName ? $officeCode . ' - ' . $officeName : $officeCode,
+                    'office'      => $officeCode,
+                    'budget'      => (float) ($row['budget'] ?? 0),
+                    'utilized'    => (float) ($row['utilized'] ?? 0),
+                    'utilization' => (int) ($row['currentUtilization'] ?? 0),
+                    'forecast'    => (int) ($row['forecast'] ?? 0),
+                    'risk'        => $row['risk'] ?? 'At Risk',
+                    'statusClass' => $this->dashboardRiskBadgeClass($row['risk'] ?? null),
+                    'url'         => route('chancellor.procurement-reports', ['office' => $officeCode]),
+                ];
+            })
+            ->values();
+
+        return [
+            'totalAppItems' => [
+                'title'      => 'Total APP Items',
+                'lead'       => 'All approved APP line items across campus included in monitoring.',
+                'rows'       => $itemRows->all(),
+                'empty'      => 'No APP items found yet.',
+                'type'       => 'items',
+                'countLabel' => 'APP item(s)',
+            ],
+            'itemsProcured' => [
+                'title'      => 'Items Procured',
+                'lead'       => 'APP items with matched PRs that reached the completed procurement lifecycle.',
+                'rows'       => $itemRows->where('statusKey', 'procured')->values()->all(),
+                'empty'      => 'No procured APP items yet.',
+                'type'       => 'items',
+                'countLabel' => 'procured item(s)',
+            ],
+            'itemsPending' => [
+                'title'      => 'Items Pending',
+                'lead'       => 'APP items not yet completed, including not-started, in-progress, delayed, and overdue items.',
+                'rows'       => $itemRows->whereIn('statusKey', ['not_started', 'in_progress', 'delayed', 'overdue'])->values()->all(),
+                'empty'      => 'No pending APP items.',
+                'type'       => 'items',
+                'countLabel' => 'pending item(s)',
+            ],
+            'itemsOverdue' => [
+                'title'      => 'Items Overdue',
+                'lead'       => 'APP items past their target quarter and still not completed.',
+                'rows'       => $itemRows->where('statusKey', 'overdue')->values()->all(),
+                'empty'      => 'No overdue APP items.',
+                'type'       => 'items',
+                'countLabel' => 'overdue item(s)',
+            ],
+            'campusUtilization' => [
+                'title'      => 'Campus Utilization',
+                'lead'       => 'Budget utilization by office using approved APP item amounts covered by matched active or completed PRs.',
+                'rows'       => $utilizationRows->all(),
+                'empty'      => 'No office utilization data yet.',
+                'type'       => 'utilization',
+                'countLabel' => 'office(s)',
+            ],
+        ];
+    }
+
+    private function dashboardAppItemDetailRow(BudgetProposalItem $item, callable $matchedPrFor, string $currentQuarter): array
+    {
+        $proposal = $item->budgetProposal;
+        $pr       = $matchedPrFor($item);
+        $bucket   = $pr?->lifecycleBucket();
+        $isPastTarget = $item->target_quarter && $item->target_quarter < $currentQuarter;
+
+        [$statusKey, $status, $statusClass] = match (true) {
+            $bucket === 'completed'   => ['procured', 'Procured', 'badge-completed'],
+            $isPastTarget             => ['overdue', 'Overdue', 'badge-overdue'],
+            $bucket === 'in_progress' => ['in_progress', 'In Progress', 'badge-in-progress'],
+            $bucket === 'delayed'     => ['delayed', 'Delayed', 'badge-overdue'],
+            default                   => ['not_started', 'Not Started', 'badge-pending'],
+        };
+
+        $trackingStage = $pr ? $pr->currentTrackingStage() : null;
+        $trackingLabel = $trackingStage['label'] ?? 'No linked purchase request yet.';
+
+        return [
+            'name'        => $item->name ?: 'Untitled item',
+            'proposal'    => $proposal?->title ?: ($proposal?->code ?: 'Untitled PPMP'),
+            'code'        => $proposal?->code ?: 'PPMP',
+            'office'      => $proposal?->office?->code ?? 'Unassigned',
+            'fiscalYear'  => $proposal?->fiscal_year,
+            'quantity'    => $this->formatDashboardQuantity((float) $item->quantity),
+            'unit'        => $item->unit ?: 'unit',
+            'category'    => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'),
+            'quarter'     => $item->target_quarter ?: 'Unscheduled',
+            'amount'      => (float) $item->estimated_total_cost,
+            'statusKey'   => $statusKey,
+            'status'      => $status,
+            'statusClass' => $statusClass,
+            'prNumber'    => $pr?->number ?: 'No PR yet',
+            'remarks'     => $trackingLabel,
+            'url'         => $proposal
+                ? route('chancellor.budget-approval.document', $proposal->id)
+                : route('chancellor.budget-approval'),
+        ];
+    }
+
+    private function dashboardRiskBadgeClass(?string $risk): string
+    {
+        return match (strtolower($risk ?? '')) {
+            'on track', 'low'  => 'badge-low-risk',
+            'critical', 'high' => 'badge-high-risk',
+            default            => 'badge-medium-risk',
+        };
+    }
+
+    private function formatDashboardQuantity(float $quantity): string
+    {
+        return rtrim(rtrim(number_format($quantity, 2), '0'), '.');
+    }
 
     private function formatProposalForChancellor(BudgetProposal $p): array
     {

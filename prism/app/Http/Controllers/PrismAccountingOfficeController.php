@@ -65,6 +65,7 @@ class PrismAccountingOfficeController extends Controller
             // The signed PO PDF — Accounting's audit basis before marking
             // payment processed, not just the row's summary fields.
             'pdfFile'      => $po->file_path,
+            'pdfUrl'       => $po->file_path ? Storage::url($po->file_path) : null,
         ];
 
         // Delivered POs waiting for Accounting to start processing payment
@@ -88,12 +89,12 @@ class PrismAccountingOfficeController extends Controller
             ])
             ->all();
 
-        $recentlyPaid = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy', 'documents'])
+        $paidRows = PurchaseOrder::with(['abstractOfCanvass.purchaseRequest.office', 'paidBy', 'documents'])
             ->where('status', 'paid')
             ->latest('paid_at')
-            ->take(10)
             ->get()
             ->map(fn ($po) => [
+                'id'          => $po->id,
                 'poNumber'    => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
                 'office'      => $po->abstractOfCanvass->purchaseRequest->office?->code ?? '—',
                 'title'       => $po->abstractOfCanvass->purchaseRequest->title ?? '—',
@@ -105,6 +106,7 @@ class PrismAccountingOfficeController extends Controller
                 // The signed PO itself, so the PO No. column can open the
                 // full document — same as the "for processing" table above.
                 'pdfFile'     => $po->file_path,
+                'pdfUrl'      => $po->file_path ? Storage::url($po->file_path) : null,
                 // Every proof attached along the way: Accounting's own
                 // payment-processing proof plus the Cashier's payment
                 // receipt, each opened in full in a new tab, not a cramped
@@ -119,24 +121,118 @@ class PrismAccountingOfficeController extends Controller
                     ])
                     ->values()
                     ->all(),
-            ])
-            ->all();
+            ]);
+
+        $recentlyPaid = $paidRows->take(10)->values()->all();
+        $kpiDetails = $this->dashboardKpiDetails($forProcessing, $awaitingCashier, $paidRows);
 
         return view('prism.accounting-office.dashboard', $this->withCommon('dashboard', [
             'pageTitle'       => 'Accounting Office Dashboard',
             'forProcessing'   => $forProcessing,
             'awaitingCashier' => $awaitingCashier,
             'recentlyPaid'    => $recentlyPaid,
+            'kpiDetails'      => $kpiDetails,
             'summary'         => [
                 'forProcessing'   => count($forProcessing),
                 'awaitingCashier' => count($awaitingCashier),
-                'totalPaid'       => PurchaseOrder::where('status', 'paid')->count(),
-                'totalAmount'     => (float) PurchaseOrder::where('status', 'paid')->sum('total_amount'),
+                'totalPaid'       => $paidRows->count(),
+                'totalAmount'     => (float) $paidRows->sum('totalAmount'),
             ],
         ]));
     }
 
     /** Delivered → Accounting attaches proof and starts payment processing; the Cashier finishes it. */
+    private function dashboardKpiDetails(array $forProcessing, array $awaitingCashier, $paidRows): array
+    {
+        $forProcessingRows = collect($forProcessing)
+            ->map(fn ($po) => $this->dashboardPoKpiRow(
+                $po,
+                'Complete Delivery',
+                'badge-delivered',
+                'Issued',
+                $po['issuedAt'] ?? 'â€”',
+                'Ready for Accounting payment processing.',
+                $po['pdfUrl'] ?? null,
+                'View PO'
+            ))
+            ->values();
+
+        $awaitingCashierRows = collect($awaitingCashier)
+            ->map(fn ($po) => $this->dashboardPoKpiRow(
+                $po,
+                $po['statusLabel'] ?? 'Processing Payment',
+                'badge-processing',
+                'Processing since',
+                $po['processingAt'] ?? 'â€”',
+                'Waiting for the Cashier receipt upload.',
+                $po['pdfUrl'] ?? null,
+                'View PO'
+            ))
+            ->values();
+
+        $paidKpiRows = $paidRows
+            ->map(fn ($po) => $this->dashboardPoKpiRow(
+                $po,
+                'Payment Made',
+                'badge-paid',
+                'Paid',
+                $po['paidAt'] ?? 'â€”',
+                'Paid by ' . ($po['paidBy'] ?? 'Cashier'),
+                $po['pdfUrl'] ?? null,
+                'View PO'
+            ))
+            ->values();
+
+        return [
+            'forProcessing' => [
+                'title'      => 'Delivered - For Processing',
+                'lead'       => 'Delivered and fully signed Purchase Orders waiting for Accounting to start payment processing.',
+                'rows'       => $forProcessingRows->all(),
+                'empty'      => 'No delivered POs are waiting for payment processing.',
+                'countLabel' => 'delivered PO(s)',
+            ],
+            'awaitingCashier' => [
+                'title'      => 'Processing - At Cashier',
+                'lead'       => 'Purchase Orders already marked as processing payment and waiting for Cashier receipt upload.',
+                'rows'       => $awaitingCashierRows->all(),
+                'empty'      => 'No POs are currently in payment processing.',
+                'countLabel' => 'processing PO(s)',
+            ],
+            'totalPaid' => [
+                'title'      => 'Total POs Paid',
+                'lead'       => 'All Purchase Orders already completed by Cashier payment release.',
+                'rows'       => $paidKpiRows->all(),
+                'empty'      => 'No paid Purchase Orders yet.',
+                'countLabel' => 'paid PO(s)',
+            ],
+            'totalAmount' => [
+                'title'      => 'Total Amount Released',
+                'lead'       => 'Paid Purchase Orders contributing to the released amount total, sorted by highest amount.',
+                'rows'       => $paidKpiRows->sortByDesc('amount')->values()->all(),
+                'empty'      => 'No released payment amount yet.',
+                'countLabel' => 'released PO(s)',
+            ],
+        ];
+    }
+
+    private function dashboardPoKpiRow(array $po, string $status, string $statusClass, string $dateLabel, string $date, string $remarks, ?string $url, string $urlLabel): array
+    {
+        return [
+            'title'       => ($po['poNumber'] ?? 'PO') . ' - ' . ($po['title'] ?? 'Untitled Purchase Order'),
+            'poNumber'    => $po['poNumber'] ?? 'PO',
+            'office'      => $po['office'] ?? 'â€”',
+            'supplier'    => $po['supplier'] ?? 'â€”',
+            'amount'      => (float) ($po['totalAmount'] ?? 0),
+            'status'      => $status,
+            'statusClass' => $statusClass,
+            'dateLabel'   => $dateLabel,
+            'date'        => $date,
+            'remarks'     => $remarks,
+            'url'         => $url,
+            'urlLabel'    => $urlLabel,
+        ];
+    }
+
     public function startPaymentProcessing(Request $request, PurchaseOrder $po): JsonResponse
     {
         if ($po->status !== 'complete_delivery') {

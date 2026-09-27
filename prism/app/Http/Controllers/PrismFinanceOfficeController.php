@@ -56,6 +56,8 @@ class PrismFinanceOfficeController extends Controller
             ])
             ->all();
 
+        $kpiDetails = $this->dashboardKpiDetails();
+
         return view('prism.finance-office.dashboard', $this->withCommon('dashboard', [
             'pageTitle' => 'Budget Office Dashboard',
             'summary' => [
@@ -64,12 +66,113 @@ class PrismFinanceOfficeController extends Controller
                 'returned'          => $returned,
                 'totalCampusBudget' => (float) $totalCampusBudget,
             ],
+            'kpiDetails'          => $kpiDetails,
             'officeStatusGroups'  => $officeStatusGroups,
             'recentSubmissions'   => $recentSubmissions,
             'proposalsByStatus'   => $this->proposalsByStatus(),
             'budgetByOffice'      => $this->campusBudgetByOffice(),
             'monthlyReviewActivity' => $this->monthlyReviewActivity(),
         ]));
+    }
+
+    private function dashboardKpiDetails(): array
+    {
+        $proposals = BudgetProposal::with([
+                'office:id,code,name',
+                'reviews' => fn ($q) => $q->latest('reviewed_at')->latest(),
+            ])
+            ->withCount('items')
+            ->whereIn('status', ['submitted', 'endorsed', 'returned', 'approved'])
+            ->latest('submitted_at')
+            ->get()
+            ->map(fn (BudgetProposal $proposal) => $this->dashboardProposalDetailRow($proposal));
+
+        return [
+            'awaitingReview' => [
+                'title' => 'Awaiting Review',
+                'lead'  => 'Submitted PPMPs waiting for Budget Office action.',
+                'rows'  => $proposals->where('statusKey', 'submitted')->values()->all(),
+                'empty' => 'No proposals are awaiting review.',
+                'countLabel' => 'proposal(s)',
+            ],
+            'endorsed' => [
+                'title' => 'Endorsed',
+                'lead'  => 'PPMPs already forwarded for Chancellor approval.',
+                'rows'  => $proposals->where('statusKey', 'endorsed')->values()->all(),
+                'empty' => 'No endorsed proposals yet.',
+                'countLabel' => 'proposal(s)',
+            ],
+            'returned' => [
+                'title' => 'Returned',
+                'lead'  => 'PPMPs returned with review remarks.',
+                'rows'  => $proposals->where('statusKey', 'returned')->values()->all(),
+                'empty' => 'No returned proposals yet.',
+                'countLabel' => 'proposal(s)',
+            ],
+            'totalCampusBudget' => [
+                'title' => 'Total Proposed Budget',
+                'lead'  => 'Active submitted, endorsed, and approved PPMPs contributing to the campus-wide proposed budget.',
+                'rows'  => $proposals
+                    ->whereIn('statusKey', ['submitted', 'endorsed', 'approved'])
+                    ->sortByDesc('amount')
+                    ->values()
+                    ->all(),
+                'empty' => 'No active proposed budget recorded yet.',
+                'countLabel' => 'budget source(s)',
+            ],
+        ];
+    }
+
+    private function dashboardProposalDetailRow(BudgetProposal $proposal): array
+    {
+        $lastReview = $proposal->reviews
+            ->sortByDesc(fn ($review) => ($review->reviewed_at ?? $review->created_at)?->timestamp ?? 0)
+            ->first();
+        $activityDate = match ($proposal->status) {
+            'submitted' => $proposal->submitted_at ?? $proposal->created_at,
+            'endorsed'  => $proposal->reviewed_at ?? $lastReview?->reviewed_at ?? $proposal->updated_at,
+            'approved'  => $proposal->approved_at ?? $proposal->updated_at,
+            'returned'  => $lastReview?->reviewed_at ?? $proposal->updated_at,
+            default     => $proposal->updated_at,
+        };
+
+        return [
+            'title'       => $proposal->title ?: ($proposal->code ?: 'Untitled PPMP'),
+            'code'        => $proposal->code ?: 'PPMP',
+            'office'      => $proposal->office?->code ?? $proposal->office?->name ?? 'Unassigned',
+            'fiscalYear'  => $proposal->fiscal_year,
+            'itemCount'   => (int) $proposal->items_count,
+            'amount'      => (float) $proposal->total_estimated_cost,
+            'statusKey'   => $proposal->status,
+            'status'      => $this->proposalStatusLabel($proposal->status),
+            'statusClass' => $this->proposalStatusBadgeClass($proposal->status),
+            'date'        => $activityDate?->format('M d, Y') ?? 'No date',
+            'remarks'     => $lastReview?->remarks ?: $proposal->remarks ?: 'No remarks recorded.',
+            'url'         => route('finance-office.proposal-review.document', $proposal->id),
+        ];
+    }
+
+    private function proposalStatusLabel(?string $status): string
+    {
+        return match ($status) {
+            'submitted' => 'Submitted',
+            'endorsed'  => 'Endorsed',
+            'returned'  => 'Returned',
+            'approved'  => 'Approved',
+            'draft'     => 'Draft',
+            default     => ucfirst(str_replace('_', ' ', $status ?: 'Unspecified')),
+        };
+    }
+
+    private function proposalStatusBadgeClass(?string $status): string
+    {
+        return match ($status) {
+            'submitted' => 'badge-pending',
+            'endorsed'  => 'badge-endorsed',
+            'returned'  => 'badge-returned',
+            'approved'  => 'badge-approved',
+            default     => 'badge-default',
+        };
     }
 
     /** Full campus PPMP pipeline breakdown (all 5 statuses), for the status doughnut chart. */
@@ -261,10 +364,14 @@ class PrismFinanceOfficeController extends Controller
                 // to endorsed/approved here used to drop those offices entirely.
                 $items = $office->budgetProposals->pluck('items')->flatten();
 
-                $quarters = $items->pluck('target_quarter')->filter()->unique()->sort()->values();
-                if ($quarters->isEmpty()) $quarters = collect(['Q1', 'Q2', 'Q3', 'Q4']);
-
                 $activePrs = $office->purchaseRequests->filter($isUtilized);
+                $quarters = $items->pluck('target_quarter')
+                    ->merge($activePrs->map(fn ($pr) => $pr->numberQuarter()))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values();
+                if ($quarters->isEmpty()) $quarters = collect(['Q1', 'Q2', 'Q3', 'Q4']);
 
                 return $quarters->map(function ($quarter) use ($items, $activePrs, $office) {
                     // Genuinely per-quarter now — was previously the office's
