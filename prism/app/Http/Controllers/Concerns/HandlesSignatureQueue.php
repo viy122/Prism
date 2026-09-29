@@ -250,6 +250,10 @@ trait HandlesSignatureQueue
             'updatedAt'      => $doc->updated_at,
         ];
 
+        if ($this->queueRoutePrefix() === 'office-head' && in_array($docType, ['pr', 'aoc'], true)) {
+            $row['wordDownloadUrl'] = route('office-head.for-my-signature.word', [$docType, $doc->id]);
+        }
+
         // Preview: PR, AOC, and PO each carry their own uploaded scanned PDF
         // (all three have a file_path column). AOC additionally carries the
         // parent PR's items + the canvass quotations gathered for it — the

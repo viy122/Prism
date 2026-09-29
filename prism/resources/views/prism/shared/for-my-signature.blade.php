@@ -109,6 +109,20 @@
     .pdf-preview iframe { width: 100%; height: 100%; border: none; }
     .pdf-print-btn { position: absolute; top: 10px; right: 10px; z-index: 2; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--s200); background: #fff; color: var(--s700); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.12); font-size: 16px; }
     .pdf-print-btn:hover { background: var(--crimson); color: #fff; border-color: var(--crimson); }
+    .export-preview-overlay { position:fixed; inset:0; z-index:10000; display:none; background:rgba(15,23,42,.64); padding:24px; box-sizing:border-box; }
+    .export-preview-overlay.open { display:flex; }
+    .export-preview-dialog { width:min(1180px,100%); height:min(760px,100%); margin:auto; display:grid; grid-template-columns:minmax(0,1fr) 310px; overflow:hidden; border-radius:14px; background:#fff; box-shadow:0 24px 70px rgba(0,0,0,.35); }
+    .export-preview-document { min-width:0; padding:22px; background:#e5e7eb; }
+    .export-preview-document iframe { width:100%; height:100%; border:0; background:#fff; box-shadow:0 3px 18px rgba(15,23,42,.16); }
+    .export-preview-options { display:flex; flex-direction:column; gap:16px; padding:24px; border-left:1px solid var(--s200); }
+    .export-preview-options h3 { font-size:18px; color:var(--s900); }
+    .export-preview-options label { font-size:11px; font-weight:700; color:var(--s500); }
+    .export-preview-options select { width:100%; height:44px; margin-top:6px; padding:0 12px; border:1px solid var(--s300); border-radius:9px; background:#fff; color:var(--s800); font:500 13px 'Poppins',sans-serif; }
+    .export-preview-actions { display:flex; gap:8px; margin-top:auto; }
+    .export-preview-actions button { flex:1; height:40px; border-radius:9px; font:700 12px 'Poppins',sans-serif; cursor:pointer; }
+    .export-preview-cancel { border:1px solid var(--s300); background:#fff; color:var(--s600); }
+    .export-preview-save { border:0; background:var(--crimson); color:#fff; }
+    @media (max-width:760px) { .export-preview-dialog { grid-template-columns:1fr; grid-template-rows:minmax(0,1fr) auto; } .export-preview-options { border-left:0; border-top:1px solid var(--s200); } }
     .pdf-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 100%; color: var(--s400); }
     .pdf-placeholder i { font-size: 34px; color: var(--s300); }
     .pdf-placeholder span { font-size: 12px; font-weight: 600; }
@@ -392,6 +406,26 @@
 {{-- Toast --}}
 <div class="pr-toast" id="prToast"></div>
 
+<div class="export-preview-overlay" id="exportPreviewOverlay" aria-hidden="true">
+    <div class="export-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="exportPreviewTitle">
+        <div class="export-preview-document"><iframe id="exportPreviewFrame" title="Document preview"></iframe></div>
+        <div class="export-preview-options">
+            <h3 id="exportPreviewTitle">Print Preview</h3>
+            <div>
+                <label for="exportFormat">Destination</label>
+                <select id="exportFormat">
+                    <option value="pdf">Save as PDF</option>
+                    <option value="word">Save as Word</option>
+                </select>
+            </div>
+            <div class="export-preview-actions">
+                <button type="button" class="export-preview-cancel" id="exportPreviewCancel">Cancel</button>
+                <button type="button" class="export-preview-save" id="exportPreviewSave">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 <script type="application/json" id="docData">@json($documents)</script>
@@ -431,6 +465,10 @@
     const previewSection  = document.getElementById('previewSection');
     const previewToggle   = document.getElementById('previewToggle');
     const previewBody     = document.getElementById('previewBody');
+    const exportOverlay   = document.getElementById('exportPreviewOverlay');
+    const exportFrame     = document.getElementById('exportPreviewFrame');
+    const exportFormat    = document.getElementById('exportFormat');
+    let exportWordUrl     = '';
 
     let activeDoc = null;
     let saving    = false;
@@ -544,17 +582,41 @@
         return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
+    window.prismOpenExportPreview = function (button) {
+        const sourceFrame = button.parentElement.querySelector('iframe');
+        if (!sourceFrame) return;
+        exportFrame.src = sourceFrame.src;
+        exportWordUrl = button.dataset.wordUrl || '';
+        exportFormat.value = 'pdf';
+        exportOverlay.classList.add('open');
+        exportOverlay.setAttribute('aria-hidden', 'false');
+    };
+    function closeExportPreview() {
+        exportOverlay.classList.remove('open');
+        exportOverlay.setAttribute('aria-hidden', 'true');
+        exportFrame.src = 'about:blank';
+    }
+    document.getElementById('exportPreviewCancel').addEventListener('click', closeExportPreview);
+    exportOverlay.addEventListener('click', e => { if (e.target === exportOverlay) closeExportPreview(); });
+    document.getElementById('exportPreviewSave').addEventListener('click', () => {
+        if (exportFormat.value === 'word') {
+            if (exportWordUrl) window.location.href = exportWordUrl;
+            closeExportPreview();
+            return;
+        }
+        window.prismPrintFrame(exportFrame);
+    });
+
     function renderPreview(doc) {
         // Open by default whenever the selected document has something to
         // preview (PR/AOC/PO) — the reviewer shouldn't need an extra click.
         const hasPreview = doc.docType === 'pr' || doc.docType === 'aoc' || doc.docType === 'po';
         previewToggle.classList.toggle('open', hasPreview);
         previewBody.classList.toggle('open', hasPreview);
-
         if (doc.docType === 'pr') {
             previewSection.style.display = '';
             previewBody.innerHTML = doc.pdfFile
-                ? `<div class="pdf-preview"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PR Document"></iframe></div>`
+                ? `<div class="pdf-preview"><button type="button" class="pdf-print-btn" title="Print or save" data-word-url="${escapeHtml(doc.wordDownloadUrl)}" onclick="window.prismOpenExportPreview(this)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="PR Document"></iframe></div>`
                 : `<div class="pdf-preview"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this PR</span></div></div>`;
             return;
         }
@@ -589,7 +651,7 @@
             }
 
             const pdfHtml = doc.pdfFile
-                ? `<div class="pdf-preview" style="margin-bottom:12px;"><button type="button" class="pdf-print-btn" title="Print" onclick="window.prismPrintFrame(this.nextElementSibling)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="AOC Document"></iframe></div>`
+                ? `<div class="pdf-preview" style="margin-bottom:12px;"><button type="button" class="pdf-print-btn" title="Print or save" data-word-url="${escapeHtml(doc.wordDownloadUrl)}" onclick="window.prismOpenExportPreview(this)"><i class="ti ti-printer"></i></button><iframe src="/storage/${doc.pdfFile}#toolbar=0" title="AOC Document"></iframe></div>`
                 : `<div class="pdf-preview" style="margin-bottom:12px;"><div class="pdf-placeholder"><i class="ti ti-file-off"></i><span>No PDF uploaded for this AOC</span></div></div>`;
 
             previewBody.innerHTML = `

@@ -92,6 +92,35 @@
     .badge { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s600); border: 1px solid var(--s200); white-space: nowrap; }
     .count-chip { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 20px; font-size: 11px; font-weight: 700; background: var(--s100); color: var(--s700); border: 1px solid var(--s200); }
 
+    .view-toggle { display:inline-flex; padding:3px; border:1px solid var(--s200); border-radius:10px; background:var(--s100); }
+    .view-toggle button { height:32px; padding:0 13px; border:0; border-radius:7px; background:transparent; color:var(--s500); font:700 11px 'Poppins',sans-serif; cursor:pointer; }
+    .view-toggle button.active { background:#fff; color:var(--crimson); box-shadow:0 1px 4px rgba(15,23,42,.12); }
+    .project-summary { display:none; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+    .project-summary-card { padding:15px 17px; border:1px solid var(--s200); border-radius:12px; background:var(--s50); }
+    .project-summary-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--s500); }
+    .project-summary-value { margin-top:4px; font-size:19px; font-weight:800; color:var(--s900); }
+    .project-row { cursor:pointer; }
+    .project-row td { vertical-align:middle; }
+    .project-main { display:flex; align-items:flex-start; gap:10px; min-width:260px; }
+    .project-chevron { margin-top:2px; color:var(--s400); transition:transform .18s; }
+    .project-row.open .project-chevron { transform:rotate(90deg); }
+    .project-code { font-size:10px; font-weight:800; color:var(--crimson); letter-spacing:.04em; }
+    .project-title { margin-top:2px; font-size:13px; font-weight:750; color:var(--s900); }
+    .project-detail-row { display:none; background:var(--s50); }
+    .project-detail-row.open { display:table-row; }
+    .project-detail-row > td { padding:14px 20px 18px 52px; }
+    .project-items { width:100%; border:1px solid var(--s200); border-radius:10px; overflow:hidden; background:#fff; }
+    .project-items th { position:static; padding:8px 10px; font-size:9px; }
+    .project-items td { padding:9px 10px; font-size:11px; }
+    .progress-track { width:120px; height:7px; overflow:hidden; border-radius:10px; background:var(--s200); }
+    .progress-fill { height:100%; border-radius:10px; background:var(--crimson); }
+    .progress-label { margin-top:4px; font-size:10px; font-weight:700; color:var(--s500); }
+    .project-status { display:inline-flex; align-items:center; height:25px; padding:0 9px; border-radius:20px; font-size:10px; font-weight:800; border:1px solid; white-space:nowrap; }
+    .project-status-approved, .project-status-endorsed { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .project-status-in-progress { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+    .project-status-completed { background:#ecfdf5; color:#15803d; border-color:#bbf7d0; }
+    .project-status-delayed { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+
     /* ── Procurement mode cell ── */
     .mode-cell { min-width: 200px; }
     .tracking-cell { min-width: 260px; }
@@ -160,8 +189,9 @@
     @media (max-width: 1024px) {
         .page-shell { padding: 16px 16px 40px; }
         .filters-grid { grid-template-columns: 1fr 1fr; }
+        .project-summary { grid-template-columns:1fr 1fr; }
     }
-    @media (max-width: 640px) { .filters-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .filters-grid, .project-summary { grid-template-columns: 1fr; } }
 </style>
 @endpush
 
@@ -242,14 +272,26 @@
     <div class="card">
         <div class="card-head">
             <div>
-                <p class="card-eyebrow">Consolidated approved items</p>
-                <h2 class="card-title">APP Item Matrix</h2>
+                <p class="card-eyebrow" id="appViewEyebrow">Consolidated approved items</p>
+                <h2 class="card-title" id="appViewTitle">APP Item Matrix</h2>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
+                <div class="view-toggle" aria-label="APP view">
+                    <button type="button" class="active" data-view="items"><i class="ti ti-list"></i> Items</button>
+                    <button type="button" data-view="projects"><i class="ti ti-folders"></i> Projects</button>
+                </div>
                 <span class="count-chip" id="appVisibleCount">{{ count($appItems) }} shown</span>
             </div>
         </div>
-        <div class="table-wrap">
+
+        <div class="project-summary" id="projectSummary">
+            <div class="project-summary-card"><p class="project-summary-label">Projects</p><p class="project-summary-value" id="summaryProjects">{{ count($projects) }}</p></div>
+            <div class="project-summary-card"><p class="project-summary-label">Total Budget</p><p class="project-summary-value" id="summaryBudget">PHP {{ number_format(collect($projects)->sum('budget')) }}</p></div>
+            <div class="project-summary-card"><p class="project-summary-label">With PR</p><p class="project-summary-value" id="summaryRequested">PHP {{ number_format(collect($projects)->sum('requested')) }}</p></div>
+            <div class="project-summary-card"><p class="project-summary-label">Completed</p><p class="project-summary-value" id="summaryCompleted">{{ collect($projects)->where('status', 'Completed')->count() }}</p></div>
+        </div>
+
+        <div class="table-wrap" id="itemTableWrap">
             <table>
                 <thead>
                     <tr>
@@ -377,6 +419,42 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="table-wrap" id="projectTableWrap" style="display:none;">
+            <table>
+                <thead><tr><th>Project / PPMP</th><th>Office</th><th>Items</th><th>Budget</th><th>With PR</th><th>Remaining</th><th>PR Coverage</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach ($projects as $project)
+                        @php($statusClass = strtolower(str_replace(' ', '-', $project['status'])))
+                        <tr class="project-row" data-project-row data-project-id="{{ $project['id'] }}"
+                            data-office="{{ $project['office'] }}" data-year="{{ $project['fiscalYear'] }}"
+                            data-quarters="{{ implode('|', $project['quarters']) }}" data-modes="{{ implode('|', $project['modes']) }}"
+                            data-budget="{{ $project['budget'] }}" data-requested="{{ $project['requested'] }}" data-status="{{ $project['status'] }}">
+                            <td><div class="project-main"><i class="ti ti-chevron-right project-chevron"></i><div><p class="project-code">{{ $project['code'] }}</p><p class="project-title">{{ $project['title'] }}</p></div></div></td>
+                            <td><span class="badge">{{ $project['office'] }}</span></td>
+                            <td>{{ $project['itemCount'] }}</td>
+                            <td><p class="amount-val">PHP {{ number_format($project['budget']) }}</p></td>
+                            <td>PHP {{ number_format($project['requested']) }}</td>
+                            <td>PHP {{ number_format($project['remaining']) }}</td>
+                            <td><div class="progress-track"><div class="progress-fill" style="width:{{ $project['coverage'] }}%"></div></div><p class="progress-label">{{ $project['coverage'] }}% of items</p></td>
+                            <td><span class="project-status project-status-{{ $statusClass }}">{{ $project['status'] }}</span></td>
+                        </tr>
+                        <tr class="project-detail-row" data-project-detail="{{ $project['id'] }}">
+                            <td colspan="8">
+                                <table class="project-items">
+                                    <thead><tr><th>Item</th><th>Qty</th><th>Quarter</th><th>Mode</th><th>Budget</th><th>Tracking Status</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($project['items'] as $projectItem)
+                                            <tr><td><strong>{{ $projectItem['item'] }}</strong></td><td>{{ $projectItem['quantity'] }} {{ $projectItem['unit'] }}</td><td>{{ $projectItem['targetQuarter'] }}</td><td>{{ $projectItem['procurementMode'] }}</td><td>PHP {{ number_format($projectItem['abcAmount']) }}</td><td>{{ $projectItem['trackingStatus']['label'] }}</td></tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
@@ -395,6 +473,11 @@
     const modeEl    = document.getElementById('appModeFilter');
     const countEl   = document.getElementById('appVisibleCount');
     const rows      = document.querySelectorAll('[data-app-row]');
+    const projectRows = document.querySelectorAll('[data-project-row]');
+    const itemTableWrap = document.getElementById('itemTableWrap');
+    const projectTableWrap = document.getElementById('projectTableWrap');
+    const projectSummary = document.getElementById('projectSummary');
+    let currentView = 'items';
 
     // Keeps each filter box's visible value text (e.g. "FY 2026") in sync
     // with its underlying <select>, which sits invisibly on top of the box
@@ -414,7 +497,7 @@
         const office  = officeEl.value;
         const quarter = quarterEl.value;
         const mode    = modeEl.value;
-        let visible   = 0;
+        let visibleItems = 0;
 
         rows.forEach(row => {
             const match =
@@ -423,16 +506,70 @@
                 (quarter === 'all' || row.dataset.quarter === quarter) &&
                 (mode    === 'all' || row.dataset.mode    === mode);
             row.style.display = match ? '' : 'none';
-            if (match) visible++;
+            if (match) visibleItems++;
         });
 
-        countEl.textContent = visible + ' shown';
+        let visibleProjects = 0;
+        let totalBudget = 0;
+        let totalRequested = 0;
+        let completed = 0;
+        projectRows.forEach(row => {
+            const match =
+                (year    === 'all' || row.dataset.year === year) &&
+                (office  === 'all' || row.dataset.office === office) &&
+                (quarter === 'all' || row.dataset.quarters.split('|').includes(quarter)) &&
+                (mode    === 'all' || row.dataset.modes.split('|').includes(mode));
+            row.style.display = match ? '' : 'none';
+            const detail = document.querySelector(`[data-project-detail="${row.dataset.projectId}"]`);
+            if (detail) {
+                detail.style.display = match && detail.classList.contains('open') ? 'table-row' : 'none';
+            }
+            if (match) {
+                visibleProjects++;
+                totalBudget += Number(row.dataset.budget || 0);
+                totalRequested += Number(row.dataset.requested || 0);
+                if (row.dataset.status === 'Completed') completed++;
+            }
+        });
+
+        document.getElementById('summaryProjects').textContent = visibleProjects;
+        document.getElementById('summaryBudget').textContent = 'PHP ' + totalBudget.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        document.getElementById('summaryRequested').textContent = 'PHP ' + totalRequested.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        document.getElementById('summaryCompleted').textContent = completed;
+        countEl.textContent = (currentView === 'projects' ? visibleProjects : visibleItems) + ' shown';
     }
 
     yearEl.addEventListener('change',    applyFilters);
     officeEl.addEventListener('change',  applyFilters);
     quarterEl.addEventListener('change', applyFilters);
     modeEl.addEventListener('change',    applyFilters);
+
+    document.querySelectorAll('.view-toggle button').forEach(button => {
+        button.addEventListener('click', () => {
+            currentView = button.dataset.view;
+            document.querySelectorAll('.view-toggle button').forEach(btn => btn.classList.toggle('active', btn === button));
+            const projectsActive = currentView === 'projects';
+            itemTableWrap.style.display = projectsActive ? 'none' : '';
+            projectTableWrap.style.display = projectsActive ? '' : 'none';
+            projectSummary.style.display = projectsActive ? 'grid' : 'none';
+            document.getElementById('appViewEyebrow').textContent = projectsActive ? 'Consolidation per project' : 'Consolidated approved items';
+            document.getElementById('appViewTitle').textContent = projectsActive ? 'APP Project Matrix' : 'APP Item Matrix';
+            applyFilters();
+        });
+    });
+
+    projectRows.forEach(row => {
+        row.addEventListener('click', () => {
+            const detail = document.querySelector(`[data-project-detail="${row.dataset.projectId}"]`);
+            if (!detail) return;
+            const open = !detail.classList.contains('open');
+            row.classList.toggle('open', open);
+            detail.classList.toggle('open', open);
+            detail.style.display = open ? 'table-row' : 'none';
+        });
+    });
+
+    applyFilters();
 
     // ── Procurement mode override ─────────────────────────────────────────
     document.querySelectorAll('.mode-cell').forEach(function (cell) {

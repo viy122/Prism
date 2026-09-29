@@ -20,6 +20,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\View\View;
 
 class PrismOfficeHeadController extends Controller
@@ -59,6 +61,31 @@ class PrismOfficeHeadController extends Controller
     public function forMySignatureRefresh(): JsonResponse
     {
         return $this->signatureHistoryJson($this->signatureDocTypes());
+    }
+
+    /** Download a Word-readable version of a PR or AOC owned by this office. */
+    public function downloadSignatureDocumentWord(string $docType, int $id): Response
+    {
+        $document = $this->resolveSignableDoc($docType, $id);
+        $purchaseRequest = $docType === 'pr'
+            ? $document->load(['office', 'items', 'signatureLogs.signedBy'])
+            : $document->load(['purchaseRequest.office', 'purchaseRequest.items', 'signatureLogs.signedBy'])->purchaseRequest;
+
+        abort_unless($purchaseRequest && $purchaseRequest->office_id === $this->officeId(), 403);
+
+        $number = $docType === 'pr'
+            ? ($document->number ?: 'PR-' . $document->id)
+            : ($document->code ?: 'AOC-' . $document->id);
+        $filename = Str::slug($number, '-') . '.doc';
+        $html = view('prism.shared.signature-document-word', compact(
+            'document', 'purchaseRequest', 'docType', 'number'
+        ))->render();
+
+        return response("\xEF\xBB\xBF" . $html, 200, [
+            'Content-Type'        => 'application/msword; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control'       => 'private, no-store, max-age=0',
+        ]);
     }
 
     private function signatureDocTypes(): array

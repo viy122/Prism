@@ -73,6 +73,9 @@ Route::middleware(['auth', 'no-cache'])->group(function () {
         Route::get('/purchase-requests', 'purchaseRequests')->name('purchase-requests');
         Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
         Route::get('/for-my-signature/refresh', 'forMySignatureRefresh')->name('for-my-signature.refresh');
+        Route::get('/for-my-signature/{docType}/{id}/word', 'downloadSignatureDocumentWord')
+            ->name('for-my-signature.word')
+            ->whereIn('docType', ['pr', 'aoc']);
         Route::post('/sign/{docType}/{id}', 'signDocument')->name('sign')->whereIn('docType', ['pr', 'aoc', 'po']);
         Route::post('/sign/{docType}/{id}/confirm', 'confirmSignDocument')->name('sign.confirm')->whereIn('docType', ['pr', 'aoc', 'po']);
     });

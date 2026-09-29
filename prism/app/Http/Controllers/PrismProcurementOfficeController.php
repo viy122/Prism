@@ -569,6 +569,10 @@ class PrismProcurementOfficeController extends Controller
 
             return [
                 'itemId'          => $item->id,
+                'projectId'       => $item->budget_proposal_id,
+                'projectCode'     => $item->budgetProposal?->code ?? 'PPMP-' . $item->budget_proposal_id,
+                'projectTitle'    => $item->budgetProposal?->title ?? 'Untitled Project',
+                'projectStatus'   => $item->budgetProposal?->status ?? 'endorsed',
                 'office'          => $item->budgetProposal?->office?->code ?? "—",
                 'fiscalYear'      => $item->budgetProposal?->fiscal_year,
                 'item'            => $item->name,
@@ -589,14 +593,59 @@ class PrismProcurementOfficeController extends Controller
                 'trackingStatus'     => $trackingStatus,
                 'trackingStatusAuto' => $trackingStatusAuto,
                 'trackingStatusUrl'  => route('procurement-office.annual-procurement-plan.update-tracking-status', $item->id),
+                'hasPurchaseRequest' => $matchedPr !== null,
+                'isPaid'             => $matchedPr?->lifecycleBucket() === 'completed',
             ];
         })->all();
+
+        // Reversible project-level projection: for now one PPMP is one project.
+        // Nothing is duplicated or migrated; this only rolls existing items up
+        // by their stable budget_proposal_id.
+        $projects = collect($mapped)
+            ->groupBy('projectId')
+            ->map(function ($projectItems) {
+                $first          = $projectItems->first();
+                $budget         = $projectItems->sum('abcAmount');
+                $requested      = $projectItems->where('hasPurchaseRequest', true)->sum('abcAmount');
+                $paid           = $projectItems->where('isPaid', true)->sum('abcAmount');
+                $itemCount      = $projectItems->count();
+                $requestedCount = $projectItems->where('hasPurchaseRequest', true)->count();
+
+                $status = match (true) {
+                    $itemCount > 0 && $projectItems->every(fn ($item) => $item['isPaid']) => 'Completed',
+                    $projectItems->contains(fn ($item) => str_starts_with($item['trackingStatus']['key'], 'halted:')) => 'Delayed',
+                    $requestedCount > 0 => 'In Progress',
+                    $first['projectStatus'] === 'approved' => 'Approved',
+                    default => 'Endorsed',
+                };
+
+                return [
+                    'id'         => $first['projectId'],
+                    'code'       => $first['projectCode'],
+                    'title'      => $first['projectTitle'],
+                    'office'     => $first['office'],
+                    'fiscalYear' => $first['fiscalYear'],
+                    'itemCount'  => $itemCount,
+                    'budget'     => $budget,
+                    'requested'  => $requested,
+                    'paid'       => $paid,
+                    'remaining'  => max(0, $budget - $requested),
+                    'coverage'   => $itemCount ? (int) round(($requestedCount / $itemCount) * 100) : 0,
+                    'status'     => $status,
+                    'quarters'   => $projectItems->pluck('targetQuarter')->unique()->values()->all(),
+                    'modes'      => $projectItems->pluck('procurementMode')->unique()->values()->all(),
+                    'items'      => $projectItems->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
 
         $fiscalYears = collect($mapped)->pluck('fiscalYear')->filter()->unique()->sort()->values();
 
         return view('prism.procurement-office.annual-procurement-plan', $this->withCommon('annual-procurement-plan', [
             'pageTitle'        => 'Annual Procurement Plan',
             'appItems'         => $mapped,
+            'projects'         => $projects,
             'offices'          => collect($mapped)->pluck('office')->unique()->values()->all(),
             'fiscalYears'      => $fiscalYears->all(),
             'quarters'         => ['Q1', 'Q2', 'Q3', 'Q4'],
