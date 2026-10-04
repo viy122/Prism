@@ -53,6 +53,7 @@ class PrismAccountingOfficeController extends Controller
     public function dashboard(): View
     {
         $mapPo = fn ($po) => [
+            'fiscalYear'   => $po->abstractOfCanvass?->purchaseRequest?->fiscal_year,
             'id'           => $po->id,
             'poNumber'     => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
             'aocCode'      => $po->abstractOfCanvass->code ?? '—',
@@ -94,6 +95,7 @@ class PrismAccountingOfficeController extends Controller
             ->latest('paid_at')
             ->get()
             ->map(fn ($po) => [
+                'fiscalYear'  => $po->abstractOfCanvass?->purchaseRequest?->fiscal_year,
                 'id'          => $po->id,
                 'poNumber'    => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
                 'office'      => $po->abstractOfCanvass->purchaseRequest->office?->code ?? '—',

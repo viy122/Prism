@@ -1,0 +1,35 @@
+﻿{
+    "run":  "final-10",
+    "users":  10,
+    "samples":  100,
+    "avg_ms":  479.44,
+    "min_ms":  308,
+    "max_ms":  655,
+    "throughput_rps":  19.146084625694048,
+    "failed":  1,
+    "error_pct":  1,
+    "measurement_seconds":  5.223,
+    "first_request_manila":  "2026-10-03T21:28:33.8540000+08:00",
+    "last_completion_manila":  "2026-10-03T21:28:39.0770000+08:00",
+    "configured_duration_seconds":  0,
+    "iterations_per_user":  10,
+    "setup_samples_excluded":  20,
+    "participating_threads":  10,
+    "min_samples_per_thread":  10,
+    "max_samples_per_thread":  10,
+    "peak_active_threads":  10,
+    "first_request_spread_ms":  3,
+    "process_wall_seconds":  13.3576234,
+    "observed_min_free_ram_mb":  408.91,
+    "command":  "C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\java.exe -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -jar \"C:\\Users\\khriz\\Downloads\\apache-jmeter-5.6.3\\apache-jmeter-5.6.3\\bin\\ApacheJMeter.jar\" -n -t \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\dashboard.jmx\" -q \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\benchmark.properties\" -l samples.jtl -j jmeter.log -Jusers=10 -Jiterations=10 -Jduration=0",
+    "exit_code":  0,
+    "failures":  [
+                     {
+                         "timeStamp":  "1791034115597",
+                         "elapsed":  "308",
+                         "responseCode":  "500",
+                         "responseMessage":  "Internal Server Error",
+                         "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                     }
+                 ]
+}

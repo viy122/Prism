@@ -328,13 +328,11 @@
         .ppmp-signoff-name { font-size: 13px; font-weight: 800; text-align: center; text-decoration: underline; text-underline-offset: 3px; color: var(--txt); }
         .ppmp-signoff-title { font-size: 11px; text-align: center; color: var(--txt3); margin-top: 2px; min-height: 14px; }
         .ppmp-signoff-date { font-size: 11px; text-align: center; color: var(--txt3); margin-top: 12px; }
-        /* Headers use short labels — the full official BSU column wording is
-             on each <th>'s title="" attribute instead, as a native hover
-             tooltip, so the row stays compact without losing the exact
-             official name. */
-        .ppmp-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); text-align: left; white-space: nowrap; cursor: help; }
-        .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: var(--txt2); }
+        /* Full template labels remain visible on screen and in print. */
+        .ppmp-preview-table { width: 100%; min-width: 1320px; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+        .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid var(--border2); padding: 10px 8px; font-size: 11px; line-height: 1.45; font-weight: 700; text-transform: none; letter-spacing: normal; color: #1C1010; text-align: left; vertical-align: middle; white-space: normal; overflow-wrap: break-word; }
+        .ppmp-preview-table .ppmp-header-detail { display: block; margin-top: 4px; font-size: .95em; font-weight: 400; color: #4b5563; }
+        .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: var(--txt2); overflow-wrap: anywhere; }
 
         /* ── Attach source file modal ── */
         .attach-modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -356,7 +354,8 @@
                clip to that scrolled viewport, or columns past the fold never make it onto
                the page. Let the table reflow to the full (landscape) print width instead. */
             .table-scroll { overflow: visible !important; }
-            .ppmp-preview-table { width: 100% !important; table-layout: fixed; font-size: 10px; }
+            .ppmp-preview-table { width: 100% !important; min-width: 0; table-layout: fixed; font-size: 10px; }
+            .ppmp-preview-table thead th { font-size: 10px; line-height: 1.3; }
             /* overflow-wrap (not word-break) — wraps at spaces between words
                first, only breaking mid-word as a last resort for a single
                word too long to fit. word-break: break-word was chopping
@@ -780,35 +779,10 @@
                              form exactly: PROCUREMENT PROJECT DETAILS (Cols 1-5),
                              PROJECTED TIMELINE (Cols 6-8), FUNDING DETAILS (Cols
                              9-10), then Attached Supporting Document/s and Remarks
-                             ungrouped. Column-name headers show short labels —
-                             hover any header for its exact official wording. --}}
+                             ungrouped. Full column labels are shared with the
+                             printable document so both views stay consistent. --}}
                         <table class="ppmp-preview-table">
-                            <thead>
-                                <tr>
-                                    <th colspan="5">Procurement Project Details</th>
-                                    <th colspan="3">Projected Timeline (MM/YYYY)</th>
-                                    <th colspan="2">Funding Details</th>
-                                    <th rowspan="2" title="Attached Supporting Document/s">Attached Supporting Document/s</th>
-                                    <th rowspan="2" title="Remarks">Remarks</th>
-                                </tr>
-                                <tr>
-                                    <th title="General Description and Objective of the Project to be Procured">General Description and Objective</th>
-                                    <th title="Type of the Project to be Procured (whether Goods, Infrastructure and Consulting Services)">Type</th>
-                                    <th title="Quantity and Size of the Project to be Procured">Qty &amp; Size</th>
-                                    <th title="Recommended Mode of Procurement">Recommended Mode of Procurement</th>
-                                    <th title="Pre-Procurement Conference, if applicable (Yes/No)">Pre-Proc. Conference</th>
-                                    <th title="Start of Procurement Activity">Start of Procurement Activity</th>
-                                    <th title="End of Procurement Activity">End of Procurement Activity</th>
-                                    <th title="Expected Delivery/Implementation Period">Expected Delivery / Implementation</th>
-                                    <th title="Source of Funds">Source of Funds</th>
-                                    <th title="Estimated Budget / Authorized Budgetary Allocation">Estimated Budget</th>
-                                </tr>
-                                <tr class="ppmp-col-number-row">
-                                    <th>Column 1</th><th>Column 2</th><th>Column 3</th><th>Column 4</th><th>Column 5</th>
-                                    <th>Column 6</th><th>Column 7</th><th>Column 8</th><th>Column 9</th><th>Column 10</th>
-                                    <th>Column 11</th><th>Column 12</th>
-                                </tr>
-                            </thead>
+                            @include('prism.shared.ppmp-table-head')
                             <tbody id="ppmpPreviewBody"></tbody>
                             <tfoot>
                                 <tr>

@@ -390,7 +390,7 @@
                 <tbody>
                     @foreach($forProcessing as $po)
                     <tr id="po-row-{{ $po['id'] }}">
-                        <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}</td>
+                        <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}<small style="display:block;">FY {{ $po['fiscalYear'] ?? 'unassigned' }}</small></td>
                         <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['office'] }}</td>
                         <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['title'] }}</td>
                         <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['supplier'] }}</td>
@@ -453,7 +453,7 @@
                 <tbody>
                     @foreach($awaitingCashier as $po)
                     <tr>
-                        <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}</td>
+                        <td style="font-weight:700;font-size:12px;color:var(--s500);">{{ $po['poNumber'] }}<small style="display:block;">FY {{ $po['fiscalYear'] ?? 'unassigned' }}</small></td>
                         <td style="font-size:12px;font-weight:600;color:var(--s600);">{{ $po['office'] }}</td>
                         <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['title'] }}</td>
                         <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $po['supplier'] }}</td>
@@ -522,6 +522,7 @@
                             @else
                                 <span style="color:var(--s500);">{{ $po['poNumber'] }}</span>
                             @endif
+                            <small style="display:block;">FY {{ $po['fiscalYear'] ?? 'unassigned' }}</small>
                         </td>
                         <td style="font-size:12px;font-weight:600;color:var(--s600);">{{ $po['office'] }}</td>
                         <td>{{ $po['supplier'] }}</td>
@@ -592,6 +593,7 @@
     </div>
 </div>
 
+@include('prism.shared.receiving-table', ['receivingReadOnly' => true])
 @endsection
 
 @push('scripts')

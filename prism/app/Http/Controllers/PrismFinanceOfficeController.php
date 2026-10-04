@@ -213,7 +213,7 @@ class PrismFinanceOfficeController extends Controller
         $submitted = array_fill(1, 12, 0);
         $endorsed  = array_fill(1, 12, 0);
 
-        BudgetProposalReview::whereYear('reviewed_at', now()->year)
+        BudgetProposalReview::whereYear('reviewed_at', app(\App\Services\FiscalYearContext::class)->year ?? now()->year)
             ->get(['action', 'reviewed_at'])
             ->each(function ($r) use (&$submitted, &$endorsed) {
                 $month = $r->reviewed_at->month;

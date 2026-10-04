@@ -1,0 +1,261 @@
+{
+  "base_url": "http://prism.test",
+  "timeout": 30,
+  "accounts": {
+    "office_head": {
+      "email": "selenium.office@prism.test",
+      "password_env": "PRISM_UI_OFFICE_PASSWORD",
+      "dashboard_path": "/office-head"
+    },
+    "finance": {
+      "email": "selenium.finance@prism.test",
+      "password_env": "PRISM_UI_FINANCE_PASSWORD",
+      "dashboard_path": "/finance-office"
+    },
+    "chancellor": {
+      "email": "selenium.chancellor@prism.test",
+      "password_env": "PRISM_UI_CHANCELLOR_PASSWORD",
+      "dashboard_path": "/chancellor"
+    },
+    "procurement": {
+      "email": "selenium.procurement@prism.test",
+      "password_env": "PRISM_UI_PROCUREMENT_PASSWORD",
+      "dashboard_path": "/procurement-office"
+    },
+    "admin": {
+      "email": "selenium.admin@prism.test",
+      "password_env": "PRISM_UI_ADMIN_PASSWORD",
+      "dashboard_path": "/admin"
+    },
+    "next_signer": {
+      "email": "selenium.vcaa@prism.test",
+      "password_env": "PRISM_UI_NEXT_PASSWORD",
+      "dashboard_path": "/vice-chancellor"
+    }
+  },
+  "cases": {
+    "draft": {
+      "path": "/office-head/budget-proposal?proposal=71&year=2026",
+      "title": "TEST Selenium draft",
+      "proposal_id": 71
+    },
+    "draft_crud": {
+      "path": "/office-head/budget-proposal?proposal=72&year=2026",
+      "title": "TEST Selenium draft_crud",
+      "proposal_id": 72,
+      "before_total": 2500
+    },
+    "missing_sources": {
+      "path": "/office-head/budget-proposal?proposal=73&year=2026",
+      "title": "TEST Selenium missing_sources",
+      "proposal_id": 73
+    },
+    "planning_chain": {
+      "path": "/office-head/budget-proposal?proposal=74&year=2026",
+      "title": "TEST Selenium planning_chain",
+      "proposal_id": 74,
+      "finance_path": "/finance-office/proposal-review/74?year=2026",
+      "approval_path": "/chancellor/budget-approval?year=2026"
+    },
+    "finance_return": {
+      "proposal_id": 75,
+      "title": "TEST Selenium finance_return",
+      "finance_path": "/finance-office/proposal-review/75?year=2026",
+      "office_path": "/office-head/budget-proposal?proposal=75&year=2026",
+      "timeline_path": "/office-head/my-proposals?year=2026",
+      "proposal_code": "SEL-20261004-finance_return"
+    },
+    "chancellor_return": {
+      "path": "/chancellor/budget-approval?year=2026",
+      "proposal_id": 76,
+      "title": "TEST Selenium chancellor_return"
+    },
+    "create_pr": {
+      "path": "/procurement-office/purchase-request-management?year=2026",
+      "proposal_id": 77,
+      "pdf": "fixtures/private/approved-test-pr.pdf",
+      "number": "SEL-20261004-EXTRACT",
+      "extraction_timeout": 120,
+      "expected_items": [
+        {
+          "name": "TEST Extraction Bond Paper A4",
+          "unit": "ream",
+          "quantity": 10,
+          "unit_cost": 250
+        }
+      ],
+      "expected_total": 2500,
+      "expected": {
+        "#fPrNumber": "SEL-20261004-EXTRACT",
+        "#fOffice": "SELTEST",
+        "#fItem": "TEST PDF paper purchase"
+      }
+    },
+    "pr": {
+      "path": "/procurement-office/purchase-request-management?year=2026",
+      "id": 77,
+      "expected": {
+        "#fPrNumber": "SEL-20261004-PR-STABLE",
+        "#fOffice": "SELTEST",
+        "#fItem": "TEST Selenium STABLE"
+      },
+      "search": "SEL-20261004-PR-STABLE",
+      "search_ids": [
+        77
+      ],
+      "office": "SELTEST",
+      "office_ids": [
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83
+      ]
+    },
+    "aoc": {
+      "path": "/procurement-office/abstract-of-canvass?year=2026",
+      "id": 35,
+      "expected": {
+        "#fCode": "SEL-20261004-AOC-STABLE",
+        "#fPrNumber": "SEL-20261004-PR-STABLE",
+        "#fOffice": "SELTEST",
+        "#fTitle": "TEST Selenium STABLE"
+      },
+      "expected_suppliers": [
+        "TEST Supplier Alpha",
+        "TEST Supplier Beta"
+      ],
+      "search": "SEL-20261004-AOC-STABLE",
+      "search_ids": [
+        35
+      ],
+      "office": "SELTEST",
+      "office_ids": [
+        35,
+        36,
+        37,
+        38
+      ]
+    },
+    "po": {
+      "path": "/procurement-office/purchase-orders?year=2026",
+      "id": 35,
+      "expected": {
+        "#fPoNumber": "SEL-20261004-PO-STABLE",
+        "#fAocCode": "SEL-20261004-AOC-STABLE",
+        "#fOffice": "SELTEST",
+        "#fSupplier": "TEST Supplier Alpha",
+        "#fAmount": "₱2,500.00"
+      },
+      "search": "SEL-20261004-PO-STABLE",
+      "search_ids": [
+        35
+      ],
+      "office": "SELTEST",
+      "office_ids": [
+        35,
+        36,
+        37
+      ]
+    },
+    "create_aoc": {
+      "path": "/procurement-office/abstract-of-canvass?year=2026",
+      "pr_id": 78,
+      "expected": {
+        "#fPrNumber": "SEL-20261004-PR-CREATE-AOC",
+        "#fOffice": "SELTEST",
+        "#fTitle": "TEST Selenium CREATE-AOC"
+      }
+    },
+    "create_po": {
+      "path": "/procurement-office/purchase-orders?year=2026",
+      "aoc_id": 36,
+      "aoc_code": "SEL-20261004-AOC-CREATE-PO",
+      "supplier": "TEST Supplier Gamma",
+      "amount": 2500,
+      "address": "TEST Gamma Warehouse",
+      "delivery_date": "2026-12-31"
+    },
+    "signature_readonly": {
+      "account": "office_head",
+      "path": "/office-head/for-my-signature?year=2026",
+      "document_key": "pr-80",
+      "number": "SEL-20261004-PR-SIGNATURE-READONLY"
+    },
+    "signature_handoff": {
+      "account": "office_head",
+      "path": "/office-head/for-my-signature?year=2026",
+      "document_key": "pr-81",
+      "number": "SEL-20261004-PR-SIGNATURE-HANDOFF",
+      "expected_stage": "PR – At Vice Chancellor (VCAA)",
+      "next_account": "next_signer",
+      "next_path": "/vice-chancellor/for-my-signature?year=2026",
+      "before_log_count": 0
+    },
+    "receiving": {
+      "path": "/office-head/purchase-requests?year=2026",
+      "item_id": 112,
+      "remaining_quantity": 10
+    },
+    "record_receipt": {
+      "path": "/office-head/purchase-requests?year=2026",
+      "item_id": 113,
+      "remaining_quantity": 10,
+      "arrival_date": "2026-10-03",
+      "quantity": 2,
+      "recipient": "TEST Selenium Receiver",
+      "before_quantity": "0 / 10 ream",
+      "after_quantity": "2 / 10 ream",
+      "after_status": "Partially Received"
+    },
+    "report_office": {
+      "path": "/procurement-office/procurement-reports?year=2026",
+      "office": "SELRPT",
+      "expected_stats": {
+        "ITEMS TARGETED": "4",
+        "ITEMS PROCURED": "1",
+        "COMPLETION RATE": "25%",
+        "DELAYED ITEMS": "0"
+      },
+      "expected_rows": [
+        [
+          "SELRPT",
+          "Q4",
+          "4",
+          "1",
+          "25%"
+        ]
+      ]
+    },
+    "report_year": {
+      "path": "/procurement-office/procurement-reports?year=2026&office=SELRPT",
+      "target_year": 2025,
+      "before_stats": {
+        "ITEMS TARGETED": "4",
+        "ITEMS PROCURED": "1",
+        "COMPLETION RATE": "25%",
+        "DELAYED ITEMS": "0"
+      },
+      "after_stats": {
+        "ITEMS TARGETED": "2",
+        "ITEMS PROCURED": "0",
+        "COMPLETION RATE": "0%",
+        "DELAYED ITEMS": "0"
+      }
+    },
+    "new_user": {
+      "role_id": 2,
+      "office_id": 40
+    },
+    "notification": {
+      "account": "office_head",
+      "path": "/office-head?year=2026",
+      "id": 664,
+      "title": "TEST Selenium signature reminder",
+      "destination": "/office-head/for-my-signature",
+      "unread_before": 1
+    }
+  }
+}

@@ -1,0 +1,29 @@
+﻿{
+    "run":  "normal-05",
+    "users":  5,
+    "samples":  50,
+    "avg_ms":  314.48,
+    "min_ms":  276,
+    "max_ms":  351,
+    "throughput_rps":  14.894250819183794,
+    "failed":  0,
+    "error_pct":  0,
+    "measurement_seconds":  3.357,
+    "first_request_manila":  "2026-10-03T21:26:13.7570000+08:00",
+    "last_completion_manila":  "2026-10-03T21:26:17.1140000+08:00",
+    "configured_duration_seconds":  0,
+    "iterations_per_user":  10,
+    "setup_samples_excluded":  10,
+    "participating_threads":  5,
+    "min_samples_per_thread":  10,
+    "max_samples_per_thread":  10,
+    "peak_active_threads":  5,
+    "first_request_spread_ms":  0,
+    "process_wall_seconds":  11.023529499999999,
+    "observed_min_free_ram_mb":  444.77,
+    "command":  "C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\java.exe -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -jar \"C:\\Users\\khriz\\Downloads\\apache-jmeter-5.6.3\\apache-jmeter-5.6.3\\bin\\ApacheJMeter.jar\" -n -t \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\dashboard.jmx\" -q \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\benchmark.properties\" -l samples.jtl -j jmeter.log -Jusers=5 -Jiterations=10 -Jduration=0",
+    "exit_code":  0,
+    "failures":  [
+
+                 ]
+}

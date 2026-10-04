@@ -117,6 +117,7 @@
 @endpush
 
 @section('content')
+@include('prism.partials.report-version')
 
 <div class="content">
 
@@ -383,6 +384,7 @@
     </div>
 
 </div>
+@include('prism.shared.receiving-table', ['receivingReadOnly' => true])
 @endsection
 
 @push('scripts')

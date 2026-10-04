@@ -218,6 +218,7 @@
 @endpush
 
 @section('content')
+@include('prism.partials.report-version')
 
 <div class="content">
 
@@ -234,7 +235,7 @@
             $selectedQuarter ? 'quarter: ' . $selectedQuarter : null,
         ])->filter()->implode(' · ');
         $reportUrl = function ($office = null) use ($selectedQuarter) {
-            $params = [];
+            $params = ['year' => app(\App\Services\FiscalYearContext::class)->year, 'version' => request()->query('version')];
             if ($office && preg_match('/^[A-Za-z0-9_-]+$/', $office)) {
                 $params['office'] = $office;
             }
@@ -714,6 +715,7 @@
     </div>
 
 </div>
+@include('prism.shared.receiving-table', ['receivingReadOnly' => true])
 @endsection
 
 @push('scripts')

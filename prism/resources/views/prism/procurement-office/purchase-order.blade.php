@@ -487,6 +487,7 @@
     </div>
 </div>
 
+@include('prism.shared.receiving-table')
 @endsection
 
 <script type="application/json" id="poData">@json($purchaseOrders)</script>

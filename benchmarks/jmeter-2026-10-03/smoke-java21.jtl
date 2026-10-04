@@ -1,0 +1,5 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1791033839140,266,SETUP - existing procurement demo login,302,Found,Authenticated users 1-1,text,true,,1648,142,1,1,http://prism.test/demo-login/procurement-office,263,0,18
+1791033839869,295,SETUP - dashboard warm-up,200,OK,Authenticated users 1-1,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,293,0,0
+1791033840279,258,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,251,0,0
+1791033840605,250,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,249,0,0

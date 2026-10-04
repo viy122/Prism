@@ -2399,6 +2399,9 @@ class PrismProcurementOfficeController extends Controller
 
     public function procurementReports(Request $request): View
     {
+        if ($archive = app(\App\Services\FiscalYearReports::class)->archived('procurement', $request)) {
+            return view('prism.procurement-office.procurement-reports', $this->withCommon('procurement-reports', $archive + ['pageTitle' => 'Procurement Reports']));
+        }
         // Every table on this page can be narrowed to one office — "all
         // offices" (no filter) stays the default so opening the page fresh
         // always shows the whole picture; a report reader only reaches for
@@ -2415,9 +2418,10 @@ class PrismProcurementOfficeController extends Controller
             'completedPurchases' => $prReportRows['completed'],
             'delayedItems'       => $prReportRows['delayed'],
             'ppmpValidationRows' => $ppmpValidationRows,
+            'deliveryRows'       => app(\App\Services\ItemReceivingService::class)->rows(null, $officeCode),
             'offices'            => Office::orderBy('code')->get(['id', 'code', 'name']),
             'selectedOffice'     => $officeCode,
-            'exportUrl'          => route('procurement-office.procurement-reports.export', $officeCode ? ['office' => $officeCode] : []),
+            'exportUrl'          => route('procurement-office.procurement-reports.export', ['year' => app(\App\Services\FiscalYearContext::class)->year, 'office' => $officeCode]),
         ]));
     }
 
@@ -2426,15 +2430,19 @@ class PrismProcurementOfficeController extends Controller
     {
         $officeCode = $request->query('office') ?: null;
 
-        $quarterlyRows      = $this->buildQuarterlyAccomplishment($officeCode);
-        $prReportRows       = $this->buildPrReportRows($officeCode);
-        $ppmpValidationRows = $this->buildPpmpValidationRows($officeCode);
+        $archive = app(\App\Services\FiscalYearReports::class)->archived('procurement', $request);
+        $quarterlyRows = $archive['quarterlyRows'] ?? $this->buildQuarterlyAccomplishment($officeCode);
+        $prReportRows = $archive ? ['completed' => $archive['completedPurchases'], 'delayed' => $archive['delayedItems']] : $this->buildPrReportRows($officeCode);
+        $ppmpValidationRows = $archive['ppmpValidationRows'] ?? $this->buildPpmpValidationRows($officeCode);
+        $deliveryRows = $archive ? ($archive['deliveryRows'] ?? []) : app(\App\Services\ItemReceivingService::class)->rows(null, $officeCode);
 
-        $filename = 'procurement-report-' . ($officeCode ?: 'all-offices') . '-' . now()->format('Ymd-His') . '.csv';
+        $filename = 'procurement-report-FY' . app(\App\Services\FiscalYearContext::class)->year . '-' . ($officeCode ?: 'all-offices') . ($archive ? '-v' . $archive['reportVersion'] : '-live') . '.csv';
 
-        return response()->streamDownload(function () use ($quarterlyRows, $prReportRows, $ppmpValidationRows) {
+        $fiscalYear = app(\App\Services\FiscalYearContext::class)->year;
+        return response()->streamDownload(function () use ($quarterlyRows, $prReportRows, $ppmpValidationRows, $deliveryRows, $fiscalYear, $archive) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel reads ₱/accented text correctly
+            fputcsv($out, ['Fiscal Year', $fiscalYear, 'Report Version', $archive['reportVersion'] ?? 'Live', 'Finalized At', $archive['reportFinalizedAt'] ?? '']);
 
             fputcsv($out, ['Quarterly Accomplishment — Items Targeted vs Procured']);
             fputcsv($out, ['Office', 'Quarter', 'Targeted', 'Procured', 'Completion Rate']);
@@ -2467,6 +2475,13 @@ class PrismProcurementOfficeController extends Controller
                 ]);
             }
 
+            fputcsv($out, []);
+            fputcsv($out, ['Item Delivery and Receiving']);
+            fputcsv($out, ['Office', 'Item', 'PR No.', 'PO No.', 'Procured Date', 'Expected Delivery', 'Arrival Date (Fully Received)', 'Latest Partial Arrival', 'Quantity Received', 'Quantity Ordered', 'Unit', 'Receiving Status', 'Delivery Duration (Days)', 'Delay (Days)', 'Delivery Timing']);
+            foreach ($deliveryRows as $row) {
+                $cells = [$row['office'], $row['item'], $row['prNumber'], $row['poNumber'], $row['procuredDate'], $row['expectedDelivery'], $row['arrivalDate'], $row['arrivalDate'] ? null : $row['lastArrivalDate'], $row['receivedQuantity'], $row['quantity'], $row['unit'], $row['receivingStatus'], $row['daysToReceive'], $row['daysDelayed'], $row['delayLabel']];
+                fputcsv($out, array_map(fn ($value) => is_string($value) && preg_match('/^[=+@\\-\\t\\r]/', $value) ? "'".$value : $value, $cells));
+            }
             fclose($out);
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',

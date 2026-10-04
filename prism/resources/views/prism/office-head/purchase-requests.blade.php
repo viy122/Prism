@@ -62,9 +62,9 @@
         ],
         [
             'key' => 'completed',
-            'label' => 'Completed',
+            'label' => 'Paid',
             'value' => number_format($completedCount),
-            'hint' => 'PRs that reached the completed stage',
+            'hint' => 'Payment completed; check item receiving separately',
             'icon' => '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
         ],
     ];
@@ -91,8 +91,8 @@
             'countLabel' => 'in-progress request(s)',
         ],
         'completed' => [
-            'title' => 'Completed PRs',
-            'lead' => 'Requests that have already reached the final completed status.',
+            'title' => 'Paid PRs',
+            'lead' => 'Requests with completed payment. Actual office receipt is tracked per item.',
             'rows' => $prKpiRows->where('bucket', 'completed')->values(),
             'empty' => 'No completed PRs yet.',
             'countLabel' => 'completed request(s)',
@@ -383,6 +383,7 @@
 @endpush
 
 @section('content')
+    @include('prism.shared.receiving-assets')
     <div class="content">
 
         {{-- Page header --}}
@@ -478,7 +479,7 @@
                             <option value="">All Statuses</option>
                             <option value="pending">Pending</option>
                             <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
+                            <option value="completed">Paid</option>
                             <option value="delayed">Delayed</option>
                         </select>
                         <i class="ti ti-chevron-down fchev"></i>
@@ -538,11 +539,13 @@
                             <table class="pr-items-table">
                                 <thead>
                                     <tr>
-                                        <th style="width:40%">Item Description</th>
+                                        <th>Item Description</th>
                                         <th class="num-cell">Quantity</th>
                                         <th>Unit</th>
                                         <th class="num-cell">Unit Cost</th>
                                         <th class="num-cell">Total</th>
+                                        <th>Arrival Date</th>
+                                        <th>Receiving Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -553,13 +556,17 @@
                                         <td>{{ $item['unit'] }}</td>
                                         <td class="num-cell">PHP {{ number_format($item['unitCost']) }}</td>
                                         <td class="total-cell">PHP {{ number_format($item['totalCost']) }}</td>
+                                        <td data-receiving-item="{{ $item['receiving']['id'] }}" data-receiving-field="arrival">{{ $item['receiving']['arrivalDate'] ?: ($item['receiving']['lastArrivalDate'] ? 'Latest partial: '.$item['receiving']['lastArrivalDate'] : 'Arrival not recorded') }}</td>
+                                        <td><span class="receiving-status" data-receiving-item="{{ $item['receiving']['id'] }}" data-receiving-field="status">{{ $item['receiving']['receivingStatus'] }}</span><br><span data-receiving-item="{{ $item['receiving']['id'] }}" data-receiving-field="quantity">{{ $item['receiving']['receivedQuantity'] }} / {{ $item['quantity'] }} {{ $item['unit'] }}</span><br><span data-receiving-item="{{ $item['receiving']['id'] }}" data-receiving-field="delay" class="{{ $item['receiving']['daysDelayed'] > 0 ? 'receiving-late' : '' }}">{{ $item['receiving']['delayLabel'] }}</span></td>
                                     </tr>
+                                    <tr class="receiving-actions-row"><td colspan="7">@include('prism.shared.receiving-details', ['delivery' => $item['receiving']])</td></tr>
                                     @endforeach
                                 </tbody>
                                 <tfoot>
                                     <tr>
                                         <td colspan="4" style="text-align:right;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--s400);">Total Amount</td>
                                         <td class="total-cell" style="font-size:14px;">PHP {{ number_format($pr['totalAmount']) }}</td>
+                                        <td colspan="2"></td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -601,7 +608,7 @@
                             <span class="badge badge-progress">{{ $inProgressCount }}</span>
                         </div>
                         <div class="health-row">
-                            <span class="health-label">Completed</span>
+                            <span class="health-label">Paid</span>
                             <span class="badge badge-completed">{{ $completedCount }}</span>
                         </div>
                         <div class="health-row">

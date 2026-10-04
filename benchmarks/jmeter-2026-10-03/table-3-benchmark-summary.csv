@@ -1,0 +1,5 @@
+Performance Metric,Result
+Response Time,"253.10 ms at 1 user; 3747.46 ms at 50 users (normal tests)."
+Throughput,"3.73 RPS at 1 user; observed normal-run peak 19.15 RPS at 10 users; 11.65 RPS at 50 users."
+Scalability,"Degradation versus 1-user baseline: 18.14% at 5 users; 89.43% at 10; 697.56% at 30; 1380.62% at 50."
+Reliability under Load,"Normal tests: 18/960 failed (1.88% overall); 50-user normal: 10/500 (2.00%); 50-user sustained: 82/3576 (2.29%)."

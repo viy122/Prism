@@ -1,0 +1,49 @@
+﻿{
+    "run":  "normal-10",
+    "users":  10,
+    "samples":  100,
+    "avg_ms":  587.46,
+    "min_ms":  209,
+    "max_ms":  11415,
+    "throughput_rps":  6.8054988430651964,
+    "failed":  3,
+    "error_pct":  3,
+    "measurement_seconds":  14.694,
+    "first_request_manila":  "2026-10-03T21:26:25.7720000+08:00",
+    "last_completion_manila":  "2026-10-03T21:26:40.4660000+08:00",
+    "configured_duration_seconds":  0,
+    "iterations_per_user":  10,
+    "setup_samples_excluded":  20,
+    "participating_threads":  10,
+    "min_samples_per_thread":  10,
+    "max_samples_per_thread":  10,
+    "peak_active_threads":  10,
+    "first_request_spread_ms":  25,
+    "process_wall_seconds":  22.8727031,
+    "observed_min_free_ram_mb":  526,
+    "command":  "C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\java.exe -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -jar \"C:\\Users\\khriz\\Downloads\\apache-jmeter-5.6.3\\apache-jmeter-5.6.3\\bin\\ApacheJMeter.jar\" -n -t \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\dashboard.jmx\" -q \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\benchmark.properties\" -l samples.jtl -j jmeter.log -Jusers=10 -Jiterations=10 -Jduration=0",
+    "exit_code":  0,
+    "failures":  [
+                     {
+                         "timeStamp":  "1791033989855",
+                         "elapsed":  "437",
+                         "responseCode":  "500",
+                         "responseMessage":  "Internal Server Error",
+                         "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                     },
+                     {
+                         "timeStamp":  "1791033988382",
+                         "elapsed":  "1905",
+                         "responseCode":  "500",
+                         "responseMessage":  "Internal Server Error",
+                         "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                     },
+                     {
+                         "timeStamp":  "1791033987507",
+                         "elapsed":  "11415",
+                         "responseCode":  "500",
+                         "responseMessage":  "Internal Server Error",
+                         "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                     }
+                 ]
+}

@@ -36,6 +36,42 @@ class NotificationService
     }
 
     /**
+     * Create a scheduled notification only once for a user and milestone.
+     * Returns true only when a new notification was inserted.
+     */
+    public static function sendOnce(
+        int $userId,
+        string $dedupeKey,
+        string $type,
+        string $title,
+        string $message,
+        string $actionUrl = '',
+        array $data = [],
+        bool $sendPush = true
+    ): bool {
+        $notification = PrismNotification::firstOrCreate(
+            ['dedupe_key' => $userId . ':' . $dedupeKey],
+            [
+                'user_id'    => $userId,
+                'type'       => $type,
+                'title'      => $title,
+                'message'    => $message,
+                'action_url' => $actionUrl,
+                'data_json'  => $data,
+            ]
+        );
+
+        if (!$notification->wasRecentlyCreated) {
+            return false;
+        }
+
+        if ($sendPush) {
+            self::sendExpoPush($userId, $title, $message, $data);
+        }
+        return true;
+    }
+
+    /**
      * Fire-and-forget Expo push. Failure never blocks the in-app notification.
      */
     private static function sendExpoPush(int $userId, string $title, string $message, array $data = []): void

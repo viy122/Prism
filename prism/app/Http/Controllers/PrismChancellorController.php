@@ -387,6 +387,9 @@ class PrismChancellorController extends Controller
      */
     public function procurementReports(Request $request): View
     {
+        if ($archive = app(\App\Services\FiscalYearReports::class)->archived('chancellor', $request)) {
+            return view('prism.chancellor.procurement-reports', $this->withCommon('procurement-reports', $archive + ['pageTitle' => 'Chancellor Procurement Reports']));
+        }
         $selectedOffice = $request->query('office', '');
         $quarterOptions = ['Q1', 'Q2', 'Q3', 'Q4'];
         $selectedQuarter = strtoupper((string) $request->query('quarter', ''));
@@ -500,6 +503,7 @@ class PrismChancellorController extends Controller
             'quarterOptions'     => $quarterOptions,
             'selectedQuarter'    => $selectedQuarter,
             'accomplishmentRows' => $accomplishmentRows,
+            'deliveryRows'       => app(\App\Services\ItemReceivingService::class)->rows(null, $selectedOffice, $selectedQuarter),
             'quarterlyRows'      => $quarterlyRows,
             'utilizationSummary' => $utilizationSummary,
             'delayedByOffice'    => $delayedByOffice,

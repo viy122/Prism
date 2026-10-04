@@ -32,6 +32,7 @@ class PrismCashierController extends Controller
                     ->first();
 
                 return [
+                    'fiscalYear'    => $pr?->fiscal_year,
                     'id'            => $po->id,
                     'poNumber'      => $po->po_number ?? 'PO-' . str_pad($po->id, 4, '0', STR_PAD_LEFT),
                     'office'        => $pr?->office?->code ?? '—',

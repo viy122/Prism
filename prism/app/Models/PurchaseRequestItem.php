@@ -40,6 +40,11 @@ class PurchaseRequestItem extends Model
         return $this->belongsTo(PurchaseRequest::class);
     }
 
+    public function receipts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ItemReceipt::class);
+    }
+
     public function annualProcurementPlanItem(): BelongsTo
     {
         return $this->belongsTo(AnnualProcurementPlanItem::class);

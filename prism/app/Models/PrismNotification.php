@@ -15,6 +15,7 @@ class PrismNotification extends Model
     protected $fillable = [
         'user_id',
         'type',
+        'dedupe_key',
         'title',
         'message',
         'action_url',

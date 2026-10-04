@@ -1,0 +1,691 @@
+﻿{
+    "normal":  [
+                   {
+                       "ConcurrentUsers":  1,
+                       "Samples":  10,
+                       "AverageMs":  253.1,
+                       "MinimumMs":  217,
+                       "MaximumMs":  281,
+                       "ThroughputRPS":  3.7285607755406414,
+                       "FailedRequests":  0,
+                       "ErrorRatePercent":  0,
+                       "MeasurementSeconds":  2.682
+                   },
+                   {
+                       "ConcurrentUsers":  5,
+                       "Samples":  50,
+                       "AverageMs":  299.02,
+                       "MinimumMs":  281,
+                       "MaximumMs":  329,
+                       "ThroughputRPS":  15.37042729787888,
+                       "FailedRequests":  0,
+                       "ErrorRatePercent":  0,
+                       "MeasurementSeconds":  3.253
+                   },
+                   {
+                       "ConcurrentUsers":  10,
+                       "Samples":  100,
+                       "AverageMs":  479.44,
+                       "MinimumMs":  308,
+                       "MaximumMs":  655,
+                       "ThroughputRPS":  19.146084625694048,
+                       "FailedRequests":  1,
+                       "ErrorRatePercent":  1,
+                       "MeasurementSeconds":  5.223
+                   },
+                   {
+                       "ConcurrentUsers":  30,
+                       "Samples":  300,
+                       "AverageMs":  2018.6166666666666,
+                       "MinimumMs":  289,
+                       "MaximumMs":  11843,
+                       "ThroughputRPS":  12.218466175212805,
+                       "FailedRequests":  7,
+                       "ErrorRatePercent":  2.3333333333333335,
+                       "MeasurementSeconds":  24.553
+                   },
+                   {
+                       "ConcurrentUsers":  50,
+                       "Samples":  500,
+                       "AverageMs":  3747.46,
+                       "MinimumMs":  309,
+                       "MaximumMs":  12743,
+                       "ThroughputRPS":  11.650666418119117,
+                       "FailedRequests":  10,
+                       "ErrorRatePercent":  2,
+                       "MeasurementSeconds":  42.916
+                   }
+               ],
+    "scalability":  [
+                        {
+                            "ConcurrentUsers":  1,
+                            "AverageMs":  253.1,
+                            "DegradationPercent":  0
+                        },
+                        {
+                            "ConcurrentUsers":  5,
+                            "AverageMs":  299.02,
+                            "DegradationPercent":  18.14302647175029632556301857
+                        },
+                        {
+                            "ConcurrentUsers":  10,
+                            "AverageMs":  479.44,
+                            "DegradationPercent":  89.42710391149743184512050573
+                        },
+                        {
+                            "ConcurrentUsers":  30,
+                            "AverageMs":  2018.6166666666666,
+                            "DegradationPercent":  697.556960358224654286843145
+                        },
+                        {
+                            "ConcurrentUsers":  50,
+                            "AverageMs":  3747.46,
+                            "DegradationPercent":  1380.6242591860924535756617938
+                        }
+                    ],
+    "normal_failed":  18,
+    "normal_samples":  960,
+    "normal_error_pct":  1.875,
+    "sustained":  {
+                      "run":  "sustained-50",
+                      "users":  50,
+                      "samples":  3576,
+                      "avg_ms":  4207.893736017897,
+                      "min_ms":  627,
+                      "max_ms":  60019,
+                      "throughput_rps":  11.719748562888775,
+                      "failed":  82,
+                      "error_pct":  2.2930648769574944,
+                      "measurement_seconds":  305.126,
+                      "first_request_manila":  "2026-10-03T21:31:29.5340000+08:00",
+                      "last_completion_manila":  "2026-10-03T21:36:34.6600000+08:00",
+                      "configured_duration_seconds":  300,
+                      "iterations_per_user":  null,
+                      "setup_samples_excluded":  100,
+                      "participating_threads":  50,
+                      "min_samples_per_thread":  58,
+                      "max_samples_per_thread":  79,
+                      "peak_active_threads":  50,
+                      "first_request_spread_ms":  125,
+                      "process_wall_seconds":  331.96591739999997,
+                      "observed_min_free_ram_mb":  47.91,
+                      "command":  "C:\\Program Files\\Android\\Android Studio\\jbr\\bin\\java.exe -Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -jar \"C:\\Users\\khriz\\Downloads\\apache-jmeter-5.6.3\\apache-jmeter-5.6.3\\bin\\ApacheJMeter.jar\" -n -t \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\dashboard.jmx\" -q \"C:\\xampp\\htdocs\\Prism\\benchmarks\\jmeter-2026-10-03\\benchmark.properties\" -l samples.jtl -j jmeter.log -Jusers=50 -Jiterations=10 -Jduration=300",
+                      "exit_code":  0,
+                      "failures":  [
+                                       {
+                                           "timeStamp":  "1791034292960",
+                                           "elapsed":  "2894",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034293053",
+                                           "elapsed":  "2981",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034293166",
+                                           "elapsed":  "2943",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034301322",
+                                           "elapsed":  "2791",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034303914",
+                                           "elapsed":  "4551",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034303327",
+                                           "elapsed":  "5298",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034338053",
+                                           "elapsed":  "4799",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034343871",
+                                           "elapsed":  "2951",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034343279",
+                                           "elapsed":  "4086",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034343761",
+                                           "elapsed":  "4589",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034352832",
+                                           "elapsed":  "627",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034354610",
+                                           "elapsed":  "1060",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034352728",
+                                           "elapsed":  "9366",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034302859",
+                                           "elapsed":  "60018",
+                                           "responseCode":  "Non HTTP response code: java.net.SocketTimeoutException",
+                                           "responseMessage":  "Non HTTP response message: Read timed out",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034346825",
+                                           "elapsed":  "16448",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034337884",
+                                           "elapsed":  "26260",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034361320",
+                                           "elapsed":  "4717",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034375294",
+                                           "elapsed":  "5212",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034378097",
+                                           "elapsed":  "2531",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034376937",
+                                           "elapsed":  "3887",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034377302",
+                                           "elapsed":  "4959",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034381999",
+                                           "elapsed":  "1477",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034383035",
+                                           "elapsed":  "2693",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034383614",
+                                           "elapsed":  "2291",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034383533",
+                                           "elapsed":  "3180",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034386711",
+                                           "elapsed":  "1762",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034391434",
+                                           "elapsed":  "2306",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034392519",
+                                           "elapsed":  "2462",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034378279",
+                                           "elapsed":  "19488",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034395306",
+                                           "elapsed":  "3353",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034398698",
+                                           "elapsed":  "4329",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034400016",
+                                           "elapsed":  "3815",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034411931",
+                                           "elapsed":  "2325",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034421621",
+                                           "elapsed":  "913",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034419393",
+                                           "elapsed":  "3701",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034420420",
+                                           "elapsed":  "3201",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034421231",
+                                           "elapsed":  "3313",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034420091",
+                                           "elapsed":  "4597",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034428048",
+                                           "elapsed":  "2523",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034427936",
+                                           "elapsed":  "2882",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034434307",
+                                           "elapsed":  "2437",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034438022",
+                                           "elapsed":  "2037",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034436418",
+                                           "elapsed":  "5157",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034443702",
+                                           "elapsed":  "2581",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034443415",
+                                           "elapsed":  "3576",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034442316",
+                                           "elapsed":  "4783",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034443459",
+                                           "elapsed":  "3949",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034445641",
+                                           "elapsed":  "2569",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034446673",
+                                           "elapsed":  "2162",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034444331",
+                                           "elapsed":  "4876",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034469012",
+                                           "elapsed":  "5379",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034491205",
+                                           "elapsed":  "2887",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034491443",
+                                           "elapsed":  "3029",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034496618",
+                                           "elapsed":  "885",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034497227",
+                                           "elapsed":  "1623",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034495965",
+                                           "elapsed":  "4154",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034501698",
+                                           "elapsed":  "2589",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034501078",
+                                           "elapsed":  "3376",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034502236",
+                                           "elapsed":  "3049",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034502164",
+                                           "elapsed":  "3222",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034503478",
+                                           "elapsed":  "3644",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034532039",
+                                           "elapsed":  "2373",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034530702",
+                                           "elapsed":  "4782",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034537668",
+                                           "elapsed":  "2722",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034543296",
+                                           "elapsed":  "3767",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034543290",
+                                           "elapsed":  "4601",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034546959",
+                                           "elapsed":  "3243",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034554059",
+                                           "elapsed":  "3230",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034498538",
+                                           "elapsed":  "60019",
+                                           "responseCode":  "Non HTTP response code: java.net.SocketTimeoutException",
+                                           "responseMessage":  "Non HTTP response message: Read timed out",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034567445",
+                                           "elapsed":  "3328",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034571076",
+                                           "elapsed":  "2235",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034571602",
+                                           "elapsed":  "3090",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034580364",
+                                           "elapsed":  "2935",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034583443",
+                                           "elapsed":  "2808",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034557289",
+                                           "elapsed":  "33192",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034559016",
+                                           "elapsed":  "32671",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034556167",
+                                           "elapsed":  "35529",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034558875",
+                                           "elapsed":  "33101",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034567447",
+                                           "elapsed":  "24575",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034565604",
+                                           "elapsed":  "26601",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034546366",
+                                           "elapsed":  "46326",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       },
+                                       {
+                                           "timeStamp":  "1791034586571",
+                                           "elapsed":  "8089",
+                                           "responseCode":  "500",
+                                           "responseMessage":  "Internal Server Error",
+                                           "failureMessage":  "Expected authenticated Procurement Office dashboard and HTTP 200."
+                                       }
+                                   ]
+                  }
+}

@@ -22,6 +22,7 @@ class PurchaseOrder extends Model
         'status',
         'signatory_stage',
         'issued_at',
+        'procured_on',
         'expected_delivery_date',
         'paid_by_user_id',
         'paid_at',
@@ -38,6 +39,7 @@ class PurchaseOrder extends Model
         return [
             'total_amount'           => 'decimal:2',
             'issued_at'              => 'datetime',
+            'procured_on'            => 'date',
             'expected_delivery_date' => 'date',
             'paid_at'                => 'datetime',
             'payment_processing_at'  => 'datetime',
@@ -63,6 +65,11 @@ class PurchaseOrder extends Model
     public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(DocumentUpload::class, 'attachable');
+    }
+
+    public function itemReceipts(): HasMany
+    {
+        return $this->hasMany(ItemReceipt::class);
     }
 
     public function signatureLogs(): HasMany

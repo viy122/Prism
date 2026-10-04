@@ -276,6 +276,7 @@
     </div>
 
 </div>
+@include('prism.shared.receiving-table', ['receivingReadOnly' => true])
 @endsection
 
 <script type="application/json" id="viceDivisionItemData">@json($divisionItems)</script>

@@ -303,7 +303,7 @@
                             @endphp
                             <tr data-doc-row data-doc-key="{{ $doc['docType'] }}-{{ $doc['id'] }}" data-doc-type="{{ $doc['docType'] }}" data-office="{{ $doc['office'] }}" data-status-bucket="{{ $doc['statusBucket'] }}" data-updated-at="{{ $doc['updatedAt']->toIso8601String() }}" data-search="{{ strtolower($doc['number'] . ' ' . $doc['office'] . ' ' . $doc['title']) }}" tabindex="0">
                                 <td><span class="doc-badge doc-{{ $doc['docType'] }}">{{ $doc['docLabel'] }}</span></td>
-                                <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $doc['number'] }}</td>
+                                <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">{{ $doc['number'] }}<small style="display:block;">{{ $doc['fiscalYear'] ? 'FY '.$doc['fiscalYear'] : 'FY unassigned' }}</small></td>
                                 <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['office'] }}</td>
                                 <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $doc['title'] }}</td>
                                 <td><span class="badge {{ $stageBadge }}" data-sig-badge="{{ $doc['docType'] }}-{{ $doc['id'] }}" @if(!empty($doc['blockedReason'])) title="{{ $doc['blockedReason'] }}" @endif>{{ !empty($doc['blockedReason']) ? 'Blocked' : ($doc['canAct'] ? 'Needs You' : $doc['signatoryLabel']) }}</span></td>
@@ -334,6 +334,7 @@
                 <div class="detail-fields">
                     <div class="detail-field"><label>Number</label><span id="fNumber">—</span></div>
                     <div class="detail-field"><label>Office</label><span id="fOffice">—</span></div>
+                    <div class="detail-field"><label>Fiscal Year</label><span id="fFiscalYear">—</span></div>
                     <div class="detail-field full"><label>Title</label><span id="fTitle">—</span></div>
                     <div class="detail-field full"><label>Remarks on File</label><span id="fRemarks" style="white-space:pre-line;">—</span></div>
                 </div>
@@ -527,7 +528,7 @@
             </div>`).join('');
     }
 
-    // Why a document was sent back — shown to whoever it now lands with.
+    // Signing/return remarks — shown to the current and next signatories.
     function remarksHtml(remarks) {
         if (!remarks) return '';
         return '<p class="activity-remarks"><i class="ti ti-message-2" style="font-size:11px;margin-right:4px"></i>' + escapeHtml(remarks) + '</p>';
@@ -672,6 +673,7 @@
     function renderDetail(doc, { refreshPreview = true } = {}) {
         document.getElementById('fNumber').textContent  = doc.number;
         document.getElementById('fOffice').textContent  = doc.office;
+        document.getElementById('fFiscalYear').textContent = doc.fiscalYear ? 'FY ' + doc.fiscalYear : 'Unassigned';
         document.getElementById('fTitle').textContent   = doc.title;
         document.getElementById('fRemarks').textContent = doc.remarks;
         const sigTimelineEl = document.getElementById('sigTimeline');
@@ -841,6 +843,7 @@
     /* ── Mark Signed / Forward (no photo — matches the Procurement page's simple flow) ── */
     async function markSigned() {
         if (!activeDoc || saving) return;
+        const submittedRemarks = remarksIn.value || null;
 
         const needsThird = activeDoc.docType === 'pr' && activeDoc.nextStage === 'at_third_sign';
         let thirdSigner = null;
@@ -861,11 +864,11 @@
                 const r = await fetch(activeDoc.signUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                    body: JSON.stringify({ remarks: remarksIn.value || null }),
+                    body: JSON.stringify({ remarks: submittedRemarks }),
                 });
                 const j = await r.json();
                 if (r.ok && j.success && j.signatoryStage) {
-                    applyAdvance(j);
+                    applyAdvance(j, submittedRemarks);
                 } else {
                     showToast(j.error || 'Failed to forward.', true);
                 }
@@ -883,7 +886,7 @@
                 return;
             }
 
-            const payload = { remarks: remarksIn.value || null };
+            const payload = { remarks: submittedRemarks };
             if (thirdSigner) payload.third_signer = thirdSigner;
 
             const r2 = await fetch(activeDoc.confirmUrl, {
@@ -894,7 +897,7 @@
             const j2 = await r2.json();
 
             if (r2.ok && j2.success && j2.signatoryStage) {
-                applyAdvance(j2);
+                applyAdvance(j2, submittedRemarks);
             } else {
                 showToast(j2.error || 'Failed to send.', true);
             }
@@ -909,12 +912,12 @@
         }
     }
 
-    function applyAdvance(json) {
+    function applyAdvance(json, submittedRemarks) {
         activeDoc.signatoryStage = json.signatoryStage;
         activeDoc.signatoryLabel = json.signatoryLabel;
         activeDoc.canAct = false; // this role's part is done until it comes back around
         activeDoc.signatureLogs = activeDoc.signatureLogs || [];
-        activeDoc.signatureLogs.push({ display: 'Signed – ' + activeDoc.signatoryLabel, by: '', at: 'just now', atRaw: new Date().toISOString() });
+        activeDoc.signatureLogs.push({ display: 'Signed – ' + activeDoc.signatoryLabel, by: '', at: 'just now', atRaw: new Date().toISOString(), remarks: submittedRemarks });
         if (Array.isArray(json.stageMeta)) {
             // Re-derive chain done/active/pending from the fresh stage list.
             const stages = json.stageMeta.map(m => m.key);
@@ -962,7 +965,7 @@
         const search = (doc.number + ' ' + doc.office + ' ' + doc.title).toLowerCase();
         return `<tr data-doc-row data-doc-key="${doc.docType}-${doc.id}" data-doc-type="${doc.docType}" data-office="${escapeHtml(doc.office)}" data-status-bucket="${doc.statusBucket || ''}" data-updated-at="${doc.updatedAt || ''}" data-search="${escapeHtml(search)}" tabindex="0">
             <td><span class="doc-badge doc-${doc.docType}">${doc.docLabel}</span></td>
-            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(doc.number)}</td>
+            <td style="font-size:12px;font-weight:700;color:var(--s500);white-space:nowrap;">${escapeHtml(doc.number)}<small style="display:block;">${doc.fiscalYear ? 'FY ' + escapeHtml(String(doc.fiscalYear)) : 'FY unassigned'}</small></td>
             <td style="font-size:12px;font-weight:600;color:var(--s600);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.office)}</td>
             <td style="font-size:13px;color:var(--s900);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(doc.title)}</td>
             <td><span class="badge ${stageBadge}" data-sig-badge="${doc.docType}-${doc.id}"${doc.blockedReason ? ` title="${escapeHtml(doc.blockedReason)}"` : ''}>${escapeHtml(badgeText)}</span></td>

@@ -1,0 +1,34 @@
+{
+  "MEASURED - Procurement dashboard FY2026" : {
+    "transaction" : "MEASURED - Procurement dashboard FY2026",
+    "sampleCount" : 300,
+    "errorCount" : 7,
+    "errorPct" : 2.3333333,
+    "meanResTime" : 2018.616666666666,
+    "medianResTime" : 1877.5,
+    "minResTime" : 289.0,
+    "maxResTime" : 11843.0,
+    "pct1ResTime" : 3069.300000000001,
+    "pct2ResTime" : 3624.1999999999994,
+    "pct3ResTime" : 4632.260000000002,
+    "throughput" : 12.218466175212805,
+    "receivedKBytesPerSec" : 3547.9479738346636,
+    "sentKBytesPerSec" : 10.309330835335803
+  },
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 300,
+    "errorCount" : 7,
+    "errorPct" : 2.3333333,
+    "meanResTime" : 2018.616666666666,
+    "medianResTime" : 1877.5,
+    "minResTime" : 289.0,
+    "maxResTime" : 11843.0,
+    "pct1ResTime" : 3069.300000000001,
+    "pct2ResTime" : 3624.1999999999994,
+    "pct3ResTime" : 4632.260000000002,
+    "throughput" : 12.218466175212805,
+    "receivedKBytesPerSec" : 3547.9479738346636,
+    "sentKBytesPerSec" : 10.309330835335803
+  }
+}

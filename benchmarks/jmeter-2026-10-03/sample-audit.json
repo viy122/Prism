@@ -1,0 +1,94 @@
+﻿[
+    {
+        "run":  "final-01",
+        "sample_count":  10,
+        "distinct_threads":  1,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  10
+                               }
+                           ],
+        "raw_sha256":  "56C66FBF6CB054A9FC1320B17F072185F4E231FFEF6DE2B8A0123730B96C1919"
+    },
+    {
+        "run":  "final-05",
+        "sample_count":  50,
+        "distinct_threads":  5,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  50
+                               }
+                           ],
+        "raw_sha256":  "DB3836C801B5EAC6BFA50B50D320D9820010F93A3D63EE143748E5F2C187F19A"
+    },
+    {
+        "run":  "final-10",
+        "sample_count":  100,
+        "distinct_threads":  10,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  99
+                               },
+                               {
+                                   "code":  "500",
+                                   "count":  1
+                               }
+                           ],
+        "raw_sha256":  "71152BA25BA024EDF7F3525D4A760A2B8E1E857B60E5656F3821EEE5BCDF8044"
+    },
+    {
+        "run":  "final-30",
+        "sample_count":  300,
+        "distinct_threads":  30,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  293
+                               },
+                               {
+                                   "code":  "500",
+                                   "count":  7
+                               }
+                           ],
+        "raw_sha256":  "00A1F0D2E50852AD57F3BE84E3B5D5BEA359A3D6756668749B016395CE348111"
+    },
+    {
+        "run":  "final-50",
+        "sample_count":  500,
+        "distinct_threads":  50,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  490
+                               },
+                               {
+                                   "code":  "500",
+                                   "count":  10
+                               }
+                           ],
+        "raw_sha256":  "E0749EC967F16E77B1EEE49D0FFE42679082F8E8A5948C7C6702A1DA81E7F589"
+    },
+    {
+        "run":  "sustained-50",
+        "sample_count":  3576,
+        "distinct_threads":  50,
+        "response_codes":  [
+                               {
+                                   "code":  "200",
+                                   "count":  3494
+                               },
+                               {
+                                   "code":  "500",
+                                   "count":  80
+                               },
+                               {
+                                   "code":  "Non HTTP response code: java.net.SocketTimeoutException",
+                                   "count":  2
+                               }
+                           ],
+        "raw_sha256":  "5744113AB983D8D3455473F6FDEC0CBE2A0ACBF4D9CFDE5BEFDBEB6C936DEE9E"
+    }
+]

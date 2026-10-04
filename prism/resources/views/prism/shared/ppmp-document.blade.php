@@ -37,10 +37,11 @@
     .ppmp-meta-row div:last-child { margin-bottom: 0; }
 
     .table-scroll { overflow-x: auto; }
-    .ppmp-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ppmp-preview-table { width: 100%; min-width: 1320px; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
     .ppmp-preview-table thead tr:first-child th { text-align: center; }
-    .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid rgba(0,0,0,.06); padding: 9px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #A88B8C; text-align: left; white-space: nowrap; }
-    .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #6B4F50; }
+    .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid rgba(0,0,0,.06); padding: 10px 8px; font-size: 11px; line-height: 1.45; font-weight: 700; text-transform: none; letter-spacing: normal; color: #1C1010; text-align: left; vertical-align: middle; white-space: normal; overflow-wrap: break-word; }
+    .ppmp-preview-table .ppmp-header-detail { display: block; margin-top: 4px; font-size: .95em; font-weight: 400; color: #4b5563; }
+    .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #6B4F50; overflow-wrap: anywhere; }
     .ppmp-col-number-row th { background: #fff !important; font-size: 9px !important; font-weight: 600 !important; text-transform: none !important; color: #A88B8C !important; text-align: center !important; white-space: nowrap; border-top: 1px solid rgba(0,0,0,.06); }
     .ppmp-total-label { text-align: right; font-weight: 800; font-size: 12px; padding: 10px 12px; border-top: 2px solid rgba(0,0,0,.06); }
     .ppmp-total-amount { font-weight: 800; font-size: 12px; padding: 10px 12px; border-top: 2px solid rgba(0,0,0,.06); }
@@ -58,7 +59,8 @@
         .print-bar { display: none; }
         .ppmp-doc { box-shadow: none; border: none; max-width: 100%; }
         .table-scroll { overflow: visible !important; }
-        .ppmp-preview-table { width: 100% !important; table-layout: fixed; font-size: 10px; }
+        .ppmp-preview-table { width: 100% !important; min-width: 0; table-layout: fixed; font-size: 10px; }
+        .ppmp-preview-table thead th { font-size: 10px; line-height: 1.3; }
         .ppmp-preview-table th, .ppmp-preview-table td { white-space: normal !important; overflow-wrap: break-word; word-break: normal; padding: 6px 8px; }
     }
 </style>
@@ -99,32 +101,7 @@
 
     <div class="table-scroll">
         <table class="ppmp-preview-table">
-            <thead>
-                <tr>
-                    <th colspan="5">Procurement Project Details</th>
-                    <th colspan="3">Projected Timeline (MM/YYYY)</th>
-                    <th colspan="2">Funding Details</th>
-                    <th rowspan="2" title="Attached Supporting Document/s">Attached Supporting Document/s</th>
-                    <th rowspan="2" title="Remarks">Remarks</th>
-                </tr>
-                <tr>
-                    <th title="General Description and Objective of the Project to be Procured">General Description and Objective</th>
-                    <th title="Type of the Project to be Procured (whether Goods, Infrastructure and Consulting Services)">Type</th>
-                    <th title="Quantity and Size of the Project to be Procured">Qty &amp; Size</th>
-                    <th title="Recommended Mode of Procurement">Recommended Mode of Procurement</th>
-                    <th title="Pre-Procurement Conference, if applicable (Yes/No)">Pre-Proc. Conference</th>
-                    <th title="Start of Procurement Activity">Start of Procurement Activity</th>
-                    <th title="End of Procurement Activity">End of Procurement Activity</th>
-                    <th title="Expected Delivery/Implementation Period">Expected Delivery / Implementation</th>
-                    <th title="Source of Funds">Source of Funds</th>
-                    <th title="Estimated Budget / Authorized Budgetary Allocation">Estimated Budget</th>
-                </tr>
-                <tr class="ppmp-col-number-row">
-                    <th>Column 1</th><th>Column 2</th><th>Column 3</th><th>Column 4</th><th>Column 5</th>
-                    <th>Column 6</th><th>Column 7</th><th>Column 8</th><th>Column 9</th><th>Column 10</th>
-                    <th>Column 11</th><th>Column 12</th>
-                </tr>
-            </thead>
+            @include('prism.shared.ppmp-table-head')
             <tbody>
                 @forelse ($items as $item)
                     @php

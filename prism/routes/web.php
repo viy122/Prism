@@ -43,7 +43,15 @@ Route::post('/forgot-password', [ForgotPasswordController::class, 'sendCode'])->
 Route::get('/reset-password', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset.form');
 Route::post('/reset-password', [ForgotPasswordController::class, 'reset'])->middleware('throttle:5,10')->name('password.reset');
 
-Route::middleware(['auth', 'no-cache'])->group(function () {
+Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class])->group(function () {
+    Route::post('/item-receiving/purchase-order/{po}/dates', [\App\Http\Controllers\ItemReceivingController::class, 'dates'])->name('item-receiving.dates');
+    Route::post('/item-receiving/item/{item}/receipts', [\App\Http\Controllers\ItemReceivingController::class, 'store'])->name('item-receiving.store');
+    Route::put('/item-receiving/receipt/{receipt}', [\App\Http\Controllers\ItemReceivingController::class, 'update'])->name('item-receiving.update');
+    Route::get('/item-receiving/receipt/{receipt}/attachment', [\App\Http\Controllers\ItemReceivingController::class, 'attachment'])->name('item-receiving.attachment');
+    Route::get('/fiscal-years', [\App\Http\Controllers\FiscalYearController::class, 'index'])->name('fiscal-years.index');
+    Route::post('/fiscal-years', [\App\Http\Controllers\FiscalYearController::class, 'store'])->name('fiscal-years.store');
+    Route::post('/fiscal-years/{year}/{action}', [\App\Http\Controllers\FiscalYearController::class, 'update'])
+        ->whereIn('action', ['activate', 'finalize', 'reopen'])->name('fiscal-years.update');
 
     Route::prefix('office-head')->name('office-head.')->middleware('role:Office Head / Dean')->controller(PrismOfficeHeadController::class)->group(function () {
         Route::get('/', 'dashboard')->name('dashboard');

@@ -11,6 +11,8 @@ PRISM (Procurement Records, Intelligence, Scoping, and Monitoring System for Cam
 
 ## Local setup
 
+Fiscal-year selection, report finalization, role behavior, and verification steps are documented in [Fiscal Year Handling](docs/FISCAL_YEAR_HANDLING.md).
+
 ### Laravel app (`prism/`)
 
 ```

@@ -445,7 +445,7 @@ class PrismOfficeHeadController extends Controller
         // Office who returned it — a Chancellor return leaves it with Budget Office
         // to reconsider first, even though the stored status looks identical.
         $isReadOnly     = $proposal
-            ? !($proposal->status === 'draft' || ($proposal->status === 'returned' && $this->isEditableByOfficeHead($proposal)))
+            ? !($this->isEditableByOfficeHead($proposal) && in_array($proposal->status, ['draft', 'returned'], true))
             : false;
         $proposalStatus = $proposal?->status ?? 'draft';
 
@@ -484,7 +484,7 @@ class PrismOfficeHeadController extends Controller
             'officeId'            => $proposal?->office_id ?? $officeId,
             'title'               => $proposal?->title ?? '',
             'code'                => $proposal?->code ?? '',
-            'fiscalYear'          => $proposal?->fiscal_year ?? (now()->year + 1),
+            'fiscalYear'          => $proposal?->fiscal_year ?? app(\App\Services\FiscalYearContext::class)->year ?? now()->year,
             // Once a PPMP has actually been submitted, "Date Prepared" should reflect
             // that — not when the draft was first started, which can be weeks earlier.
             'date'                => ($proposal?->submitted_at ?? $proposal?->created_at)?->format('Y-m-d') ?? now()->format('Y-m-d'),
@@ -623,7 +623,7 @@ class PrismOfficeHeadController extends Controller
     public function createNewProposal(): RedirectResponse
     {
         $officeId = $this->officeId();
-        $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
+        $nextYear = app(\App\Services\FiscalYearContext::class)->year ?? now()->year;
 
         $proposal = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
             ?? $this->createDraftProposal($officeId, $nextYear);
@@ -650,7 +650,7 @@ class PrismOfficeHeadController extends Controller
             ? BudgetProposal::where('office_id', $officeId)->find($requestedId)
             : null;
         $fiscalYear = $sourceProposal?->fiscal_year
-            ?? (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year);
+            ?? app(\App\Services\FiscalYearContext::class)->year ?? now()->year;
 
         $proposal = $this->createDraftProposal($officeId, $fiscalYear);
 
@@ -882,16 +882,14 @@ class PrismOfficeHeadController extends Controller
 
     public function purchaseRequests(): View
     {
-        $purchaseItems = PurchaseRequest::with(['items', 'abstractOfCanvass.purchaseOrder'])
+        $purchaseItems = PurchaseRequest::with(['items.receipts.recordedBy', 'abstractOfCanvass.purchaseOrder', 'office'])
             ->where('office_id', $this->officeId())
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($pr) {
                 $tracking = $pr->effectiveTrackingStatus();
-                // End users don't need internal-office phrasing — once paid, their
-                // request has simply reached its final, completed state.
                 if (($tracking['key'] ?? null) === 'paid') {
-                    $tracking['label'] = 'Completed';
+                    $tracking['label'] = 'Paid — see item receiving status';
                 }
                 $bucket = $this->bucketTrackingStage($tracking['key'] ?? '');
 
@@ -913,13 +911,17 @@ class PrismOfficeHeadController extends Controller
                     'createdAt'   => $pr->created_at->toIso8601String(),
                     'pdfFile'     => $pr->file_path,
                     'itemCount'   => $pr->items->count(),
-                    'items'       => $pr->items->map(fn ($item) => [
-                        'name'      => $item->name,
-                        'quantity'  => (int) $item->quantity,
-                        'unit'      => $item->unit,
-                        'unitCost'  => (float) $item->estimated_unit_cost,
-                        'totalCost' => (float) $item->estimated_total_cost,
-                    ])->all(),
+                    'items'       => $pr->items->map(function ($item) use ($pr) {
+                        $item->setRelation('purchaseRequest', $pr);
+                        return [
+                            'name'      => $item->name,
+                            'quantity'  => (float) $item->quantity,
+                            'unit'      => $item->unit,
+                            'unitCost'  => (float) $item->estimated_unit_cost,
+                            'totalCost' => (float) $item->estimated_total_cost,
+                            'receiving' => app(\App\Services\ItemReceivingService::class)->row($item, auth()->user()),
+                        ];
+                    })->all(),
                 ];
             })
             ->all();
@@ -1102,7 +1104,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         if (!$proposal) {
-            $nextYear = (int) (DB::table('budget_proposals')->where('office_id', $officeId)->max('fiscal_year') ?? now()->year) + 1;
+            $nextYear = app(\App\Services\FiscalYearContext::class)->year ?? now()->year;
             $proposal = $this->createDraftProposal($officeId, $nextYear);
         }
 
@@ -1750,7 +1752,7 @@ class PrismOfficeHeadController extends Controller
         }
 
         if (!$proposal) {
-            $year     = now()->year + 1;
+            $year     = app(\App\Services\FiscalYearContext::class)->year ?? now()->year;
             $baseCode = 'BP-' . str_pad($officeId, 3, '0', STR_PAD_LEFT) . '-' . $year;
             $code     = $baseCode;
             $n        = 2;
@@ -1966,6 +1968,7 @@ class PrismOfficeHeadController extends Controller
      */
     private function isEditableByOfficeHead(BudgetProposal $proposal): bool
     {
+        if (\App\Models\FiscalYear::find($proposal->fiscal_year)?->status === 'locked') return false;
         $lastReturn = $proposal->reviews()->where('action', 'return')->latest('reviewed_at')->first();
 
         // No review record found is treated as editable (safe default for older/legacy

@@ -205,6 +205,7 @@ trait HandlesSignatureQueue
 
         $row = [
             'docType'        => $docType,
+            'fiscalYear'     => $docType === 'pr' ? $doc->fiscal_year : ($docType === 'aoc' ? $doc->purchaseRequest?->fiscal_year : $doc->abstractOfCanvass?->purchaseRequest?->fiscal_year),
             'docLabel'       => strtoupper($docType),
             'id'             => $doc->id,
             'number'         => $number,
@@ -232,11 +233,9 @@ trait HandlesSignatureQueue
                 'by'          => $l->signedBy?->name ?? '—',
                 'at'          => $l->signed_at?->format('M d, Y g:i A') ?? '—',
                 'atRaw'       => $l->signed_at?->toIso8601String(),
-                // Only meaningful for a 'returned' entry (the reason it was sent
-                // back) — surfaced separately from 'display' so the reason is
-                // visible to whoever the document lands with next, not just
-                // logged silently.
-                'remarks'     => $l->action === 'returned' ? $l->remarks : null,
+                // Both signing and returning accept remarks. Preserve them in
+                // the history shown to the current and next signatories.
+                'remarks'     => $l->remarks,
                 'attachments' => $l->attachments->map(fn ($a) => [
                     'filename' => $a->original_filename,
                     'isImage'  => str_starts_with($a->mime_type ?? '', 'image/'),

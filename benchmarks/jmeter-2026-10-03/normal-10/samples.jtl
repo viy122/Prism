@@ -1,0 +1,121 @@
+timeStamp,elapsed,label,responseCode,responseMessage,threadName,dataType,success,failureMessage,bytes,sentBytes,grpThreads,allThreads,URL,Latency,IdleTime,Connect
+1791033981144,277,SETUP - existing procurement demo login,302,Found,Authenticated users 1-2,text,true,,1648,142,2,2,http://prism.test/demo-login/procurement-office,274,0,2
+1791033980694,296,SETUP - existing procurement demo login,302,Found,Authenticated users 1-1,text,true,,1648,142,1,1,http://prism.test/demo-login/procurement-office,292,0,17
+1791033981644,186,SETUP - existing procurement demo login,302,Found,Authenticated users 1-3,text,true,,1648,142,3,3,http://prism.test/demo-login/procurement-office,184,0,1
+1791033981625,261,SETUP - dashboard warm-up,200,OK,Authenticated users 1-2,text,true,,301168,864,3,3,http://prism.test/procurement-office?year=2026,259,0,0
+1791033981625,271,SETUP - dashboard warm-up,200,OK,Authenticated users 1-1,text,true,,301168,864,3,3,http://prism.test/procurement-office?year=2026,268,0,0
+1791033981831,242,SETUP - dashboard warm-up,200,OK,Authenticated users 1-3,text,true,,301168,864,3,3,http://prism.test/procurement-office?year=2026,241,0,0
+1791033982142,171,SETUP - existing procurement demo login,302,Found,Authenticated users 1-4,text,true,,1648,142,4,4,http://prism.test/demo-login/procurement-office,168,0,1
+1791033982315,242,SETUP - dashboard warm-up,200,OK,Authenticated users 1-4,text,true,,301168,864,4,4,http://prism.test/procurement-office?year=2026,240,0,0
+1791033982644,161,SETUP - existing procurement demo login,302,Found,Authenticated users 1-5,text,true,,1648,142,5,5,http://prism.test/demo-login/procurement-office,159,0,2
+1791033982807,283,SETUP - dashboard warm-up,200,OK,Authenticated users 1-5,text,true,,301168,864,5,5,http://prism.test/procurement-office?year=2026,281,0,0
+1791033983144,231,SETUP - existing procurement demo login,302,Found,Authenticated users 1-6,text,true,,1648,142,6,6,http://prism.test/demo-login/procurement-office,228,0,2
+1791033983376,228,SETUP - dashboard warm-up,200,OK,Authenticated users 1-6,text,true,,301168,864,6,6,http://prism.test/procurement-office?year=2026,225,0,0
+1791033983644,247,SETUP - existing procurement demo login,302,Found,Authenticated users 1-7,text,true,,1648,142,7,7,http://prism.test/demo-login/procurement-office,245,0,2
+1791033983893,278,SETUP - dashboard warm-up,200,OK,Authenticated users 1-7,text,true,,301168,864,8,8,http://prism.test/procurement-office?year=2026,275,0,0
+1791033984143,230,SETUP - existing procurement demo login,302,Found,Authenticated users 1-8,text,true,,1648,142,8,8,http://prism.test/demo-login/procurement-office,228,0,2
+1791033984375,232,SETUP - dashboard warm-up,200,OK,Authenticated users 1-8,text,true,,301168,864,8,8,http://prism.test/procurement-office?year=2026,230,0,0
+1791033984643,205,SETUP - existing procurement demo login,302,Found,Authenticated users 1-9,text,true,,1648,142,9,9,http://prism.test/demo-login/procurement-office,202,0,1
+1791033984849,241,SETUP - dashboard warm-up,200,OK,Authenticated users 1-9,text,true,,301168,864,9,9,http://prism.test/procurement-office?year=2026,239,0,0
+1791033985152,238,SETUP - existing procurement demo login,302,Found,Authenticated users 1-10,text,true,,1648,142,10,10,http://prism.test/demo-login/procurement-office,235,0,2
+1791033985391,260,SETUP - dashboard warm-up,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,258,0,0
+1791033985773,530,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,526,0,0
+1791033985772,453,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,448,0,0
+1791033985796,401,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,398,0,0
+1791033985776,435,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,431,0,0
+1791033985797,480,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,476,0,0
+1791033985772,476,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,473,0,0
+1791033985772,423,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,420,0,0
+1791033985774,437,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,432,0,0
+1791033985776,424,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,420,0,0
+1791033985772,445,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,442,0,0
+1791033986350,405,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,402,0,0
+1791033986354,446,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,443,0,0
+1791033986349,456,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,453,0,0
+1791033986378,439,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,430,0,0
+1791033986354,474,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,471,0,0
+1791033986355,481,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,476,0,0
+1791033986349,509,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,505,0,0
+1791033986350,507,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,504,0,0
+1791033986378,533,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,531,0,0
+1791033986376,586,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,583,0,0
+1791033986805,430,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,427,0,0
+1791033986809,432,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,429,0,0
+1791033986759,504,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,501,0,0
+1791033986833,440,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,438,0,0
+1791033986869,424,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,420,0,0
+1791033986822,472,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,468,0,0
+1791033986841,479,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,475,0,0
+1791033986869,485,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,482,0,0
+1791033986965,537,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,534,0,0
+1791033986915,601,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,599,0,0
+1791033987238,434,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,431,0,0
+1791033987268,424,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,421,0,0
+1791033987297,419,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,416,0,0
+1791033987297,423,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,419,0,0
+1791033987324,476,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,473,0,0
+1791033987244,561,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,556,0,0
+1791033987277,589,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,586,0,0
+1791033987357,587,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,584,0,0
+1791033987520,460,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,457,0,0
+1791033987675,460,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,457,0,0
+1791033987696,485,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,481,0,0
+1791033987727,466,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,464,0,0
+1791033987720,534,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,531,0,0
+1791033987809,532,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,529,0,0
+1791033987806,571,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,568,0,0
+1791033987984,406,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,404,0,0
+1791033987869,563,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,560,0,0
+1791033987948,535,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,531,0,0
+1791033988138,472,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,468,0,0
+1791033988184,492,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,489,0,0
+1791033988196,539,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,536,0,0
+1791033988259,554,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,552,0,0
+1791033988344,481,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,477,0,0
+1791033988394,595,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,592,0,0
+1791033988438,620,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,617,0,0
+1791033988487,599,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,596,0,0
+1791033988614,521,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,518,0,0
+1791033988683,507,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,504,0,0
+1791033988741,485,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,482,0,0
+1791033988828,420,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,418,0,0
+1791033988818,475,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,472,0,0
+1791033988993,484,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,480,0,0
+1791033989062,475,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,473,0,0
+1791033989090,494,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,491,0,0
+1791033989193,444,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,441,0,0
+1791033989138,525,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,523,0,0
+1791033989230,440,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,435,0,0
+1791033989253,478,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,476,0,0
+1791033989297,554,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,551,0,0
+1791033989481,485,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,484,0,0
+1791033989540,498,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,495,0,0
+1791033989588,483,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,481,0,0
+1791033989736,425,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,423,0,0
+1791033989670,504,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,501,0,0
+1791033989641,544,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,540,0,0
+1791033989675,520,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,516,0,0
+1791033989855,437,MEASURED - Procurement dashboard FY2026,500,Internal Server Error,Authenticated users 1-1,text,false,Expected authenticated Procurement Office dashboard and HTTP 200.,13629,864,10,10,http://prism.test/procurement-office?year=2026,392,0,0
+1791033988382,1905,MEASURED - Procurement dashboard FY2026,500,Internal Server Error,Authenticated users 1-8,text,false,Expected authenticated Procurement Office dashboard and HTTP 200.,13629,864,10,10,http://prism.test/procurement-office?year=2026,1863,0,0
+1791033990047,477,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,474,0,0
+1791033989969,590,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,586,0,0
+1791033990074,501,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,498,0,0
+1791033990189,422,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-9,text,true,,301168,864,10,10,http://prism.test/procurement-office?year=2026,420,0,0
+1791033990165,480,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-10,text,true,,301168,864,9,9,http://prism.test/procurement-office?year=2026,477,0,0
+1791033990199,464,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-6,text,true,,301168,864,8,8,http://prism.test/procurement-office?year=2026,461,0,0
+1791033990178,513,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-4,text,true,,301168,864,7,7,http://prism.test/procurement-office?year=2026,510,0,0
+1791033990297,457,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-1,text,true,,301169,864,6,6,http://prism.test/procurement-office?year=2026,455,0,1
+1791033990297,552,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301169,864,5,5,http://prism.test/procurement-office?year=2026,550,0,1
+1791033990527,361,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-3,text,true,,301168,864,5,5,http://prism.test/procurement-office?year=2026,359,0,0
+1791033990563,345,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-5,text,true,,301168,864,4,4,http://prism.test/procurement-office?year=2026,343,0,0
+1791033990579,344,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-7,text,true,,301168,864,3,3,http://prism.test/procurement-office?year=2026,342,0,0
+1791033990853,287,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,2,2,http://prism.test/procurement-office?year=2026,284,0,0
+1791033991142,275,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,2,2,http://prism.test/procurement-office?year=2026,273,0,0
+1791033991419,209,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-8,text,true,,301168,864,2,2,http://prism.test/procurement-office?year=2026,207,0,0
+1791033987507,11415,MEASURED - Procurement dashboard FY2026,500,Internal Server Error,Authenticated users 1-2,text,false,Expected authenticated Procurement Office dashboard and HTTP 200.,879452,864,1,1,http://prism.test/procurement-office?year=2026,11412,0,0
+1791033998924,349,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301169,864,1,1,http://prism.test/procurement-office?year=2026,347,0,1
+1791033999277,216,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,214,0,0
+1791033999495,265,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,263,0,0
+1791033999762,216,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,214,0,0
+1791033999980,234,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,231,0,0
+1791034000216,250,MEASURED - Procurement dashboard FY2026,200,OK,Authenticated users 1-2,text,true,,301168,864,1,1,http://prism.test/procurement-office?year=2026,248,0,0
