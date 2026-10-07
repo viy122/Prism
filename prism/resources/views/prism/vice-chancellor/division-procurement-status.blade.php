@@ -151,6 +151,7 @@
 @endpush
 
 @section('content')
+@include('prism.shared.asset-report-tabs', ['assetReportRole' => 'vice-chancellor'])
 
 <div class="content">
 

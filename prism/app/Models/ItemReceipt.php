@@ -23,6 +23,11 @@ class ItemReceipt extends Model
         return $this->belongsTo(PurchaseRequestItem::class, 'purchase_request_item_id');
     }
 
+    public function officeAssets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OfficeAsset::class, 'item_receipt_id');
+    }
+
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);

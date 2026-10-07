@@ -492,6 +492,14 @@ class PrismViceChancellorController extends Controller
         };
     }
 
+    public function officeAssets(\Illuminate\Http\Request $request, \App\Services\OfficeAssetService $assets)
+    {
+        return view('prism.shared.office-assets', $this->withCommon('office-assets', $assets->pageData($request) + [
+            'pageTitle' => 'Allocation & Warranty', 'assetPageRole' => 'vice-chancellor',
+            'assetLayout' => 'prism.layouts.app',
+        ]));
+    }
+
     private function withCommon(string $activeViceChancellorPage, array $data): array
     {
         return array_merge([
@@ -503,6 +511,7 @@ class PrismViceChancellorController extends Controller
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Vice Chancellor pages',
             'moduleNavigation' => [
+                ['slug' => 'office-assets', 'label' => 'Allocation & Warranty', 'href' => route('vice-chancellor.office-assets'), 'icon' => 'devices'],
                 ['slug' => 'dashboard',                    'label' => 'Division Dashboard',          'href' => route('vice-chancellor.dashboard'),                    'icon' => 'layout-dashboard'],
                 ['slug' => 'for-my-signature',             'label' => 'For My Signature',            'href' => route('vice-chancellor.for-my-signature'),             'icon' => 'signature'],
                 ['slug' => 'division-procurement-status',  'label' => 'Division Procurement Status', 'href' => route('vice-chancellor.division-procurement-status'),  'icon' => 'list-check'],

@@ -1,0 +1,20 @@
+{
+  "passed": [
+    "Receiving allocation tab opens",
+    "Registers three received units and opens Office Assets",
+    "Bulk assignment and actual usage saved",
+    "Bulk warranty calculates one year coverage",
+    "Prior-year assets remain visible and usage filter works",
+    "Asset detail shows recorded history",
+    "Transfer request keeps ownership pending",
+    "Receiving office sees incoming transfer",
+    "Accepted unit becomes available in receiving office",
+    "Accepted unit needs a new assignment and retains warranty",
+    "Mobile page has no document-level horizontal overflow",
+    "procurement-office monitoring is read-only",
+    "chancellor monitoring is read-only",
+    "vice-chancellor monitoring is read-only",
+    "No JavaScript exceptions in the tested flow"
+  ],
+  "javascript_errors": []
+}

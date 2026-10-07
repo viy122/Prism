@@ -231,4 +231,120 @@ class ItemReceivingTest extends TestCase
         ])->assertOk()->assertJsonPath('delivery.receivingStatus', 'Partially Received')
             ->assertJsonPath('delivery.remainingQuantity', 1);
     }
+
+    public function test_receipts_sync_delivery_and_refresh_tracking_then_corrections_reopen_accounting_queue(): void
+    {
+        $this->po->update(['status' => 'awaiting_delivery']);
+        $this->pr->update(['tracking_status_override' => 'po_status:awaiting_delivery']);
+        $this->postJson($this->url(), $this->payload())
+            ->assertOk()->assertJsonPath('trackingStatus.key', 'po_status:partial_delivery');
+        $this->assertSame('partial_delivery', $this->po->fresh()->status);
+        $this->assertNull($this->pr->fresh()->tracking_status_override);
+        $this->postJson($this->url(), $this->payload(['quantity' => 2, 'arrival_date' => '2026-09-19']))
+            ->assertOk()->assertJsonPath('trackingStatus.key', 'po_status:complete_delivery')
+            ->assertJsonPath('delivery.paymentStatus', 'Complete Delivery (Supply Office)');
+        $this->assertSame('complete_delivery', $this->po->fresh()->status);
+        $this->assertSame(2, AuditLog::where('action', 'po_delivery_synced')->count());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'po_delivery_synced', 'user_id' => $this->head->id]);
+
+        $accountant = $this->user('Accounting Office');
+        $this->actingAs($accountant)->get('/accounting-office?year=2026')
+            ->assertOk()->assertViewHas('forProcessing', fn ($orders) => count($orders) === 1);
+        $this->actingAs($this->head)->putJson('/item-receiving/receipt/'.ItemReceipt::firstOrFail()->id.'?year=2026', [
+            'arrival_date' => '2026-09-18', 'quantity' => 2, 'received_by_name' => 'Receiver', 'correction_reason' => 'Count corrected',
+        ])->assertOk()->assertJsonPath('trackingStatus.key', 'po_status:partial_delivery');
+        $this->actingAs($accountant)->get('/accounting-office?year=2026')
+            ->assertOk()->assertViewHas('forProcessing', fn ($orders) => count($orders) === 0);
+        $this->postJson('/accounting-office/purchase-order/'.$this->po->id.'/process-payment?year=2026')
+            ->assertUnprocessable();
+    }
+
+    public function test_delivery_requires_every_item_and_can_skip_partial_for_one_full_receipt(): void
+    {
+        $this->po->update(['status' => 'issued']);
+        $second = $this->pr->items()->create(['name' => 'Cable', 'quantity' => 0.3, 'unit' => 'unit', 'estimated_unit_cost' => 10, 'estimated_total_cost' => 3]);
+        $this->postJson($this->url(), $this->payload(['quantity' => 5]))->assertOk();
+        $this->assertSame('partial_delivery', $this->po->fresh()->status);
+        $url = '/item-receiving/item/'.$second->id.'/receipts?year=2026';
+        $this->postJson($url, $this->payload(['quantity' => 0.1]))->assertOk();
+        $this->assertSame('partial_delivery', $this->po->fresh()->status);
+        $this->postJson($url, $this->payload(['quantity' => 0.2]))->assertOk();
+        $this->assertSame('complete_delivery', $this->po->fresh()->status);
+    }
+
+    public function test_payment_discrepancy_is_flagged_and_resolved_without_changing_payment_status(): void
+    {
+        foreach (['processing_payment', 'paid'] as $status) {
+            $this->po->update(['status' => $status]);
+            $receipt = $this->item->receipts()->first();
+            if (!$receipt) {
+                $this->postJson($this->url(), $this->payload(['quantity' => 5]))->assertOk();
+                $receipt = $this->item->receipts()->firstOrFail();
+            }
+            $url = '/item-receiving/receipt/'.$receipt->id.'?year=2026';
+            $payload = ['arrival_date' => '2026-09-18', 'quantity' => 4, 'received_by_name' => 'Receiver', 'correction_reason' => 'Count corrected'];
+            $response = $this->putJson($url, $payload)->assertOk()->assertJsonPath('delivery.receivingReviewRequired', true);
+            $this->assertStringContainsString('Review required', $response->json('detailsHtml'));
+            $this->assertSame($status, $this->po->fresh()->status);
+            $this->assertSame('po_receiving_review_required', AuditLog::where('auditable_type', PurchaseOrder::class)->latest('id')->first()->action);
+            $this->putJson($url, array_replace($payload, ['quantity' => 5]))->assertOk()->assertJsonPath('delivery.receivingReviewRequired', false);
+            $this->assertSame($status, $this->po->fresh()->status);
+            $this->assertSame('po_receiving_review_resolved', AuditLog::where('auditable_type', PurchaseOrder::class)->latest('id')->first()->action);
+        }
+    }
+
+    public function test_backfill_is_dry_runnable_idempotent_and_preserves_legacy_and_inactive_orders(): void
+    {
+        $this->po->update(['status' => 'complete_delivery']);
+        $this->artisan('procurement:sync-delivery-statuses')->assertSuccessful();
+        $this->assertSame('complete_delivery', $this->po->fresh()->status);
+        $this->postJson($this->url(), $this->payload(['quantity' => 5]))->assertOk();
+        $this->po->update(['status' => 'awaiting_delivery']);
+        $before = AuditLog::count();
+        $this->artisan('procurement:sync-delivery-statuses', ['--dry-run' => true])->assertSuccessful();
+        $this->assertSame('awaiting_delivery', $this->po->fresh()->status);
+        $this->assertSame($before, AuditLog::count());
+        $this->artisan('procurement:sync-delivery-statuses')->assertSuccessful();
+        $this->assertSame('complete_delivery', $this->po->fresh()->status);
+        $after = AuditLog::count();
+        $this->artisan('procurement:sync-delivery-statuses')->assertSuccessful();
+        $this->assertSame($after, AuditLog::count());
+        foreach (['cancelled', 'cancelled_system_error', 'pr_denied'] as $status) {
+            $this->pr->update(['status' => $status]);
+            $this->po->refresh()->update(['status' => 'awaiting_delivery']);
+            $this->artisan('procurement:sync-delivery-statuses')->assertSuccessful();
+            $this->assertSame('awaiting_delivery', $this->po->fresh()->status);
+        }
+        $this->pr->update(['status' => 'approved']);
+        $this->po->update(['signatory_stage' => 'draft']);
+        $this->artisan('procurement:sync-delivery-statuses')->assertSuccessful();
+        $this->assertSame('awaiting_delivery', $this->po->fresh()->status);
+    }
+
+    public function test_procurement_cannot_manually_override_receipt_driven_delivery(): void
+    {
+        $this->actingAs($this->procurement);
+        $url = '/procurement-office/purchase-order/'.$this->po->id.'/status?year=2026';
+        $this->po->update(['status' => 'issued']);
+        $this->postJson($url)->assertOk()->assertJsonPath('status', 'awaiting_delivery');
+        $this->postJson($url)->assertUnprocessable();
+        $this->assertSame('awaiting_delivery', $this->po->fresh()->status);
+        $this->po->update(['status' => 'partial_delivery']);
+        $this->postJson($url)->assertUnprocessable();
+        $this->assertSame('partial_delivery', $this->po->fresh()->status);
+        $this->po->update(['status' => 'processing_payment']);
+        $this->postJson($url)->assertUnprocessable();
+        $this->assertSame('processing_payment', $this->po->fresh()->status);
+    }
+
+    public function test_single_full_receipt_advances_directly_to_complete(): void
+    {
+        $this->po->update(['status' => 'awaiting_delivery']);
+        $this->postJson($this->url(), $this->payload(['quantity' => 5]))
+            ->assertOk()->assertJsonPath('trackingStatus.key', 'po_status:complete_delivery');
+        $this->assertSame('complete_delivery', $this->po->fresh()->status);
+        $log = AuditLog::where('action', 'po_delivery_synced')->firstOrFail();
+        $this->assertSame(['status' => 'awaiting_delivery'], $log->old_values_json);
+        $this->assertSame(['status' => 'complete_delivery'], $log->new_values_json);
+    }
 }

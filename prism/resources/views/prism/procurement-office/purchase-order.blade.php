@@ -630,6 +630,11 @@
             return;
         }
 
+        if (['awaiting_delivery', 'partial_delivery'].includes(po.status)) {
+            statusAction.innerHTML = '<p class="po-pending-note">Delivery status updates automatically when the requesting office records receipts. It becomes complete once every item is fully received.</p>';
+            return;
+        }
+
         if (po.nextStatus) {
             const nextLabel = ({
                 awaiting_delivery: 'Forward to Supply Office',

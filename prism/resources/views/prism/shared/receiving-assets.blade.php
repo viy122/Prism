@@ -1,6 +1,10 @@
 @once
 @push('page-css')
 <style>
+    .asset-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+    .asset-tabs button { padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#681012; cursor:pointer; font:inherit; }
+    .asset-tabs button[aria-selected="true"] { background:#681012; color:white; }
+    .asset-panel[hidden] { display:none !important; }
     .receiving-section { margin: 24px 28px; padding: 22px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; color: #1e293b; }
     .receiving-section h2 { margin: 0 0 6px; font-size: 18px; }
     .receiving-note { color: #475569; font-size: 12px; line-height: 1.6; margin: 4px 0 12px; }
@@ -51,6 +55,13 @@
 </dialog>
 <script>
 (() => {
+    document.addEventListener('click', event => {
+        const tab = event.target.closest('[data-receiving-tab]');
+        if (!tab) return;
+        const details = tab.closest('.receiving-details');
+        details.querySelectorAll('[data-receiving-tab]').forEach(button => button.setAttribute('aria-selected', String(button === tab)));
+        details.querySelectorAll('[data-receiving-panel]').forEach(panel => { panel.hidden = panel.dataset.receivingPanel !== tab.dataset.receivingTab; });
+    });
     const modal = document.getElementById('receivingSuccessModal');
     let returnFocus = null;
     modal.addEventListener('close', () => returnFocus?.focus({ preventScroll: true }));
@@ -106,6 +117,7 @@
                 arrival: delivery.arrivalDate || (delivery.lastArrivalDate ? 'Latest partial: ' + delivery.lastArrivalDate : 'Arrival not recorded'),
                 quantity: `${delivery.receivedQuantity} / ${delivery.quantity} ${delivery.unit}`,
                 status: delivery.receivingStatus,
+                review: delivery.receivingReviewRequired ? 'Receipt discrepancy: review required' : '',
                 duration: delivery.daysToReceive !== null ? delivery.daysToReceive + ' days' : '—',
                 delay: delivery.delayLabel,
             };
@@ -117,6 +129,16 @@
             });
             // Keep the expanded item and surrounding page in place; refresh only its contents.
             details.replaceChildren(...updated.childNodes);
+            document.querySelectorAll('[data-receiving-po]').forEach(cell => {
+                if (cell.dataset.receivingPo === String(delivery.poId)) cell.textContent = delivery.paymentStatus;
+            });
+            const badge = details.closest('.pr-card')?.querySelector('.pr-card-right .badge');
+            if (badge && data.trackingStatus) {
+                badge.textContent = data.trackingStatus.key === 'paid' ? 'Paid — see item receiving status' : data.trackingStatus.label;
+                badge.classList.toggle('badge-completed', data.trackingStatus.key === 'paid');
+                badge.classList.toggle('badge-progress', data.trackingStatus.key !== 'paid');
+                badge.classList.remove('badge-pending');
+            }
             returnFocus = details.querySelector('summary');
             document.getElementById('receivingSuccessMessage').textContent = data.message;
             if (!modal.open) modal.showModal();
@@ -137,10 +159,10 @@
 @endpush
 @endonce
 @once
-    @if(session('receiving_success'))
+    @if(!($suppressReceivingMessages ?? false) && session('receiving_success'))
         <div class="receiving-message" role="status">{{ session('receiving_success') }}</div>
     @endif
-    @if($errors->any())
+    @if(!($suppressReceivingMessages ?? false) && $errors->any())
         <div class="receiving-message error" role="alert">
             @foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach
         </div>

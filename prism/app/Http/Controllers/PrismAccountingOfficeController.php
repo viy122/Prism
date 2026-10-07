@@ -275,26 +275,39 @@ class PrismAccountingOfficeController extends Controller
 
         $path = $file->store('payment-processing/' . now()->year, 'public');
 
-        DocumentUpload::create([
-            'uploaded_by_user_id' => auth()->id(),
-            'attachable_type'     => PurchaseOrder::class,
-            'attachable_id'       => $po->id,
-            'document_type'       => 'payment_processing_proof',
-            'title'               => 'Payment processing attachment for ' . ($po->po_number ?? 'PO-' . $po->id),
-            'original_filename'   => $file->getClientOriginalName(),
-            'file_path'           => $path,
-            'mime_type'           => $file->getClientMimeType(),
-            'file_size'           => $file->getSize(),
-            'status'              => 'uploaded',
-            'remarks'             => $request->input('remarks'),
-            'uploaded_at'         => now(),
-        ]);
-
-        $po->update([
-            'status'                => 'processing_payment',
-            'payment_processing_at' => now(),
-        ]);
-        $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $po, $file, $path) {
+                // A receipt correction may have reopened delivery during attachment processing.
+                $po = PurchaseOrder::lockForUpdate()->findOrFail($po->id);
+                if ($po->status !== 'complete_delivery' || $po->signatory_stage !== 'fully_signed') {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'delivery' => 'Delivery status changed. Refresh and verify all items are received before processing payment.',
+                    ]);
+                }
+                DocumentUpload::create([
+                    'uploaded_by_user_id' => auth()->id(),
+                    'attachable_type'     => PurchaseOrder::class,
+                    'attachable_id'       => $po->id,
+                    'document_type'       => 'payment_processing_proof',
+                    'title'               => 'Payment processing attachment for ' . ($po->po_number ?? 'PO-' . $po->id),
+                    'original_filename'   => $file->getClientOriginalName(),
+                    'file_path'           => $path,
+                    'mime_type'           => $file->getClientMimeType(),
+                    'file_size'           => $file->getSize(),
+                    'status'              => 'uploaded',
+                    'remarks'             => $request->input('remarks'),
+                    'uploaded_at'         => now(),
+                ]);
+                $po->update([
+                    'status'                => 'processing_payment',
+                    'payment_processing_at' => now(),
+                ]);
+                $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($path);
+            throw $e;
+        }
 
         NotificationService::paymentProcessingStarted($po->fresh());
 

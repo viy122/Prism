@@ -44,6 +44,12 @@ Route::get('/reset-password', [ForgotPasswordController::class, 'showResetForm']
 Route::post('/reset-password', [ForgotPasswordController::class, 'reset'])->middleware('throttle:5,10')->name('password.reset');
 
 Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class])->group(function () {
+    Route::post('/office-assets/receipts/{receipt}/register', [\App\Http\Controllers\OfficeAssetController::class, 'register'])->name('office-assets.register');
+    Route::post('/office-assets/update', [\App\Http\Controllers\OfficeAssetController::class, 'update'])->name('office-assets.update');
+    Route::get('/office-assets/{asset}', [\App\Http\Controllers\OfficeAssetController::class, 'show'])->name('office-assets.show');
+    Route::get('/office-assets/{asset}/proof', [\App\Http\Controllers\OfficeAssetController::class, 'proof'])->name('office-assets.proof');
+    Route::post('/office-assets/{asset}/transfer', [\App\Http\Controllers\OfficeAssetController::class, 'transfer'])->name('office-assets.transfer');
+    Route::post('/office-assets/transfers/{transfer}/resolve', [\App\Http\Controllers\OfficeAssetController::class, 'resolveTransfer'])->name('office-assets.resolve-transfer');
     Route::post('/item-receiving/purchase-order/{po}/dates', [\App\Http\Controllers\ItemReceivingController::class, 'dates'])->name('item-receiving.dates');
     Route::post('/item-receiving/item/{item}/receipts', [\App\Http\Controllers\ItemReceivingController::class, 'store'])->name('item-receiving.store');
     Route::put('/item-receiving/receipt/{receipt}', [\App\Http\Controllers\ItemReceivingController::class, 'update'])->name('item-receiving.update');
@@ -54,6 +60,8 @@ Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class
         ->whereIn('action', ['activate', 'finalize', 'reopen'])->name('fiscal-years.update');
 
     Route::prefix('office-head')->name('office-head.')->middleware('role:Office Head / Dean')->controller(PrismOfficeHeadController::class)->group(function () {
+        Route::get('/office-assets/received-items', 'receivedAssets')->name('office-assets.received');
+        Route::get('/office-assets', 'officeAssets')->name('office-assets');
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
         Route::get('/budget-proposal/new', 'createNewProposal')->name('budget-proposal.new');
@@ -101,6 +109,7 @@ Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class
     });
 
     Route::prefix('procurement-office')->name('procurement-office.')->middleware('role:Procurement Office')->controller(PrismProcurementOfficeController::class)->group(function () {
+        Route::get('/office-assets', 'officeAssets')->name('office-assets');
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/annual-procurement-plan', 'annualProcurementPlan')->name('annual-procurement-plan');
         Route::post('/annual-procurement-plan/item/{item}/mode', 'saveProcurementMode')->name('annual-procurement-plan.save-mode');
@@ -142,6 +151,7 @@ Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class
     });
 
     Route::prefix('chancellor')->name('chancellor.')->middleware('role:Chancellor')->controller(PrismChancellorController::class)->group(function () {
+        Route::get('/office-assets', 'officeAssets')->name('office-assets');
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-approval', 'budgetApproval')->name('budget-approval');
         Route::post('/budget-approval/{proposal}/approve', 'approve')->name('budget-approval.approve');
@@ -155,6 +165,7 @@ Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class
     });
 
     Route::prefix('vice-chancellor')->name('vice-chancellor.')->middleware('role:Vice Chancellor')->controller(PrismViceChancellorController::class)->group(function () {
+        Route::get('/office-assets', 'officeAssets')->name('office-assets');
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/for-my-signature', 'forMySignature')->name('for-my-signature');
         Route::get('/for-my-signature/refresh', 'forMySignatureRefresh')->name('for-my-signature.refresh');

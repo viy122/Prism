@@ -1,0 +1,58 @@
+[
+  {
+    "time": "2026-10-04T18:42:40.422180+08:00",
+    "available_ram_mb": 494.55078125,
+    "locust_rss_mb": 48.6953125,
+    "locust_cpu_percent": 0.0,
+    "active_users": 0
+  },
+  {
+    "time": "2026-10-04T18:42:41.435729+08:00",
+    "available_ram_mb": 384.484375,
+    "locust_rss_mb": 51.09765625,
+    "locust_cpu_percent": 1.5,
+    "active_users": 1
+  },
+  {
+    "time": "2026-10-04T18:42:42.437543+08:00",
+    "available_ram_mb": 472.97265625,
+    "locust_rss_mb": 51.6171875,
+    "locust_cpu_percent": 1.6,
+    "active_users": 2
+  },
+  {
+    "time": "2026-10-04T18:42:43.450762+08:00",
+    "available_ram_mb": 461.8828125,
+    "locust_rss_mb": 51.6640625,
+    "locust_cpu_percent": 0.0,
+    "active_users": 3
+  },
+  {
+    "time": "2026-10-04T18:42:44.464990+08:00",
+    "available_ram_mb": 438.89453125,
+    "locust_rss_mb": 51.95703125,
+    "locust_cpu_percent": 0.0,
+    "active_users": 4
+  },
+  {
+    "time": "2026-10-04T18:42:45.474956+08:00",
+    "available_ram_mb": 392.49609375,
+    "locust_rss_mb": 51.7421875,
+    "locust_cpu_percent": 1.6,
+    "active_users": 5
+  },
+  {
+    "time": "2026-10-04T18:42:46.475384+08:00",
+    "available_ram_mb": 408.765625,
+    "locust_rss_mb": 51.92578125,
+    "locust_cpu_percent": 10.9,
+    "active_users": 5
+  },
+  {
+    "time": "2026-10-04T18:42:47.482346+08:00",
+    "available_ram_mb": 418.12890625,
+    "locust_rss_mb": 52.3359375,
+    "locust_cpu_percent": 6.2,
+    "active_users": 5
+  }
+]

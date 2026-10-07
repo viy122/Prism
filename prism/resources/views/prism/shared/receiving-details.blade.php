@@ -1,14 +1,26 @@
 @php($receivingReadOnly = $receivingReadOnly ?? false)
 <details class="receiving-details" id="receiving-item-{{ $delivery['id'] }}">
     <summary>View Details{{ !$receivingReadOnly && $delivery['canReceive'] && $delivery['remainingQuantity'] > 0 ? ' / Record Receipt' : '' }} — {{ $delivery['item'] }}</summary>
+    @php($showEquipment = !$receivingReadOnly && ($delivery['canReceive'] || $delivery['canManageDates']))
+    @if($showEquipment)
+    <div class="asset-tabs" role="tablist" aria-label="Item tracking">
+        @foreach(['receiving' => 'Receiving', 'allocation' => 'Allocation & Usage', 'warranty' => 'Warranty'] as $tabKey => $tabLabel)
+        <button type="button" role="tab" data-receiving-tab="{{ $tabKey }}" aria-selected="{{ $tabKey === 'receiving' ? 'true' : 'false' }}">{{ $tabLabel }}</button>
+        @endforeach
+    </div>
+    @endif
+    <div data-receiving-panel="receiving" class="asset-panel">
     <dl>
         <div><dt>Procured Date</dt><dd>{{ $delivery['procuredDate'] ?: 'Not recorded' }}</dd></div>
         <div><dt>Expected Delivery</dt><dd>{{ $delivery['expectedDelivery'] ?: 'No target date' }}</dd></div>
         <div><dt>Fully Received On</dt><dd>{{ $delivery['arrivalDate'] ?: 'Not yet recorded' }}</dd></div>
         <div><dt>Procurement to Full Receipt</dt><dd>{{ $delivery['daysToReceive'] !== null ? $delivery['daysToReceive'].' days' : 'Not available yet' }}</dd></div>
         <div><dt>Delivery Timing</dt><dd>{{ $delivery['delayLabel'] }}</dd></div>
-        <div><dt>PO / Payment Status</dt><dd>{{ $delivery['paymentStatus'] }}</dd></div>
+        <div><dt>PO / Payment Status</dt><dd data-receiving-po="{{ $delivery['poId'] }}">{{ $delivery['paymentStatus'] }}</dd></div>
     </dl>
+    @if($delivery['receivingReviewRequired'] ?? false)
+        <p class="receiving-message error" role="alert">Review required: recorded receipts are incomplete while payment is processing or already paid. Procurement and Accounting should reconcile the quantities. Payment status has been preserved.</p>
+    @endif
     @if(!$receivingReadOnly && $delivery['canManageDates'])
         <p class="receiving-note">Procured Date is the actual date the order was confirmed with the supplier after approvals. Expected Delivery is the target arrival at the requesting office.</p>
         <form class="receiving-form" method="POST" action="{{ route('item-receiving.dates', ['po' => $delivery['poId'], 'year' => $delivery['fiscalYear']]) }}">
@@ -42,4 +54,6 @@
     @empty
         <p class="receiving-note">Arrival not recorded. Payment or Supply Office delivery status does not confirm receipt by the requesting office.</p>
     @endforelse
+    </div>
+    @if($showEquipment)@include('prism.shared.receiving-equipment')@endif
 </details>

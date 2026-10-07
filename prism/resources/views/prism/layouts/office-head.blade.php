@@ -111,6 +111,24 @@
             transform: translateY(-50%); width: 4px; height: 26px;
             background: var(--crimson); border-radius: 4px 0 0 4px;
         }
+        .sb-assets > summary { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:var(--r-sm); color:var(--txt2); font-size:12px; font-weight:600; cursor:pointer; list-style:none; }
+        .sb-assets > summary::-webkit-details-marker { display:none; }
+        .sb-assets > summary > i { font-size:18px; color:var(--txt3); }
+        .sb-assets > summary .sb-assets-chevron { margin-left:auto; font-size:14px; transition:transform .18s; }
+        .sb-assets[open] > summary .sb-assets-chevron { transform:rotate(180deg); }
+        .sb-assets > summary:hover { background:var(--crimson-mid); color:var(--crimson); }
+        .sb-assets.is-current > summary { background:var(--crimson); color:white; }
+        .sb-assets.is-current > summary > i { color:white; }
+        .sb-assets summary:focus-visible { outline:2px solid var(--crimson); outline-offset:2px; }
+        .sb-assets-links { margin:6px 0 8px 23px; padding-left:8px; border-left:1px solid var(--crimson-border); }
+        .sb-nav .sb-assets-links a { padding:9px 10px; gap:8px; font-size:11px; }
+        .sb-nav .sb-assets-links a i { font-size:15px; }
+        .sb-nav .sb-assets-links a.active { background:var(--crimson-mid); color:var(--crimson); box-shadow:none; }
+        .sb-nav .sb-assets-links a.active i { color:var(--crimson); }
+        .sb-nav .sb-assets-links a.active::before { display:none; }
+        .sb-assets-unit { display:block; max-width:148px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px; font-weight:500; opacity:.8; }
+        body.sb-collapsed .sb-assets > summary { justify-content:center; padding:11px 0; }
+        body.sb-collapsed .sb-assets-chevron, body.sb-collapsed .sb-assets-links { display:none; }
         .sb-bottom { padding: 10px 10px 20px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
         .sb-user {
             display: flex; align-items: center; gap: 10px; padding: 10px 12px;
@@ -224,6 +242,17 @@
         <a href="{{ route('office-head.purchase-requests') }}" title="Purchase Requests" @if(($activeOfficePage ?? '') === 'purchase-requests') class="active" @endif>
             <i class="ti ti-cloud-upload"></i><span class="sb-label">Purchase Requests</span>
         </a>
+        @php
+            $assetNavCurrent = ($activeOfficePage ?? '') === 'office-assets';
+            $assetNavDetail = request()->routeIs('office-assets.show') && isset($asset);
+        @endphp
+        <details class="sb-assets {{ $assetNavCurrent ? 'is-current' : '' }}" id="officeAssetsNav" @if($assetNavCurrent) open @endif>
+            <summary title="Office Assets"><i class="ti ti-devices" aria-hidden="true"></i><span class="sb-label">Office Assets</span><i class="ti ti-chevron-down sb-assets-chevron" aria-hidden="true"></i></summary>
+            <div class="sb-assets-links">
+                <a href="{{ route('office-head.office-assets') }}" data-asset-nav="register" @if(request()->routeIs('office-head.office-assets') || $assetNavDetail) class="active" aria-current="page" @endif><i class="ti ti-list-details" aria-hidden="true"></i><span>Asset Register</span></a>
+                <a href="{{ route('office-head.office-assets.received') }}" data-asset-nav="received" @if(request()->routeIs('office-head.office-assets.received')) class="active" aria-current="page" @endif><i class="ti ti-package" aria-hidden="true"></i><span>Received Items</span></a>
+            </div>
+        </details>
     </nav>
     <div class="sb-bottom">
         @php
@@ -308,6 +337,17 @@
     }
 
     const sbUserBtn = document.getElementById('sbUserBtn');
+    const assetNav = document.getElementById('officeAssetsNav');
+    if (assetNav) {
+        assetNav.querySelector('summary').addEventListener('click', event => {
+            if (document.body.classList.contains('sb-collapsed')) {
+                event.preventDefault();
+                document.body.classList.remove('sb-collapsed');
+                localStorage.setItem('sb-collapsed', '0');
+                assetNav.open = true;
+            }
+        });
+    }
     if (sbUserBtn) {
         sbUserBtn.addEventListener('click', function () {
             if (window.prismOpenProfile) window.prismOpenProfile();

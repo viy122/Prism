@@ -1,0 +1,6 @@
+ConcurrentUsers,JMeterAverageMs,JMeterThroughputRPS,BlazeMeterAverageMs,BlazeMeterThroughputRPS,BlazeMeterErrorPercent,Status
+1,253.10,3.73,,,,NOT RUN - requires BlazeMeter account access and reachable target
+5,299.02,15.37,,,,NOT RUN - requires BlazeMeter account access and reachable target
+10,479.44,19.15,,,,NOT RUN - requires BlazeMeter account access and reachable target
+30,2018.62,12.22,,,,NOT RUN - requires BlazeMeter account access and reachable target
+50,3747.46,11.65,,,,NOT RUN - requires BlazeMeter account access and reachable target

@@ -21,7 +21,7 @@
                     <td>{{ $delivery['expectedDelivery'] ?: 'No target date' }}</td>
                     <td data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="arrival">{{ $delivery['arrivalDate'] ?: ($delivery['lastArrivalDate'] ? 'Latest partial: '.$delivery['lastArrivalDate'] : 'Arrival not recorded') }}</td>
                     <td data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="quantity">{{ $delivery['receivedQuantity'] }} / {{ $delivery['quantity'] }} {{ $delivery['unit'] }}</td>
-                    <td><span class="receiving-status" data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="status">{{ $delivery['receivingStatus'] }}</span></td>
+                    <td><span class="receiving-status" data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="status">{{ $delivery['receivingStatus'] }}</span><br><span class="receiving-late" data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="review">{{ ($delivery['receivingReviewRequired'] ?? false) ? 'Receipt discrepancy: review required' : '' }}</span></td>
                     <td data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="duration">{{ $delivery['daysToReceive'] !== null ? $delivery['daysToReceive'].' days' : '—' }}</td>
                     <td data-receiving-item="{{ $delivery['id'] }}" data-receiving-field="delay" class="{{ $delivery['daysDelayed'] > 0 ? 'receiving-late' : '' }}">{{ $delivery['delayLabel'] }}</td>
                 </tr>

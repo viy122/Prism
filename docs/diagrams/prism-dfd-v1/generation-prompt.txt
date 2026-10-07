@@ -1,0 +1,93 @@
+Use case: infographic-diagram.
+Create a precise academic DATA FLOW DIAGRAM image, landscape very high resolution, ideally 3840x2160 or larger, white background, crisp black lines, clean readable sans-serif type. Title: "PRISM — Level 1 Data Flow Diagram". Subtitle: "8 Processes • 6 Data Stores • 6 User Roles". This is a formal technical drawing, NOT decorative infographic. Gane-Sarson notation: processes are rounded rectangles with a small numbered header compartment; external entities are plain rectangles; data stores are open-ended rectangles with narrow ID compartments. Orthogonal routed arrows with clear arrowheads, neatly labeled, avoid crossings and never cross through boxes or labels. Generous whitespace and tiny white backing behind arrow text. Use multiple lines for long labels WITHOUT changing their exact wording. Fit every requested node and arrow. No external price service, BAC, administrator, Accounting Office, process 0, extra entities, icons, gradients, illustration, or invented nodes.
+
+EXACTLY eight process nodes:
+1.0 Manage Budget Proposals
+2.0 Manage Market Scoping
+3.0 Manage Reviews and Signatures
+4.0 Manage Procurement Plans
+5.0 Manage Procurement Documents
+6.0 Manage Delivery and Payment Records
+7.0 Monitor Procurement Progress
+8.0 Generate Reports
+
+EXACTLY six user entity types: Office Head / Dean; Budget Office; Procurement Office; Chancellor; Vice Chancellor; Cashier.
+EXACTLY six data stores:
+D1 Budget Proposal Records
+D2 Market Scoping Records
+D3 Procurement Records
+D4 Review and Signature Records
+D5 Delivery and Payment Records
+D6 Report Archives.
+Place users mainly at outer perimeter, processes distributed centrally with adjacent stores. You may repeat a user box marked with a small duplicate notation if essential to avoid long crossings, but never repeat a process or invent a user type. Aim for structured 2-row process layout, with scoping/proposal/review/planning toward top and documents/receiving/monitoring/reports toward bottom. Legibility is critical.
+
+EXTERNAL ARROWS: preserve ALL following labels EXACTLY, direction from source to target (they must match the user's approved context diagram). No paraphrases. Each line is SOURCE -> TARGET : LABEL.
+Office Head / Dean -> 1.0 : Submit Budget Proposal
+Office Head / Dean -> 2.0 : Specify Market Scoping Criteria
+Office Head / Dean -> 2.0 : Select Price References
+Office Head / Dean -> 3.0 : Confirm Document Signature
+Office Head / Dean -> 6.0 : Record Item Receipt
+3.0 -> Office Head / Dean : Provide Proposal Review and Approval Status
+2.0 -> Office Head / Dean : Present Market Scoping Results
+3.0 -> Office Head / Dean : Route Documents for Signature
+7.0 -> Office Head / Dean : Provide Procurement Schedule and Status
+7.0 -> Office Head / Dean : Present Item Receiving Summary
+Budget Office -> 3.0 : Submit Proposal Review and Endorsement
+3.0 -> Budget Office : Forward Proposals for Review
+8.0 -> Budget Office : Provide Budget Utilization Report
+Procurement Office -> 4.0 : Update Procurement Plan
+Procurement Office -> 5.0 : Submit Purchase Request Details
+Procurement Office -> 5.0 : Submit Canvassing and Purchase Order Details
+Procurement Office -> 3.0 : Update Document Routing
+Procurement Office -> 6.0 : Record Procurement Dates and Delivery Updates
+4.0 -> Procurement Office : Provide Annual Procurement Plan
+7.0 -> Procurement Office : Provide Procurement Documents and Routing Status
+8.0 -> Procurement Office : Provide Procurement and Receiving Reports
+Chancellor -> 3.0 : Submit Proposal Approval or Return Decision
+Chancellor -> 3.0 : Confirm Document Signature
+3.0 -> Chancellor : Forward Proposals for Approval
+3.0 -> Chancellor : Route Documents for Signature
+8.0 -> Chancellor : Provide Campus Procurement Reports
+Vice Chancellor -> 3.0 : Submit Signature Confirmation and Remarks
+3.0 -> Vice Chancellor : Route Documents for Signature
+8.0 -> Vice Chancellor : Provide Division Procurement Status and Performance Report
+Cashier -> 6.0 : Submit Payment Confirmation and Receipt
+6.0 -> Cashier : Forward Purchase Orders and Processing Proof for Payment
+8.0 -> Cashier : Provide Payment History
+
+INTERNAL STORE ARROWS:
+1.0 -> D1 : Save Budget Proposal
+D1 -> 1.0 : Retrieve Proposal Details
+2.0 -> D2 : Save Market Scoping References
+D2 -> 2.0 : Retrieve Market Scoping References
+D1 -> 3.0 : Retrieve Submitted Proposals
+3.0 -> D1 : Update Proposal Review and Approval Status
+D3 -> 3.0 : Retrieve Documents for Routing
+3.0 -> D3 : Update Document Signing Status
+3.0 -> D4 : Save Review and Signature History
+D4 -> 3.0 : Retrieve Review and Signature History
+D1 -> 4.0 : Retrieve Approved Requirements
+4.0 -> D3 : Save Procurement Plan and Schedule
+D3 -> 4.0 : Retrieve Procurement Plan
+D3 -> 5.0 : Retrieve Procurement Requirements and Documents
+5.0 -> D3 : Save Procurement Documents
+D3 -> 6.0 : Retrieve Signed Purchase Orders
+D5 -> 6.0 : Retrieve Delivery and Payment Details
+6.0 -> D5 : Save Delivery, Receipt, and Payment Records
+6.0 -> D3 : Update Purchase Order Delivery and Payment Status
+D1 -> 7.0 : Retrieve Proposal Progress
+D3 -> 7.0 : Retrieve Procurement Documents and Schedules
+D4 -> 7.0 : Retrieve Routing and Signature Status
+D5 -> 7.0 : Retrieve Receiving and Payment Status
+D1 -> 8.0 : Retrieve Budget Data
+D3 -> 8.0 : Retrieve Procurement Data
+D5 -> 8.0 : Retrieve Delivery and Payment Data
+D6 -> 8.0 : Retrieve Archived Reports
+8.0 -> D6 : Preserve Finalized Report Snapshots
+
+DIRECT PROCESS ARROWS:
+1.0 -> 2.0 : Supply Proposal Item Specifications
+2.0 -> 1.0 : Supply Selected Price References
+7.0 -> 8.0 : Supply Consolidated Progress Summary
+
+Footer small: "Scope: six selected user roles. Arrows preserve the approved context flow labels." No legend listing flows instead of drawing them: labels must be on actual connecting arrows. Prioritize exact text, correct arrows and complete connectivity over style.

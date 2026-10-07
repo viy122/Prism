@@ -1,0 +1,79 @@
+[
+  {
+    "time": "2026-10-04T18:42:49.180421+08:00",
+    "available_ram_mb": 402.453125,
+    "locust_rss_mb": 48.46484375,
+    "locust_cpu_percent": 0.0,
+    "active_users": 0
+  },
+  {
+    "time": "2026-10-04T18:42:50.183392+08:00",
+    "available_ram_mb": 422.47265625,
+    "locust_rss_mb": 51.15234375,
+    "locust_cpu_percent": 1.6,
+    "active_users": 4
+  },
+  {
+    "time": "2026-10-04T18:42:51.188232+08:00",
+    "available_ram_mb": 423.48046875,
+    "locust_rss_mb": 51.23828125,
+    "locust_cpu_percent": 1.5,
+    "active_users": 6
+  },
+  {
+    "time": "2026-10-04T18:42:52.187253+08:00",
+    "available_ram_mb": 372.91796875,
+    "locust_rss_mb": 50.94140625,
+    "locust_cpu_percent": 1.6,
+    "active_users": 8
+  },
+  {
+    "time": "2026-10-04T18:42:53.195362+08:00",
+    "available_ram_mb": 314.7265625,
+    "locust_rss_mb": 51.03125,
+    "locust_cpu_percent": 0.0,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:54.201356+08:00",
+    "available_ram_mb": 337.12890625,
+    "locust_rss_mb": 51.69140625,
+    "locust_cpu_percent": 4.6,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:55.203457+08:00",
+    "available_ram_mb": 325.77734375,
+    "locust_rss_mb": 53.21875,
+    "locust_cpu_percent": 6.2,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:56.205575+08:00",
+    "available_ram_mb": 330.43359375,
+    "locust_rss_mb": 54.20703125,
+    "locust_cpu_percent": 18.8,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:57.216880+08:00",
+    "available_ram_mb": 499.546875,
+    "locust_rss_mb": 54.0078125,
+    "locust_cpu_percent": 7.7,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:58.232481+08:00",
+    "available_ram_mb": 533.5078125,
+    "locust_rss_mb": 56.1484375,
+    "locust_cpu_percent": 10.8,
+    "active_users": 10
+  },
+  {
+    "time": "2026-10-04T18:42:59.235533+08:00",
+    "available_ram_mb": 514.7734375,
+    "locust_rss_mb": 56.43359375,
+    "locust_cpu_percent": 7.8,
+    "active_users": 9
+  }
+]

@@ -107,7 +107,12 @@ class AuthController extends Controller
         $username = $usernameMap[$role] ?? null;
         abort_if(!$username, 404);
 
-        $user = User::where('username', $username)->where('account_status', 'active')->firstOrFail();
+        $user = User::where('username', $username)->where('account_status', 'active')->first();
+        if (!$user) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'This demo account is unavailable. Please contact the administrator to restore access.',
+            ]);
+        }
 
         Auth::login($user);
         $user->update(['last_login_at' => now()]);

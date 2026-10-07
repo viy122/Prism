@@ -117,6 +117,7 @@
 @endpush
 
 @section('content')
+@include('prism.shared.asset-report-tabs', ['assetReportRole' => 'procurement-office'])
 @include('prism.partials.report-version')
 
 <div class="content">

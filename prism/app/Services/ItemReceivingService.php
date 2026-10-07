@@ -94,6 +94,7 @@ class ItemReceivingService
             'arrivalDate' => $arrival?->toDateString(), 'lastArrivalDate' => $last?->toDateString(),
             'receivingStatus' => $complete ? 'Fully Received' : ($received > 0 ? 'Partially Received' : ($po?->procured_on ? 'Awaiting Receipt' : 'Arrival not recorded')),
             'paymentStatus' => $po?->status_label ?? 'No PO',
+            'receivingReviewRequired' => !$complete && in_array($po?->status, ['processing_payment', 'paid'], true),
             'daysToReceive' => $duration, 'daysDelayed' => $delay,
             'delayLabel' => !$active ? 'Not applicable' : (!$expected ? 'No target date' : ($delay > 0 ? ($complete ? "{$delay} days late" : "Overdue by {$delay} days") : ($complete ? 'On time' : 'Within target'))),
             'canReceive' => $active && $viewer && $this->canReceive($viewer, $pr),

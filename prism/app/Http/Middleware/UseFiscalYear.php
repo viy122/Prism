@@ -37,7 +37,7 @@ class UseFiscalYear
             || str_starts_with($name, 'accounting-office.') || str_starts_with($name, 'cashier.')
             || str_starts_with($name, 'bac.') || str_starts_with($name, 'notifications.')
             || str_starts_with($name, 'profile.') || str_starts_with($name, 'fiscal-years.')
-            || str_starts_with($name, 'admin.');
+            || str_starts_with($name, 'admin.') || str_contains($name, 'office-assets');
         $context->filterReads = $request->isMethod('GET') && !$queue;
         $planning = str_contains($name, 'budget-proposal') || str_contains($name, 'proposal-review')
             || str_contains($name, 'budget-approval') || str_contains($name, 'annual-procurement-plan')

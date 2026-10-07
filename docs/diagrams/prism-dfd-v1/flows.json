@@ -1,0 +1,345 @@
+{
+  "entities": [
+    "Office Head / Dean",
+    "Budget Office",
+    "Procurement Office",
+    "Chancellor",
+    "Vice Chancellor",
+    "Cashier"
+  ],
+  "processes": [
+    "Manage Budget Proposals",
+    "Manage Market Scoping",
+    "Manage Reviews and Signatures",
+    "Manage Procurement Plans",
+    "Manage Procurement Documents",
+    "Manage Delivery and Payment Records",
+    "Monitor Procurement Progress",
+    "Generate Reports"
+  ],
+  "stores": [
+    "Budget Proposal Records",
+    "Market Scoping Records",
+    "Procurement Records",
+    "Review and Signature Records",
+    "Delivery and Payment Records",
+    "Report Archives"
+  ],
+  "edges": [
+    {
+      "from": "E0",
+      "to": "P1",
+      "label": "Submit Budget Proposal"
+    },
+    {
+      "from": "E0",
+      "to": "P2",
+      "label": "Specify Market Scoping Criteria"
+    },
+    {
+      "from": "E0",
+      "to": "P2",
+      "label": "Select Price References"
+    },
+    {
+      "from": "E0",
+      "to": "P3",
+      "label": "Confirm Document Signature"
+    },
+    {
+      "from": "E0",
+      "to": "P6",
+      "label": "Record Item Receipt"
+    },
+    {
+      "from": "P3",
+      "to": "E0",
+      "label": "Provide Proposal Review and Approval Status"
+    },
+    {
+      "from": "P2",
+      "to": "E0",
+      "label": "Present Market Scoping Results"
+    },
+    {
+      "from": "P3",
+      "to": "E0",
+      "label": "Route Documents for Signature"
+    },
+    {
+      "from": "P7",
+      "to": "E0",
+      "label": "Provide Procurement Schedule and Status"
+    },
+    {
+      "from": "P7",
+      "to": "E0",
+      "label": "Present Item Receiving Summary"
+    },
+    {
+      "from": "E1",
+      "to": "P3",
+      "label": "Submit Proposal Review and Endorsement"
+    },
+    {
+      "from": "P3",
+      "to": "E1",
+      "label": "Forward Proposals for Review"
+    },
+    {
+      "from": "P8",
+      "to": "E1",
+      "label": "Provide Budget Utilization Report"
+    },
+    {
+      "from": "E2",
+      "to": "P4",
+      "label": "Update Procurement Plan"
+    },
+    {
+      "from": "E2",
+      "to": "P5",
+      "label": "Submit Purchase Request Details"
+    },
+    {
+      "from": "E2",
+      "to": "P5",
+      "label": "Submit Canvassing and Purchase Order Details"
+    },
+    {
+      "from": "E2",
+      "to": "P3",
+      "label": "Update Document Routing"
+    },
+    {
+      "from": "E2",
+      "to": "P6",
+      "label": "Record Procurement Dates and Delivery Updates"
+    },
+    {
+      "from": "P4",
+      "to": "E2",
+      "label": "Provide Annual Procurement Plan"
+    },
+    {
+      "from": "P7",
+      "to": "E2",
+      "label": "Provide Procurement Documents and Routing Status"
+    },
+    {
+      "from": "P8",
+      "to": "E2",
+      "label": "Provide Procurement and Receiving Reports"
+    },
+    {
+      "from": "E3",
+      "to": "P3",
+      "label": "Submit Proposal Approval or Return Decision"
+    },
+    {
+      "from": "E3",
+      "to": "P3",
+      "label": "Confirm Document Signature"
+    },
+    {
+      "from": "P3",
+      "to": "E3",
+      "label": "Forward Proposals for Approval"
+    },
+    {
+      "from": "P3",
+      "to": "E3",
+      "label": "Route Documents for Signature"
+    },
+    {
+      "from": "P8",
+      "to": "E3",
+      "label": "Provide Campus Procurement Reports"
+    },
+    {
+      "from": "E4",
+      "to": "P3",
+      "label": "Submit Signature Confirmation and Remarks"
+    },
+    {
+      "from": "P3",
+      "to": "E4",
+      "label": "Route Documents for Signature"
+    },
+    {
+      "from": "P8",
+      "to": "E4",
+      "label": "Provide Division Procurement Status and Performance Report"
+    },
+    {
+      "from": "E5",
+      "to": "P6",
+      "label": "Submit Payment Confirmation and Receipt"
+    },
+    {
+      "from": "P6",
+      "to": "E5",
+      "label": "Forward Purchase Orders and Processing Proof for Payment"
+    },
+    {
+      "from": "P8",
+      "to": "E5",
+      "label": "Provide Payment History"
+    },
+    {
+      "from": "P1",
+      "to": "D1",
+      "label": "Save Budget Proposal"
+    },
+    {
+      "from": "D1",
+      "to": "P1",
+      "label": "Retrieve Proposal Details"
+    },
+    {
+      "from": "P2",
+      "to": "D2",
+      "label": "Save Market Scoping References"
+    },
+    {
+      "from": "D2",
+      "to": "P2",
+      "label": "Retrieve Market Scoping References"
+    },
+    {
+      "from": "D1",
+      "to": "P3",
+      "label": "Retrieve Submitted Proposals"
+    },
+    {
+      "from": "P3",
+      "to": "D1",
+      "label": "Update Proposal Review and Approval Status"
+    },
+    {
+      "from": "D3",
+      "to": "P3",
+      "label": "Retrieve Documents for Routing"
+    },
+    {
+      "from": "P3",
+      "to": "D3",
+      "label": "Update Document Signing Status"
+    },
+    {
+      "from": "P3",
+      "to": "D4",
+      "label": "Save Review and Signature History"
+    },
+    {
+      "from": "D4",
+      "to": "P3",
+      "label": "Retrieve Review and Signature History"
+    },
+    {
+      "from": "D1",
+      "to": "P4",
+      "label": "Retrieve Approved Requirements"
+    },
+    {
+      "from": "P4",
+      "to": "D3",
+      "label": "Save Procurement Plan and Schedule"
+    },
+    {
+      "from": "D3",
+      "to": "P4",
+      "label": "Retrieve Procurement Plan"
+    },
+    {
+      "from": "D3",
+      "to": "P5",
+      "label": "Retrieve Procurement Requirements and Documents"
+    },
+    {
+      "from": "P5",
+      "to": "D3",
+      "label": "Save Procurement Documents"
+    },
+    {
+      "from": "D3",
+      "to": "P6",
+      "label": "Retrieve Signed Purchase Orders"
+    },
+    {
+      "from": "D5",
+      "to": "P6",
+      "label": "Retrieve Delivery and Payment Details"
+    },
+    {
+      "from": "P6",
+      "to": "D5",
+      "label": "Save Delivery, Receipt, and Payment Records"
+    },
+    {
+      "from": "P6",
+      "to": "D3",
+      "label": "Update Purchase Order Delivery and Payment Status"
+    },
+    {
+      "from": "D1",
+      "to": "P7",
+      "label": "Retrieve Proposal Progress"
+    },
+    {
+      "from": "D3",
+      "to": "P7",
+      "label": "Retrieve Procurement Documents and Schedules"
+    },
+    {
+      "from": "D4",
+      "to": "P7",
+      "label": "Retrieve Routing and Signature Status"
+    },
+    {
+      "from": "D5",
+      "to": "P7",
+      "label": "Retrieve Receiving and Payment Status"
+    },
+    {
+      "from": "D1",
+      "to": "P8",
+      "label": "Retrieve Budget Data"
+    },
+    {
+      "from": "D3",
+      "to": "P8",
+      "label": "Retrieve Procurement Data"
+    },
+    {
+      "from": "D5",
+      "to": "P8",
+      "label": "Retrieve Delivery and Payment Data"
+    },
+    {
+      "from": "D6",
+      "to": "P8",
+      "label": "Retrieve Archived Reports"
+    },
+    {
+      "from": "P8",
+      "to": "D6",
+      "label": "Preserve Finalized Report Snapshots"
+    },
+    {
+      "from": "P1",
+      "to": "P2",
+      "label": "Supply Proposal Item Specifications"
+    },
+    {
+      "from": "P2",
+      "to": "P1",
+      "label": "Supply Selected Price References"
+    },
+    {
+      "from": "P7",
+      "to": "P8",
+      "label": "Supply Consolidated Progress Summary"
+    }
+  ]
+}

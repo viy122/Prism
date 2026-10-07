@@ -1,0 +1,10 @@
+{
+  "passed": [
+    "Office Assets is present in sidebar",
+    "Only the acquisition FY filter is shown for assets",
+    "390px mobile viewport has no horizontal page overflow",
+    "Warranty tab shows recorded coverage",
+    "No JavaScript exceptions after layout updates"
+  ],
+  "javascript_errors": []
+}

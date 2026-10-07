@@ -1,4 +1,4 @@
-@if($fySelected)
+@if($fySelected && !request()->routeIs('*.office-assets', '*.office-assets.*', 'office-assets.*'))
 <script>
 // Pin the displayed FY in this tab's URL (also used by form/AJAX referrers).
 (() => { const u = new URL(location.href); if (!u.searchParams.has('year')) { u.searchParams.set('year', @json($fySelected)); history.replaceState(null, '', u); } })();

@@ -2341,31 +2341,38 @@ class PrismProcurementOfficeController extends Controller
 
     public function updatePoStatus(Request $request, PurchaseOrder $po): JsonResponse
     {
-        if ($po->signatory_stage !== 'fully_signed') {
-            return response()->json(['error' => 'PO must be fully signed before updating delivery status.'], 422);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $po) {
+            $po = PurchaseOrder::lockForUpdate()->findOrFail($po->id);
+            if ($po->signatory_stage !== 'fully_signed') {
+                return response()->json(['error' => 'PO must be fully signed before updating delivery status.'], 422);
+            }
 
-        $next = $po->nextStatus();
-        if (!$next || $po->status === 'paid') {
-            return response()->json(['error' => 'No further status available.'], 422);
-        }
+            $next = $po->nextStatus();
+            if (!$next || $po->status === 'paid') {
+                return response()->json(['error' => 'No further status available.'], 422);
+            }
 
-        // Payment steps belong to Accounting (start processing) and the Cashier (receipt → paid)
-        if ($next === 'processing_payment') {
-            return response()->json(['error' => 'Delivery is complete — the Accounting Office takes over payment processing from here.'], 422);
-        }
+            // Payment steps belong to Accounting (start processing) and the Cashier (receipt → paid)
+            if (in_array($next, ['processing_payment', 'paid'], true)) {
+                return response()->json(['error' => 'Delivery is complete — the Accounting Office takes over payment processing from here.'], 422);
+            }
 
-        $po->update([
-            'status'  => $next,
-            'remarks' => $request->input('remarks'),
-        ]);
-        $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
+            if (in_array($next, ['partial_delivery', 'complete_delivery'], true)) {
+                return response()->json(['error' => 'Delivery status updates automatically from item receipts. Record or correct the received quantities in Item Delivery & Receiving.'], 422);
+            }
 
-        return response()->json([
-            'success'     => true,
-            'status'      => $next,
-            'statusLabel' => $po->fresh()->status_label,
-        ]);
+            $po->update([
+                'status'  => $next,
+                'remarks' => $request->input('remarks'),
+            ]);
+            $po->abstractOfCanvass?->purchaseRequest?->clearTrackingOverride();
+
+            return response()->json([
+                'success'     => true,
+                'status'      => $next,
+                'statusLabel' => $po->fresh()->status_label,
+            ]);
+        });
     }
 
     public function advancePoStage(Request $request, PurchaseOrder $po, SignatoryActionService $signatory): JsonResponse
@@ -3119,6 +3126,14 @@ class PrismProcurementOfficeController extends Controller
         };
     }
 
+    public function officeAssets(\Illuminate\Http\Request $request, \App\Services\OfficeAssetService $assets)
+    {
+        return view('prism.shared.office-assets', $this->withCommon('office-assets', $assets->pageData($request) + [
+            'pageTitle' => 'Allocation & Warranty', 'assetPageRole' => 'procurement-office',
+            'assetLayout' => 'prism.layouts.app',
+        ]));
+    }
+
     private function withCommon(string $activeProcurementPage, array $data): array
     {
         return array_merge([
@@ -3130,6 +3145,7 @@ class PrismProcurementOfficeController extends Controller
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Procurement Office pages',
             'moduleNavigation' => [
+                ['slug' => 'office-assets', 'label' => 'Allocation & Warranty', 'href' => route('procurement-office.office-assets'), 'icon' => 'devices'],
                 ['slug' => 'dashboard',                   'label' => 'Dashboard',                  'href' => route('procurement-office.dashboard'),                   'icon' => 'layout-dashboard'],
                 ['slug' => 'annual-procurement-plan',     'label' => 'Annual Procurement Plan',     'href' => route('procurement-office.annual-procurement-plan'),     'icon' => 'calendar-stats'],
                 ['slug' => 'purchase-request-management', 'label' => 'Purchase Requests',           'href' => route('procurement-office.purchase-request-management'), 'icon' => 'receipt'],

@@ -2024,6 +2024,21 @@ class PrismOfficeHeadController extends Controller
         };
     }
 
+    public function officeAssets(\Illuminate\Http\Request $request, \App\Services\OfficeAssetService $assets)
+    {
+        return view('prism.shared.office-assets', $this->withCommon('office-head', 'office-assets', $assets->pageData($request) + [
+            'pageTitle' => 'Asset Register', 'assetPageRole' => 'office-head',
+            'assetLayout' => 'prism.layouts.office-head',
+        ]));
+    }
+
+    public function receivedAssets(\Illuminate\Http\Request $request, \App\Services\OfficeAssetService $assets)
+    {
+        return view('prism.shared.received-items', $this->withCommon('office-head', 'office-assets', $assets->receivedPageData($request) + [
+            'pageTitle' => 'Received Items',
+        ]));
+    }
+
     private function withCommon(string $activeRole, ?string $activeOfficePage, array $data): array
     {
         return array_merge([
@@ -2036,6 +2051,7 @@ class PrismOfficeHeadController extends Controller
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Office Head / Dean pages',
             'moduleNavigation' => [
+                ['slug' => 'office-assets', 'label' => 'Office Assets', 'href' => route('office-head.office-assets'), 'icon' => 'devices'],
                 ['slug' => 'dashboard',         'label' => 'Dashboard',         'href' => route('office-head.dashboard'),         'icon' => 'layout-dashboard'],
                 ['slug' => 'for-my-signature',  'label' => 'For My Signature',  'href' => route('office-head.for-my-signature'),  'icon' => 'signature'],
                 ['slug' => 'market-scoping',    'label' => 'Market Scoping',    'href' => route('office-head.market-scoping'),    'icon' => 'search'],

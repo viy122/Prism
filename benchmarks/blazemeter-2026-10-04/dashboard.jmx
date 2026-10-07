@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="PRISM authenticated dashboard benchmark" enabled="true">
+      <stringProp name="TestPlan.comments">Existing demo login establishes independent Laravel sessions; setup and warm-up are excluded from measured dashboard results. No procurement data mutations.</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="Variables"><collectionProp name="Arguments.arguments"/></elementProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Authenticated users" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="One session per thread">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">5</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="Apache local host" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+          <stringProp name="HTTPSampler.domain">${__P(target_host,prism.test)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(target_port,80)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(target_protocol,http)}</stringProp>
+          <stringProp name="HTTPSampler.implementation">HttpClient4</stringProp>
+          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+          <stringProp name="HTTPSampler.response_timeout">60000</stringProp>
+          <boolProp name="HTTPSampler.image_parser">false</boolProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <CookieManager guiclass="CookiePanel" testclass="CookieManager" testname="Independent session cookies per user" enabled="true">
+          <collectionProp name="CookieManager.cookies"/>
+          <boolProp name="CookieManager.clearEachIteration">false</boolProp>
+          <boolProp name="CookieManager.controlledByThreadGroup">false</boolProp>
+        </CookieManager>
+        <hashTree/>
+        <CriticalSectionController guiclass="CriticalSectionControllerGui" testclass="CriticalSectionController" testname="Serialize unmeasured session setup only" enabled="true">
+          <stringProp name="CriticalSectionController.lockName">prism-benchmark-session-setup</stringProp>
+        </CriticalSectionController>
+        <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="SETUP - existing procurement demo login" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+          <stringProp name="HTTPSampler.path">/demo-login/procurement-office</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Require successful session setup" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="cacheKey">true</stringProp><stringProp name="filename"/><stringProp name="parameters"/>
+            <stringProp name="script"><![CDATA[
+if (prev.getResponseCode() != '302' || !prev.getResponseHeaders().contains('/procurement-office')) {
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage('Authentication setup failed; benchmark stopped.')
+    ctx.getEngine().stopTest()
+}
+]]></stringProp>
+          </JSR223Assertion><hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="SETUP - dashboard warm-up" enabled="true">
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+          <stringProp name="HTTPSampler.path">/procurement-office?year=2026</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">false</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Validate warm-up destination" enabled="true">
+            <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="cacheKey">true</stringProp><stringProp name="filename"/><stringProp name="parameters"/>
+            <stringProp name="script"><![CDATA[
+if (prev.getResponseCode() != '200' || !prev.getResponseDataAsString().contains('<title>Dashboard | Procurement Office | PRISM</title>')) {
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage('Authenticated dashboard warm-up failed; benchmark stopped.')
+    ctx.getEngine().stopTest()
+}
+]]></stringProp>
+          </JSR223Assertion><hashTree/>
+        </hashTree>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="Synchronize measurement start (not a sample)" enabled="true">
+          <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="cacheKey">true</stringProp><stringProp name="filename"/><stringProp name="parameters"/>
+          <stringProp name="script"><![CDATA[
+SampleResult.setIgnore()
+synchronized (props) {
+    if (!props.containsKey('benchmarkStartMs')) {
+        props.put('benchmarkStartMs', Long.toString(System.currentTimeMillis()))
+        log.info('BENCHMARK_START_MS=' + props.get('benchmarkStartMs'))
+    }
+}
+vars.put('completed', '0')
+vars.put('benchmarkContinue', 'true')
+]]></stringProp>
+        </JSR223Sampler>
+        <hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Wait for every authenticated user" enabled="true">
+            <stringProp name="groupSize">${__P(users,1)}</stringProp>
+            <longProp name="timeoutInMs">120000</longProp>
+          </SyncTimer><hashTree/>
+        </hashTree>
+        <WhileController guiclass="WhileControllerGui" testclass="WhileController" testname="10 iterations per user or sustained duration" enabled="true">
+          <stringProp name="WhileController.condition">${benchmarkContinue}</stringProp>
+        </WhileController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="MEASURED - Procurement dashboard FY2026" enabled="true">
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments"><collectionProp name="Arguments.arguments"/></elementProp>
+            <stringProp name="HTTPSampler.path">/procurement-office?year=2026</stringProp>
+            <stringProp name="HTTPSampler.method">GET</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">false</boolProp><boolProp name="HTTPSampler.auto_redirects">false</boolProp><boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <JSR223Assertion guiclass="TestBeanGUI" testclass="JSR223Assertion" testname="Require HTTP 200 and actual dashboard" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="cacheKey">true</stringProp><stringProp name="filename"/><stringProp name="parameters"/>
+              <stringProp name="script"><![CDATA[
+if (prev.getResponseCode() != '200' || !prev.getResponseDataAsString().contains('<title>Dashboard | Procurement Office | PRISM</title>')) {
+    AssertionResult.setFailure(true)
+    AssertionResult.setFailureMessage('Expected authenticated Procurement Office dashboard and HTTP 200.')
+}
+]]></stringProp>
+            </JSR223Assertion><hashTree/>
+            <JSR223PostProcessor guiclass="TestBeanGUI" testclass="JSR223PostProcessor" testname="Exact iteration count or sustained deadline" enabled="true">
+              <stringProp name="scriptLanguage">groovy</stringProp><stringProp name="cacheKey">true</stringProp><stringProp name="filename"/><stringProp name="parameters"/>
+              <stringProp name="script"><![CDATA[
+int completed = Integer.parseInt(vars.get('completed')) + 1
+vars.put('completed', Integer.toString(completed))
+long duration = Long.parseLong(props.getProperty('duration', '0'))
+boolean again = duration > 0
+    ? System.currentTimeMillis() < Long.parseLong(props.getProperty('benchmarkStartMs')) + duration * 1000
+    : completed < Integer.parseInt(props.getProperty('iterations', '10'))
+vars.put('benchmarkContinue', Boolean.toString(again))
+]]></stringProp>
+            </JSR223PostProcessor><hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

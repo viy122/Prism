@@ -1,0 +1,6 @@
+Network Performance Parameter,Reference Image,Measured Value
+Download Speed,83.87 Mbps,183.32 Mbps
+Upload Speed,51.24 Mbps,53.31 Mbps
+Ping,5 ms,26.00 ms
+Jitter (Download),66 ms,2.29 ms
+Jitter (Upload),400 ms,0.89 ms

@@ -77,11 +77,18 @@ class ItemReceivingController extends Controller
                 if ($receipt) {
                     $receipt = ItemReceipt::lockForUpdate()->findOrFail($receipt->id);
                     abort_unless((int) $receipt->purchase_order_id === (int) $po->id, 422);
+                    $registeredAssets = \App\Models\OfficeAsset::where('item_receipt_id', $receipt->id)->get();
+                    if ($registeredAssets->isNotEmpty() && ((float) $data['quantity'] < $registeredAssets->count() || floor((float) $data['quantity']) !== (float) $data['quantity'])) {
+                        throw ValidationException::withMessages(['quantity' => 'This receipt has registered equipment units. Its quantity must remain whole and cannot fall below the registered count, including transferred or retired units.']);
+                    }
+                    if ($registeredAssets->contains(fn ($asset) => ($asset->assigned_on && $asset->assigned_on->toDateString() < $data['arrival_date']) || ($asset->usage_started_on && $asset->usage_started_on->toDateString() < $data['arrival_date']))) {
+                        throw ValidationException::withMessages(['arrival_date' => 'Arrival cannot move after an existing asset assignment or usage date. Reconcile the asset records first.']);
+                    }
                 }
                 if ($po->procured_on && $data['arrival_date'] < $po->procured_on->toDateString()) {
                     throw ValidationException::withMessages(['arrival_date' => 'Arrival Date cannot be earlier than Procured Date.']);
                 }
-                $received = $item->receipts()->when($receipt, fn ($q) => $q->where('id', '!=', $receipt->id))->sum('quantity');
+                $received = $item->receipts()->where('purchase_order_id', $po->id)->when($receipt, fn ($q) => $q->where('id', '!=', $receipt->id))->sum('quantity');
                 $remaining = (int) round((float) $item->quantity * 100) - (int) round((float) $received * 100);
                 if ((int) round((float) $data['quantity'] * 100) > $remaining) {
                     throw ValidationException::withMessages(['quantity' => 'Received quantity exceeds the remaining ordered quantity.']);
@@ -103,6 +110,7 @@ class ItemReceivingController extends Controller
                     ]);
                 }
                 $this->audit($request, $receipt, $old ? 'item_receipt_corrected' : 'item_receipt_recorded', $old, $receipt->fresh()->toArray(), $data['correction_reason'] ?? null);
+                app(\App\Services\DeliveryStatusService::class)->sync($po->id, $request->user()->id, $request->ip());
             });
         } catch (\Throwable $e) {
             if ($storedPath) Storage::disk('local')->delete($storedPath);
@@ -117,6 +125,7 @@ class ItemReceivingController extends Controller
             return response()->json([
                 'message' => $message,
                 'delivery' => $delivery,
+                'trackingStatus' => $item->purchaseRequest->effectiveTrackingStatus(),
                 'detailsHtml' => view('prism.shared.receiving-details', ['delivery' => $delivery])->render(),
             ]);
         }

@@ -733,6 +733,14 @@ class PrismChancellorController extends Controller
         };
     }
 
+    public function officeAssets(\Illuminate\Http\Request $request, \App\Services\OfficeAssetService $assets)
+    {
+        return view('prism.shared.office-assets', $this->withCommon('office-assets', $assets->pageData($request) + [
+            'pageTitle' => 'Allocation & Warranty', 'assetPageRole' => 'chancellor',
+            'assetLayout' => 'prism.layouts.app',
+        ]));
+    }
+
     private function withCommon(string $activeChancellorPage, array $data): array
     {
         return array_merge([
@@ -744,6 +752,7 @@ class PrismChancellorController extends Controller
             'roleNavigation'   => \App\Support\PrismNav::roleNavigation(),
             'moduleNavLabel'   => 'Chancellor pages',
             'moduleNavigation' => [
+                ['slug' => 'office-assets', 'label' => 'Allocation & Warranty', 'href' => route('chancellor.office-assets'), 'icon' => 'devices'],
                 ['slug' => 'dashboard',           'label' => 'Campus Monitoring',   'href' => route('chancellor.dashboard'),           'icon' => 'layout-dashboard'],
                 ['slug' => 'budget-approval',     'label' => 'PPMP Approval',       'href' => route('chancellor.budget-approval'),     'icon' => 'shield-check'],
                 ['slug' => 'for-my-signature',    'label' => 'For My Signature',    'href' => route('chancellor.for-my-signature'),    'icon' => 'signature'],

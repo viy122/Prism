@@ -1,0 +1,92 @@
+Edit the attached PRISM data flow diagram reference. The user explicitly wants THIS compact black-and-white visual arrangement, not a sprawling auto-layout circuit diagram. Produce a polished, very high-resolution landscape academic DFD with sharp readable type and balanced whitespace. Preserve the reference's clean, compact overall appearance, numbered rounded process boxes, plain rectangular user boxes, open-ended data store symbols, and carefully routed thin orthogonal black arrows. Remove the outer rounded decorative border if it consumes space. Title: "PRISM — Level 1 Data Flow Diagram". Subtitle MUST read "8 Processes • 3 Data Stores • 6 User Roles".
+
+REQUIRED CORRECTIONS:
+1. EXACTLY THREE data store symbols total, each only once:
+D1 "Proposal and Market Records" (combine old Budget Proposal Records and Market Scoping Records).
+D2 "Procurement Records" (combine old Procurement Records and Delivery and Payment Records).
+D3 "Review and Report Records" (combine old Review and Signature Records and Report Archives).
+Do not show D4, D5, D6 or any other store, even small.
+2. EXACTLY ONE BOX for each of SIX user roles, six external boxes TOTAL:
+"Office Head / Dean", "Budget Office", "Procurement Office", "Chancellor", "Vice Chancellor", "Cashier".
+The reference repeats Budget Office, Procurement Office, Chancellor, Vice Chancellor, Cashier in the bottom-right report area: REMOVE ALL these duplicate user boxes. Instead route the report arrows back to each user's single primary box. Each user box must be the endpoint of ALL its respective flows. No duplicated entity symbols, no auxiliary user boxes, no invented users.
+3. EXACTLY EIGHT process boxes, each once:
+1.0 Manage Budget Proposals
+2.0 Manage Market Scoping
+3.0 Manage Reviews and Signatures
+4.0 Manage Procurement Plans
+5.0 Manage Procurement Documents
+6.0 Manage Delivery and Payment Records
+7.0 Monitor Procurement Progress
+8.0 Generate Reports
+4. Retain the compact arrangement: top row P1, P2, P3; middle row P4, P5, P6; bottom row P7, P8. D1 in the region between top and middle left; D2 between middle and bottom center; D3 near P3 and P8 on right. Office Head at upper left perimeter, Procurement Office at left mid perimeter, Budget Office at top center, Chancellor and Vice Chancellor across top right, Cashier on right mid perimeter. Keep process nodes large enough to read. Route edges in separately spaced corridors around the boxes, not through them.
+5. No overlapping line segments, no arrow labels overlapping lines or boxes. Avoid crossings through thoughtful placement and perimeter routing; where a crossing truly cannot be removed, show a small clean line hop instead of a confusing intersection. Do not substitute sprawling dense rails for the compact composition.
+6. This is a DFD, not a sequential flowchart: maintain the directed endpoints below. Never connect user directly to a store, never connect store directly to store.
+
+EXTERNAL FLOW LABELS ARE FIXED. Render all of these verbatim, with line wraps permitted, correct arrow direction:
+Office Head / Dean -> 1.0: Submit Budget Proposal
+Office Head / Dean -> 2.0: Specify Market Scoping Criteria
+Office Head / Dean -> 2.0: Select Price References
+Office Head / Dean -> 3.0: Confirm Document Signature
+Office Head / Dean -> 6.0: Record Item Receipt
+3.0 -> Office Head / Dean: Provide Proposal Review and Approval Status
+2.0 -> Office Head / Dean: Present Market Scoping Results
+3.0 -> Office Head / Dean: Route Documents for Signature
+7.0 -> Office Head / Dean: Provide Procurement Schedule and Status
+7.0 -> Office Head / Dean: Present Item Receiving Summary
+Budget Office -> 3.0: Submit Proposal Review and Endorsement
+3.0 -> Budget Office: Forward Proposals for Review
+8.0 -> Budget Office: Provide Budget Utilization Report
+Procurement Office -> 4.0: Update Procurement Plan
+Procurement Office -> 5.0: Submit Purchase Request Details
+Procurement Office -> 5.0: Submit Canvassing and Purchase Order Details
+Procurement Office -> 3.0: Update Document Routing
+Procurement Office -> 6.0: Record Procurement Dates and Delivery Updates
+4.0 -> Procurement Office: Provide Annual Procurement Plan
+7.0 -> Procurement Office: Provide Procurement Documents and Routing Status
+8.0 -> Procurement Office: Provide Procurement and Receiving Reports
+Chancellor -> 3.0: Submit Proposal Approval or Return Decision
+Chancellor -> 3.0: Confirm Document Signature
+3.0 -> Chancellor: Forward Proposals for Approval
+3.0 -> Chancellor: Route Documents for Signature
+8.0 -> Chancellor: Provide Campus Procurement Reports
+Vice Chancellor -> 3.0: Submit Signature Confirmation and Remarks
+3.0 -> Vice Chancellor: Route Documents for Signature
+8.0 -> Vice Chancellor: Provide Division Procurement Status and Performance Report
+Cashier -> 6.0: Submit Payment Confirmation and Receipt
+6.0 -> Cashier: Forward Purchase Orders and Processing Proof for Payment
+8.0 -> Cashier: Provide Payment History
+
+INTERNAL DATA CONNECTIONS (label each route clearly; opposite directions use separate arrows):
+1.0 -> D1: Save Budget Proposal
+D1 -> 1.0: Retrieve Proposal Details
+2.0 -> D1: Save Market Scoping References
+D1 -> 2.0: Retrieve Market Scoping References
+D1 -> 3.0: Retrieve Submitted Proposals
+3.0 -> D1: Update Proposal Review and Approval Status
+D2 -> 3.0: Retrieve Documents for Routing
+3.0 -> D2: Update Document Signing Status
+3.0 -> D3: Save Review and Signature History
+D3 -> 3.0: Retrieve Review and Signature History
+D1 -> 4.0: Retrieve Approved Requirements
+4.0 -> D2: Save Procurement Plan and Schedule
+D2 -> 4.0: Retrieve Procurement Plan
+D2 -> 5.0: Retrieve Procurement Requirements and Documents
+5.0 -> D2: Save Procurement Documents
+D2 -> 6.0: Retrieve Signed Purchase Orders
+D2 -> 6.0: Retrieve Delivery and Payment Details
+6.0 -> D2: Save Delivery, Receipt, and Payment Records
+6.0 -> D2: Update Purchase Order Delivery and Payment Status
+D1 -> 7.0: Retrieve Proposal Progress
+D2 -> 7.0: Retrieve Procurement Documents and Schedules
+D3 -> 7.0: Retrieve Routing and Signature Status
+D2 -> 7.0: Retrieve Receiving and Payment Status
+D1 -> 8.0: Retrieve Budget Data
+D2 -> 8.0: Retrieve Procurement Data
+D2 -> 8.0: Retrieve Delivery and Payment Data
+D3 -> 8.0: Retrieve Archived Reports
+8.0 -> D3: Preserve Finalized Report Snapshots
+1.0 -> 2.0: Supply Proposal Item Specifications
+2.0 -> 1.0: Supply Selected Price References
+7.0 -> 8.0: Supply Consolidated Progress Summary
+
+Final count check before rendering: 8 process symbols + 3 datastore symbols + 6 user symbols = 17 total boxes. All text in English. No duplicate user boxes, no old 6-store subtitle. Preserve the requested visual aesthetic closely.

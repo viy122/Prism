@@ -1,0 +1,30 @@
+[
+  {
+    "time": "2026-10-04T18:42:36.064662+08:00",
+    "available_ram_mb": 488.5,
+    "locust_rss_mb": 48.640625,
+    "locust_cpu_percent": 0.0,
+    "active_users": 0
+  },
+  {
+    "time": "2026-10-04T18:42:37.073421+08:00",
+    "available_ram_mb": 486.95703125,
+    "locust_rss_mb": 51.12109375,
+    "locust_cpu_percent": 4.7,
+    "active_users": 1
+  },
+  {
+    "time": "2026-10-04T18:42:38.089316+08:00",
+    "available_ram_mb": 499.19140625,
+    "locust_rss_mb": 52.09375,
+    "locust_cpu_percent": 0.0,
+    "active_users": 1
+  },
+  {
+    "time": "2026-10-04T18:42:39.092646+08:00",
+    "available_ram_mb": 497.5625,
+    "locust_rss_mb": 51.1328125,
+    "locust_cpu_percent": 1.5,
+    "active_users": 1
+  }
+]
