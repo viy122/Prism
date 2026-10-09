@@ -64,7 +64,7 @@ trait RendersPpmpDocument
             'procurementStartDate' => $item->procurement_start_date?->format('M d, Y'),
             'dateNeeded'        => $item->date_needed?->format('M d, Y'),
             'expectedDeliveryDate' => $poDeliveryDateByItemName->get(strtolower(trim($item->name)))?->format('M d, Y'),
-            'sourceOfFund'      => $item->source_of_fund,
+            'sourceOfFund'      => $item->source_of_fund ?: 'General Fund',
             'totalCost'         => (float) $item->estimated_total_cost,
             'justification'     => $item->remarks ?? '',
             'attachments'       => $item->sourceFiles->map(fn ($doc) => [

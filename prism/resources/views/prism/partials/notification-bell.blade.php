@@ -188,6 +188,15 @@
         return Math.floor(diff / 86400) + 'd ago';
     }
 
+    function actionUrl(n) {
+        let url = n.action_url || '';
+        const data = n.data || {};
+        if (!url || n.type !== 'awaiting_signature' || !data.docType || !data.id) return url;
+        if (/[?&](docType|documentType|id|documentId)=/.test(url)) return url;
+        const sep = url.includes('?') ? '&' : '?';
+        return url + sep + 'docType=' + encodeURIComponent(data.docType) + '&id=' + encodeURIComponent(data.id);
+    }
+
     function post(url) {
         return fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' } });
     }
@@ -288,7 +297,7 @@
         $list.innerHTML = items.map(n => {
             const m    = TYPE_META[n.type] || { icon: 'ti-info-circle', bg: '#F0E8E8', color: '#8B1A1C' };
             const unrd = !n.read_at ? 'unread' : '';
-            return `<div class="notif-item ${unrd}" data-id="${n.id}" data-url="${esc(n.action_url || '')}">
+            return `<div class="notif-item ${unrd}" data-id="${n.id}" data-url="${esc(actionUrl(n))}">
                 <div class="notif-item-icon" style="background:${m.bg}">
                     <i class="ti ${m.icon}" style="color:${m.color}"></i>
                 </div>

@@ -909,6 +909,14 @@
             if (extra.quantity)     params.set('quantity', extra.quantity);
             if (extra.justification) params.set('justification', extra.justification);
             if (extra.quarter)      params.set('quarter', extra.quarter);
+            if (extra.category)     params.set('category', extra.category);
+            if (extra.sourceOfFund) params.set('sourceOfFund', extra.sourceOfFund);
+            if (extra.itemClassification) params.set('itemClassification', extra.itemClassification);
+            if (extra.projectType)  params.set('projectType', extra.projectType);
+            if (extra.procurementMode) params.set('procurementMode', extra.procurementMode);
+            if (extra.preProcurementConference !== undefined && extra.preProcurementConference !== '') {
+                params.set('preProcurementConference', extra.preProcurementConference ? '1' : '0');
+            }
         }
         const qs = params.toString();
         return scopingUrl + (qs ? '?' + qs : '');
@@ -1481,6 +1489,12 @@
             quantity:      document.getElementById('itemQuantity')?.value || '',
             justification: document.getElementById('itemJustification')?.value.trim() || '',
             quarter:       document.getElementById('itemQuarter')?.value || '',
+            category:      document.getElementById('itemCategory')?.value || '',
+            sourceOfFund:  resolvedSourceOfFund() || 'General Fund',
+            itemClassification: resolvedClassification() || 'Regular',
+            projectType:   resolvedProjectType() || 'Goods',
+            preProcurementConference: document.getElementById('itemPrePpmpConference')?.value === '1',
+            procurementMode: document.getElementById('itemProcurementMode')?.value || '',
         };
         window.location.href = scopingUrlFor(query, budget, itemId, extra);
     });

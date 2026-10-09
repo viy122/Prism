@@ -586,7 +586,7 @@ class PrismProcurementOfficeController extends Controller
                 'isOverridden'    => (bool) $item->is_overridden,
                 'overrideReason'  => $item->override_reason ?? '',
                 'saveUrl'         => route('procurement-office.annual-procurement-plan.save-mode', $item->id),
-                'sourceOfFund'         => $item->source_of_fund ?: '—',
+                'sourceOfFund'         => $item->source_of_fund ?: 'General Fund',
                 'procurementStartDate' => $item->procurement_start_date?->format('Y-m-d'),
                 'dateNeeded'           => $item->date_needed?->format('Y-m-d'),
                 'datesSaveUrl'         => route('procurement-office.annual-procurement-plan.update-dates', $item->id),
@@ -3048,7 +3048,14 @@ class PrismProcurementOfficeController extends Controller
         $byName = $budgetItems->keyBy(fn ($item) => strtolower(trim($item->name)));
 
         $sources = $pr->items
-            ->map(fn ($item) => $byName->get(strtolower(trim($item->name)))?->source_of_fund)
+            ->map(function ($item) use ($byName) {
+                $ppmpItem = $byName->get(strtolower(trim($item->name)));
+                if (!$ppmpItem) {
+                    return null;
+                }
+
+                return $ppmpItem->source_of_fund ?: 'General Fund';
+            })
             ->filter()
             ->unique()
             ->values();

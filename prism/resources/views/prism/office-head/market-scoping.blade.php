@@ -654,10 +654,15 @@
                     quantity:          parseFloat(carriedNewItemFields.quantity),
                     estimatedUnitCost: data.average_price ? parseFloat(data.average_price) : 0,
                     targetQuarter:     carriedNewItemFields.quarter,
-                    // Not collected on the PPMP tab's Add Item form (nor asked
-                    // there), same default the "Add Item to Proposal" modal itself
-                    // starts on — office head can still edit it after redirect.
-                    category:          'Sched 9 - Supplies',
+                    // Preserve the PPMP Add Item values that were carried through
+                    // the Market Scoping redirect.
+                    justification:     carriedNewItemFields.justification || '',
+                    category:          carriedNewItemFields.category || 'Sched 9 - Supplies',
+                    sourceOfFund:      carriedNewItemFields.sourceOfFund || 'General Fund',
+                    itemClassification: carriedNewItemFields.itemClassification || 'Regular',
+                    projectType:       carriedNewItemFields.projectType || 'Goods',
+                    preProcurementConference: !!carriedNewItemFields.preProcurementConference,
+                    procurementMode:   carriedNewItemFields.procurementMode || null,
                     refs:              data.refs_data,
                     proposal_id:       proposalId,
                 }),
@@ -721,9 +726,25 @@
             const res  = await fetch('{{ route("office-head.market-scoping.add-item-with-refs") }}', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                // Category isn't collected here anymore — same default as the
-                // auto-add path below, editable afterward on the PPMP tab.
-                body:    JSON.stringify({ description: name, unit, quantity: qty, estimatedUnitCost: cost, targetQuarter: quarter, category: 'Sched 9 - Supplies', refs: pendingRefsData, proposal_id: proposalId }),
+                // These PPMP fields are editable after redirect; carry them when
+                // the user arrived from the PPMP Add Item form, otherwise use
+                // the same defaults that form shows.
+                body:    JSON.stringify({
+                    description: name,
+                    unit,
+                    quantity: qty,
+                    estimatedUnitCost: cost,
+                    targetQuarter: quarter,
+                    justification: carriedNewItemFields?.justification || '',
+                    category: carriedNewItemFields?.category || 'Sched 9 - Supplies',
+                    sourceOfFund: carriedNewItemFields?.sourceOfFund || 'General Fund',
+                    itemClassification: carriedNewItemFields?.itemClassification || 'Regular',
+                    projectType: carriedNewItemFields?.projectType || 'Goods',
+                    preProcurementConference: !!carriedNewItemFields?.preProcurementConference,
+                    procurementMode: carriedNewItemFields?.procurementMode || null,
+                    refs: pendingRefsData,
+                    proposal_id: proposalId,
+                }),
             });
             const json = await res.json();
             if (json.success) {
@@ -1192,6 +1213,12 @@
                 quantity: quantityParam,
                 quarter: quarterParam,
                 justification: params.get('justification') || '',
+                category: params.get('category') || 'Sched 9 - Supplies',
+                sourceOfFund: params.get('sourceOfFund') || 'General Fund',
+                itemClassification: params.get('itemClassification') || 'Regular',
+                projectType: params.get('projectType') || 'Goods',
+                preProcurementConference: params.get('preProcurementConference') === '1',
+                procurementMode: params.get('procurementMode') || null,
             };
         }
 

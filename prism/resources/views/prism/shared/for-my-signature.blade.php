@@ -34,6 +34,8 @@
     tbody tr:hover { background: var(--crimson-mid); }
     tbody tr.selected { background: rgba(139,26,28,.07); }
     tbody tr.selected td:first-child { border-left: 3px solid var(--m); }
+    tbody tr.targeted { background: #fef2f2; box-shadow: inset 0 0 0 2px var(--m); }
+    tbody tr.targeted td:first-child { border-left: 4px solid var(--m); }
 
     .badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .badge-signed  { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
@@ -473,6 +475,13 @@
 
     let activeDoc = null;
     let saving    = false;
+    const initialTarget = (() => {
+        const params = new URLSearchParams(window.location.search);
+        const docType = (params.get('docType') || params.get('documentType') || '').toLowerCase();
+        const id = params.get('id') || params.get('documentId');
+        return docType && id ? { docType, id: String(id) } : null;
+    })();
+    let targetDocKey = initialTarget ? initialTarget.docType + '-' + initialTarget.id : null;
 
     function showToast(msg, isError = false) {
         toastEl.textContent = msg;
@@ -708,10 +717,32 @@
         renderLog(doc);
     }
 
-    function openDoc(doc) {
+    function docKey(doc) {
+        return doc.docType + '-' + doc.id;
+    }
+
+    function rowForDoc(doc) {
+        return tbody?.querySelector(`[data-doc-key="${docKey(doc)}"]`) || null;
+    }
+
+    function scrollToRow(row) {
+        if (!row) return;
+        requestAnimationFrame(() => {
+            row.focus({ preventScroll: true });
+            row.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        });
+    }
+
+    function openDoc(doc, { fromQueueTarget = false } = {}) {
         activeDoc = doc;
-        getRows().forEach(r => r.classList.remove('selected'));
-        tbody?.querySelector(`[data-doc-key="${doc.docType}-${doc.id}"]`)?.classList.add('selected');
+        getRows().forEach(r => r.classList.remove('selected', 'targeted'));
+        const row = rowForDoc(doc);
+        row?.classList.add('selected');
+        if (fromQueueTarget) {
+            targetDocKey = docKey(doc);
+            row?.classList.add('targeted');
+            scrollToRow(row);
+        }
         titleEl.textContent = doc.docLabel + ' ' + doc.number;
         remarksIn.value = '';
         logToggle.classList.remove('open');
@@ -719,6 +750,28 @@
         renderDetail(doc);
         emptyEl.style.display = 'none';
         contentEl.classList.add('visible');
+    }
+
+    function clearFiltersForTarget() {
+        if (docSearch) docSearch.value = '';
+        if (docTypeFilter) docTypeFilter.value = '';
+        if (docOfficeFilter) docOfficeFilter.value = '';
+        if (docStatusFilter) docStatusFilter.value = '';
+        applyDocSearchFilter();
+    }
+
+    function openQueueTarget() {
+        let doc = null;
+        if (targetDocKey) {
+            doc = allDocs.find(d => docKey(d) === targetDocKey);
+        }
+        if (!doc) {
+            doc = allDocs.find(d => d.canAct);
+            if (doc) targetDocKey = docKey(doc);
+        }
+        if (!doc) return;
+        clearFiltersForTarget();
+        openDoc(doc, { fromQueueTarget: true });
     }
 
     // Delegated so rows appended later (by the background refresh) work
@@ -735,17 +788,6 @@
         if (!row) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     });
-
-    // Arrived via a "document awaiting your signature" notification — open that
-    // exact document instead of leaving the generic queue with nothing selected.
-    (function openFromNotification() {
-        const params  = new URLSearchParams(window.location.search);
-        const docType = params.get('docType');
-        const id      = params.get('id');
-        if (!docType || !id) return;
-        const doc = allDocs.find(d => d.docType === docType && String(d.id) === id);
-        if (doc) openDoc(doc);
-    })();
 
     previewToggle.addEventListener('click', () => {
         previewToggle.classList.toggle('open');
@@ -818,6 +860,10 @@
             docOfficeFilter.appendChild(opt);
         });
     })();
+
+    // Queue deep links (?docType=pr&id=123) open that exact document. Generic
+    // Open Queue clicks still select the first row that is waiting on this user.
+    openQueueTarget();
 
     // Re-orders the DOM rows by last-updated — newest-first by default
     // (matches the initial server-side order), toggled to oldest-first here.
@@ -1008,7 +1054,11 @@
                 if (!existingKeys.has(key)) tbody.insertAdjacentHTML('beforeend', rowHtml(doc));
             });
 
-            if (activeDoc) tbody.querySelector(`[data-doc-key="${activeDoc.docType}-${activeDoc.id}"]`)?.classList.add('selected');
+            if (activeDoc) {
+                const row = tbody.querySelector(`[data-doc-key="${activeDoc.docType}-${activeDoc.id}"]`);
+                row?.classList.add('selected');
+                if (targetDocKey === activeDoc.docType + '-' + activeDoc.id) row?.classList.add('targeted');
+            }
 
             applyDocSearchFilter();
             applySortOrder();
@@ -1027,6 +1077,8 @@
                 activeDoc = freshActive;
                 renderDetail(activeDoc, { refreshPreview: !previewUnchanged });
             }
+        } else {
+            openQueueTarget();
         }
     }
 
