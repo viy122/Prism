@@ -12,7 +12,17 @@ class NotificationController extends Controller
             ->prismNotifications()
             ->latest()
             ->take(20)
-            ->get(['id', 'type', 'title', 'message', 'action_url', 'read_at', 'created_at']);
+            ->get(['id', 'type', 'title', 'message', 'action_url', 'data_json', 'read_at', 'created_at'])
+            ->map(fn ($notification) => [
+                'id'         => $notification->id,
+                'type'       => $notification->type,
+                'title'      => $notification->title,
+                'message'    => $notification->message,
+                'action_url' => $notification->action_url,
+                'data'       => $notification->data_json,
+                'read_at'    => $notification->read_at,
+                'created_at' => $notification->created_at,
+            ]);
 
         return response()->json($notifications);
     }

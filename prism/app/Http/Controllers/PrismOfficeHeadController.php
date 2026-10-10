@@ -28,6 +28,24 @@ class PrismOfficeHeadController extends Controller
 {
     use HandlesSignatureQueue;
 
+    private const DEFAULT_SOURCE_OF_FUND = 'General Fund';
+
+    private function sourceOfFundOrDefault(?string $source): string
+    {
+        $source = trim((string) $source);
+
+        return $source !== '' ? $source : self::DEFAULT_SOURCE_OF_FUND;
+    }
+
+    private function defaultProposalTitle(BudgetProposal $proposal): string
+    {
+        $proposal->loadMissing('office');
+
+        $office = $proposal->office?->name ?: $proposal->office?->code;
+
+        return ($office ?: 'Office') . ' PPMP FY' . $proposal->fiscal_year;
+    }
+
     protected function queueRoleCode(): string
     {
         return 'office-head';
@@ -533,7 +551,7 @@ class PrismOfficeHeadController extends Controller
                     'financeRemark'     => $item->finance_remark ?? '',
                     'targetQuarter'     => $item->target_quarter ?? 'Q1',
                     'category'          => $item->category ?? $item->ppmpCategoryLabel() ?? 'General',
-                    'sourceOfFund'      => $item->source_of_fund,
+                    'sourceOfFund'      => $this->sourceOfFundOrDefault($item->source_of_fund),
                     'itemClassification' => $item->item_classification ?? 'Regular',
                     // Official PPMP form columns 2/5 — unlike mode/dates below,
                     // these belong to the encoding office, not Procurement's
@@ -1126,7 +1144,7 @@ class PrismOfficeHeadController extends Controller
             'estimated_total_cost' => $total,
             'target_quarter'       => $validated['targetQuarter'],
             'remarks'              => $validated['justification'] ?? null,
-            'source_of_fund'       => $validated['sourceOfFund'] ?? null,
+            'source_of_fund'       => $this->sourceOfFundOrDefault($validated['sourceOfFund'] ?? null),
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
             'category'             => $validated['category'] ?? null,
@@ -1153,7 +1171,7 @@ class PrismOfficeHeadController extends Controller
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
                 'category'          => $item->category ?? 'General',
-                'sourceOfFund'      => $item->source_of_fund,
+                'sourceOfFund'      => $this->sourceOfFundOrDefault($item->source_of_fund),
                 'itemClassification' => $item->item_classification,
                 'projectType'       => $item->project_type,
                 'preProcurementConference' => (bool) $item->pre_procurement_conference,
@@ -1203,7 +1221,7 @@ class PrismOfficeHeadController extends Controller
             'estimated_total_cost' => $total,
             'target_quarter'       => $validated['targetQuarter'],
             'remarks'              => $validated['justification'] ?? null,
-            'source_of_fund'       => $validated['sourceOfFund'] ?? null,
+            'source_of_fund'       => $this->sourceOfFundOrDefault($validated['sourceOfFund'] ?? null),
             'item_classification'  => $validated['itemClassification'] ?? 'Regular',
             'project_type'         => $validated['projectType'] ?? 'Goods',
             'category'             => $validated['category'] ?? null,
@@ -1229,7 +1247,7 @@ class PrismOfficeHeadController extends Controller
                 'justification'     => $item->remarks ?? '',
                 'targetQuarter'     => $item->target_quarter,
                 'category'          => $item->category ?? 'General',
-                'sourceOfFund'      => $item->source_of_fund,
+                'sourceOfFund'      => $this->sourceOfFundOrDefault($item->source_of_fund),
                 'itemClassification' => $item->item_classification,
                 'projectType'       => $item->project_type,
                 'preProcurementConference' => (bool) $item->pre_procurement_conference,
@@ -1376,11 +1394,17 @@ class PrismOfficeHeadController extends Controller
             $proposal->items()->where('finance_ok', false)->update(['finance_ok' => null]);
         }
 
-        $proposal->update([
+        $proposalUpdate = [
             'status'                => 'submitted',
             'submitted_at'          => now(),
             'submitted_by_user_id'  => auth()->id(),
-        ]);
+        ];
+
+        if (trim((string) $proposal->title) === '') {
+            $proposalUpdate['title'] = $this->defaultProposalTitle($proposal);
+        }
+
+        $proposal->update($proposalUpdate);
 
         // Item edits after a return are destructive (updateItem()/destroyItem()
         // write/delete in place) — this is the one point that actually matters
@@ -1389,6 +1413,9 @@ class PrismOfficeHeadController extends Controller
         $itemsSnapshot = $proposal->items()->get([
             'id', 'name', 'description', 'quantity', 'unit',
             'estimated_unit_cost', 'estimated_total_cost', 'target_quarter',
+            'source_of_fund', 'item_classification', 'project_type',
+            'category', 'pre_procurement_conference', 'procurement_mode',
+            'recommended_mode', 'remarks',
         ])->toArray();
 
         BudgetProposalReview::create([
@@ -1728,6 +1755,12 @@ class PrismOfficeHeadController extends Controller
             'estimatedUnitCost' => 'required|numeric|min:0',
             'targetQuarter'     => 'required|in:Q1,Q2,Q3,Q4',
             'category'          => 'required|string|max:200',
+            'sourceOfFund'      => 'nullable|string|max:100',
+            'itemClassification' => 'nullable|string|max:50',
+            'projectType'       => 'nullable|string|max:100',
+            'justification'     => 'nullable|string|max:1000',
+            'preProcurementConference' => 'nullable|boolean',
+            'procurementMode'   => 'nullable|in:' . implode(',', ProcurementModeService::MODES),
             'refs'              => 'required|array|min:1|max:3',
             'proposal_id'       => 'nullable|integer|exists:budget_proposals,id',
         ]);
@@ -1769,6 +1802,8 @@ class PrismOfficeHeadController extends Controller
         }
 
         $total = $validated['quantity'] * $validated['estimatedUnitCost'];
+        $recommendedMode = ProcurementModeService::recommend($total);
+        $procurementMode = $validated['procurementMode'] ?? $recommendedMode;
 
         $item = $proposal->items()->create([
             'created_by_user_id'   => $request->user()?->id,
@@ -1780,6 +1815,14 @@ class PrismOfficeHeadController extends Controller
             'estimated_unit_cost'  => $validated['estimatedUnitCost'],
             'estimated_total_cost' => $total,
             'target_quarter'       => $validated['targetQuarter'],
+            'remarks'              => $validated['justification'] ?? null,
+            'source_of_fund'       => $this->sourceOfFundOrDefault($validated['sourceOfFund'] ?? null),
+            'item_classification'  => $validated['itemClassification'] ?? 'Regular',
+            'project_type'         => $validated['projectType'] ?? 'Goods',
+            'pre_procurement_conference' => $validated['preProcurementConference'] ?? false,
+            'recommended_mode'     => $recommendedMode,
+            'procurement_mode'     => $procurementMode,
+            'is_overridden'        => $procurementMode !== $recommendedMode,
             'status'               => 'draft',
         ]);
 

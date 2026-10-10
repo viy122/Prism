@@ -137,7 +137,7 @@ class PrismFinanceOfficeController extends Controller
         };
 
         return [
-            'title'       => $proposal->title ?: ($proposal->code ?: 'Untitled PPMP'),
+            'title'       => $this->proposalTitle($proposal),
             'code'        => $proposal->code ?: 'PPMP',
             'office'      => $proposal->office?->code ?? $proposal->office?->name ?? 'Unassigned',
             'fiscalYear'  => $proposal->fiscal_year,
@@ -150,6 +150,20 @@ class PrismFinanceOfficeController extends Controller
             'remarks'     => $lastReview?->remarks ?: $proposal->remarks ?: 'No remarks recorded.',
             'url'         => route('finance-office.proposal-review.document', $proposal->id),
         ];
+    }
+
+    private function proposalTitle(BudgetProposal $proposal): string
+    {
+        $title = trim((string) $proposal->title);
+        if ($title !== '') {
+            return $title;
+        }
+
+        $office = $proposal->office?->name ?: $proposal->office?->code;
+
+        return $office
+            ? "{$office} PPMP FY{$proposal->fiscal_year}"
+            : ($proposal->code ?: 'Untitled PPMP');
     }
 
     private function proposalStatusLabel(?string $status): string
@@ -298,7 +312,7 @@ class PrismFinanceOfficeController extends Controller
             ->map(fn ($p) => [
                 'id'            => $p->id,
                 'code'          => $p->code,
-                'title'         => $p->title,
+                'title'         => $this->proposalTitle($p),
                 'status'        => ucfirst($p->status),
                 'office'        => $p->office?->code ?? '—',
                 'fiscalYear'    => (string) $p->fiscal_year,
@@ -358,14 +372,14 @@ class PrismFinanceOfficeController extends Controller
             ->with(['budgetProposals.items', 'purchaseRequests'])
             ->get()
             ->flatMap(function ($office) use ($isUtilized) {
-                // Every proposal regardless of status — an office whose only
-                // PPMP is still 'returned' or 'submitted' can still have real,
-                // active spending Budget Office needs visibility into; filtering
-                // to endorsed/approved here used to drop those offices entirely.
-                $items = $office->budgetProposals->pluck('items')->flatten();
+                // Budget side: count only PPMP lines Budget Office has already
+                // accepted/budgeted. Utilization side still includes real PR
+                // movement so overspend or missing-budget cases stay visible.
+                $budgetLines = $office->budgetProposals
+                    ->flatMap(fn (BudgetProposal $proposal) => $this->budgetedPpmpLines($proposal));
 
                 $activePrs = $office->purchaseRequests->filter($isUtilized);
-                $quarters = $items->pluck('target_quarter')
+                $quarters = $budgetLines->pluck('quarter')
                     ->merge($activePrs->map(fn ($pr) => $pr->numberQuarter()))
                     ->filter()
                     ->unique()
@@ -373,11 +387,11 @@ class PrismFinanceOfficeController extends Controller
                     ->values();
                 if ($quarters->isEmpty()) $quarters = collect(['Q1', 'Q2', 'Q3', 'Q4']);
 
-                return $quarters->map(function ($quarter) use ($items, $activePrs, $office) {
+                return $quarters->map(function ($quarter) use ($budgetLines, $activePrs, $office) {
                     // Genuinely per-quarter now — was previously the office's
                     // whole-year total divided by 4 and repeated identically
                     // across all 4 rows regardless of $quarter.
-                    $budget   = (float) $items->where('target_quarter', $quarter)->sum('estimated_total_cost');
+                    $budget   = (float) $budgetLines->where('quarter', $quarter)->sum('budget');
                     $utilized = (float) $activePrs->filter(fn ($pr) => $pr->numberQuarter() === $quarter)->sum('total_amount');
                     $pct      = $budget > 0 ? min(100, round(($utilized / $budget) * 100)) : 0;
                     $risk     = $pct >= 70 ? 'On Track' : ($pct >= 40 ? 'Watch' : 'At Risk');
@@ -433,21 +447,48 @@ class PrismFinanceOfficeController extends Controller
     }
 
     /**
-     * Campus-wide spend by Schedule 9 category, across every office's PPMP
-     * items regardless of proposal status — the same fallback chain the
-     * Office Head dashboard's own category chart uses (`category` is free
-     * text and takes priority; `ppmp_category` is the Schedule 9 letter code,
-     * never actually written anywhere in the app, so it's really just a
-     * safety net before falling back to "General").
+     * Campus-wide budgeted spend by category. Uses the same "budgeted PPMP"
+     * line source as the office utilization table so the chart and table agree.
      */
     private function campusCategoryBreakdown(): array
     {
-        return BudgetProposalItem::whereHas('budgetProposal')
-            ->get(['category', 'ppmp_category', 'estimated_total_cost'])
-            ->groupBy(fn ($item) => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'))
-            ->map(fn ($group) => (float) $group->sum('estimated_total_cost'))
+        return BudgetProposal::with('items')
+            ->get()
+            ->flatMap(fn (BudgetProposal $proposal) => $this->budgetedPpmpLines($proposal))
+            ->groupBy('category')
+            ->map(fn ($group) => (float) $group->sum('budget'))
             ->sortDesc()
             ->all();
+    }
+
+    private function budgetedPpmpLines(BudgetProposal $proposal)
+    {
+        $proposalIsBudgeted = in_array($proposal->status, ['endorsed', 'approved'], true);
+        $items = $proposal->items
+            ->filter(fn (BudgetProposalItem $item) => $proposalIsBudgeted || $item->finance_ok === true)
+            ->values();
+
+        if ($items->isEmpty()) {
+            return collect();
+        }
+
+        $estimatedTotal = (float) $items->sum('estimated_total_cost');
+        $proposalApprovedBudget = $proposal->approved_budget !== null ? (float) $proposal->approved_budget : null;
+        $scale = $proposalApprovedBudget !== null && $estimatedTotal > 0
+            ? $proposalApprovedBudget / $estimatedTotal
+            : null;
+
+        return $items->map(function (BudgetProposalItem $item) use ($scale) {
+            $budget = $item->approved_budget !== null
+                ? (float) $item->approved_budget
+                : (float) $item->estimated_total_cost * ($scale ?? 1);
+
+            return [
+                'quarter'  => $item->target_quarter,
+                'budget'   => $budget,
+                'category' => $item->category ?: ($item->ppmpCategoryLabel() ?: 'General'),
+            ];
+        });
     }
 
     /** Budget vs utilized totals per office (summed across quarters), for the office bar chart. */

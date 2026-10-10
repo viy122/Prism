@@ -688,7 +688,7 @@ class PrismChancellorController extends Controller
                 'quantity'       => (int) $item->quantity,
                 'unit'           => $item->unit ?: '—',
                 'unitCost'       => (float) $item->estimated_unit_cost,
-                'sourceOfFund'   => $item->source_of_fund ?: '—',
+                'sourceOfFund'   => $item->source_of_fund ?: 'General Fund',
                 'classification' => $item->item_classification ?: '—',
                 'targetQuarter'  => $item->target_quarter ?: '—',
                 'justification'  => $item->remarks ?? '',
