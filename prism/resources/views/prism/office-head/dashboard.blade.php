@@ -314,6 +314,15 @@
 @endpush
 
 @section('content')
+        <script>
+        (() => { const u = new URL(location.href); if (!u.searchParams.has('year')) { u.searchParams.set('year', @json($selectedYear ?? 'all')); history.replaceState(null, '', u); } })();
+        </script>
+        @php
+            $selectedFiscalYear = $availableYears->firstWhere('year', $selectedYear);
+            $yearStatus = $selectedFiscalYear
+                ? (($selectedFiscalYear->is_active ? ' • Active' : '') . ($selectedFiscalYear->status === 'locked' ? ' • Locked' : ''))
+                : '';
+        @endphp
         <div class="dash">
 
             {{-- Page header card --}}
@@ -329,24 +338,24 @@
                             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                         </div>
                         <div class="pd-year-body">
-                            <span class="pd-year-label">Year</span>
-                            <span class="pd-year-value">{{ $selectedYear ? 'FY ' . $selectedYear : 'Overall' }}</span>
+                            <span class="pd-year-label">Fiscal Year</span>
+                            <span class="pd-year-value">{{ $selectedYear ? 'FY ' . $selectedYear . $yearStatus : 'Overall' }}</span>
                         </div>
                         <svg class="pd-year-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                         <form method="GET" action="{{ route('office-head.dashboard') }}">
                             <select name="year" id="pdYearSelect" onchange="this.form.submit()" aria-label="Filter dashboard by fiscal year">
                                 <option value="all" {{ is_null($selectedYear) ? 'selected' : '' }}>Overall</option>
-                                @foreach($availableYears as $y)
-                                    <option value="{{ $y }}" {{ $selectedYear === $y ? 'selected' : '' }}>FY {{ $y }}</option>
+                                @foreach($availableYears as $fy)
+                                    <option value="{{ $fy->year }}" @selected($selectedYear === $fy->year)>FY {{ $fy->year }}{{ $fy->is_active ? ' • Active' : '' }}{{ $fy->status === 'locked' ? ' • Locked' : '' }}</option>
                                 @endforeach
                             </select>
                         </form>
                     </div>
-                    <a href="{{ route('office-head.budget-proposal') }}" class="pd-btn-primary">
+                    <button type="button" data-create-ppmp class="pd-btn-primary">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                         New PPMP
-                    </a>
-                    <a href="{{ route('office-head.purchase-requests') }}" class="pd-btn-outline">
+                    </button>
+                    <a href="{{ route('office-head.purchase-requests', ['year' => $planningYear]) }}" class="pd-btn-outline">
                         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         View PRs
                     </a>

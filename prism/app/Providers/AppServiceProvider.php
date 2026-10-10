@@ -67,9 +67,17 @@ class AppServiceProvider extends ServiceProvider
         });
         \Illuminate\Support\Facades\View::composer('prism.partials.fiscal-year', function ($view) {
             $year = app(\App\Services\FiscalYearContext::class)->year;
-            $view->with('fyYears', \App\Models\FiscalYear::orderByDesc('year')->get());
+            $view->with('fyYears', \App\Models\FiscalYear::where(function ($q) use ($year) {
+                $q->where('year', '<=', now()->year);
+                if (request()->routeIs('office-head.budget-proposal*', 'office-head.market-scoping*')) $q->orWhere('year', $year);
+            })->orderByDesc('year')->get());
             $view->with('fySelected', $year);
             $view->with('fyLocked', \App\Models\FiscalYear::find($year)?->status === 'locked');
+        });
+        \Illuminate\Support\Facades\View::composer('prism.partials.create-ppmp-modal', function ($view) {
+            $view->with('planningYears', \App\Models\FiscalYear::where('status', 'open')
+                ->where('year', '<=', now()->year + 1)->orderByDesc('year')->get());
+            $view->with('defaultPlanningYear', app(\App\Services\FiscalYearContext::class)->year);
         });
         \Illuminate\Support\Facades\View::composer([
             'prism.procurement-office.purchase-order',

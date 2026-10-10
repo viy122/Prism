@@ -4,7 +4,13 @@
 @section('content')
 <main class="asset-page">
     <nav class="asset-actions" aria-label="Breadcrumb"><span>Office Assets</span><span aria-hidden="true">/</span><a class="asset-text-action" href="{{ $backUrl }}">Asset Register</a><span aria-hidden="true">/</span><span aria-current="page">{{ $asset->reference }}</span></nav>
-    <header class="asset-page-header"><div><p class="asset-eyebrow">Office assets · Equipment record</p><h1>{{ $asset->receipt?->item?->name }}</h1><p class="asset-subtitle">{{ $asset->reference }}</p></div><span class="asset-pill" data-status="{{ \App\Models\OfficeAsset::USAGE[$asset->usage_status] }}">{{ \App\Models\OfficeAsset::USAGE[$asset->usage_status] }}</span></header>
+    <header class="asset-page-header">
+        <div><p class="asset-eyebrow">Office assets · Equipment record</p><h1>{{ $asset->receipt?->item?->name }}</h1><p class="asset-subtitle">{{ $asset->reference }}</p></div>
+        <div class="asset-actions">
+            <span class="asset-pill" data-status="{{ \App\Models\OfficeAsset::USAGE[$asset->usage_status] }}">{{ \App\Models\OfficeAsset::USAGE[$asset->usage_status] }}</span>
+            <a class="asset-button" href="{{ $backUrl }}"><i class="ti ti-arrow-left" aria-hidden="true"></i> Back to Asset Register</a>
+        </div>
+    </header>
     @if(session('receiving_success'))<p class="receiving-message" role="status">{{ session('receiving_success') }}</p>@endif
     @if($errors->any())<div class="receiving-message error" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
     @php($canManageAsset = $assetService->canManage(auth()->user(), $asset->office_id))

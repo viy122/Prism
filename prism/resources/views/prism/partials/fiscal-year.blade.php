@@ -25,6 +25,8 @@
 window.addEventListener('DOMContentLoaded', () => {
     // Backend guards enforce the lock; disable the matching editing controls too.
     document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(form => {
+        // New drafts choose their own open planning year in the modal.
+        if (form.id === 'createPpmpForm') return;
         if (/budget-proposal|proposal-review|budget-approval|market-scoping|annual-procurement-plan/.test(form.action)) {
             form.querySelectorAll('button,input,select,textarea').forEach(el => el.disabled = true);
         }

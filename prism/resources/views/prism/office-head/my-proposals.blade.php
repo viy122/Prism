@@ -650,10 +650,10 @@
                     <p class="card-eyebrow">Overview</p>
                     <h2 class="card-title">PPMP Summary</h2>
                 </div>
-                <a class="btn-primary" href="{{ route('office-head.budget-proposal') }}">
+                <button type="button" class="btn-primary" data-create-ppmp>
                     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                     New PPMP
-                </a>
+                </button>
             </div>
 
             <div class="stats-bar">
@@ -776,7 +776,10 @@
                             <div class="proposal-row-head">
                                 <div class="min-w-0">
                                     <p class="proposal-row-title">{{ $proposal['title'] }}</p>
-                                    <p class="proposal-row-meta">FY {{ $proposal['fiscalYear'] }} &middot; Submitted {{ $proposal['dateSubmitted'] }}</p>
+                                    <p class="proposal-row-meta">FY {{ $proposal['fiscalYear'] }} @if((int) $proposal['fiscalYear'] > now()->year) &middot; Advance Planning @endif &middot; {{ $proposal['status'] === 'Draft' ? 'Saved' : 'Submitted' }} {{ $proposal['dateSubmitted'] }}</p>
+                                    @if($proposal['status'] === 'Draft')
+                                        <a href="{{ route('office-head.budget-proposal', ['proposal' => $proposal['proposalId'], 'year' => $proposal['fiscalYear']]) }}" onclick="event.stopPropagation()">Continue Draft</a>
+                                    @endif
                                 </div>
                                 <x-prism.status-badge :status="$proposal['status']" />
                             </div>

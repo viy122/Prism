@@ -6,9 +6,9 @@
 <title>{{ $proposalForm['code'] ?: 'PPMP' }} — {{ $pageTitle }}</title>
 <style>
     * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1C1010; background: #f0f0f0; margin: 0; padding: 24px; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1C1010; background: #f0f0f0; margin: 0; padding: 16px; }
 
-    .print-bar { max-width: 950px; margin: 0 auto 14px; display: flex; justify-content: flex-end; }
+    .print-bar { width: 100%; margin: 0 auto 14px; display: flex; justify-content: flex-end; }
     .print-btn {
         display: inline-flex; align-items: center; gap: 6px;
         height: 38px; padding: 0 16px; border-radius: 9px;
@@ -17,7 +17,7 @@
     }
     .print-btn:hover { background: #6B1315; }
 
-    .ppmp-doc { max-width: 950px; margin: 0 auto; border: 1px solid rgba(0,0,0,.06); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+    .ppmp-doc { width: 100%; margin: 0 auto; border: 1px solid rgba(0,0,0,.06); border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
 
     .ppmp-letterhead { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 16px 20px 10px; border-bottom: 2px solid #000; }
     .ppmp-letterhead-logo { width: 62px; height: 62px; object-fit: contain; flex-shrink: 0; }
@@ -36,10 +36,10 @@
     .ppmp-meta-row div { margin-bottom: 3px; color: #6B4F50; }
     .ppmp-meta-row div:last-child { margin-bottom: 0; }
 
-    .table-scroll { overflow-x: auto; }
-    .ppmp-preview-table { width: 100%; min-width: 1320px; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
+    .table-scroll { width: 100%; }
+    .ppmp-preview-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: clamp(8px, .85vw, 12px); }
     .ppmp-preview-table thead tr:first-child th { text-align: center; }
-    .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid rgba(0,0,0,.06); padding: 10px 8px; font-size: 11px; line-height: 1.45; font-weight: 700; text-transform: none; letter-spacing: normal; color: #1C1010; text-align: left; vertical-align: middle; white-space: normal; overflow-wrap: break-word; }
+    .ppmp-preview-table thead th { background: #f8fafc; border-bottom: 1px solid rgba(0,0,0,.06); padding: 10px 6px; font-size: clamp(8px, .8vw, 11px); line-height: 1.45; font-weight: 700; text-transform: none; letter-spacing: normal; color: #1C1010; text-align: left; vertical-align: middle; white-space: normal; overflow-wrap: anywhere; }
     .ppmp-preview-table .ppmp-header-detail { display: block; margin-top: 4px; font-size: .95em; font-weight: 400; color: #4b5563; }
     .ppmp-preview-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #6B4F50; overflow-wrap: anywhere; }
     .ppmp-col-number-row th { background: #fff !important; font-size: 9px !important; font-weight: 600 !important; text-transform: none !important; color: #A88B8C !important; text-align: center !important; white-space: nowrap; border-top: 1px solid rgba(0,0,0,.06); }
@@ -51,6 +51,16 @@
     .ppmp-signoff-name { font-size: 13px; font-weight: 800; text-align: center; text-decoration: underline; text-underline-offset: 3px; color: #1C1010; }
     .ppmp-signoff-title { font-size: 11px; text-align: center; color: #A88B8C; margin-top: 2px; min-height: 14px; }
     .ppmp-signoff-date { font-size: 11px; text-align: center; color: #A88B8C; margin-top: 12px; }
+
+    @media screen and (max-width: 800px) {
+        body { padding: 8px; }
+        .ppmp-preview-table th, .ppmp-preview-table tbody td { padding: 6px 3px; }
+        .ppmp-col-number-row th { white-space: normal; overflow-wrap: anywhere; }
+        .ppmp-letterhead { padding: 12px 8px; gap: 8px; }
+        .ppmp-letterhead-text { min-width: 0; overflow-wrap: anywhere; }
+        .ppmp-signoff { gap: 8px; padding: 20px 10px; }
+        .ppmp-signoff > div { min-width: 0; overflow-wrap: anywhere; }
+    }
 
     @media print {
         @page { size: landscape; margin: 10mm; }

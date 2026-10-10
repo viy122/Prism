@@ -374,7 +374,7 @@
             $currentFy = $proposalForm['fiscalYear'] ?? now()->year;
             $readOnlyBannerText = match($proposalStatus) {
                 'endorsed' => ['PPMP Endorsed — With the Chancellor', 'This PPMP has been endorsed by the Budget Office and forwarded to the Chancellor for approval. Editing is disabled.'],
-                'approved' => ['PPMP Approved', "FY{$currentFy} PPMP is approved. Ready to begin FY" . ($currentFy + 1) . " budget planning, or add a supplemental PPMP for FY{$currentFy}?"],
+                'approved' => ['PPMP Approved', "FY{$currentFy} PPMP is approved. Add a supplemental PPMP for this fiscal year, or use New PPMP to prepare a draft for another planning year."],
                 'returned' => ['PPMP Returned — With Budget Office', 'This PPMP was returned by the Chancellor and is being reconsidered by the Budget Office. Editing is disabled.'],
                 default    => ['PPMP Submitted — Under Review', 'This PPMP has been submitted and is awaiting Budget Office review. Editing is disabled.'],
             };
@@ -386,8 +386,8 @@
                 <p class="submitted-banner-sub">{{ $readOnlyBannerText[1] }}</p>
             </div>
             @if($proposalStatus === 'approved')
-            <a href="{{ route('office-head.budget-proposal.new') }}" class="btn-primary" style="flex:none;">
-                <i class="ti ti-file-plus"></i> Create New PPMP
+            <a href="{{ route('office-head.budget-proposal.new-supplemental', ['proposal' => $selectedProposalId, 'year' => $currentFy]) }}" class="btn-primary" style="flex:none;">
+                <i class="ti ti-file-plus"></i> Add Supplemental PPMP
             </a>
             @endif
         </div>
@@ -424,9 +424,9 @@
             <div class="empty-state">
                 <i class="ti ti-file-plus"></i>
                 <p>No active PPMP yet for this office. Start one when you're ready — it stays a draft until you submit it.</p>
-                <a href="{{ route('office-head.budget-proposal.new') }}" class="btn-primary" style="margin-top:6px;">
+                <button type="button" data-create-ppmp class="btn-primary" style="margin-top:6px;">
                     <i class="ti ti-file-plus"></i> Create New PPMP
-                </a>
+                </button>
             </div>
         </div>
         @else
@@ -447,9 +447,9 @@
                         @if($needsRevisionCount > 0)
                             <span class="badge badge-red" style="margin-left:6px;">{{ $needsRevisionCount }} item(s) need revision</span>
                         @endif
-                        <a href="{{ route('office-head.budget-proposal.new-supplemental', ['proposal' => $selectedProposalId]) }}" class="btn-outline" style="margin-left:8px;white-space:nowrap;" title="Start another PPMP for FY{{ $proposalForm['fiscalYear'] }}, side by side with this one">
-                            <i class="ti ti-plus"></i> Create New PPMP
-                        </a>
+                        <button type="button" data-create-ppmp class="btn-outline" style="margin-left:8px;white-space:nowrap;">
+                            <i class="ti ti-plus"></i> New PPMP
+                        </button>
                     </div>
                     <div class="card-body">
                         <div class="field-group" style="margin-bottom:14px;">

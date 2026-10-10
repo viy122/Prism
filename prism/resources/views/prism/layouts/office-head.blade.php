@@ -309,7 +309,9 @@
         </div>
     </div>
 
-    @include('prism.partials.fiscal-year')
+    @unless(request()->routeIs('office-head.dashboard'))
+        @include('prism.partials.fiscal-year')
+    @endunless
     @yield('content')
 
 </div>{{-- /main --}}
@@ -357,6 +359,7 @@
 </script>
 
 <x-prism.confirm-modal />
+@include('prism.partials.create-ppmp-modal')
 <div class="pr-toast" id="globalToast"></div>
 
 @stack('scripts')

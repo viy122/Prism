@@ -9,17 +9,37 @@
         @if($assetPageRole === 'office-head')<a class="asset-button" href="{{ route('office-head.office-assets.received') }}"><i class="ti ti-receipt" aria-hidden="true"></i> Received Items</a>@endif
     </header>
     @if($assetPageRole !== 'office-head')
-        <nav class="asset-tabs" aria-label="Report views">
-            <a href="{{ route($assetPageRole.'.'.($assetPageRole === 'vice-chancellor' ? 'division-procurement-status' : 'procurement-reports')) }}">Procurement Reports</a>
-            <a href="{{ route($assetPageRole.'.office-assets') }}" aria-current="page">Allocation &amp; Warranty</a>
-        </nav>
         <p class="receiving-note">Current asset monitoring. Finalized procurement report snapshots remain unchanged.</p>
     @endif
     @if(session('receiving_success'))<p class="receiving-message" role="status">{{ session('receiving_success') }}</p>@endif
     @if($errors->any())<div class="receiving-message error" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
     @php($assetStatIcons = ['Registered Units' => 'devices', 'Unassigned' => 'user-question', 'In Use' => 'circle-check', 'Under Repair' => 'tool', 'Warranty Expiring Soon' => 'shield-exclamation'])
     <div class="asset-summary" aria-label="Equipment summary">
-        @foreach($summary as $label => $count)<div class="asset-stat"><span class="asset-stat-icon"><i class="ti ti-{{ $assetStatIcons[$label] }}" aria-hidden="true"></i></span><span class="asset-stat-label">{{ $label }}</span><strong>{{ number_format($count) }}</strong><span class="asset-stat-hint">{{ $label === 'Warranty Expiring Soon' ? 'Within the next 30 days' : 'Matching current filters' }}</span></div>@endforeach
+        @foreach($summary as $label => $count)
+        <div class="asset-stat-wrap">
+            <button type="button" class="asset-stat" aria-label="View {{ $label }} breakdown" aria-expanded="false" aria-controls="assetKpi{{ $loop->index }}">
+                <span class="asset-stat-icon"><i class="ti ti-{{ $assetStatIcons[$label] }}" aria-hidden="true"></i></span><span class="asset-stat-label">{{ $label }}</span><strong>{{ number_format($count) }}</strong><span class="asset-stat-hint">{{ $label === 'Warranty Expiring Soon' ? 'Within the next 30 days' : 'Matching current filters' }}</span>
+            </button>
+            <section class="asset-kpi-popover" id="assetKpi{{ $loop->index }}" aria-label="{{ $label }} breakdown" hidden>
+                <p class="asset-eyebrow">Equipment breakdown</p><h3>{{ $label }}</h3>
+                <p class="asset-kpi-lead">{{ number_format($count) }} units matching current filters. Each record below represents one registered unit.</p>
+                <div class="asset-kpi-rows">
+                @forelse($summaryDetails[$label] as $unit)
+                    <a class="asset-kpi-row" href="{{ route('office-assets.show', $unit['id']) }}">
+                        <span class="asset-kpi-name">{{ $unit['item'] }}</span>
+                        <span>{{ $unit['reference'] }}</span>
+                        <span>{{ $unit['office'] }} · FY {{ $unit['year'] }} · {{ $unit['source'] }}</span>
+                        <span>{{ $unit['location'] }} · {{ $unit['person'] }}</span>
+                        @if($label === 'Warranty Expiring Soon')<span>Warranty expires {{ $unit['warranty'] }}</span>@endif
+                    </a>
+                @empty
+                    <p class="asset-kpi-empty">No units match this category and the current filters.</p>
+                @endforelse
+                </div>
+                @if($count > count($summaryDetails[$label]))<p class="asset-kpi-lead">Showing the latest {{ count($summaryDetails[$label]) }} of {{ number_format($count) }} units. Use the equipment register below for the full list.</p>@endif
+            </section>
+        </div>
+        @endforeach
     </div>
     <section class="asset-card asset-filter-card" aria-labelledby="assetFilterTitle">
     <div class="asset-card-head"><div><p class="asset-eyebrow">Find equipment</p><h2 id="assetFilterTitle">Search &amp; filters</h2></div><a class="asset-text-action" href="{{ route($assetPageRole.'.office-assets') }}"><i class="ti ti-refresh" aria-hidden="true"></i> Reset filters</a></div>
@@ -76,6 +96,25 @@
 @endsection
 @push('scripts')
 <script>
+document.querySelectorAll('.asset-stat-wrap').forEach(wrap => {
+    const button = wrap.querySelector('.asset-stat'), panel = wrap.querySelector('.asset-kpi-popover');
+    let pinned = false;
+    const show = () => {
+        panel.hidden = false; button.setAttribute('aria-expanded', 'true');
+        if (window.innerWidth > 600) {
+            panel.style.maxHeight = Math.max(100, window.innerHeight - panel.getBoundingClientRect().top - 16) + 'px';
+            panel.style.overflowY = 'auto';
+        }
+    };
+    const hide = () => { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    wrap.addEventListener('mouseenter', show);
+    wrap.addEventListener('mouseleave', () => { if (!pinned && !wrap.contains(document.activeElement)) hide(); });
+    wrap.addEventListener('focusin', show);
+    wrap.addEventListener('focusout', event => { if (!wrap.contains(event.relatedTarget)) { pinned = false; hide(); } });
+    button.addEventListener('click', () => { pinned = !pinned; pinned ? show() : hide(); });
+    wrap.addEventListener('keydown', event => { if (event.key === 'Escape') { pinned = false; hide(); button.focus(); } });
+    document.addEventListener('click', event => { if (!wrap.contains(event.target)) { pinned = false; hide(); } });
+});
 document.addEventListener('change', event => {
     if (!event.target.matches('[data-asset-select]')) return;
     const selected = [...document.querySelectorAll('[data-asset-select]:checked')];

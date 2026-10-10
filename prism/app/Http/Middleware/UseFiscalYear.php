@@ -23,13 +23,23 @@ class UseFiscalYear
             $fallback = $query['year'] ?? $fallback;
         }
         $raw = $request->query('year', $request->query('fy', $fallback));
+        if ($request->routeIs('office-head.budget-proposal.create-draft')) {
+            $request->validate(['planning_year' => ['required', 'integer', 'exists:fiscal_years,year', 'max:'.(now()->year + 1)]]);
+            $raw = $request->input('planning_year');
+        }
+        $overallDashboard = $request->isMethod('GET')
+            && $request->routeIs('office-head.dashboard') && $raw === 'all';
         if ($raw === null || $raw === 'all') {
             $raw = FiscalYear::where('is_active', true)->value('year') ?? now()->year;
+        }
+        if ($request->routeIs('office-head.dashboard', 'office-head.my-proposals') && (int) $raw > now()->year) {
+            $raw = FiscalYear::where('year', '<=', now()->year)->where('is_active', true)->value('year')
+                ?? FiscalYear::where('year', '<=', now()->year)->max('year');
         }
         abort_unless(filter_var($raw, FILTER_VALIDATE_INT) && FiscalYear::find($raw), 422, 'Select a registered fiscal year.');
         $context->year = (int) $raw;
         $request->session()->put('fiscal_year', $context->year);
-        $request->query->set('year', $context->year);
+        $request->query->set('year', $overallDashboard ? 'all' : $context->year);
 
         $name = (string) $request->route()?->getName();
         // Task queues and their supporting lookups must include pending older years.
@@ -38,7 +48,8 @@ class UseFiscalYear
             || str_starts_with($name, 'bac.') || str_starts_with($name, 'notifications.')
             || str_starts_with($name, 'profile.') || str_starts_with($name, 'fiscal-years.')
             || str_starts_with($name, 'admin.') || str_contains($name, 'office-assets');
-        $context->filterReads = $request->isMethod('GET') && !$queue;
+        $context->filterReads = $request->isMethod('GET') && !$queue && !$overallDashboard
+            && !$request->routeIs('office-head.my-proposals');
         $planning = str_contains($name, 'budget-proposal') || str_contains($name, 'proposal-review')
             || str_contains($name, 'budget-approval') || str_contains($name, 'annual-procurement-plan')
             || str_contains($name, 'market-scoping');

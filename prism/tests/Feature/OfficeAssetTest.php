@@ -58,10 +58,32 @@ class OfficeAssetTest extends TestCase
         return $overrides + ['section' => 'allocation', 'allocation' => 'assigned', 'location' => "Dean's Office", 'accountable_person' => 'Employee A', 'assigned_on' => '2026-09-19', 'usage_status' => 'in_use', 'usage_started_on' => '2026-09-20'];
     }
 
+    public function test_kpi_breakdowns_follow_category_and_current_filters(): void
+    {
+        $this->register(3);
+        $units = OfficeAsset::orderBy('id')->get();
+        $units[0]->update(['usage_status' => 'in_use', 'assigned_on' => '2026-09-19', 'location' => 'Lab A', 'accountable_person' => 'Employee A']);
+        $units[1]->update(['usage_status' => 'under_repair', 'warranty_coverage' => 'covered', 'warranty_start' => '2026-09-18', 'warranty_end' => '2026-10-20']);
+        $response = $this->get('/office-head/office-assets')->assertOk()->assertSee('View Registered Units breakdown');
+        $details = $response->viewData('summaryDetails');
+        $this->assertCount(3, $details['Registered Units']);
+        $this->assertCount(2, $details['Unassigned']);
+        $this->assertSame($units[0]->id, $details['In Use'][0]['id']);
+        $this->assertSame('PR-ASSET-2026', $details['In Use'][0]['source']);
+        $this->assertSame('Lab A', $details['In Use'][0]['location']);
+        $this->assertSame($units[1]->id, $details['Under Repair'][0]['id']);
+        $this->assertSame($units[1]->id, $details['Warranty Expiring Soon'][0]['id']);
+        $response = $this->get('/office-head/office-assets?usage=in_use')->assertOk();
+        $this->assertCount(1, $response->viewData('summaryDetails')['Registered Units']);
+        $this->assertSame([], $response->viewData('summaryDetails')['Under Repair']);
+        $this->get('/office-head/office-assets?search=no-match')->assertOk()
+            ->assertViewHas('summaryDetails', fn ($groups) => collect($groups)->every(fn ($rows) => $rows === []));
+    }
+
     public function test_office_assets_lists_received_items_before_registration_and_tracks_remaining_units(): void
     {
         $url = '/office-head/office-assets/received-items?year=2027';
-        $response = $this->get($url)->assertOk()->assertSee('Received items ready for allocation')
+        $response = $this->get($url)->assertOk()->assertSee('Received items ready for registration')
             ->assertSee('Asset Test Laptop')->assertSee('data-ready-receipt="'.$this->receipt->id.'"', false);
         $this->assertEquals(3, $response->viewData('readyUnitCount'));
         $this->assertDatabaseCount('office_assets', 0);
@@ -93,7 +115,7 @@ class OfficeAssetTest extends TestCase
         $this->assertEquals(0, $this->get('/office-head/office-assets/received-items')->viewData('readyUnitCount'));
         $this->actingAs($this->user('Procurement Office'));
         $this->get('/office-head/office-assets/received-items')->assertRedirect(route('procurement-office.dashboard'));
-        $this->get('/procurement-office/office-assets')->assertOk()->assertDontSee('Received items ready for allocation');
+        $this->get('/procurement-office/office-assets')->assertOk()->assertDontSee('Received items ready for registration');
     }
 
     public function test_new_registration_filter_and_detail_navigation_stay_in_asset_register(): void

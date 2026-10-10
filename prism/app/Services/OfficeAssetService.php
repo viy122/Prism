@@ -55,18 +55,29 @@ class OfficeAssetService
                 && (!$request->filled('item') || (int) $asset->receipt?->purchase_request_item_id === (int) $request->query('item'))
                 && (!$request->filled('registration') || $asset->registration_token === $request->query('registration'));
         });
-        $summary = [
-            'Registered Units' => $assets->count(), 'Unassigned' => $assets->whereNull('assigned_on')->count(),
-            'In Use' => $assets->where('usage_status', 'in_use')->count(), 'Under Repair' => $assets->where('usage_status', 'under_repair')->count(),
-            'Warranty Expiring Soon' => $assets->filter(fn ($a) => $a->warrantyStatus() === 'Expiring Soon')->count(),
+        $groups = [
+            'Registered Units' => $assets, 'Unassigned' => $assets->whereNull('assigned_on'),
+            'In Use' => $assets->where('usage_status', 'in_use'), 'Under Repair' => $assets->where('usage_status', 'under_repair'),
+            'Warranty Expiring Soon' => $assets->filter(fn ($a) => $a->warrantyStatus() === 'Expiring Soon'),
         ];
+        $summary = collect($groups)->map(fn ($units) => $units->count())->all();
+        $summaryDetails = collect($groups)->map(fn ($units) => $units->take(12)->values()->map(fn ($asset) => [
+            'id' => $asset->id, 'reference' => $asset->reference,
+            'item' => $asset->receipt?->item?->name ?? 'Equipment',
+            'office' => $asset->office?->code ?? 'No office',
+            'year' => $asset->receipt?->item?->purchaseRequest?->fiscal_year,
+            'source' => $asset->receipt?->item?->purchaseRequest?->number ?? 'No PR reference',
+            'location' => $asset->location ?: 'Unassigned',
+            'person' => $asset->accountable_person ?: 'No accountable person',
+            'warranty' => $asset->warranty_end?->toDateString(),
+        ])->all())->all();
         $perPage = 25;
         $page = max(1, (int) $request->query('page', 1));
         $assets = new \Illuminate\Pagination\LengthAwarePaginator($assets->forPage($page, $perPage)->values(), $assets->count(), $perPage, $page, ['path' => $request->url(), 'query' => $request->query()]);
         $incoming = OfficeAssetTransfer::with(['asset.receipt.item', 'fromOffice', 'toOffice'])
             ->where('status', 'pending')->where('to_office_id', $request->user()->office_id)
             ->when(!$this->canManage($request->user(), (int) $request->user()->office_id), fn ($q) => $q->whereRaw('1 = 0'))->get();
-        return compact('assets', 'summary', 'offices', 'years', 'incoming') + ['assetService' => $this];
+        return compact('assets', 'summary', 'summaryDetails', 'offices', 'years', 'incoming') + ['assetService' => $this];
     }
 
     public function receivedPageData(Request $request): array

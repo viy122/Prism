@@ -10,8 +10,8 @@
     @if(session('receiving_success'))<p class="receiving-message" role="status">{{ session('receiving_success') }}</p>@endif
     @if($errors->any())<div class="receiving-message error" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
     <section class="asset-card" id="received-items" aria-labelledby="receivedItemsTitle">
-        <div class="asset-card-head"><div><p class="asset-eyebrow">Receiving &amp; registration</p><h2 id="receivedItemsTitle">Received items ready for allocation</h2>
-        <p class="receiving-note">Register received equipment here, then assign its location and accountable person in Asset Register.</p></div><span class="asset-count"><i class="ti ti-package" aria-hidden="true"></i> {{ $readyUnitCount }} received units</span></div>
+        <div class="asset-card-head"><div><p class="asset-eyebrow">Receiving &amp; registration</p><h2 id="receivedItemsTitle">Received items ready for registration</h2>
+        <p class="receiving-note">Register received equipment here, then assign its location and accountable person in Asset Register.</p></div><span class="asset-count"><i class="ti ti-package" aria-hidden="true"></i> {{ $readyUnitCount }} units ready to register</span></div>
         <div class="receiving-scroll"><table class="receiving-table"><thead><tr><th>Received item</th><th>PR / PO / FY</th><th>Arrival</th><th>Received</th><th>Already registered</th><th>Ready to register</th><th>Next step</th></tr></thead><tbody>
         @forelse($readyReceipts as $readyReceipt)
             @php($remainingUnits = (int) $readyReceipt->quantity - $readyReceipt->office_assets_count)
@@ -25,7 +25,10 @@
                         <input type="hidden" name="submission_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                         <label>Equipment units<input type="number" name="quantity" min="1" max="{{ min(500, $remainingUnits) }}" value="{{ min(500, $remainingUnits) }}" required></label>
                         <label><span><input style="width:auto" type="checkbox" name="equipment_confirmed" value="1" required> These are individual equipment units, not consumables.</span></label>
-                        <button type="submit">Register units</button>
+                        <div class="asset-registration-actions">
+                            <button type="button" class="asset-registration-cancel" onclick="const panel=this.closest('details');this.form.reset();panel.open=false;panel.querySelector('summary').focus();">Cancel</button>
+                            <button type="submit">Register units</button>
+                        </div>
                         <p class="receiving-note receiving-wide">After registration, you will go to Asset Register to assign these units and record warranty coverage.</p>
                     </form>
                 </details></td>

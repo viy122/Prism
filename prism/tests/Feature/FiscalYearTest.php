@@ -129,8 +129,70 @@ class FiscalYearTest extends TestCase
     {
         $this->proposal(2026);
         foreach (['office-head', 'office-head/budget-proposal', 'office-head/my-proposals', 'finance-office', 'finance-office/proposal-review', 'finance-office/budget-utilization-report', 'procurement-office', 'procurement-office/annual-procurement-plan', 'chancellor', 'chancellor/procurement-reports', 'vice-chancellor', 'vice-chancellor/division-performance-report'] as $path) {
-            $this->get('/'.$path.'?year=2026')->assertOk()->assertSee('globalFiscalYear');
+            $this->get('/'.$path.'?year=2026')->assertOk()->assertSee($path === 'office-head' ? 'pdYearSelect' : 'globalFiscalYear');
         }
+    }
+
+    public function test_dashboard_has_one_picker_and_overall_combines_years(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::create(2027, 10, 10));
+        $this->proposal(2026);
+        $this->proposal(2027);
+        FiscalYear::query()->update(['is_active' => false]);
+        FiscalYear::find(2027)->update(['is_active' => true]);
+        FiscalYear::find(2026)->update(['status' => 'locked']);
+        FiscalYear::create(['year' => 2028]);
+
+        $response = $this->get('/office-head?year=2026')->assertOk()
+            ->assertSee('pdYearSelect')->assertDontSee('globalFiscalYear')
+            ->assertSee('FY 2026 • Locked')->assertSee('FY 2027 • Active')
+            ->assertSee('planningFiscalYear')
+            ->assertSee(route('office-head.purchase-requests', ['year' => 2026]), false);
+        $this->assertSame([2027, 2026], $response->viewData('availableYears')->pluck('year')->all());
+        $this->assertSame(1, $response->viewData('summary')['totalProposedItems']);
+        $this->assertSame(2026, $response->viewData('selectedYear'));
+        $this->get('/office-head/budget-proposal')->assertOk()->assertSee('globalFiscalYear')
+            ->assertViewHas('proposalForm', fn ($form) => $form['fiscalYear'] === 2026);
+
+        $response = $this->get('/office-head?year=all')->assertOk();
+        $this->assertNull($response->viewData('selectedYear'));
+        $this->assertSame(2, $response->viewData('summary')['totalProposedItems']);
+        $this->assertEquals(200, $response->viewData('summary')['totalProposedBudget']);
+        $this->assertSame(2027, $response->viewData('planningYear'));
+        $this->get('/office-head/budget-proposal')->assertOk()
+            ->assertViewHas('proposalForm', fn ($form) => $form['fiscalYear'] === 2027);
+    }
+
+    public function test_advance_planning_draft_is_reachable_without_changing_current_year(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::create(2026, 10, 10));
+        FiscalYear::query()->update(['is_active' => false]);
+        FiscalYear::find(2026)->update(['is_active' => true]);
+        $old = $this->proposal(2026);
+        $response = $this->post('/office-head/budget-proposal/new', ['planning_year' => 2027])->assertRedirect();
+        $draft = BudgetProposal::where('office_id', $this->office->id)->where('fiscal_year', 2027)->firstOrFail();
+        $this->assertSame('draft', $draft->status);
+        $this->get($response->headers->get('Location'))->assertOk()
+            ->assertViewHas('selectedProposalId', $draft->id)
+            ->assertViewHas('isReadOnly', false);
+        $this->get('/office-head')->assertOk()->assertViewHas('selectedYear', 2026);
+        $this->assertSame(2026, $old->fresh()->fiscal_year);
+        $this->assertTrue(FiscalYear::find(2026)->is_active);
+        $response = $this->get('/office-head/my-proposals?year=2026')->assertOk()
+            ->assertSee('Advance Planning')->assertSee('Continue Draft')
+            ->assertSee(route('office-head.budget-proposal', ['proposal' => $draft->id, 'year' => 2027]));
+        $this->assertCount(2, $response->viewData('proposals'));
+        $response = $this->get('/office-head?year=2026')->assertOk();
+        $this->assertSame(1, $response->viewData('summary')['totalProposedItems']);
+        $this->assertNotContains(2027, $response->viewData('availableYears')->pluck('year'));
+        $this->get('/office-head/budget-proposal?year=2026&proposal='.$old->id)->assertOk()->assertSee('Add Supplemental PPMP');
+
+        FiscalYear::find(2027)->update(['status' => 'locked']);
+        $this->post('/office-head/budget-proposal/new', ['planning_year' => 2027])->assertSessionHasErrors('fiscal_year');
+        FiscalYear::create(['year' => 2028]);
+        $this->post('/office-head/budget-proposal/new', ['planning_year' => 2028])->assertSessionHasErrors('planning_year');
+        $this->post('/office-head/budget-proposal/new', ['planning_year' => 9999])->assertSessionHasErrors('planning_year');
+        $this->assertDatabaseCount('budget_proposals', 2);
     }
 
     public function test_new_planning_uses_selected_year_without_changing_prior_records(): void

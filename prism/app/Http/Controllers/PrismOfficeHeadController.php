@@ -103,16 +103,7 @@ class PrismOfficeHeadController extends Controller
         // is the sentinel for that throughout the helpers below, rather than
         // defaulting to the current year, so the KPIs actually reflect the
         // office's full history until a specific year is chosen.
-        $availableYears = BudgetProposal::where('office_id', $officeId)
-            ->whereNotNull('fiscal_year')
-            ->distinct()
-            ->orderByDesc('fiscal_year')
-            ->pluck('fiscal_year')
-            ->all();
-        if (!in_array(now()->year, $availableYears, true)) {
-            $availableYears[] = now()->year;
-            rsort($availableYears);
-        }
+        $availableYears = \App\Models\FiscalYear::where('year', '<=', now()->year)->orderByDesc('year')->get();
 
         $selectedYear = ($request->filled('year') && $request->query('year') !== 'all')
             ? (int) $request->query('year')
@@ -155,6 +146,7 @@ class PrismOfficeHeadController extends Controller
             'recentActivity' => $recentActivity,
             'availableYears' => $availableYears,
             'selectedYear'   => $selectedYear,
+            'planningYear'   => app(\App\Services\FiscalYearContext::class)->year,
         ]));
     }
 
@@ -620,15 +612,17 @@ class PrismOfficeHeadController extends Controller
      * lands on the new draft explicitly (?proposal=) so it isn't ambiguous
      * with whatever the session happened to remember.
      */
-    public function createNewProposal(): RedirectResponse
+    public function createNewProposal(Request $request): RedirectResponse
     {
         $officeId = $this->officeId();
         $nextYear = app(\App\Services\FiscalYearContext::class)->year ?? now()->year;
 
-        $proposal = BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
-            ?? $this->createDraftProposal($officeId, $nextYear);
+        $proposal = $request->isMethod('POST')
+            ? $this->createDraftProposal($officeId, $nextYear)
+            : (BudgetProposal::where('office_id', $officeId)->where('fiscal_year', $nextYear)->first()
+                ?? $this->createDraftProposal($officeId, $nextYear));
 
-        return redirect()->route('office-head.budget-proposal', ['proposal' => $proposal->id]);
+        return redirect()->route('office-head.budget-proposal', ['proposal' => $proposal->id, 'year' => $nextYear]);
     }
 
     /**
@@ -826,6 +820,8 @@ class PrismOfficeHeadController extends Controller
     {
         $proposals = BudgetProposal::with('reviews')
             ->where('office_id', $this->officeId())
+            ->where(fn ($q) => $q->where('fiscal_year', app(\App\Services\FiscalYearContext::class)->year)
+                ->orWhere('fiscal_year', '>', now()->year))
             ->latest()
             ->get()
             // Returned PPMPs need action, so they surface first regardless of date —
@@ -874,6 +870,8 @@ class PrismOfficeHeadController extends Controller
             'pageTitle'   => 'My PPMPs',
             'statuses'    => ['Draft', 'Submitted', 'Under Review', 'Endorsed', 'Returned', 'Approved'],
             'fiscalYears' => BudgetProposal::where('office_id', $this->officeId())
+                                ->where(fn ($q) => $q->where('fiscal_year', app(\App\Services\FiscalYearContext::class)->year)
+                                    ->orWhere('fiscal_year', '>', now()->year))
                                 ->distinct()->orderByDesc('fiscal_year')
                                 ->pluck('fiscal_year')->map(fn ($y) => (string) $y)->all(),
             'proposals'   => $proposals,

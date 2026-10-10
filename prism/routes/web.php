@@ -65,6 +65,7 @@ Route::middleware(['auth', 'no-cache', \App\Http\Middleware\UseFiscalYear::class
         Route::get('/', 'dashboard')->name('dashboard');
         Route::get('/budget-proposal', 'budgetProposal')->name('budget-proposal');
         Route::get('/budget-proposal/new', 'createNewProposal')->name('budget-proposal.new');
+        Route::post('/budget-proposal/new', 'createNewProposal')->name('budget-proposal.create-draft');
         Route::get('/budget-proposal/new-supplemental', 'createSupplementalProposal')->name('budget-proposal.new-supplemental');
         Route::post('/budget-proposal/item', 'storeItem')->name('budget-proposal.store-item');
         Route::put('/budget-proposal/item/{item}', 'updateItem')->name('budget-proposal.update-item');
